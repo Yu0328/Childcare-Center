@@ -1,0 +1,226 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { clearAllData, addChild } from '../src/storage/db.js';
+import { renderChildListView } from '../src/ui/childListView.js';
+import { generateDocxBlob } from '../src/export/docxExport.js';
+import { generateParentReportDocxBlob } from '../src/export/parentReportDocxExport.js';
+import { getIndicatorsForTier } from '../src/data/indicators.js';
+import { waitFor } from './helpers.js';
+
+function selectFile(input, file) {
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  input.dispatchEvent(new Event('change'));
+}
+
+async function buildSampleDocxFile() {
+  const indicators = getIndicatorsForTier('Ⅳ');
+  return generateDocxBlob({
+    child: { name: '陳小安', birthDate: '2024-11-01' },
+    form: { tier: 'Ⅳ', period: '115年01月' },
+    indicators,
+    entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' }],
+  });
+}
+
+async function buildSampleParentReportDocxFile() {
+  const blob = await generateParentReportDocxBlob({
+    child: { name: '陳小安', birthDate: '2024-06-20' },
+    report: { tier: 'Ⅴ', period: '115年06月' },
+    coursePlanEntries: [{ id: 1, reportId: 1, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' }],
+    courseOccurrencesByEntryId: {},
+    developmentRecordEntries: [],
+    behaviorObservations: [],
+    highlightEntries: [],
+  });
+  return new File([blob], '陳小安-115年06月適性紀錄(家長版).docx', {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+}
+
+describe('renderChildListView', () => {
+  beforeEach(async () => {
+    await clearAllData();
+  });
+
+  it('renders existing children', async () => {
+    await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    expect(container.textContent).toContain('陳小安');
+  });
+
+  it('adds a new child via the form and re-renders the list', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    container.querySelector('[data-field="name"]').value = '林小晴';
+    container.querySelector('[data-field="birthDate"]').value = '2024-07-19';
+    container.querySelector('[data-action="add-child"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.textContent.includes('林小晴'));
+
+    expect(container.textContent).toContain('林小晴');
+  });
+
+  it('calls onSelectChild with the clicked child', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    let selected = null;
+    await renderChildListView(container, { onSelectChild: c => { selected = c; } });
+
+    container.querySelector(`[data-child-id="${child.id}"]`).click();
+
+    expect(selected).toEqual(child);
+  });
+
+  it('shows error message when addChild fails and preserves form input', async () => {
+    // Mock the addChild import in childListView
+    const dbModule = await import('../src/storage/db.js');
+    const originalAddChild = dbModule.addChild;
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    // Mock addChild to reject on the next call
+    vi.spyOn(dbModule, 'addChild').mockRejectedValueOnce(new Error('Database error'));
+
+    container.querySelector('[data-field="name"]').value = '失敗測試';
+    container.querySelector('[data-field="birthDate"]').value = '2024-07-19';
+    container.querySelector('[data-action="add-child"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.textContent.includes('新增失敗，請再試一次'));
+
+    // Error message should appear
+    expect(container.textContent).toContain('新增失敗，請再試一次');
+
+    // Form inputs should still have values (not cleared)
+    expect(container.querySelector('[data-field="name"]').value).toBe('失敗測試');
+    expect(container.querySelector('[data-field="birthDate"]').value).toBe('2024-07-19');
+
+    // Restore original function
+    vi.restoreAllMocks();
+  });
+  it('opens the import preview after selecting a valid Word file', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    const file = await buildSampleDocxFile();
+    selectFile(container.querySelector('[data-field="import-file"]'), file);
+
+    await waitFor(() => container.textContent.includes('確認匯入內容'));
+    expect(container.querySelector('[data-field="name"]').value).toBe('陳小安');
+  });
+
+  it('shows an error and stays on the child list when the selected file cannot be read', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    const badFile = new Blob(['not a docx file'], { type: 'text/plain' });
+    selectFile(container.querySelector('[data-field="import-file"]'), badFile);
+
+    await waitFor(() => container.textContent.includes('無法讀取這個檔案'));
+    expect(container.textContent).toContain('幼兒列表');
+  });
+
+  it('deletes a child after confirmation and re-renders the list without it', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, confirmDelete: () => true });
+
+    container.querySelector(`[data-delete-child="${child.id}"]`).click();
+
+    await waitFor(() => !container.textContent.includes('陳小安'));
+    expect(container.textContent).not.toContain('陳小安');
+  });
+
+  it('keeps the child when deletion is not confirmed', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, confirmDelete: () => false });
+
+    container.querySelector(`[data-delete-child="${child.id}"]`).click();
+
+    expect(container.textContent).toContain('陳小安');
+  });
+
+  it('shows an error message when deleting a child fails', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const dbModule = await import('../src/storage/db.js');
+    vi.spyOn(dbModule, 'deleteChild').mockRejectedValueOnce(new Error('Database error'));
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, confirmDelete: () => true });
+
+    container.querySelector(`[data-delete-child="${child.id}"]`).click();
+
+    await waitFor(() => container.textContent.includes('刪除失敗，請再試一次'));
+    expect(container.textContent).toContain('陳小安');
+
+    vi.restoreAllMocks();
+  });
+
+  it('renders a malicious child name as inert text, not markup', async () => {
+    await addChild({ name: '<script>window.__xss = true;</script>', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.innerHTML).toContain('&lt;script&gt;');
+    expect(container.textContent).toContain('<script>window.__xss = true;</script>');
+  });
+
+  it('renders no back button when onBack is not provided (existing top-level usage)', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+    expect(container.querySelector('[data-action="back"]')).toBeNull();
+  });
+
+  it('calls onBack when the back button is clicked, when onBack is provided', async () => {
+    const container = document.createElement('div');
+    let backCalled = false;
+    await renderChildListView(container, { onSelectChild: () => {}, onBack: () => { backCalled = true; } });
+
+    container.querySelector('[data-action="back"]').click();
+    expect(backCalled).toBe(true);
+  });
+
+  it('shows the relabeled 適性總表 import trigger when reportType is not passed (backward compatibility)', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    expect(container.querySelector('[data-action="import-docx"]').textContent).toBe('適性總表匯入');
+    expect(container.querySelector('[data-action="import-parent-report-docx"]')).toBeNull();
+  });
+
+  it('shows the 適性總表 import trigger, not the 適性紀錄 one, when reportType is not parent-report', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, reportType: 'assessment' });
+
+    expect(container.querySelector('[data-action="import-docx"]').textContent).toBe('適性總表匯入');
+    expect(container.querySelector('[data-action="import-parent-report-docx"]')).toBeNull();
+  });
+
+  it('shows the 適性紀錄 import trigger, not the 適性總表 one, when reportType is parent-report', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, reportType: 'parent-report' });
+
+    expect(container.querySelector('[data-action="import-parent-report-docx"]').textContent).toBe('適性紀錄匯入');
+    expect(container.querySelector('[data-action="import-docx"]')).toBeNull();
+  });
+
+  it('opens the parent-report import preview after selecting a valid Word file, when reportType is parent-report', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, reportType: 'parent-report' });
+
+    const file = await buildSampleParentReportDocxFile();
+    selectFile(container.querySelector('[data-field="import-parent-report-file"]'), file);
+
+    await waitFor(() => container.textContent.includes('確認匯入內容（適性紀錄）'));
+    expect(container.querySelector('[data-field="name"]').value).toBe('陳小安');
+  });
+});

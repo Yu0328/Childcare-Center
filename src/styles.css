@@ -1,0 +1,939 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Microsoft JhengHei", "PingFang TC", sans-serif;
+
+  --surface: #fcfcfb;
+  --page-bg: #f4f4f1;
+  --text-primary: #1f2422;
+  --text-secondary: #55605c;
+  --text-muted: #8a9490;
+  --border: #e2e4de;
+  --border-strong: #c9ccc4;
+
+  --brand: #2a78d6;
+  --brand-dark: #1c5cab;
+  --brand-tint: #dceafb;
+  --danger: #d03b3b;
+  --danger-bg: #fbeaea;
+
+  /* A warm accent for "human" touches (title block, header buttons) — distinct from the
+     cooler domain hues below so it reads as its own thing, not a 6th domain color. */
+  --warm-tint: #fbe9d2;
+  --warm-accent: #b5691b;
+  --warm-border: #f0cd9c;
+
+  /* Soft purple for inline "編輯" (edit) affordances — same lightness/saturation family as
+     --brand-tint/--warm-tint so it reads as another soft badge, not a jarring bright purple. */
+  --edit-tint: #ece3fb;
+  --edit-tint-hover: #ddccf7;
+  --edit-accent: #6b46a8;
+  --edit-border: #d7c3f2;
+
+  /* Domain identity colors — one per 發展領域, ordered for adjacent-pair
+     colorblind-safe contrast (see dataviz palette reference). Tints are deliberately a shade
+     deeper than a barely-there pastel so each card reads as colored against the page, not white. */
+  --domain-1-accent: #2a78d6; /* 身體動作 · blue */
+  --domain-1-tint: #dbe9fa;
+  --domain-1-border: #b9d4f3;
+  --domain-2-accent: #d9611f; /* 社會情緒 · orange */
+  --domain-2-tint: #fbe0c9;
+  --domain-2-border: #f0c39c;
+  --domain-3-accent: #189b6c; /* 語言溝通 · aqua */
+  --domain-3-tint: #cdf0e1;
+  --domain-3-border: #9fdcc0;
+  --domain-4-accent: #b9790a; /* 認知探索 · yellow (darkened for text-contrast use) */
+  --domain-4-tint: #faeab8;
+  --domain-4-border: #edd287;
+  --domain-5-accent: #c85d84; /* 生活自理 · magenta */
+  --domain-5-tint: #f8d9e6;
+  --domain-5-border: #eeb3cc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+  margin: 0 0 0.5em;
+  font-weight: 700;
+}
+
+button {
+  font: inherit;
+}
+
+/* ---------- App shell ---------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.app-header__brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-right: auto;
+}
+
+.app-header__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.55em 1.1em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn--primary {
+  background: var(--brand);
+  color: #fff;
+}
+.btn--primary:hover {
+  background: var(--brand-dark);
+}
+
+.btn--outline {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.btn--outline:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.btn--ghost {
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+}
+.btn--ghost:hover {
+  background: #cadff8;
+}
+
+.btn--small {
+  padding: 0.35em 0.8em;
+  font-size: 0.85rem;
+}
+
+.btn--header {
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  border-color: transparent;
+  font-size: 0.85rem;
+  padding: 0.5em 0.9em;
+  position: relative;
+  overflow: hidden;
+}
+.btn--header:hover {
+  background: #cadff8;
+}
+
+.btn--header-file input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.btn--edit {
+  background: var(--edit-tint);
+  color: var(--edit-accent);
+  border-color: var(--edit-border);
+}
+.btn--edit:hover {
+  background: var(--edit-tint-hover);
+}
+
+/* Small fixed-size circular delete button used for per-item deletes inside 適性紀錄's
+   course-plan / development-record / behavior-observation tabs. Sibling of .card-list__delete
+   (same shape/sizing pattern) but a distinct light pink — .card-list__delete's crimson stays
+   as-is since it's still used for child/report deletion elsewhere. Fixed circle + symbol-only
+   label means it can never text-wrap the way the old text-labeled "刪除" buttons did in
+   narrow layouts. */
+.btn--delete-circle {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: #f9c9da;
+  color: #99304f;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.15);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn--delete-circle:hover {
+  background: #f3a8c3;
+  transform: scale(1.08);
+}
+.btn--delete-circle:active {
+  transform: scale(0.96);
+}
+
+/* ---------- Page header (child list / form list / form editor) ---------- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+  position: relative;
+  text-align: center;
+}
+
+.page-header .btn {
+  position: absolute;
+  left: 0;
+}
+
+.page-header__title {
+  font-size: 1.4rem;
+  display: inline-block;
+  background: var(--warm-tint);
+  border: 1px solid var(--warm-border);
+  color: #7a4614;
+  padding: 0.45em 1.3em;
+  border-radius: 999px;
+}
+
+.page-header--editor {
+  flex-wrap: wrap;
+}
+
+.page-header--editor .btn[data-action="export"] {
+  position: absolute;
+  right: 0;
+  left: auto;
+}
+
+/* ---------- Report-type select screen ---------- */
+
+.type-select-card {
+  max-width: 420px;
+  margin: 3rem auto 0;
+  padding: 2rem 1.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(15, 23, 20, 0.06);
+}
+
+.type-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.type-select__option {
+  width: 100%;
+  padding: 1.25rem;
+  font-size: 1.3rem;
+  justify-content: center;
+  text-align: center;
+}
+
+/* ---------- Card lists (幼兒列表 / 評量表列表) ---------- */
+
+.card-list {
+  list-style: none;
+  margin: 0 0 2rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
+  gap: 0.9rem;
+  justify-content: center;
+}
+
+.card-list__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1.1rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(15, 23, 20, 0.04);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.card-list__item:hover {
+  border-color: var(--brand);
+  box-shadow: 0 4px 12px rgba(15, 23, 20, 0.08);
+  transform: translateY(-1px);
+}
+
+.card-list__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.card-list__meta {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.card-list__row {
+  position: relative;
+  width: 100%;
+}
+
+.card-list__delete {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: #d3455b;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.2);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.card-list__delete:hover {
+  background: #b5324a;
+  transform: scale(1.08);
+}
+
+/* ---------- Forms (add-child / add-form / entry-form) ---------- */
+
+.panel-form {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.panel-form__title {
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+}
+
+.panel-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.panel-form input,
+.panel-form select,
+.panel-form textarea {
+  font: inherit;
+  padding: 0.5em 0.7em;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.highlight-caption {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.75em 0.9em;
+  border-radius: 14px;
+  resize: vertical;
+}
+
+.panel-form__period-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.panel-form__period-row select {
+  flex: 1;
+}
+
+.panel-form__checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+}
+
+.panel-form .btn {
+  align-self: center;
+  margin-top: 0.3rem;
+}
+
+/* ---------- Two-column tab layout (add-form left, existing content right) ----------
+   Used by the 適性紀錄 tabs (課程計畫/適性發展/行為觀察/點滴分享): the "新增..." panel-form
+   is narrower and shorter than the content beside it, so it gets a fixed-ish column while
+   the domain-grid/entry-list-wrap takes the remaining space. Centered as a unit via #app's
+   own max-width/margin, so no extra max-width is needed here. */
+.tab-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.tab-layout > .panel-form {
+  margin: 0;
+}
+
+/* ---------- Domain grid (form editor) ---------- */
+
+.domain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  justify-content: center;
+  align-items: start;
+}
+
+.domain-card {
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem 1.4rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.domain-card[data-domain="1"] { background: var(--domain-1-tint); border-color: var(--domain-1-border); }
+.domain-card[data-domain="2"] { background: var(--domain-2-tint); border-color: var(--domain-2-border); }
+.domain-card[data-domain="3"] { background: var(--domain-3-tint); border-color: var(--domain-3-border); }
+.domain-card[data-domain="4"] { background: var(--domain-4-tint); border-color: var(--domain-4-border); }
+.domain-card[data-domain="5"] { background: var(--domain-5-tint); border-color: var(--domain-5-border); }
+
+.domain-card__title {
+  font-size: 1.05rem;
+  padding-left: 0.6rem;
+  border-left: 4px solid transparent;
+}
+.domain-card[data-domain="1"] .domain-card__title { border-color: var(--domain-1-accent); color: var(--domain-1-accent); }
+.domain-card[data-domain="2"] .domain-card__title { border-color: var(--domain-2-accent); color: var(--domain-2-accent); }
+.domain-card[data-domain="3"] .domain-card__title { border-color: var(--domain-3-accent); color: var(--domain-3-accent); }
+.domain-card[data-domain="4"] .domain-card__title { border-color: var(--domain-4-accent); color: var(--domain-4-accent); }
+.domain-card[data-domain="5"] .domain-card__title { border-color: var(--domain-5-accent); color: var(--domain-5-accent); }
+
+.domain-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* ---------- Indicator blocks ---------- */
+
+.indicator-block {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+}
+
+.indicator-block__title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  /* Reserve room for the corner-fixed 編輯/× buttons so this title's own text never has to
+     make room for them inline — it can wrap freely underneath instead. */
+  padding-right: 5.5rem;
+  color: var(--text-primary);
+}
+
+.indicator-block__code {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--page-bg);
+  border-radius: 6px;
+  padding: 0.1em 0.5em;
+  margin-right: 0.5em;
+}
+
+/* Fixed to the card's top-right corner, out of normal text flow, so the title/content never
+   has to make room for it inline. Shared by cards that lead with a title (course-plan,
+   behavior-observation, formEditorView) via .indicator-block__actions and by cards/rows that
+   don't (course-plan occurrences, highlights, development-record, formEditorView entries) via
+   .entry-row__actions below — both anchor to the nearest `position: relative` ancestor
+   (.indicator-block or .entry-row), so the same top/right offsets keep every usage visually
+   consistent regardless of which wrapper class is present. */
+.indicator-block__actions {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.entry-row__actions {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Cards that don't lead with a title element (development-record's referenced-indicator list,
+   highlights' photo thumbnails) need their first line of content pushed clear of the
+   absolutely-positioned corner buttons instead of narrowed beside them. */
+.indicator-block > .entry-list:first-child,
+.indicator-block > .highlight-thumbs:first-child {
+  margin-top: 1.9rem;
+}
+
+.entry-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.entry-row {
+  position: relative;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: var(--page-bg);
+}
+
+.entry-row--achieved {
+  background: #eaf7ee;
+}
+
+.entry-row--absent .entry-row__date,
+.entry-row--absent .entry-row__note {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.entry-row__top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Reserve room for the corner-fixed 編輯/× buttons so the date text never collides with them.
+     min-height guarantees clearance even when the date text is empty (date isn't required, and
+     an achieved-less/dateless row would otherwise collapse to ~0 height, letting the note below
+     ride up underneath the absolutely-positioned buttons). */
+  min-height: 1.9rem;
+  padding-right: 5.2rem;
+}
+
+.entry-row__mark {
+  color: #1f8a3c;
+  font-weight: 700;
+  margin-right: 0.3em;
+}
+
+.entry-row__date {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.entry-row .btn--ghost.btn--small {
+  padding: 0.15em 0.5em;
+  flex-shrink: 0;
+}
+
+.entry-row__note {
+  margin: 0.25rem 0 0;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.entry-form[hidden] {
+  display: none;
+}
+
+/* Redesigned to read as a distinct, self-contained panel — same visual family as
+   .panel-form (light card, generous spacing, clearly grouped buttons) rather than a bare
+   cluster of unstyled inline inputs. Used for both the "新增..." sub-forms (occurrence/entry
+   add) and the "編輯" forms across all five tab/editor views. */
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.7rem;
+  padding: 0.9rem 1rem;
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.entry-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.entry-form__checkbox {
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.entry-form__radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+}
+
+.entry-form__radio {
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Excludes radio/checkbox inputs: they're native tick controls, not text-entry boxes, so
+   width: 100% (and the box-model chrome below) would distort them instead of styling them. */
+.entry-form input:not([type="radio"]):not([type="checkbox"]),
+.entry-form select,
+.entry-form textarea {
+  font: inherit;
+  padding: 0.5em 0.7em;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.entry-form textarea {
+  resize: vertical;
+}
+
+.entry-form input[type="radio"],
+.entry-form input[type="checkbox"] {
+  flex-shrink: 0;
+}
+
+/* Save/cancel grouped together, visually separated from the fields above. */
+.entry-form__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--border-strong);
+}
+
+/* ---------- Tabs (適性紀錄家長版 editor) ---------- */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs__button {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.tabs__button--active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 700;
+}
+
+.tabs__panel {
+  min-height: 200px;
+}
+
+/* ---------- 點滴分享 photo upload ---------- */
+
+.highlight-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.8rem;
+  margin: 0.6rem 0;
+}
+
+.highlight-upload-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 4 / 3;
+  padding: 0.8rem;
+  border: 2px dashed var(--brand);
+  border-radius: 14px;
+  background: var(--brand-tint);
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.highlight-upload-slot:hover {
+  background: #cadff8;
+}
+
+.highlight-upload-slot--dragover {
+  border-color: var(--brand-dark);
+  background: #cadff8;
+}
+
+.highlight-upload-slot__label {
+  font-weight: 600;
+  color: var(--brand-dark);
+  pointer-events: none;
+}
+
+.highlight-upload-slot__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.highlight-upload-slot__preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.highlight-upload-slot__preview:empty {
+  display: none;
+}
+
+.highlight-upload-slot__preview .highlight-thumb {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border: none;
+}
+
+.highlight-thumbs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.highlight-thumb {
+  width: 100%;
+  max-width: 120px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.highlight-thumb--empty {
+  display: block;
+  width: 100%;
+  max-width: 120px;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: var(--surface);
+}
+
+.highlight-thumb-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 120px;
+}
+
+.highlight-thumb-wrap .highlight-thumb {
+  width: 100%;
+  height: 100%;
+}
+
+/* Small "remove this photo" affordance overlaid on a thumbnail's corner — used both for
+   pending (not-yet-saved) upload-slot previews and already-saved 點滴分享 photos. Deliberately
+   NOT .btn--delete-circle's pink (that's reserved for whole-item/whole-entry deletion); this is
+   a smaller, lower-stakes per-photo action, so it gets a neutral dark translucent circle instead. */
+.highlight-thumb-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: rgba(15, 23, 20, 0.6);
+  color: #fff;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.25);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.highlight-thumb-remove:hover {
+  background: rgba(15, 23, 20, 0.82);
+  transform: scale(1.08);
+}
+.highlight-thumb-remove:active {
+  transform: scale(0.96);
+}
+
+/* ---------- Word import ---------- */
+
+.import-trigger {
+  max-width: 420px;
+  margin: 1.5rem auto 0;
+  text-align: center;
+}
+
+.import-preview__warnings {
+  list-style: none;
+  max-width: 640px;
+  margin: 0 auto 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.import-preview__entry-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.import-preview__entry {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  background: var(--page-bg);
+}
+
+.import-preview__entry--warning {
+  background: var(--danger-bg);
+}
+
+.import-preview__entry label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.import-preview__entry-code {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.import-preview__entry-note {
+  color: var(--text-primary);
+}
+
+/* ---------- Errors ---------- */
+
+.field-error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 8px;
+  padding: 0.5em 0.8em;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+.field-error:empty {
+  display: none;
+}
+
+.field-error--center {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+  }
+  .page-header .btn,
+  .page-header--editor .btn[data-action="export"] {
+    position: static;
+  }
+  .tab-layout {
+    grid-template-columns: 1fr;
+  }
+}

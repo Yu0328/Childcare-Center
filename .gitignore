@@ -1,0 +1,10 @@
+# Real children's personal data and reference samples — never commit.
+# Generic pattern rather than exact filenames, so this never has to name a real child.
+*.docx
+*.pdf
+
+node_modules/
+dist/
+site/
+.superpowers/
+.claude/settings.local.json

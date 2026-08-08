@@ -1,0 +1,165 @@
+import { getIndicatorsForTier } from '../data/indicators.js';
+import { addEntry, deleteEntry, listEntriesForForm, updateEntry } from '../storage/db.js';
+import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
+import { escapeHtml } from './escapeHtml.js';
+
+function entryRow(entry) {
+  return `
+    <li class="entry-row${entry.achieved ? ' entry-row--achieved' : ''}" data-entry="${escapeHtml(entry.id)}">
+      <div class="entry-row__top">
+        <span class="entry-row__date">${entry.achieved ? '<span class="entry-row__mark">○</span>' : ''}${escapeHtml(entry.date)}</span>
+        <div class="entry-row__actions">
+          <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
+          <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">×</button>
+        </div>
+      </div>
+      <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+      <div class="entry-form" data-entry-edit-form-for="${escapeHtml(entry.id)}" hidden>
+        <label class="entry-form__field">日期 <input type="date" data-entry-edit-field="date" data-entry-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
+        <label class="entry-form__checkbox"><input type="checkbox" data-entry-edit-field="achieved" data-entry-id="${escapeHtml(entry.id)}" ${entry.achieved ? 'checked' : ''}> 已達成</label>
+        <input type="text" class="entry-form__note" data-entry-edit-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="觀察敘述" value="${escapeHtml(entry.note)}">
+        <div class="entry-form__actions">
+          <button type="button" class="btn btn--primary btn--small" data-entry-edit-save-for="${escapeHtml(entry.id)}">儲存</button>
+          <button type="button" class="btn btn--outline btn--small" data-entry-edit-cancel-for="${escapeHtml(entry.id)}">取消</button>
+        </div>
+        <p class="field-error" data-error></p>
+      </div>
+    </li>
+  `;
+}
+
+function indicatorBlock(indicator, entries) {
+  return `
+    <div class="indicator-block" data-indicator-code="${escapeHtml(indicator.code)}">
+      <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(indicator.code)}</span>${escapeHtml(indicator.description)}</h4>
+      <ul class="entry-list">${entries.map(entryRow).join('')}</ul>
+      <button type="button" class="btn btn--outline btn--small" data-add-entry-for="${escapeHtml(indicator.code)}">＋ 新增觀察紀錄</button>
+      <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}" hidden>
+        <label class="entry-form__field">日期 <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
+        <label class="entry-form__checkbox"><input type="checkbox" data-entry-field="achieved" data-indicator-code="${escapeHtml(indicator.code)}"> 已達成</label>
+        <input type="text" class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="觀察敘述">
+        <div class="entry-form__actions">
+          <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">儲存</button>
+        </div>
+        <p class="field-error" data-error></p>
+      </div>
+    </div>
+  `;
+}
+
+export async function renderFormEditorView(
+  container,
+  { child, form, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
+) {
+  const indicators = getIndicatorsForTier(form.tier);
+  const entries = await listEntriesForForm(form.id);
+
+  const entriesByIndicatorCode = {};
+  for (const entry of entries) {
+    (entriesByIndicatorCode[entry.indicatorCode] ??= []).push(entry);
+  }
+
+  const domains = [...new Map(indicators.map(i => [i.domainName, i.domain])).entries()];
+
+  container.innerHTML = `
+    <div class="page-header page-header--editor">
+      <button type="button" class="btn btn--ghost" data-action="back">← 返回適性總表列表</button>
+      <h2 class="page-header__title">${escapeHtml(child.name)}　${escapeHtml(form.tier)} 階段　${escapeHtml(form.period)}</h2>
+      <button type="button" class="btn btn--primary" data-action="export">匯出 Word</button>
+    </div>
+    <p class="field-error field-error--center" data-error="export"></p>
+    <div class="domain-grid">
+      ${domains
+        .map(
+          ([domainName, domainId]) => `
+            <section class="domain-card" data-domain="${domainId}">
+              <h3 class="domain-card__title">${escapeHtml(domainName)}</h3>
+              <div class="domain-card__body">
+                ${indicators
+                  .filter(i => i.domainName === domainName)
+                  .map(indicator => indicatorBlock(indicator, entriesByIndicatorCode[indicator.code] || []))
+                  .join('')}
+              </div>
+            </section>
+          `
+        )
+        .join('')}
+    </div>
+  `;
+
+  container.querySelector('[data-action="back"]').addEventListener('click', onBack);
+
+  container.querySelector('[data-action="export"]').addEventListener('click', async () => {
+    const errorEl = container.querySelector('[data-error="export"]');
+    try {
+      const blob = await generateDocxBlob({ child, form, indicators, entries: await listEntriesForForm(form.id) });
+      downloadDocx(blob, `${child.name}-C表-${form.period}.docx`);
+      if (errorEl) errorEl.textContent = '';
+    } catch (err) {
+      if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';
+    }
+  });
+
+  for (const indicator of indicators) {
+    container.querySelector(`[data-add-entry-for="${indicator.code}"]`).addEventListener('click', () => {
+      const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
+      entryForm.hidden = !entryForm.hidden;
+    });
+
+    container.querySelector(`[data-entry-save-for="${indicator.code}"]`).addEventListener('click', async () => {
+      const date = container.querySelector(`[data-entry-field="date"][data-indicator-code="${indicator.code}"]`).value;
+      const achieved = container.querySelector(`[data-entry-field="achieved"][data-indicator-code="${indicator.code}"]`).checked;
+      const note = container.querySelector(`[data-entry-field="note"][data-indicator-code="${indicator.code}"]`).value;
+      try {
+        await addEntry({ formId: form.id, indicatorCode: indicator.code, date, achieved, note });
+        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+      } catch (err) {
+        const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
+        const errorEl = entryForm.querySelector('[data-error]');
+        if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
+      }
+    });
+  }
+
+  for (const entry of entries) {
+    container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', async () => {
+      if (!confirmDelete(`確定要刪除「${entry.indicatorCode} ${entry.date}」這筆觀察紀錄嗎？此操作無法復原。`)) return;
+      try {
+        await deleteEntry(entry.id);
+        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+      } catch (err) {
+        const indicatorBlockEl = container.querySelector(`[data-indicator-code="${entry.indicatorCode}"]`);
+        let errorEl = indicatorBlockEl.querySelector('[data-error="delete"]');
+        if (!errorEl) {
+          errorEl = document.createElement('p');
+          errorEl.dataset.error = 'delete';
+          errorEl.className = 'field-error';
+          indicatorBlockEl.appendChild(errorEl);
+        }
+        errorEl.textContent = '刪除失敗，請再試一次';
+      }
+    });
+
+    container.querySelector(`[data-edit-entry="${entry.id}"]`).addEventListener('click', () => {
+      const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
+      editForm.hidden = !editForm.hidden;
+    });
+
+    container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`).addEventListener('click', () => {
+      container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`).hidden = true;
+    });
+
+    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', async () => {
+      const date = container.querySelector(`[data-entry-edit-field="date"][data-entry-id="${entry.id}"]`).value;
+      const achieved = container.querySelector(`[data-entry-edit-field="achieved"][data-entry-id="${entry.id}"]`).checked;
+      const note = container.querySelector(`[data-entry-edit-field="note"][data-entry-id="${entry.id}"]`).value;
+      try {
+        await updateEntry(entry.id, { date, achieved, note });
+        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+      } catch (err) {
+        const errorEl = container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`);
+        if (errorEl) errorEl.textContent = '更新失敗，請再試一次';
+      }
+    });
+  }
+}

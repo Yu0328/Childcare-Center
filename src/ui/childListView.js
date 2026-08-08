@@ -1,0 +1,139 @@
+import { addChild, listChildren, deleteChild } from '../storage/db.js';
+import { escapeHtml } from './escapeHtml.js';
+import { parseDocxImport } from '../import/docxImport.js';
+import { renderImportPreviewView } from './importPreviewView.js';
+import { parseParentReportDocxImport } from '../import/parentReportDocxImport.js';
+import { renderParentReportImportPreviewView } from './parentReportImportPreviewView.js';
+
+export async function renderChildListView(
+  container,
+  { onSelectChild, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false), onBack, reportType }
+) {
+  const children = await listChildren();
+  const isParentReport = reportType === 'parent-report';
+
+  container.innerHTML = `
+    <div class="page-header">
+      ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
+      <h2 class="page-header__title">幼兒列表</h2>
+    </div>
+    <ul class="card-list">
+      ${children
+        .map(
+          child =>
+            `<li class="card-list__row">
+              <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
+                <span class="card-list__name">${escapeHtml(child.name)}</span>
+                <span class="card-list__meta">出生日期：${escapeHtml(child.birthDate)}</span>
+              </button>
+              <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="刪除${escapeHtml(child.name)}">×</button>
+            </li>`
+        )
+        .join('')}
+    </ul>
+    <p class="field-error" data-error="delete"></p>
+    <form class="panel-form" data-action="add-child">
+      <h3 class="panel-form__title">新增幼兒</h3>
+      <label class="panel-form__field">姓名 <input data-field="name" required></label>
+      <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" required></label>
+      <button type="submit" class="btn btn--primary">新增</button>
+    </form>
+    ${
+      isParentReport
+        ? `<div class="import-trigger">
+            <button type="button" class="btn btn--outline" data-action="import-parent-report-docx">適性紀錄匯入</button>
+            <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>
+            <p class="field-error" data-error="import"></p>
+          </div>`
+        : `<div class="import-trigger">
+            <button type="button" class="btn btn--outline" data-action="import-docx">適性總表匯入</button>
+            <input type="file" accept=".docx" data-field="import-file" hidden>
+            <p class="field-error" data-error="import"></p>
+          </div>`
+    }
+  `;
+
+  if (onBack) {
+    container.querySelector('[data-action="back"]').addEventListener('click', onBack);
+  }
+
+  for (const child of children) {
+    container.querySelector(`[data-child-id="${child.id}"]`).addEventListener('click', () => onSelectChild(child));
+  }
+
+  for (const child of children) {
+    container.querySelector(`[data-delete-child="${child.id}"]`).addEventListener('click', async () => {
+      if (!confirmDelete(`確定要刪除「${child.name}」的所有資料嗎？此操作無法復原。`)) return;
+      try {
+        await deleteChild(child.id);
+        await renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType });
+      } catch (err) {
+        container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
+      }
+    });
+  }
+
+  container.querySelector('[data-action="add-child"]').addEventListener('submit', async event => {
+    event.preventDefault();
+    const name = container.querySelector('[data-field="name"]').value;
+    const birthDate = container.querySelector('[data-field="birthDate"]').value;
+    try {
+      await addChild({ name, birthDate });
+      await renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType });
+    } catch (err) {
+      const form = container.querySelector('[data-action="add-child"]');
+      let errorEl = form.querySelector('[data-error]');
+      if (!errorEl) {
+        errorEl = document.createElement('p');
+        errorEl.dataset.error = '';
+        errorEl.className = 'field-error';
+        form.insertAdjacentElement('afterbegin', errorEl);
+      }
+      errorEl.textContent = '新增失敗，請再試一次';
+    }
+  });
+
+  if (isParentReport) {
+    const fileInput = container.querySelector('[data-field="import-parent-report-file"]');
+    container.querySelector('[data-action="import-parent-report-docx"]').addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const importErrorEl = container.querySelector('[data-error="import"]');
+
+      try {
+        const parsed = await parseParentReportDocxImport(file);
+        renderParentReportImportPreviewView(container, {
+          parsed,
+          onCancel: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
+          onImported: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
+        });
+      } catch (err) {
+        importErrorEl.textContent = '無法讀取這個檔案，請確認是有效的 Word 檔案';
+        fileInput.value = '';
+      }
+    });
+  } else {
+    const fileInput = container.querySelector('[data-field="import-file"]');
+    container.querySelector('[data-action="import-docx"]').addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const importErrorEl = container.querySelector('[data-error="import"]');
+
+      try {
+        const parsed = await parseDocxImport(file);
+        renderImportPreviewView(container, {
+          parsed,
+          onCancel: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
+          onImported: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
+        });
+      } catch (err) {
+        importErrorEl.textContent = '無法讀取這個檔案，請確認是有效的 Word 檔案';
+        fileInput.value = '';
+      }
+    });
+  }
+}

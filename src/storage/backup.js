@@ -1,0 +1,181 @@
+import {
+  listChildren, listFormsForChild, listEntriesForForm,
+  addChild, addForm, addEntry, clearAllData,
+} from './db.js';
+import {
+  listParentReportsForChild, listCoursePlanEntriesForReport, listCourseOccurrencesForEntry,
+  listDevelopmentRecordEntriesForReport, listBehaviorObservationsForReport, listHighlightEntriesForReport,
+  addParentReport, addCoursePlanEntry, addCourseOccurrence,
+  addDevelopmentRecordEntry, addBehaviorObservation, addHighlightEntry,
+} from './parentReportDb.js';
+
+const BACKUP_VERSION = 2;
+
+// Chunked to avoid call-stack overflows from spreading a huge byte array into String.fromCharCode.
+async function blobToBase64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBlob(base64, type) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+
+export async function exportBackup() {
+  const children = await listChildren();
+  const forms = [];
+  const entries = [];
+  const parentReports = [];
+  const coursePlanEntries = [];
+  const courseOccurrences = [];
+  const developmentRecordEntries = [];
+  const behaviorObservations = [];
+  const highlightEntries = [];
+
+  for (const child of children) {
+    const childForms = await listFormsForChild(child.id);
+    forms.push(...childForms);
+    for (const form of childForms) {
+      entries.push(...(await listEntriesForForm(form.id)));
+    }
+
+    const childReports = await listParentReportsForChild(child.id);
+    parentReports.push(...childReports);
+    for (const report of childReports) {
+      const reportEntries = await listCoursePlanEntriesForReport(report.id);
+      coursePlanEntries.push(...reportEntries);
+      for (const entry of reportEntries) {
+        courseOccurrences.push(...(await listCourseOccurrencesForEntry(entry.id)));
+      }
+      developmentRecordEntries.push(...(await listDevelopmentRecordEntriesForReport(report.id)));
+      behaviorObservations.push(...(await listBehaviorObservationsForReport(report.id)));
+
+      const reportHighlights = await listHighlightEntriesForReport(report.id);
+      for (const highlight of reportHighlights) {
+        const photos = await Promise.all(
+          highlight.photos.map(async photo => ({
+            base64: await blobToBase64(photo.blob),
+            type: photo.blob.type,
+            width: photo.width,
+            height: photo.height,
+          }))
+        );
+        highlightEntries.push({ ...highlight, photos });
+      }
+    }
+  }
+
+  return JSON.stringify(
+    {
+      version: BACKUP_VERSION,
+      children, forms, entries,
+      parentReports, coursePlanEntries, courseOccurrences,
+      developmentRecordEntries, behaviorObservations, highlightEntries,
+    },
+    null,
+    2
+  );
+}
+
+async function importV1Or2Children(data) {
+  const childIdMap = new Map();
+  for (const child of data.children) {
+    const created = await addChild({ name: child.name, birthDate: child.birthDate });
+    childIdMap.set(child.id, created.id);
+  }
+
+  const formIdMap = new Map();
+  for (const form of data.forms) {
+    const created = await addForm({ childId: childIdMap.get(form.childId), tier: form.tier, period: form.period });
+    formIdMap.set(form.id, created.id);
+  }
+
+  for (const entry of data.entries) {
+    await addEntry({
+      formId: formIdMap.get(entry.formId),
+      indicatorCode: entry.indicatorCode,
+      date: entry.date,
+      achieved: entry.achieved,
+      note: entry.note,
+    });
+  }
+
+  return childIdMap;
+}
+
+async function importParentReports(data, childIdMap) {
+  const reportIdMap = new Map();
+  for (const report of data.parentReports ?? []) {
+    const created = await addParentReport({ childId: childIdMap.get(report.childId), tier: report.tier, period: report.period });
+    reportIdMap.set(report.id, created.id);
+  }
+
+  const entryIdMap = new Map();
+  for (const entry of data.coursePlanEntries ?? []) {
+    const created = await addCoursePlanEntry({
+      reportId: reportIdMap.get(entry.reportId),
+      indicatorCode: entry.indicatorCode,
+      activityName: entry.activityName,
+      indicatorText: entry.indicatorText,
+    });
+    entryIdMap.set(entry.id, created.id);
+  }
+
+  for (const occurrence of data.courseOccurrences ?? []) {
+    await addCourseOccurrence({
+      entryId: entryIdMap.get(occurrence.entryId),
+      date: occurrence.date,
+      status: occurrence.status,
+      absent: occurrence.absent,
+      note: occurrence.note,
+    });
+  }
+
+  for (const record of data.developmentRecordEntries ?? []) {
+    await addDevelopmentRecordEntry({
+      reportId: reportIdMap.get(record.reportId),
+      domain: record.domain,
+      courseEntryIds: record.courseEntryIds.map(id => entryIdMap.get(id)),
+      narrative: record.narrative,
+    });
+  }
+
+  for (const observation of data.behaviorObservations ?? []) {
+    await addBehaviorObservation({
+      reportId: reportIdMap.get(observation.reportId),
+      title: observation.title,
+      narrative: observation.narrative,
+    });
+  }
+
+  for (const highlight of data.highlightEntries ?? []) {
+    const photos = highlight.photos.map(photo => ({
+      blob: base64ToBlob(photo.base64, photo.type),
+      width: photo.width,
+      height: photo.height,
+    }));
+    await addHighlightEntry({ reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption });
+  }
+}
+
+export async function importBackup(json) {
+  const data = JSON.parse(json);
+  if (data.version !== 1 && data.version !== 2) {
+    throw new Error(`Unsupported backup version: ${data.version}`);
+  }
+
+  await clearAllData();
+
+  const childIdMap = await importV1Or2Children(data);
+  if (data.version === 2) {
+    await importParentReports(data, childIdMap);
+  }
+}

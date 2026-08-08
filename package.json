@@ -1,0 +1,21 @@
+{
+  "name": "c-form-digitization",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "node scripts/build.mjs",
+    "build:web": "node scripts/build-web.mjs"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "jsdom": "^25.0.0",
+    "esbuild": "^0.24.0",
+    "fake-indexeddb": "^6.0.0"
+  },
+  "dependencies": {
+    "docx": "^9.0.2",
+    "jszip": "^3.10.1"
+  }
+}
