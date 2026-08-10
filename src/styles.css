@@ -418,20 +418,29 @@ button {
   margin-top: 0.3rem;
 }
 
-/* ---------- Two-column tab layout (add-form left, existing content right) ----------
+/* ---------- Two-column tab layout (existing content left, add-form right) ----------
    Used by the 適性紀錄 tabs (課程計畫/適性發展/行為觀察/點滴分享): the "新增..." panel-form
    is narrower and shorter than the content beside it, so it gets a fixed-ish column while
    the domain-grid/entry-list-wrap takes the remaining space. Centered as a unit via #app's
-   own max-width/margin, so no extra max-width is needed here. */
+   own max-width/margin, so no extra max-width is needed here.
+   The panel-form is the first child in markup, but `order` moves it to the second (right)
+   grid column so every 適性紀錄 tab keeps its "新增..." panel on the right without touching
+   each view's own markup. */
 .tab-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) 1fr;
+  grid-template-columns: 1fr minmax(260px, 340px);
   gap: 1.5rem;
   align-items: start;
 }
 
 .tab-layout > .panel-form {
   margin: 0;
+  order: 2;
+}
+
+.tab-layout > .domain-grid,
+.tab-layout > .entry-list-wrap {
+  order: 1;
 }
 
 /* ---------- Domain grid (form editor) ---------- */
@@ -442,6 +451,31 @@ button {
   gap: 1.25rem;
   justify-content: center;
   align-items: start;
+}
+
+/* 適性總表 only: all five domains side by side to shorten the page (see .domain-grid above for
+   the default auto-fit behavior used by the other two domain-grid users, which stays untouched).
+   Collapses back to the default stacked layout on mobile, same breakpoint as .tab-layout below. */
+.domain-grid--row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* #app's normal 960px cap (sized for the narrow panel-form pages) leaves each of the five
+   columns above too little room for real indicator text, dates, and notes to stay readable —
+   widen the page specifically when domain-grid--row is present, native :has() so no JS/markup
+   is needed to flag the page from formEditorView. Still capped, not unbounded, so it doesn't
+   stretch oddly on ultra-wide monitors; on narrower windows #app simply fills what's available,
+   same as before. */
+#app:has(.domain-grid--row) {
+  max-width: 1600px;
+}
+
+/* formEditorView's indicator-block__title never carries the corner-fixed action buttons (only
+   its per-entry rows do), so the 5.5rem clearance .indicator-block__title reserves for those
+   buttons elsewhere is dead space here — reclaiming it matters once .domain-grid--row's five
+   columns leave much less width per card than the other domain-grid users. */
+.domain-grid--row .indicator-block__title {
+  padding-right: 0;
 }
 
 .domain-card {
@@ -461,6 +495,8 @@ button {
   font-size: 1.05rem;
   padding-left: 0.6rem;
   border-left: 4px solid transparent;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
 }
 .domain-card[data-domain="1"] .domain-card__title { border-color: var(--domain-1-accent); color: var(--domain-1-accent); }
 .domain-card[data-domain="2"] .domain-card__title { border-color: var(--domain-2-accent); color: var(--domain-2-accent); }
@@ -585,7 +621,10 @@ button {
 
 .entry-row__date {
   color: var(--text-secondary);
-  white-space: nowrap;
+  /* Wraps instead of overflowing into the corner-fixed buttons' reserved padding when the column
+     is narrow (e.g. formEditorView's .domain-grid--row); anywhere is needed because the achieved
+     mark + date (e.g. "○2026-08-12") has no natural break character for the browser to wrap at. */
+  overflow-wrap: anywhere;
   font-weight: 600;
 }
 
@@ -935,5 +974,8 @@ button {
   }
   .tab-layout {
     grid-template-columns: 1fr;
+  }
+  .domain-grid--row {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }

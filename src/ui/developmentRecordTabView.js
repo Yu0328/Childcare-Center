@@ -96,6 +96,12 @@ export async function renderDevelopmentRecordTab(
       return indicator && indicator.domain === Number(domainNumber);
     });
 
+  // See courseplanTabView.js's identical block for why reading the container's existing
+  // <details> state (before overwriting it) is what lets collapse/expand survive re-renders.
+  const previousDomainCards = [...container.querySelectorAll('.domain-card')];
+  const previousOpenDomains = new Set(previousDomainCards.filter(el => el.open).map(el => el.dataset.domain));
+  const hadPreviousRender = previousDomainCards.length > 0;
+
   container.innerHTML = `
     <div class="tab-layout">
       <form class="panel-form" data-action="add-record">
@@ -116,10 +122,11 @@ export async function renderDevelopmentRecordTab(
       </form>
       <div class="domain-grid">
         ${DOMAINS.filter(d => byDomain.has(d.id))
-          .map(
-            domain => `
-              <section class="domain-card" data-domain="${domain.id}">
-                <h3 class="domain-card__title">${escapeHtml(domain.name)}</h3>
+          .map((domain, index) => {
+            const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domain.id)) : index === 0;
+            return `
+              <details class="domain-card" data-domain="${domain.id}" ${isOpen ? 'open' : ''}>
+                <summary class="domain-card__title">${escapeHtml(domain.name)}</summary>
                 <div class="domain-card__body">
                   ${byDomain
                     .get(domain.id)
@@ -134,9 +141,9 @@ export async function renderDevelopmentRecordTab(
                     })
                     .join('')}
                 </div>
-              </section>
-            `
-          )
+              </details>
+            `;
+          })
           .join('')}
       </div>
     </div>

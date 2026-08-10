@@ -429,20 +429,29 @@ button {
   margin-top: 0.3rem;
 }
 
-/* ---------- Two-column tab layout (add-form left, existing content right) ----------
+/* ---------- Two-column tab layout (existing content left, add-form right) ----------
    Used by the 適性紀錄 tabs (課程計畫/適性發展/行為觀察/點滴分享): the "新增..." panel-form
    is narrower and shorter than the content beside it, so it gets a fixed-ish column while
    the domain-grid/entry-list-wrap takes the remaining space. Centered as a unit via #app's
-   own max-width/margin, so no extra max-width is needed here. */
+   own max-width/margin, so no extra max-width is needed here.
+   The panel-form is the first child in markup, but `order` moves it to the second (right)
+   grid column so every 適性紀錄 tab keeps its "新增..." panel on the right without touching
+   each view's own markup. */
 .tab-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) 1fr;
+  grid-template-columns: 1fr minmax(260px, 340px);
   gap: 1.5rem;
   align-items: start;
 }
 
 .tab-layout > .panel-form {
   margin: 0;
+  order: 2;
+}
+
+.tab-layout > .domain-grid,
+.tab-layout > .entry-list-wrap {
+  order: 1;
 }
 
 /* ---------- Domain grid (form editor) ---------- */
@@ -453,6 +462,31 @@ button {
   gap: 1.25rem;
   justify-content: center;
   align-items: start;
+}
+
+/* 適性總表 only: all five domains side by side to shorten the page (see .domain-grid above for
+   the default auto-fit behavior used by the other two domain-grid users, which stays untouched).
+   Collapses back to the default stacked layout on mobile, same breakpoint as .tab-layout below. */
+.domain-grid--row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* #app's normal 960px cap (sized for the narrow panel-form pages) leaves each of the five
+   columns above too little room for real indicator text, dates, and notes to stay readable —
+   widen the page specifically when domain-grid--row is present, native :has() so no JS/markup
+   is needed to flag the page from formEditorView. Still capped, not unbounded, so it doesn't
+   stretch oddly on ultra-wide monitors; on narrower windows #app simply fills what's available,
+   same as before. */
+#app:has(.domain-grid--row) {
+  max-width: 1600px;
+}
+
+/* formEditorView's indicator-block__title never carries the corner-fixed action buttons (only
+   its per-entry rows do), so the 5.5rem clearance .indicator-block__title reserves for those
+   buttons elsewhere is dead space here — reclaiming it matters once .domain-grid--row's five
+   columns leave much less width per card than the other domain-grid users. */
+.domain-grid--row .indicator-block__title {
+  padding-right: 0;
 }
 
 .domain-card {
@@ -472,6 +506,8 @@ button {
   font-size: 1.05rem;
   padding-left: 0.6rem;
   border-left: 4px solid transparent;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
 }
 .domain-card[data-domain="1"] .domain-card__title { border-color: var(--domain-1-accent); color: var(--domain-1-accent); }
 .domain-card[data-domain="2"] .domain-card__title { border-color: var(--domain-2-accent); color: var(--domain-2-accent); }
@@ -596,7 +632,10 @@ button {
 
 .entry-row__date {
   color: var(--text-secondary);
-  white-space: nowrap;
+  /* Wraps instead of overflowing into the corner-fixed buttons' reserved padding when the column
+     is narrow (e.g. formEditorView's .domain-grid--row); anywhere is needed because the achieved
+     mark + date (e.g. "○2026-08-12") has no natural break character for the browser to wrap at. */
+  overflow-wrap: anywhere;
   font-weight: 600;
 }
 
@@ -946,6 +985,9 @@ button {
   }
   .tab-layout {
     grid-template-columns: 1fr;
+  }
+  .domain-grid--row {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
 
@@ -24148,7 +24190,7 @@ var CFormApp = (() => {
       <button type="button" class="btn btn--primary" data-action="export">\u532F\u51FA Word</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
-    <div class="domain-grid">
+    <div class="domain-grid domain-grid--row">
       ${domains.map(
       ([domainName, domainId]) => `
             <section class="domain-card" data-domain="${domainId}">
@@ -24703,7 +24745,6 @@ var CFormApp = (() => {
           headers: { default: pageHeader2({ child, report, title: "\u6BCF\u6708\u5B30\u5E7C\u5152\u9069\u6027\u767C\u5C55\u7D00\u9304\u8868" }) },
           children: [
             developmentRecordTable,
-            emptyParagraph(),
             highlightsTable,
             ...signatureParagraphs2()
           ]
@@ -24834,10 +24875,17 @@ var CFormApp = (() => {
     const byDomain = /* @__PURE__ */ new Map();
     for (const entry of entries) {
       const indicator = getIndicator(entry.indicatorCode);
-      const domainName = indicator ? indicator.domainName : "\u672A\u77E5\u9818\u57DF";
-      if (!byDomain.has(domainName)) byDomain.set(domainName, []);
-      byDomain.get(domainName).push({ entry, indicator });
+      const domainId = indicator ? indicator.domain : "unknown";
+      if (!byDomain.has(domainId)) byDomain.set(domainId, []);
+      byDomain.get(domainId).push({ entry, indicator });
     }
+    const domainGroups = [
+      ...DOMAINS.filter((d) => byDomain.has(d.id)).map((d) => [d.id, d.name, byDomain.get(d.id)]),
+      ...byDomain.has("unknown") ? [["unknown", "\u672A\u77E5\u9818\u57DF", byDomain.get("unknown")]] : []
+    ];
+    const previousDomainCards = [...container.querySelectorAll(".domain-card")];
+    const previousOpenDomains = new Set(previousDomainCards.filter((el) => el.open).map((el) => el.dataset.domain));
+    const hadPreviousRender = previousDomainCards.length > 0;
     container.innerHTML = `
     <div class="tab-layout">
       <form class="panel-form" data-action="add-entry">
@@ -24848,20 +24896,30 @@ var CFormApp = (() => {
         </label>
         <label class="panel-form__field">\u6D3B\u52D5\u540D\u7A31 <input data-field="activityName" required></label>
         <label class="panel-form__field">\u80FD\u529B\u6307\u6A19\u5167\u5BB9 <textarea data-field="indicatorText" rows="3"></textarea></label>
+        <label class="panel-form__field">\u65E5\u671F <input type="date" data-field="occurrenceDate"></label>
+        <div class="entry-form__radio-group">
+          <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> \u5DF2\u767C\u5C55\u25CB</label>
+          <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> \u767C\u5C55\u4E2D\u25B3</label>
+        </div>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="occurrenceAbsent"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
+        </label>
+        <label class="panel-form__field">\u8AAA\u660E\u5167\u5BB9 <input type="text" data-field="occurrenceNote"></label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
         <p class="field-error" data-error></p>
       </form>
       <div class="domain-grid">
-        ${[...byDomain.entries()].map(
-      ([domainName, group]) => `
-              <section class="domain-card" data-domain="${escapeHtml(group[0].indicator ? group[0].indicator.domain : "")}">
-                <h3 class="domain-card__title">${escapeHtml(domainName)}</h3>
+        ${domainGroups.map(([domainId, domainName, group], index) => {
+      const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domainId)) : index === 0;
+      return `
+              <details class="domain-card" data-domain="${escapeHtml(domainId)}" ${isOpen ? "open" : ""}>
+                <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
                 <div class="domain-card__body">
                   ${group.map(({ entry, indicator }) => entryCard(entry, indicator, occurrencesByEntryId[entry.id] || [], report.tier)).join("")}
                 </div>
-              </section>
-            `
-    ).join("")}
+              </details>
+            `;
+    }).join("")}
       </div>
     </div>
   `;
@@ -24870,12 +24928,25 @@ var CFormApp = (() => {
       const indicatorCode = container.querySelector('[data-field="indicatorCode"]').value;
       const activityName = container.querySelector('[data-field="activityName"]').value;
       const indicatorText = container.querySelector('[data-field="indicatorText"]').value;
+      const occurrenceDate = container.querySelector('[data-field="occurrenceDate"]').value;
+      const occurrenceStatus = container.querySelector('[data-field="occurrenceStatus"]:checked').value;
+      const occurrenceAbsent = container.querySelector('[data-field="occurrenceAbsent"]').checked;
+      const occurrenceNote = container.querySelector('[data-field="occurrenceNote"]').value;
       try {
-        await addCoursePlanEntry({ reportId: report.id, indicatorCode, activityName, indicatorText });
+        const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode, activityName, indicatorText });
+        if (occurrenceDate) {
+          await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, note: occurrenceNote });
+        }
         onChange();
       } catch (err) {
         container.querySelector('[data-action="add-entry"] [data-error]').textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
       }
+    });
+    container.querySelector('[data-field="occurrenceAbsent"]').addEventListener("change", (event) => {
+      const disabled = event.target.checked;
+      container.querySelectorAll('[data-field="occurrenceStatus"]').forEach((radio) => {
+        radio.disabled = disabled;
+      });
     });
     for (const entry of entries) {
       container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener("click", async () => {
@@ -25046,6 +25117,9 @@ var CFormApp = (() => {
       const indicator = getIndicator(entry.indicatorCode);
       return indicator && indicator.domain === Number(domainNumber);
     });
+    const previousDomainCards = [...container.querySelectorAll(".domain-card")];
+    const previousOpenDomains = new Set(previousDomainCards.filter((el) => el.open).map((el) => el.dataset.domain));
+    const hadPreviousRender = previousDomainCards.length > 0;
     container.innerHTML = `
     <div class="tab-layout">
       <form class="panel-form" data-action="add-record">
@@ -25065,10 +25139,11 @@ var CFormApp = (() => {
         <p class="field-error" data-error></p>
       </form>
       <div class="domain-grid">
-        ${DOMAINS.filter((d) => byDomain.has(d.id)).map(
-      (domain) => `
-              <section class="domain-card" data-domain="${domain.id}">
-                <h3 class="domain-card__title">${escapeHtml(domain.name)}</h3>
+        ${DOMAINS.filter((d) => byDomain.has(d.id)).map((domain, index) => {
+      const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domain.id)) : index === 0;
+      return `
+              <details class="domain-card" data-domain="${domain.id}" ${isOpen ? "open" : ""}>
+                <summary class="domain-card__title">${escapeHtml(domain.name)}</summary>
                 <div class="domain-card__body">
                   ${byDomain.get(domain.id).map((record) => {
         const isEditing = record.id === editingRecordId;
@@ -25080,9 +25155,9 @@ var CFormApp = (() => {
         });
       }).join("")}
                 </div>
-              </section>
-            `
-    ).join("")}
+              </details>
+            `;
+    }).join("")}
       </div>
     </div>
   `;
@@ -25308,7 +25383,7 @@ var CFormApp = (() => {
       (i) => `
                 <label class="highlight-upload-slot" data-drop-slot="${i}">
                   <span class="highlight-upload-slot__label">\u7167\u7247 ${i + 1}</span>
-                  <input type="file" accept="image/*" class="highlight-upload-slot__input" data-photo-slot="${i}">
+                  <input type="file" accept="image/*" multiple class="highlight-upload-slot__input" data-photo-slot="${i}">
                   <span class="highlight-upload-slot__preview" data-preview-slot="${i}"></span>
                 </label>
               `
@@ -25325,6 +25400,16 @@ var CFormApp = (() => {
       pendingPhotos[i] = null;
       const previewEl = container.querySelector(`[data-preview-slot="${i}"]`);
       previewEl.innerHTML = "";
+    }
+    async function handleFilesChosen(startIndex, fileList) {
+      const files = [...fileList || []];
+      let slot = startIndex;
+      for (const file of files) {
+        while (slot < 3 && pendingPhotos[slot]) slot++;
+        if (slot >= 3) break;
+        await handleFileChosen(slot, file);
+        slot++;
+      }
     }
     async function handleFileChosen(i, file) {
       if (!file) return;
@@ -25348,7 +25433,7 @@ var CFormApp = (() => {
     for (const i of [0, 1, 2]) {
       const slotEl = container.querySelector(`[data-drop-slot="${i}"]`);
       container.querySelector(`[data-photo-slot="${i}"]`).addEventListener("change", (event) => {
-        handleFileChosen(i, event.target.files[0]);
+        handleFilesChosen(i, event.target.files);
       });
       slotEl.addEventListener("dragover", (event) => {
         event.preventDefault();
@@ -25363,8 +25448,7 @@ var CFormApp = (() => {
       slotEl.addEventListener("drop", (event) => {
         event.preventDefault();
         slotEl.classList.remove("highlight-upload-slot--dragover");
-        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
-        handleFileChosen(i, file);
+        handleFilesChosen(i, event.dataTransfer && event.dataTransfer.files);
       });
     }
     container.querySelector('[data-action="add-highlight"]').addEventListener("submit", async (event) => {

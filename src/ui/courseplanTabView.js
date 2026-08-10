@@ -1,4 +1,4 @@
-import { getIndicatorsForTier, getIndicator } from '../data/indicators.js';
+import { DOMAINS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
 import {
   addCoursePlanEntry, listCoursePlanEntriesForReport, deleteCoursePlanEntry, updateCoursePlanEntry,
   addCourseOccurrence, listCourseOccurrencesForEntry, deleteCourseOccurrence, updateCourseOccurrence,
@@ -123,13 +123,27 @@ export async function renderCoursePlanTab(
     occurrencesByEntryId[entry.id] = await listCourseOccurrencesForEntry(entry.id);
   }
 
+  // Keyed by numeric domain id (not insertion order) so rendering below can walk DOMAINS in its
+  // canonical Ⅰ~Ⅴ-tier order instead of whatever order entries happen to have been added in.
   const byDomain = new Map();
   for (const entry of entries) {
     const indicator = getIndicator(entry.indicatorCode);
-    const domainName = indicator ? indicator.domainName : '未知領域';
-    if (!byDomain.has(domainName)) byDomain.set(domainName, []);
-    byDomain.get(domainName).push({ entry, indicator });
+    const domainId = indicator ? indicator.domain : 'unknown';
+    if (!byDomain.has(domainId)) byDomain.set(domainId, []);
+    byDomain.get(domainId).push({ entry, indicator });
   }
+  const domainGroups = [
+    ...DOMAINS.filter(d => byDomain.has(d.id)).map(d => [d.id, d.name, byDomain.get(d.id)]),
+    ...(byDomain.has('unknown') ? [['unknown', '未知領域', byDomain.get('unknown')]] : []),
+  ];
+
+  // Preserve which domains the user has expanded/collapsed across re-renders (the container is
+  // reused, so its previous <details> state is still readable right before we overwrite it). An
+  // empty previous render (nothing to read yet) is what triggers the "expand the first domain"
+  // default, distinct from the user having collapsed everything themselves.
+  const previousDomainCards = [...container.querySelectorAll('.domain-card')];
+  const previousOpenDomains = new Set(previousDomainCards.filter(el => el.open).map(el => el.dataset.domain));
+  const hadPreviousRender = previousDomainCards.length > 0;
 
   container.innerHTML = `
     <div class="tab-layout">
@@ -141,21 +155,31 @@ export async function renderCoursePlanTab(
         </label>
         <label class="panel-form__field">活動名稱 <input data-field="activityName" required></label>
         <label class="panel-form__field">能力指標內容 <textarea data-field="indicatorText" rows="3"></textarea></label>
+        <label class="panel-form__field">日期 <input type="date" data-field="occurrenceDate"></label>
+        <div class="entry-form__radio-group">
+          <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> 已發展○</label>
+          <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> 發展中△</label>
+        </div>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="occurrenceAbsent"> 請假／未執行（劃掉日期與說明）
+        </label>
+        <label class="panel-form__field">說明內容 <input type="text" data-field="occurrenceNote"></label>
         <button type="submit" class="btn btn--primary">新增</button>
         <p class="field-error" data-error></p>
       </form>
       <div class="domain-grid">
-        ${[...byDomain.entries()]
-          .map(
-            ([domainName, group]) => `
-              <section class="domain-card" data-domain="${escapeHtml(group[0].indicator ? group[0].indicator.domain : '')}">
-                <h3 class="domain-card__title">${escapeHtml(domainName)}</h3>
+        ${domainGroups
+          .map(([domainId, domainName, group], index) => {
+            const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domainId)) : index === 0;
+            return `
+              <details class="domain-card" data-domain="${escapeHtml(domainId)}" ${isOpen ? 'open' : ''}>
+                <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
                 <div class="domain-card__body">
                   ${group.map(({ entry, indicator }) => entryCard(entry, indicator, occurrencesByEntryId[entry.id] || [], report.tier)).join('')}
                 </div>
-              </section>
-            `
-          )
+              </details>
+            `;
+          })
           .join('')}
       </div>
     </div>
@@ -166,12 +190,24 @@ export async function renderCoursePlanTab(
     const indicatorCode = container.querySelector('[data-field="indicatorCode"]').value;
     const activityName = container.querySelector('[data-field="activityName"]').value;
     const indicatorText = container.querySelector('[data-field="indicatorText"]').value;
+    const occurrenceDate = container.querySelector('[data-field="occurrenceDate"]').value;
+    const occurrenceStatus = container.querySelector('[data-field="occurrenceStatus"]:checked').value;
+    const occurrenceAbsent = container.querySelector('[data-field="occurrenceAbsent"]').checked;
+    const occurrenceNote = container.querySelector('[data-field="occurrenceNote"]').value;
     try {
-      await addCoursePlanEntry({ reportId: report.id, indicatorCode, activityName, indicatorText });
+      const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode, activityName, indicatorText });
+      if (occurrenceDate) {
+        await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, note: occurrenceNote });
+      }
       onChange();
     } catch (err) {
       container.querySelector('[data-action="add-entry"] [data-error]').textContent = '新增失敗，請再試一次';
     }
+  });
+
+  container.querySelector('[data-field="occurrenceAbsent"]').addEventListener('change', event => {
+    const disabled = event.target.checked;
+    container.querySelectorAll('[data-field="occurrenceStatus"]').forEach(radio => { radio.disabled = disabled; });
   });
 
   for (const entry of entries) {

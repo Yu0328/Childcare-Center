@@ -68,7 +68,7 @@ export async function renderFormEditorView(
       <button type="button" class="btn btn--primary" data-action="export">匯出 Word</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
-    <div class="domain-grid">
+    <div class="domain-grid domain-grid--row">
       ${domains
         .map(
           ([domainName, domainId]) => `

@@ -53,7 +53,7 @@ export async function renderHighlightsTab(
               i => `
                 <label class="highlight-upload-slot" data-drop-slot="${i}">
                   <span class="highlight-upload-slot__label">照片 ${i + 1}</span>
-                  <input type="file" accept="image/*" class="highlight-upload-slot__input" data-photo-slot="${i}">
+                  <input type="file" accept="image/*" multiple class="highlight-upload-slot__input" data-photo-slot="${i}">
                   <span class="highlight-upload-slot__preview" data-preview-slot="${i}"></span>
                 </label>
               `
@@ -72,6 +72,19 @@ export async function renderHighlightsTab(
     pendingPhotos[i] = null;
     const previewEl = container.querySelector(`[data-preview-slot="${i}"]`);
     previewEl.innerHTML = '';
+  }
+
+  // Fills empty slots starting at `startIndex` with as many of the chosen/dropped files as fit,
+  // so picking or dropping several photos at once no longer requires repeating the action per slot.
+  async function handleFilesChosen(startIndex, fileList) {
+    const files = [...(fileList || [])];
+    let slot = startIndex;
+    for (const file of files) {
+      while (slot < 3 && pendingPhotos[slot]) slot++;
+      if (slot >= 3) break;
+      await handleFileChosen(slot, file);
+      slot++;
+    }
   }
 
   async function handleFileChosen(i, file) {
@@ -101,7 +114,7 @@ export async function renderHighlightsTab(
     const slotEl = container.querySelector(`[data-drop-slot="${i}"]`);
 
     container.querySelector(`[data-photo-slot="${i}"]`).addEventListener('change', event => {
-      handleFileChosen(i, event.target.files[0]);
+      handleFilesChosen(i, event.target.files);
     });
 
     slotEl.addEventListener('dragover', event => {
@@ -117,8 +130,7 @@ export async function renderHighlightsTab(
     slotEl.addEventListener('drop', event => {
       event.preventDefault();
       slotEl.classList.remove('highlight-upload-slot--dragover');
-      const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
-      handleFileChosen(i, file);
+      handleFilesChosen(i, event.dataTransfer && event.dataTransfer.files);
     });
   }
 

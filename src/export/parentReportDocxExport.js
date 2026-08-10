@@ -531,7 +531,7 @@ export async function generateParentReportDocxBlob({
         properties: sectionProperties,
         headers: { default: pageHeader({ child, report, title: '每月嬰幼兒適性發展紀錄表' }) },
         children: [
-          developmentRecordTable, emptyParagraph(),
+          developmentRecordTable,
           highlightsTable,
           ...signatureParagraphs(),
         ],
