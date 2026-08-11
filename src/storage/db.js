@@ -60,11 +60,11 @@ export async function deleteForm(id) {
   await runRequest('forms', 'readwrite', store => store.delete(id));
 }
 
-export async function addEntry({ formId, indicatorCode, date, achieved, note }) {
+export async function addEntry({ formId, indicatorCode, date, status, note }) {
   const id = await runRequest('entries', 'readwrite', store =>
-    store.add({ formId, indicatorCode, date, achieved, note })
+    store.add({ formId, indicatorCode, date, status, note })
   );
-  return { id, formId, indicatorCode, date, achieved, note };
+  return { id, formId, indicatorCode, date, status, note };
 }
 
 export async function updateEntry(id, changes) {
@@ -81,6 +81,10 @@ export async function deleteEntry(id) {
   await runRequest('entries', 'readwrite', store => store.delete(id));
 }
 
+// Legacy records written before `status` existed only have a boolean `achieved` flag.
+// Normalize them here, at the single read path every consumer (UI, docx export) goes
+// through, instead of teaching every caller to understand both shapes.
 export async function listEntriesForForm(formId) {
-  return runRequest('entries', 'readonly', store => store.index('by_formId').getAll(formId));
+  const entries = await runRequest('entries', 'readonly', store => store.index('by_formId').getAll(formId));
+  return entries.map(entry => (entry.status ? entry : { ...entry, status: entry.achieved ? 'developed' : 'developing' }));
 }

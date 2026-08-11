@@ -7,10 +7,10 @@ const child = { name: '陳小安', birthDate: '2024-11-01' };
 const form = { tier: 'Ⅳ', period: '115年01月' };
 
 const entries = [
-  { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' },
-  { indicatorCode: 'Ⅳ-1-1', date: '2026-02-26', achieved: true, note: '可穩定行走至戶外遊戲場' },
-  { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', achieved: true, note: '穩定蹲下拿起地上的書本' },
-  { indicatorCode: 'Ⅳ-1-2', date: '2026-02-26', achieved: true, note: '可穩定蹲下拿起地上的小石頭' },
+  { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' },
+  { indicatorCode: 'Ⅳ-1-1', date: '2026-02-26', status: 'developing', note: '可穩定行走至戶外遊戲場' },
+  { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', status: 'developed', note: '穩定蹲下拿起地上的書本' },
+  { indicatorCode: 'Ⅳ-1-2', date: '2026-02-26', status: 'developed', note: '可穩定蹲下拿起地上的小石頭' },
 ];
 
 async function exportParts() {
@@ -64,11 +64,11 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     }
   });
 
-  it('writes dates as MM/DD with the ○ achieved marker, not ISO dates', async () => {
+  it('writes dates as MM/DD with the ○/△ status marker, not ISO dates', async () => {
     const { documentXml } = await exportParts();
 
     expect(documentXml).toContain('01/07○');
-    expect(documentXml).toContain('02/26○');
+    expect(documentXml).toContain('02/26△');
     expect(documentXml).not.toContain('2026-01-07');
     expect(documentXml).not.toContain('2026-02-26');
   });
@@ -92,12 +92,33 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(documentXml).not.toContain('幼兒姓名');
   });
 
+  it('computes 實際月齡 from the end of a merged form\'s "115年05月-115年08月" range, not a duplicated tier label', async () => {
+    const rangeForm = { tier: 'Ⅳ', period: '115年05月-115年08月' };
+    const blob = await generateDocxBlob({ child, form: rangeForm, indicators: getIndicatorsForTier('Ⅳ'), entries: [] });
+    const zip = await JSZip.loadAsync(blob);
+    const headerFiles = zip.file(/word\/header\d*\.xml/);
+    const headerXml = await headerFiles[0].async('text');
+
+    // 2024-11-01 (birth) to 115年08月 (2026-08-01, the range's end) is 21 months.
+    expect(headerXml).toContain('實際月齡：21個月');
+    expect(headerXml).not.toContain('個月個月');
+    expect(headerXml).toContain('實施時間：115年05月-115年08月');
+  });
+
+  it('shrinks the 幼兒姓名/出生日期/實際月齡/實施時間 line to 10pt so a long 實施時間 range stays on one line', async () => {
+    const { headerXml } = await exportParts();
+
+    const nameIndex = headerXml.indexOf('幼兒姓名');
+    const paragraph = headerXml.slice(headerXml.lastIndexOf('<w:p>', nameIndex), headerXml.indexOf('</w:p>', nameIndex));
+    expect(paragraph).toContain('<w:sz w:val="20"/>');
+  });
+
   it('builds a 6-column grid with a two-row merged header', async () => {
     const { documentXml } = await exportParts();
 
     expect(documentXml).toContain(
-      '<w:tblGrid><w:gridCol w:w="565"/><w:gridCol w:w="1420"/><w:gridCol w:w="992"/>' +
-        '<w:gridCol w:w="1980"/><w:gridCol w:w="1559"/><w:gridCol w:w="2585"/></w:tblGrid>'
+      '<w:tblGrid><w:gridCol w:w="565"/><w:gridCol w:w="1557"/><w:gridCol w:w="992"/>' +
+        '<w:gridCol w:w="1984"/><w:gridCol w:w="1560"/><w:gridCol w:w="2443"/></w:tblGrid>'
     );
 
     // Header row 1 spans 指標項次/發展活動 and 實施記錄 over two grid columns each.
@@ -108,6 +129,23 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(documentXml).toContain('適性發展指標活動');
     expect(documentXml).toContain('課程實施日期【已發展○】');
     expect(documentXml).toContain('課程實施記錄');
+  });
+
+  it('sets every table border (outer + inside) to 2 1/4 pt (sz 18)', async () => {
+    const { documentXml } = await exportParts();
+
+    const tblPr = documentXml.slice(documentXml.indexOf('<w:tbl>'), documentXml.indexOf('<w:tblGrid>'));
+    expect(tblPr).toContain('<w:tblBorders>');
+    for (const edge of ['top', 'bottom', 'left', 'right', 'insideH', 'insideV']) {
+      expect(tblPr).toContain(`<w:${edge} w:val="single" w:color="auto" w:sz="18"/>`);
+    }
+  });
+
+  it('marks the header column with both status glyphs, matching the two possible row markers', async () => {
+    const { documentXml } = await exportParts();
+
+    expect(documentXml).toContain('課程實施日期【已發展○】');
+    expect(documentXml).toContain('【發展中△】');
   });
 
   it('vertically merges 指標項次/發展活動 across the rows of one indicator only', async () => {

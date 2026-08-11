@@ -103,7 +103,7 @@ async function importV1Or2Children(data) {
       formId: formIdMap.get(entry.formId),
       indicatorCode: entry.indicatorCode,
       date: entry.date,
-      achieved: entry.achieved,
+      status: entry.status ?? (entry.achieved ? 'developed' : 'developing'),
       note: entry.note,
     });
   }

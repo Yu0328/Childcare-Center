@@ -4,6 +4,7 @@ import { renderFormEditorView } from './ui/formEditorView.js';
 import { renderReportTypeSelectView } from './ui/reportTypeSelectView.js';
 import { renderParentReportListView } from './ui/parentReportListView.js';
 import { renderParentReportEditorView } from './ui/parentReportEditorView.js';
+import { renderAggregateCoursePlanView } from './ui/aggregateCoursePlanView.js';
 import { exportBackup, importBackup } from './storage/backup.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 
@@ -39,6 +40,15 @@ export function mountApp(container) {
       child,
       onSelectForm: form => showFormEditor(child, form),
       onBack: () => showChildList('assessment'),
+      onAggregate: () => showAggregateSelect(child),
+    }).catch(showRenderError);
+  }
+
+  function showAggregateSelect(child) {
+    renderAggregateCoursePlanView(container, {
+      child,
+      onCreated: form => showFormEditor(child, form),
+      onBack: () => showFormList(child),
     }).catch(showRenderError);
   }
 

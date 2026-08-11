@@ -25,7 +25,7 @@ describe('backup export/import', () => {
   it('exports all data as a JSON string', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
-    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' });
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
 
     const json = await exportBackup();
     const data = JSON.parse(json);
@@ -39,7 +39,7 @@ describe('backup export/import', () => {
   it('round-trips through export and import, preserving relationships', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
-    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' });
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
 
     const json = await exportBackup();
     await clearAllData();
@@ -105,13 +105,13 @@ describe('backup export/import', () => {
     expect(restoredHighlight.photos[0].width).toBe(100);
   });
 
-  it('still imports a version-1 backup file (no parent-report data) without error', async () => {
+  it('still imports a version-1 backup file (no parent-report data) without error, mapping its achieved flag to a status', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
-    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: 'x' });
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: 'x' });
 
-    // Simulate an old backup file: hand-build the exact v1 JSON shape, since exportBackup() now
-    // always writes v2 — this is what a real user's pre-existing backup file looks like.
+    // Simulate a real old backup file: hand-build the exact v1 JSON shape, which only ever had
+    // `achieved`, never `status` — this is what a real user's pre-existing backup file looks like.
     const v1Json = JSON.stringify({
       version: 1,
       children: [{ id: child.id, name: child.name, birthDate: child.birthDate }],
@@ -124,5 +124,9 @@ describe('backup export/import', () => {
 
     const [restoredChild] = await listChildren();
     expect(restoredChild.name).toBe('陳小安');
+
+    const forms = await listFormsForChild(restoredChild.id);
+    const entries = await listEntriesForForm(forms[0].id);
+    expect(entries[0].status).toBe('developed');
   });
 });

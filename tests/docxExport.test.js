@@ -10,26 +10,33 @@ describe('buildIndicatorRows', () => {
   it('emits one blank row for an indicator with no entries', () => {
     const rows = buildIndicatorRows(indicators, {});
     expect(rows).toEqual([
-      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', date: '', achieved: false, note: '' },
-      { code: 'Ⅳ-1-2', description: '能保持平衡撿拾地上物品', date: '', achieved: false, note: '' },
+      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', date: '', status: null, note: '' },
+      { code: 'Ⅳ-1-2', description: '能保持平衡撿拾地上物品', date: '', status: null, note: '' },
     ]);
   });
 
   it('emits one row per entry, preserving indicator order', () => {
     const entriesByIndicatorCode = {
       'Ⅳ-1-1': [
-        { date: '2026-01-07', achieved: true, note: '可以來回穩定行走' },
-        { date: '2026-02-26', achieved: true, note: '可穩定行走至戶外遊戲場' },
+        { date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' },
+        { date: '2026-02-26', status: 'developing', note: '可穩定行走至戶外遊戲場' },
       ],
     };
 
     const rows = buildIndicatorRows(indicators, entriesByIndicatorCode);
 
     expect(rows).toEqual([
-      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' },
-      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', date: '2026-02-26', achieved: true, note: '可穩定行走至戶外遊戲場' },
-      { code: 'Ⅳ-1-2', description: '能保持平衡撿拾地上物品', date: '', achieved: false, note: '' },
+      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' },
+      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', date: '2026-02-26', status: 'developing', note: '可穩定行走至戶外遊戲場' },
+      { code: 'Ⅳ-1-2', description: '能保持平衡撿拾地上物品', date: '', status: null, note: '' },
     ]);
+  });
+
+  it('passes an entry\'s status through unchanged, even when it is undefined', () => {
+    const rows = buildIndicatorRows(indicators, {
+      'Ⅳ-1-1': [{ date: '2026-01-07', status: undefined, note: 'x' }],
+    });
+    expect(rows[0].status).toBeUndefined();
   });
 });
 
@@ -51,8 +58,8 @@ describe('buildIndicatorRowGroups domain grouping', () => {
   it('keeps the flag independent of how many entry rows an indicator has', () => {
     const groups = buildIndicatorRowGroups(byDomain, {
       'Ⅳ-1-1': [
-        { date: '2026-01-07', achieved: true, note: 'x' },
-        { date: '2026-02-26', achieved: true, note: 'y' },
+        { date: '2026-01-07', status: 'developed', note: 'x' },
+        { date: '2026-02-26', status: 'developed', note: 'y' },
       ],
     });
 
@@ -81,7 +88,7 @@ describe('generateDocxBlob', () => {
       { code: 'Ⅳ-1-1', description: '能獨立穩定行走', domainName: '身體動作', subdomain: '粗動作、精細動作' },
     ];
     const entries = [
-      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' },
     ];
 
     const blob = await generateDocxBlob({

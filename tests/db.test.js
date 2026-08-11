@@ -5,6 +5,7 @@ import {
   addEntry, updateEntry, deleteEntry, listEntriesForForm,
 } from '../src/storage/db.js';
 import { addParentReport, listParentReportsForChild } from '../src/storage/parentReportDb.js';
+import { runRequest } from '../src/storage/dbCore.js';
 
 describe('children storage', () => {
   beforeEach(async () => {
@@ -41,7 +42,7 @@ describe('children storage', () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     const otherChild = await addChild({ name: '林小晴', birthDate: '2024-07-19' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
-    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '測試' });
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '測試' });
 
     await deleteChild(child.id);
 
@@ -103,7 +104,7 @@ describe('forms and entries storage', () => {
       formId: form.id,
       indicatorCode: 'Ⅳ-1-1',
       date: '2026-01-07',
-      achieved: true,
+      status: 'developed',
       note: '可以來回穩定行走',
     });
     expect(entry.id).toBeTypeOf('number');
@@ -128,13 +129,31 @@ describe('forms and entries storage', () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
     const otherForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年02月' });
-    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '測試' });
-    const otherEntry = await addEntry({ formId: otherForm.id, indicatorCode: 'Ⅳ-1-1', date: '2026-02-07', achieved: true, note: '不受影響' });
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '測試' });
+    const otherEntry = await addEntry({ formId: otherForm.id, indicatorCode: 'Ⅳ-1-1', date: '2026-02-07', status: 'developed', note: '不受影響' });
 
     await deleteForm(form.id);
 
     expect(await getForm(form.id)).toBeUndefined();
     expect(await listEntriesForForm(form.id)).toEqual([]);
     expect(await listEntriesForForm(otherForm.id)).toEqual([otherEntry]);
+  });
+
+  it('normalizes legacy entries that only have "achieved" (pre-status data) into a status when listed', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+
+    // Simulate a record written before this field existed: no `status`, only `achieved`.
+    const developedId = await runRequest('entries', 'readwrite', store =>
+      store.add({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '舊資料-已達成' })
+    );
+    const developingId = await runRequest('entries', 'readwrite', store =>
+      store.add({ formId: form.id, indicatorCode: 'Ⅳ-1-2', date: '2026-01-08', achieved: false, note: '舊資料-未達成' })
+    );
+
+    const entries = await listEntriesForForm(form.id);
+
+    expect(entries.find(e => e.id === developedId).status).toBe('developed');
+    expect(entries.find(e => e.id === developingId).status).toBe('developing');
   });
 });

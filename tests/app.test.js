@@ -63,6 +63,26 @@ describe('mountApp navigation', () => {
     await waitFor(() => container.textContent.includes('選擇要填寫的表'));
     expect(container.textContent).toContain('選擇要填寫的表');
   });
+
+  it('navigates from the form list to the aggregate-from-parent-reports screen and back', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    mountApp(container);
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    container.querySelector('[data-type="assessment"]').click();
+    await waitFor(() => container.querySelector(`[data-child-id="${child.id}"]`));
+    container.querySelector(`[data-child-id="${child.id}"]`).click();
+    await waitFor(() => container.textContent.includes('的適性總表'));
+
+    container.querySelector('[data-action="aggregate"]').click();
+    await waitFor(() => container.textContent.includes('尚無適性紀錄可彙整'));
+    expect(container.textContent).toContain('從適性紀錄彙整');
+
+    container.querySelector('[data-action="back"]').click();
+    await waitFor(() => container.textContent.includes('的適性總表'));
+    expect(container.textContent).toContain('的適性總表');
+  });
 });
 
 describe('mountApp password gate', () => {

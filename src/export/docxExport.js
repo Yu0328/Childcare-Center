@@ -1,5 +1,6 @@
 import {
   AlignmentType,
+  BorderStyle,
   Document,
   Header,
   HeightRule,
@@ -33,14 +34,27 @@ import {
 // (陳小安C表-2.docx). Kept as a constant so another centre adopting this tool can change it in one place.
 const INSTITUTION_NAME = '屏東縣內埔鄉社區公共托育家園';
 
-// Column widths in DXA (twips), copied from the real form's <w:tblGrid>.
-const COLUMN_WIDTHS = [565, 1420, 992, 1980, 1559, 2585];
+// Column widths in DXA (twips), copied from the real form's <w:tblGrid> (verified against both
+// 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these widths).
+const COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
 // The real form's table is narrower than the page's text area and centered in the remaining
 // space (<w:jc w:val="center"/> on the original's <w:tblPr>) rather than stretched edge to edge.
 const TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
 // Cell padding, copied from the original's table style (<w:tblCellMar>) — narrower than the
 // library default, which was leaving enough room for two characters per line in narrow columns.
 const TABLE_CELL_MARGIN_DXA = 115;
+
+// All table borders at 2 1/4 pt (Word's border-width dropdown preset). docx's `size` is in
+// eighths of a point, so 18 = 2.25pt.
+const TABLE_BORDER = { style: BorderStyle.SINGLE, size: 18, color: 'auto' };
+const TABLE_BORDERS = {
+  top: TABLE_BORDER,
+  bottom: TABLE_BORDER,
+  left: TABLE_BORDER,
+  right: TABLE_BORDER,
+  insideHorizontal: TABLE_BORDER,
+  insideVertical: TABLE_BORDER,
+};
 
 const SUBDOMAIN_SEPARATOR = '、';
 
@@ -50,6 +64,11 @@ const PAGE_MARGIN = { top: 851, right: 851, bottom: 851, left: 1134, header: 851
 
 // Header title font size in half-points: 34 half-points = 17pt, as in the original.
 const HEADER_TITLE_SIZE = 34;
+
+// Smaller than DEFAULT_TEXT_SIZE (24 = 12pt): the 幼兒姓名/出生日期/實際月齡/實施時間 line has grown
+// longer since a merged form's 實施時間 can be a "115年05月-115年08月" range, and at the default
+// size it wraps onto a second line. 20 half-points = 10pt keeps it on one line.
+const CHILD_INFO_LINE_SIZE = 20;
 
 // The original's decorative icon size floats in the left margin, offset far enough left that it
 // never overlaps the title's text line — that way the title can be centered on the full page
@@ -95,12 +114,12 @@ export function buildIndicatorRowGroups(indicators, entriesByIndicatorCode) {
 
     const rows =
       entries.length === 0
-        ? [{ code: indicator.code, description: indicator.description, date: '', achieved: false, note: '' }]
+        ? [{ code: indicator.code, description: indicator.description, date: '', status: null, note: '' }]
         : entries.map(entry => ({
             code: indicator.code,
             description: indicator.description,
             date: entry.date,
-            achieved: entry.achieved,
+            status: entry.status,
             note: entry.note,
           }));
 
@@ -121,7 +140,8 @@ function formatDateCell(row) {
   if (!row.date) return '';
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
   const formatted = match ? `${match[2]}/${match[3]}` : row.date;
-  return row.achieved ? `${formatted}○` : formatted;
+  const glyph = row.status === 'developed' ? '○' : row.status === 'developing' ? '△' : '';
+  return `${formatted}${glyph}`;
 }
 
 function tierLabelFor(tierCode) {
@@ -186,7 +206,7 @@ function headerRows() {
         verticalAlign: VerticalAlign.CENTER,
         children: [
           textParagraph('課程實施日期【已發展○】', { bold: true, ...CENTERED }),
-          textParagraph('【發展中】', { bold: true, ...CENTERED }),
+          textParagraph('【發展中△】', { bold: true, ...CENTERED }),
         ],
       }),
       new TableCell({
@@ -246,9 +266,14 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
 }
 
 // "115年01月" (ROC year + month, as entered in 紀錄年月) -> "2026-01-01" for age calculation.
+// A merged form's period can be a "115年05月-115年08月" range (see aggregateCoursePlan.js) — use
+// the later (rightmost) end of the range, since that's the most recent point in time and closest
+// to the child's actual age when the merged total form was assembled.
 // Falls back to null for anything that doesn't match, since 期 is free-text.
 function periodToReferenceDate(period) {
-  const match = /^(\d{1,3})年(\d{1,2})月$/.exec(String(period ?? '').trim());
+  const trimmed = String(period ?? '').trim();
+  const lastSegment = trimmed.includes('-') ? trimmed.slice(trimmed.lastIndexOf('-') + 1).trim() : trimmed;
+  const match = /^(\d{1,3})年(\d{1,2})月$/.exec(lastSegment);
   if (!match) return null;
   const gregorianYear = Number(match[1]) + 1911;
   const month = String(Number(match[2])).padStart(2, '0');
@@ -258,10 +283,9 @@ function periodToReferenceDate(period) {
 function pageHeader({ child, form }) {
   const tierLabel = tierLabelFor(form.tier);
   const referenceDate = periodToReferenceDate(form.period);
+  // tierLabel (e.g. "13-18個月") already ends in "個月" — do not append a second one here.
   const actualAgeText =
-    referenceDate && child.birthDate
-      ? `${calculateAgeInMonths(child.birthDate, referenceDate)}個月`
-      : `${tierLabel}個月`;
+    referenceDate && child.birthDate ? `${calculateAgeInMonths(child.birthDate, referenceDate)}個月` : tierLabel;
 
   return new Header({
     children: [
@@ -279,7 +303,7 @@ function pageHeader({ child, form }) {
       }),
       textParagraph(
         `幼兒姓名：${child.name} 出生日期：${toRocDate(child.birthDate)} 實際月齡：${actualAgeText}　實施時間：${form.period}`,
-        { bold: true, ...CENTERED }
+        { bold: true, size: CHILD_INFO_LINE_SIZE, ...CENTERED }
       ),
     ],
   });
@@ -319,6 +343,7 @@ export async function generateDocxBlob({ child, form, indicators, entries }) {
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
     margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
+    borders: TABLE_BORDERS,
     rows: [...headerRows(), ...bodyRows],
   });
 

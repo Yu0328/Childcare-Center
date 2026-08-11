@@ -94,6 +94,22 @@ describe('renderImportPreviewView', () => {
     expect(entries[0].indicatorCode).toBe('Ⅳ-1-1');
   });
 
+  it('maps each parsed entry\'s achieved flag to a status when saving', async () => {
+    const container = document.createElement('div');
+    let imported = false;
+    renderImportPreviewView(container, { parsed: baseParsed(), onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const children = await listChildren();
+    const forms = await listFormsForChild(children[0].id);
+    const entries = await listEntriesForForm(forms[0].id);
+
+    expect(entries.find(e => e.indicatorCode === 'Ⅳ-1-1').status).toBe('developed');
+    expect(entries.find(e => e.indicatorCode === 'Ⅳ-1-2').status).toBe('developing');
+  });
+
   it('lets the teacher correct the header fields before confirming', async () => {
     const container = document.createElement('div');
     let imported = false;

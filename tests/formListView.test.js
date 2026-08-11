@@ -111,4 +111,14 @@ describe('renderFormListView', () => {
     expect(container.innerHTML).toContain('&lt;script&gt;');
     expect(container.textContent).toContain('<script>window.__xss = true;</script>');
   });
+
+  it('calls onAggregate when the "從適性紀錄彙整" button is clicked', async () => {
+    const container = document.createElement('div');
+    const onAggregate = vi.fn();
+    await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {}, onAggregate });
+
+    container.querySelector('[data-action="aggregate"]').click();
+
+    expect(onAggregate).toHaveBeenCalled();
+  });
 });

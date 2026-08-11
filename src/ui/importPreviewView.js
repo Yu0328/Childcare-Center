@@ -12,7 +12,7 @@ function entryRow(entry, index) {
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
         ${entry.description ? escapeHtml(entry.description) : '（無法對應到系統指標，建議取消勾選）'}
         —
-        ${escapeHtml(entry.date)}${entry.achieved ? '○' : ''}
+        ${escapeHtml(entry.date)}${entry.achieved ? '○' : '△'}
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>
@@ -89,7 +89,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
           formId: form.id,
           indicatorCode: entry.indicatorCode,
           date: entry.date,
-          achieved: entry.achieved,
+          status: entry.achieved ? 'developed' : 'developing',
           note: entry.note,
         });
       }

@@ -139,6 +139,17 @@ button {
   color: var(--brand);
 }
 
+/* Reuses the same soft-purple tokens as .btn--edit (see --edit-tint et al. above) so this
+   doesn't introduce a second, near-duplicate purple. */
+.btn--purple {
+  background: var(--edit-tint);
+  border-color: var(--edit-border);
+  color: var(--edit-accent);
+}
+.btn--purple:hover {
+  background: var(--edit-tint-hover);
+}
+
 .btn--ghost {
   background: var(--brand-tint);
   color: var(--brand-dark);
@@ -244,7 +255,10 @@ button {
   flex-wrap: wrap;
 }
 
-.page-header--editor .btn[data-action="export"] {
+.page-header--editor .btn[data-action="export"],
+.page-header--editor .btn[data-action="aggregate"],
+.page-header--editor .btn[data-action="import-docx"],
+.page-header--editor .btn[data-action="import-parent-report-docx"] {
   position: absolute;
   right: 0;
   left: auto;
@@ -888,12 +902,6 @@ button {
 
 /* ---------- Word import ---------- */
 
-.import-trigger {
-  max-width: 420px;
-  margin: 1.5rem auto 0;
-  text-align: center;
-}
-
 .import-preview__warnings {
   list-style: none;
   max-width: 640px;
@@ -969,7 +977,10 @@ button {
     flex-direction: column;
   }
   .page-header .btn,
-  .page-header--editor .btn[data-action="export"] {
+  .page-header--editor .btn[data-action="export"],
+  .page-header--editor .btn[data-action="aggregate"],
+  .page-header--editor .btn[data-action="import-docx"],
+  .page-header--editor .btn[data-action="import-parent-report-docx"] {
     position: static;
   }
   .tab-layout {

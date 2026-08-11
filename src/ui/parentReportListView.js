@@ -19,40 +19,44 @@ export async function renderParentReportListView(
       <button type="button" class="btn btn--ghost" data-action="back">← 返回幼兒列表</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} 的適性紀錄(家長版)</h2>
     </div>
-    <ul class="card-list">
-      ${reports
-        .map(
-          report =>
-            `<li class="card-list__row">
-              <button type="button" class="card-list__item" data-report-id="${escapeHtml(report.id)}">
-                <span class="card-list__name">${escapeHtml(report.tier)} 階段</span>
-                <span class="card-list__meta">${escapeHtml(report.period)}</span>
-              </button>
-              <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="刪除${escapeHtml(report.tier)} ${escapeHtml(report.period)}">×</button>
-            </li>`
-        )
-        .join('')}
-    </ul>
-    <p class="field-error" data-error="delete"></p>
-    <form class="panel-form" data-action="add-report">
-      <h3 class="panel-form__title">新增適性紀錄</h3>
-      <label class="panel-form__field">
-        月齡階段
-        <select data-field="tier">
-          ${TIERS.map(t => `<option value="${t.code}" ${t.code === suggested ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        紀錄年月
-        ${periodSelectsHtml({
-          yearFieldName: 'period-year',
-          monthFieldName: 'period-month',
-          selectedYear: defaultYear,
-          selectedMonth: defaultMonth,
-        })}
-      </label>
-      <button type="submit" class="btn btn--primary">新增</button>
-    </form>
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list">
+          ${reports
+            .map(
+              report =>
+                `<li class="card-list__row">
+                  <button type="button" class="card-list__item" data-report-id="${escapeHtml(report.id)}">
+                    <span class="card-list__name">${escapeHtml(report.tier)} 階段</span>
+                    <span class="card-list__meta">${escapeHtml(report.period)}</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="刪除${escapeHtml(report.tier)} ${escapeHtml(report.period)}">×</button>
+                </li>`
+            )
+            .join('')}
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      <form class="panel-form" data-action="add-report">
+        <h3 class="panel-form__title">新增適性紀錄</h3>
+        <label class="panel-form__field">
+          月齡階段
+          <select data-field="tier">
+            ${TIERS.map(t => `<option value="${t.code}" ${t.code === suggested ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          紀錄年月
+          ${periodSelectsHtml({
+            yearFieldName: 'period-year',
+            monthFieldName: 'period-month',
+            selectedYear: defaultYear,
+            selectedMonth: defaultMonth,
+          })}
+        </label>
+        <button type="submit" class="btn btn--primary">新增</button>
+      </form>
+    </div>
   `;
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);

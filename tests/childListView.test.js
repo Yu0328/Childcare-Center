@@ -17,7 +17,7 @@ async function buildSampleDocxFile() {
     child: { name: '陳小安', birthDate: '2024-11-01' },
     form: { tier: 'Ⅳ', period: '115年01月' },
     indicators,
-    entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' }],
+    entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' }],
   });
 }
 

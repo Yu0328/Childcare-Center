@@ -150,6 +150,17 @@ button {
   color: var(--brand);
 }
 
+/* Reuses the same soft-purple tokens as .btn--edit (see --edit-tint et al. above) so this
+   doesn't introduce a second, near-duplicate purple. */
+.btn--purple {
+  background: var(--edit-tint);
+  border-color: var(--edit-border);
+  color: var(--edit-accent);
+}
+.btn--purple:hover {
+  background: var(--edit-tint-hover);
+}
+
 .btn--ghost {
   background: var(--brand-tint);
   color: var(--brand-dark);
@@ -255,7 +266,10 @@ button {
   flex-wrap: wrap;
 }
 
-.page-header--editor .btn[data-action="export"] {
+.page-header--editor .btn[data-action="export"],
+.page-header--editor .btn[data-action="aggregate"],
+.page-header--editor .btn[data-action="import-docx"],
+.page-header--editor .btn[data-action="import-parent-report-docx"] {
   position: absolute;
   right: 0;
   left: auto;
@@ -899,12 +913,6 @@ button {
 
 /* ---------- Word import ---------- */
 
-.import-trigger {
-  max-width: 420px;
-  margin: 1.5rem auto 0;
-  text-align: center;
-}
-
 .import-preview__warnings {
   list-style: none;
   max-width: 640px;
@@ -980,7 +988,10 @@ button {
     flex-direction: column;
   }
   .page-header .btn,
-  .page-header--editor .btn[data-action="export"] {
+  .page-header--editor .btn[data-action="export"],
+  .page-header--editor .btn[data-action="aggregate"],
+  .page-header--editor .btn[data-action="import-docx"],
+  .page-header--editor .btn[data-action="import-parent-report-docx"] {
     position: static;
   }
   .tab-layout {
@@ -3492,6 +3503,9 @@ var CFormApp = (() => {
   async function listParentReportsForChild(childId) {
     return runRequest("parentReports", "readonly", (store) => store.index("by_childId").getAll(childId));
   }
+  async function getParentReport(id) {
+    return runRequest("parentReports", "readonly", (store) => store.get(id));
+  }
   async function deleteParentReport(id) {
     const coursePlanEntries = await listCoursePlanEntriesForReport(id);
     for (const entry of coursePlanEntries) {
@@ -3647,13 +3661,13 @@ var CFormApp = (() => {
     }
     await runRequest("forms", "readwrite", (store) => store.delete(id));
   }
-  async function addEntry({ formId, indicatorCode, date, achieved, note }) {
+  async function addEntry({ formId, indicatorCode, date, status, note }) {
     const id = await runRequest(
       "entries",
       "readwrite",
-      (store) => store.add({ formId, indicatorCode, date, achieved, note })
+      (store) => store.add({ formId, indicatorCode, date, status, note })
     );
-    return { id, formId, indicatorCode, date, achieved, note };
+    return { id, formId, indicatorCode, date, status, note };
   }
   async function updateEntry(id, changes) {
     const existing = await runRequest("entries", "readonly", (store) => store.get(id));
@@ -3668,7 +3682,8 @@ var CFormApp = (() => {
     await runRequest("entries", "readwrite", (store) => store.delete(id));
   }
   async function listEntriesForForm(formId) {
-    return runRequest("entries", "readonly", (store) => store.index("by_formId").getAll(formId));
+    const entries = await runRequest("entries", "readonly", (store) => store.index("by_formId").getAll(formId));
+    return entries.map((entry) => entry.status ? entry : { ...entry, status: entry.achieved ? "developed" : "developing" });
   }
 
   // src/ui/escapeHtml.js
@@ -3912,11 +3927,11 @@ var CFormApp = (() => {
     }
   ];
   var TIERS = [
-    { code: "\u2160", label: "0-3\u500B\u6708", minMonths: 0, maxMonths: 3 },
-    { code: "\u2161", label: "4-6\u500B\u6708", minMonths: 4, maxMonths: 6 },
-    { code: "\u2162", label: "7-12\u500B\u6708", minMonths: 7, maxMonths: 12 },
-    { code: "\u2163", label: "13-18\u500B\u6708", minMonths: 13, maxMonths: 18 },
-    { code: "\u2164", label: "19-24\u500B\u6708", minMonths: 19, maxMonths: 24 }
+    { code: "\u2160", label: "0-3\u500B\u6708", minMonths: 0, maxMonths: 3, formLetter: "A" },
+    { code: "\u2161", label: "4-6\u500B\u6708", minMonths: 4, maxMonths: 6, formLetter: "B" },
+    { code: "\u2162", label: "7-12\u500B\u6708", minMonths: 7, maxMonths: 12, formLetter: "C" },
+    { code: "\u2163", label: "13-18\u500B\u6708", minMonths: 13, maxMonths: 18, formLetter: "D" },
+    { code: "\u2164", label: "19-24\u500B\u6708", minMonths: 19, maxMonths: 24, formLetter: "E" }
   ];
   var DOMAINS = RAW_DOMAINS.map(({ domain, name, subdomain }) => ({
     id: domain,
@@ -4111,7 +4126,7 @@ var CFormApp = (() => {
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
         ${entry.description ? escapeHtml(entry.description) : "\uFF08\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF0C\u5EFA\u8B70\u53D6\u6D88\u52FE\u9078\uFF09"}
         \u2014
-        ${escapeHtml(entry.date)}${entry.achieved ? "\u25CB" : ""}
+        ${escapeHtml(entry.date)}${entry.achieved ? "\u25CB" : "\u25B3"}
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>
@@ -4177,7 +4192,7 @@ var CFormApp = (() => {
             formId: form.id,
             indicatorCode: entry.indicatorCode,
             date: entry.date,
-            achieved: entry.achieved,
+            status: entry.achieved ? "developed" : "developing",
             note: entry.note
           });
         }
@@ -4560,37 +4575,36 @@ var CFormApp = (() => {
     const children = await listChildren();
     const isParentReport = reportType === "parent-report";
     container.innerHTML = `
-    <div class="page-header">
+    <div class="page-header page-header--editor">
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
       <h2 class="page-header__title">\u5E7C\u5152\u5217\u8868</h2>
+      ${isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">\u9069\u6027\u7D00\u9304\u532F\u5165</button>
+             <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
+             <input type="file" accept=".docx" data-field="import-file" hidden>`}
     </div>
-    <ul class="card-list">
-      ${children.map(
+    <p class="field-error field-error--center" data-error="import"></p>
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list">
+          ${children.map(
       (child) => `<li class="card-list__row">
-              <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
-                <span class="card-list__name">${escapeHtml(child.name)}</span>
-                <span class="card-list__meta">\u51FA\u751F\u65E5\u671F\uFF1A${escapeHtml(child.birthDate)}</span>
-              </button>
-              <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="\u522A\u9664${escapeHtml(child.name)}">\xD7</button>
-            </li>`
+                  <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
+                    <span class="card-list__name">${escapeHtml(child.name)}</span>
+                    <span class="card-list__meta">\u51FA\u751F\u65E5\u671F\uFF1A${escapeHtml(child.birthDate)}</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="\u522A\u9664${escapeHtml(child.name)}">\xD7</button>
+                </li>`
     ).join("")}
-    </ul>
-    <p class="field-error" data-error="delete"></p>
-    <form class="panel-form" data-action="add-child">
-      <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
-      <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
-      <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" required></label>
-      <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-    </form>
-    ${isParentReport ? `<div class="import-trigger">
-            <button type="button" class="btn btn--outline" data-action="import-parent-report-docx">\u9069\u6027\u7D00\u9304\u532F\u5165</button>
-            <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>
-            <p class="field-error" data-error="import"></p>
-          </div>` : `<div class="import-trigger">
-            <button type="button" class="btn btn--outline" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
-            <input type="file" accept=".docx" data-field="import-file" hidden>
-            <p class="field-error" data-error="import"></p>
-          </div>`}
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      <form class="panel-form" data-action="add-child">
+        <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
+        <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" required></label>
+        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+      </form>
+    </div>
   `;
     if (onBack) {
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
@@ -4686,50 +4700,57 @@ var CFormApp = (() => {
   }
 
   // src/ui/formListView.js
-  async function renderFormListView(container, { child, onSelectForm, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
+  async function renderFormListView(container, { child, onSelectForm, onBack, onAggregate = () => {
+  }, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
     const forms = await listFormsForChild(child.id);
     const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const suggested = suggestTier(child.birthDate, today);
     const defaultYear = currentRocYear();
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
     container.innerHTML = `
-    <div class="page-header">
+    <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} \u7684\u9069\u6027\u7E3D\u8868</h2>
+      <button type="button" class="btn btn--purple" data-action="aggregate">\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</button>
     </div>
-    <ul class="card-list">
-      ${forms.map(
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list">
+          ${forms.map(
       (form) => `<li class="card-list__row">
-              <button type="button" class="card-list__item" data-form-id="${escapeHtml(form.id)}">
-                <span class="card-list__name">${escapeHtml(form.tier)} \u968E\u6BB5</span>
-                <span class="card-list__meta">${escapeHtml(form.period)}</span>
-              </button>
-              <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="\u522A\u9664${escapeHtml(form.tier)} ${escapeHtml(form.period)}">\xD7</button>
-            </li>`
+                  <button type="button" class="card-list__item" data-form-id="${escapeHtml(form.id)}">
+                    <span class="card-list__name">${escapeHtml(form.tier)} \u968E\u6BB5</span>
+                    <span class="card-list__meta">${escapeHtml(form.period)}</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="\u522A\u9664${escapeHtml(form.tier)} ${escapeHtml(form.period)}">\xD7</button>
+                </li>`
     ).join("")}
-    </ul>
-    <p class="field-error" data-error="delete"></p>
-    <form class="panel-form" data-action="add-form">
-      <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7E3D\u8868</h3>
-      <label class="panel-form__field">
-        \u6708\u9F61\u968E\u6BB5
-        <select data-field="tier">
-          ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        \u7D00\u9304\u5E74\u6708
-        ${periodSelectsHtml({
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      <form class="panel-form" data-action="add-form">
+        <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7E3D\u8868</h3>
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          \u7D00\u9304\u5E74\u6708
+          ${periodSelectsHtml({
       yearFieldName: "period-year",
       monthFieldName: "period-month",
       selectedYear: defaultYear,
       selectedMonth: defaultMonth
     })}
-      </label>
-      <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-    </form>
+        </label>
+        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+      </form>
+    </div>
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    container.querySelector('[data-action="aggregate"]').addEventListener("click", onAggregate);
     for (const form of forms) {
       container.querySelector(`[data-form-id="${form.id}"]`).addEventListener("click", () => onSelectForm(form));
     }
@@ -4738,7 +4759,7 @@ var CFormApp = (() => {
         if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${form.tier} ${form.period}\u300D\u9019\u4EFD\u9069\u6027\u7E3D\u8868\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
         try {
           await deleteForm(form.id);
-          await renderFormListView(container, { child, onSelectForm, onBack, confirmDelete });
+          await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
         } catch (err) {
           container.querySelector('[data-error="delete"]').textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
         }
@@ -4752,7 +4773,7 @@ var CFormApp = (() => {
       const period = `${year}\u5E74${month}\u6708`;
       try {
         await addForm({ childId: child.id, tier, period });
-        await renderFormListView(container, { child, onSelectForm, onBack, confirmDelete });
+        await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
       } catch (err) {
         const form = container.querySelector('[data-action="add-form"]');
         let errorEl = form.querySelector("[data-error]");
@@ -23896,12 +23917,22 @@ var CFormApp = (() => {
 
   // src/export/docxExport.js
   var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u793E\u5340\u516C\u5171\u6258\u80B2\u5BB6\u5712";
-  var COLUMN_WIDTHS = [565, 1420, 992, 1980, 1559, 2585];
+  var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
   var TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
   var TABLE_CELL_MARGIN_DXA = 115;
+  var TABLE_BORDER = { style: BorderStyle.SINGLE, size: 18, color: "auto" };
+  var TABLE_BORDERS = {
+    top: TABLE_BORDER,
+    bottom: TABLE_BORDER,
+    left: TABLE_BORDER,
+    right: TABLE_BORDER,
+    insideHorizontal: TABLE_BORDER,
+    insideVertical: TABLE_BORDER
+  };
   var SUBDOMAIN_SEPARATOR = "\u3001";
   var PAGE_MARGIN = { top: 851, right: 851, bottom: 851, left: 1134, header: 851, footer: 992 };
   var HEADER_TITLE_SIZE = 34;
+  var CHILD_INFO_LINE_SIZE = 20;
   var HEADER_ICON_OFFSET_EMU = { horizontal: -(HEADER_ICON_EMU.width + 4e4), vertical: 8890 };
   var TABLE_HEADER_ROW_HEIGHTS = [438, 720];
   var CAREGIVER_SIGNATURE_LINE = "\u6258\u80B2\u4EBA\u54E1\uFF1A\u3000\u3000\u3000\u3000\u3000\u4E3B\u7BA1\u7C3D\u540D\uFF1A";
@@ -23922,11 +23953,11 @@ var CFormApp = (() => {
     let previousDomainLabel = null;
     return indicators.map((indicator) => {
       const entries = entriesByIndicatorCode[indicator.code] || [];
-      const rows = entries.length === 0 ? [{ code: indicator.code, description: indicator.description, date: "", achieved: false, note: "" }] : entries.map((entry) => ({
+      const rows = entries.length === 0 ? [{ code: indicator.code, description: indicator.description, date: "", status: null, note: "" }] : entries.map((entry) => ({
         code: indicator.code,
         description: indicator.description,
         date: entry.date,
-        achieved: entry.achieved,
+        status: entry.status,
         note: entry.note
       }));
       const domainLabel = domainLabelFor(indicator);
@@ -23939,7 +23970,8 @@ var CFormApp = (() => {
     if (!row.date) return "";
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
     const formatted = match ? `${match[2]}/${match[3]}` : row.date;
-    return row.achieved ? `${formatted}\u25CB` : formatted;
+    const glyph = row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
+    return `${formatted}${glyph}`;
   }
   function tierLabelFor(tierCode) {
     const tier = TIERS.find((t) => t.code === tierCode);
@@ -24001,7 +24033,7 @@ var CFormApp = (() => {
           verticalAlign: VerticalAlign.CENTER,
           children: [
             textParagraph("\u8AB2\u7A0B\u5BE6\u65BD\u65E5\u671F\u3010\u5DF2\u767C\u5C55\u25CB\u3011", { bold: true, ...CENTERED }),
-            textParagraph("\u3010\u767C\u5C55\u4E2D\u3011", { bold: true, ...CENTERED })
+            textParagraph("\u3010\u767C\u5C55\u4E2D\u25B3\u3011", { bold: true, ...CENTERED })
           ]
         }),
         new TableCell({
@@ -24047,7 +24079,9 @@ var CFormApp = (() => {
     });
   }
   function periodToReferenceDate(period) {
-    const match = /^(\d{1,3})年(\d{1,2})月$/.exec(String(period ?? "").trim());
+    const trimmed = String(period ?? "").trim();
+    const lastSegment = trimmed.includes("-") ? trimmed.slice(trimmed.lastIndexOf("-") + 1).trim() : trimmed;
+    const match = /^(\d{1,3})年(\d{1,2})月$/.exec(lastSegment);
     if (!match) return null;
     const gregorianYear = Number(match[1]) + 1911;
     const month = String(Number(match[2])).padStart(2, "0");
@@ -24056,7 +24090,7 @@ var CFormApp = (() => {
   function pageHeader({ child, form }) {
     const tierLabel = tierLabelFor(form.tier);
     const referenceDate = periodToReferenceDate(form.period);
-    const actualAgeText = referenceDate && child.birthDate ? `${calculateAgeInMonths(child.birthDate, referenceDate)}\u500B\u6708` : `${tierLabel}\u500B\u6708`;
+    const actualAgeText = referenceDate && child.birthDate ? `${calculateAgeInMonths(child.birthDate, referenceDate)}\u500B\u6708` : tierLabel;
     return new Header({
       children: [
         new Paragraph({
@@ -24073,7 +24107,7 @@ var CFormApp = (() => {
         }),
         textParagraph(
           `\u5E7C\u5152\u59D3\u540D\uFF1A${child.name} \u51FA\u751F\u65E5\u671F\uFF1A${toRocDate(child.birthDate)} \u5BE6\u969B\u6708\u9F61\uFF1A${actualAgeText}\u3000\u5BE6\u65BD\u6642\u9593\uFF1A${form.period}`,
-          { bold: true, ...CENTERED }
+          { bold: true, size: CHILD_INFO_LINE_SIZE, ...CENTERED }
         )
       ]
     });
@@ -24108,6 +24142,7 @@ var CFormApp = (() => {
       layout: TableLayoutType.FIXED,
       alignment: AlignmentType.CENTER,
       margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
+      borders: TABLE_BORDERS,
       rows: [...headerRows(), ...bodyRows]
     });
     const doc = new File({
@@ -24133,11 +24168,24 @@ var CFormApp = (() => {
   }
 
   // src/ui/formEditorView.js
-  function entryRow2(entry) {
+  function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
     return `
-    <li class="entry-row${entry.achieved ? " entry-row--achieved" : ""}" data-entry="${escapeHtml(entry.id)}">
+    <div class="entry-form__radio-group">
+      <label class="entry-form__radio">
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === "developed" ? "checked" : ""}> \u5DF2\u767C\u5C55\u25CB
+      </label>
+      <label class="entry-form__radio">
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === "developing" ? "checked" : ""}> \u767C\u5C55\u4E2D\u25B3
+      </label>
+    </div>
+  `;
+  }
+  function entryRow2(entry) {
+    const mark = entry.status === "developed" ? "\u25CB" : "\u25B3";
+    return `
+    <li class="entry-row${entry.status === "developed" ? " entry-row--achieved" : ""}" data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date">${entry.achieved ? '<span class="entry-row__mark">\u25CB</span>' : ""}${escapeHtml(entry.date)}</span>
+        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>
@@ -24146,7 +24194,7 @@ var CFormApp = (() => {
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
       <div class="entry-form" data-entry-edit-form-for="${escapeHtml(entry.id)}" hidden>
         <label class="entry-form__field">\u65E5\u671F <input type="date" data-entry-edit-field="date" data-entry-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
-        <label class="entry-form__checkbox"><input type="checkbox" data-entry-edit-field="achieved" data-entry-id="${escapeHtml(entry.id)}" ${entry.achieved ? "checked" : ""}> \u5DF2\u9054\u6210</label>
+        ${statusRadios(entry.id, { fieldAttr: "entry-edit-field", idAttr: "entry-id", checkedStatus: entry.status })}
         <input type="text" class="entry-form__note" data-entry-edit-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="\u89C0\u5BDF\u6558\u8FF0" value="${escapeHtml(entry.note)}">
         <div class="entry-form__actions">
           <button type="button" class="btn btn--primary btn--small" data-entry-edit-save-for="${escapeHtml(entry.id)}">\u5132\u5B58</button>
@@ -24165,7 +24213,7 @@ var CFormApp = (() => {
       <button type="button" class="btn btn--outline btn--small" data-add-entry-for="${escapeHtml(indicator.code)}">\uFF0B \u65B0\u589E\u89C0\u5BDF\u7D00\u9304</button>
       <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}" hidden>
         <label class="entry-form__field">\u65E5\u671F <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
-        <label class="entry-form__checkbox"><input type="checkbox" data-entry-field="achieved" data-indicator-code="${escapeHtml(indicator.code)}"> \u5DF2\u9054\u6210</label>
+        ${statusRadios(indicator.code, { fieldAttr: "entry-field", idAttr: "indicator-code", checkedStatus: "developed" })}
         <input type="text" class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="\u89C0\u5BDF\u6558\u8FF0">
         <div class="entry-form__actions">
           <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">\u5132\u5B58</button>
@@ -24208,7 +24256,8 @@ var CFormApp = (() => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
         const blob = await generateDocxBlob({ child, form, indicators, entries: await listEntriesForForm(form.id) });
-        downloadDocx(blob, `${child.name}-C\u8868-${form.period}.docx`);
+        const formLetter = TIERS.find((t) => t.code === form.tier)?.formLetter ?? "C";
+        downloadDocx(blob, `${child.name}-${formLetter}\u8868-${form.period}.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
         if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -24221,10 +24270,12 @@ var CFormApp = (() => {
       });
       container.querySelector(`[data-entry-save-for="${indicator.code}"]`).addEventListener("click", async () => {
         const date = container.querySelector(`[data-entry-field="date"][data-indicator-code="${indicator.code}"]`).value;
-        const achieved = container.querySelector(`[data-entry-field="achieved"][data-indicator-code="${indicator.code}"]`).checked;
+        const radios = container.querySelectorAll(`input[name="status-${escapeHtml(indicator.code)}"]`);
+        const statusInput = Array.from(radios).find((r) => r.checked);
+        const status = statusInput ? statusInput.value : "developed";
         const note = container.querySelector(`[data-entry-field="note"][data-indicator-code="${indicator.code}"]`).value;
         try {
-          await addEntry({ formId: form.id, indicatorCode: indicator.code, date, achieved, note });
+          await addEntry({ formId: form.id, indicatorCode: indicator.code, date, status, note });
           await renderFormEditorView(container, { child, form, onBack, confirmDelete });
         } catch (err) {
           const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
@@ -24260,10 +24311,12 @@ var CFormApp = (() => {
       });
       container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener("click", async () => {
         const date = container.querySelector(`[data-entry-edit-field="date"][data-entry-id="${entry.id}"]`).value;
-        const achieved = container.querySelector(`[data-entry-edit-field="achieved"][data-entry-id="${entry.id}"]`).checked;
+        const radios = container.querySelectorAll(`input[name="status-${escapeHtml(entry.id)}"]`);
+        const statusInput = Array.from(radios).find((r) => r.checked);
+        const status = statusInput ? statusInput.value : "developed";
         const note = container.querySelector(`[data-entry-edit-field="note"][data-entry-id="${entry.id}"]`).value;
         try {
-          await updateEntry(entry.id, { date, achieved, note });
+          await updateEntry(entry.id, { date, status, note });
           await renderFormEditorView(container, { child, form, onBack, confirmDelete });
         } catch (err) {
           const errorEl = container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`);
@@ -24302,37 +24355,41 @@ var CFormApp = (() => {
       <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} \u7684\u9069\u6027\u7D00\u9304(\u5BB6\u9577\u7248)</h2>
     </div>
-    <ul class="card-list">
-      ${reports.map(
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list">
+          ${reports.map(
       (report) => `<li class="card-list__row">
-              <button type="button" class="card-list__item" data-report-id="${escapeHtml(report.id)}">
-                <span class="card-list__name">${escapeHtml(report.tier)} \u968E\u6BB5</span>
-                <span class="card-list__meta">${escapeHtml(report.period)}</span>
-              </button>
-              <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="\u522A\u9664${escapeHtml(report.tier)} ${escapeHtml(report.period)}">\xD7</button>
-            </li>`
+                  <button type="button" class="card-list__item" data-report-id="${escapeHtml(report.id)}">
+                    <span class="card-list__name">${escapeHtml(report.tier)} \u968E\u6BB5</span>
+                    <span class="card-list__meta">${escapeHtml(report.period)}</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="\u522A\u9664${escapeHtml(report.tier)} ${escapeHtml(report.period)}">\xD7</button>
+                </li>`
     ).join("")}
-    </ul>
-    <p class="field-error" data-error="delete"></p>
-    <form class="panel-form" data-action="add-report">
-      <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7D00\u9304</h3>
-      <label class="panel-form__field">
-        \u6708\u9F61\u968E\u6BB5
-        <select data-field="tier">
-          ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        \u7D00\u9304\u5E74\u6708
-        ${periodSelectsHtml({
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      <form class="panel-form" data-action="add-report">
+        <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7D00\u9304</h3>
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          \u7D00\u9304\u5E74\u6708
+          ${periodSelectsHtml({
       yearFieldName: "period-year",
       monthFieldName: "period-month",
       selectedYear: defaultYear,
       selectedMonth: defaultMonth
     })}
-      </label>
-      <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-    </form>
+        </label>
+        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+      </form>
+    </div>
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     for (const report of reports) {
@@ -24765,7 +24822,7 @@ var CFormApp = (() => {
   }
 
   // src/ui/courseplanTabView.js
-  function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
+  function statusRadios2(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
     return `
     <div class="entry-form__radio-group">
       <label class="entry-form__radio">
@@ -24791,7 +24848,7 @@ var CFormApp = (() => {
       <p class="entry-row__note">${escapeHtml(occurrence.note)}</p>
       <div class="entry-form" data-occurrence-edit-form-for="${escapeHtml(occurrence.id)}" hidden>
         <label class="entry-form__field">\u65E5\u671F <input type="date" data-occurrence-edit-field="date" data-occurrence-id="${escapeHtml(occurrence.id)}" value="${escapeHtml(occurrence.date)}"></label>
-        ${statusRadios(occurrence.id, { namePrefix: "status-edit", fieldAttr: "occurrence-edit-field", idAttr: "occurrence-id", checkedStatus: occurrence.status })}
+        ${statusRadios2(occurrence.id, { namePrefix: "status-edit", fieldAttr: "occurrence-edit-field", idAttr: "occurrence-id", checkedStatus: occurrence.status })}
         <label class="entry-form__checkbox">
           <input type="checkbox" data-occurrence-edit-field="absent" data-occurrence-id="${escapeHtml(occurrence.id)}" ${occurrence.absent ? "checked" : ""}> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
         </label>
@@ -25573,6 +25630,139 @@ var CFormApp = (() => {
     await activeTabConfig.render(panel, { report, onChange });
   }
 
+  // src/domain/aggregateCoursePlan.js
+  async function aggregateCoursePlanIntoForm({ childId, tier, reportIds }) {
+    const reports = [];
+    for (const reportId of reportIds) {
+      const report = await getParentReport(reportId);
+      if (report) reports.push(report);
+    }
+    reports.sort((a, b) => a.period.localeCompare(b.period));
+    const toWrite = [];
+    const failed = [];
+    for (const report of reports) {
+      const entries = await listCoursePlanEntriesForReport(report.id);
+      for (const entry of entries) {
+        const indicator = getIndicator(entry.indicatorCode);
+        if (!indicator || indicator.tier !== tier) {
+          failed.push({
+            reportPeriod: report.period,
+            indicatorCode: entry.indicatorCode,
+            activityName: entry.activityName,
+            reason: indicator ? "\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5" : "\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19"
+          });
+          continue;
+        }
+        const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
+        for (const occurrence of occurrences) {
+          if (occurrence.absent) continue;
+          toWrite.push({ indicatorCode: entry.indicatorCode, date: occurrence.date, status: occurrence.status, note: occurrence.note });
+        }
+      }
+    }
+    const firstPeriod = reports[0]?.period ?? "";
+    const lastPeriod = reports[reports.length - 1]?.period ?? "";
+    const period = firstPeriod === lastPeriod ? firstPeriod : `${firstPeriod}-${lastPeriod}`;
+    const form = await addForm({ childId, tier, period });
+    for (const row of toWrite) {
+      await addEntry({ formId: form.id, ...row });
+    }
+    return { form, failed };
+  }
+
+  // src/ui/aggregateCoursePlanView.js
+  function failedListHtml(failed) {
+    return `
+    <div class="field-error" data-aggregate-failed>
+      <p>\u5DF2\u5EFA\u7ACB\u7E3D\u8868\uFF0C\u4F46\u4EE5\u4E0B ${failed.length} \u7B46\u56E0\u6545\u7121\u6CD5\u5E36\u5165\uFF1A</p>
+      <ul>
+        ${failed.map(
+      (item) => `<li>${escapeHtml(item.reportPeriod)}\u3000${escapeHtml(item.indicatorCode)}\u3000\u3010${escapeHtml(item.activityName)}\u3011\u2014${escapeHtml(item.reason)}</li>`
+    ).join("")}
+      </ul>
+      <button type="button" class="btn btn--primary" data-action="go-to-form">\u524D\u5F80\u67E5\u770B\u7E3D\u8868</button>
+    </div>
+  `;
+  }
+  async function renderAggregateCoursePlanView(container, { child, onCreated, onBack }) {
+    const reports = await listParentReportsForChild(child.id);
+    if (reports.length === 0) {
+      container.innerHTML = `
+      <div class="page-header">
+        <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
+        <h2 class="page-header__title">${escapeHtml(child.name)}\u3000\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</h2>
+      </div>
+      <p>\u9019\u4F4D\u5E7C\u5152\u5C1A\u7121\u9069\u6027\u7D00\u9304\u53EF\u5F59\u6574</p>
+    `;
+      container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+      return;
+    }
+    const tiers = [...new Set(reports.map((r) => r.tier))].sort();
+    let selectedTier = tiers[0];
+    function reportsForTier(tier) {
+      return reports.filter((r) => r.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
+    }
+    function render(failed = null, createdForm = null) {
+      const tierReports = reportsForTier(selectedTier);
+      container.innerHTML = `
+      <div class="page-header">
+        <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
+        <h2 class="page-header__title">${escapeHtml(child.name)}\u3000\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</h2>
+      </div>
+      <form class="panel-form" data-action="aggregate">
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${tiers.map((t) => `<option value="${escapeHtml(t)}" ${t === selectedTier ? "selected" : ""}>${escapeHtml(t)} \u968E\u6BB5</option>`).join("")}
+          </select>
+        </label>
+        <fieldset class="panel-form__field">
+          <legend>\u9078\u64C7\u8981\u5F59\u6574\u7684\u9069\u6027\u7D00\u9304</legend>
+          ${tierReports.map(
+        (r) => `
+                <label class="panel-form__checkbox-row">
+                  <input type="checkbox" data-report-checkbox="${escapeHtml(r.id)}">
+                  ${escapeHtml(r.period)}
+                </label>
+              `
+      ).join("")}
+        </fieldset>
+        <button type="submit" class="btn btn--primary">\u5EFA\u7ACB\u7E3D\u8868</button>
+        <p class="field-error" data-error></p>
+      </form>
+      ${failed ? failedListHtml(failed) : ""}
+    `;
+      container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+      container.querySelector('[data-field="tier"]').addEventListener("change", (event) => {
+        selectedTier = event.target.value;
+        render();
+      });
+      container.querySelector('[data-action="aggregate"]').addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const errorEl = container.querySelector('[data-action="aggregate"] [data-error]');
+        const reportIds = tierReports.filter((r) => container.querySelector(`[data-report-checkbox="${r.id}"]`).checked).map((r) => r.id);
+        if (reportIds.length === 0) {
+          errorEl.textContent = "\u8ACB\u81F3\u5C11\u52FE\u9078\u4E00\u7B46\u9069\u6027\u7D00\u9304";
+          return;
+        }
+        try {
+          const { form, failed: failedResult } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: selectedTier, reportIds });
+          if (failedResult.length === 0) {
+            onCreated(form);
+          } else {
+            render(failedResult, form);
+          }
+        } catch (err) {
+          errorEl.textContent = "\u5EFA\u7ACB\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+      if (failed && createdForm) {
+        container.querySelector('[data-action="go-to-form"]').addEventListener("click", () => onCreated(createdForm));
+      }
+    }
+    render();
+  }
+
   // src/storage/backup.js
   var BACKUP_VERSION = 2;
   async function blobToBase64(blob) {
@@ -25663,7 +25853,7 @@ var CFormApp = (() => {
         formId: formIdMap.get(entry.formId),
         indicatorCode: entry.indicatorCode,
         date: entry.date,
-        achieved: entry.achieved,
+        status: entry.status ?? (entry.achieved ? "developed" : "developing"),
         note: entry.note
       });
     }
@@ -25799,7 +25989,15 @@ var CFormApp = (() => {
       renderFormListView(container, {
         child,
         onSelectForm: (form) => showFormEditor(child, form),
-        onBack: () => showChildList("assessment")
+        onBack: () => showChildList("assessment"),
+        onAggregate: () => showAggregateSelect(child)
+      }).catch(showRenderError);
+    }
+    function showAggregateSelect(child) {
+      renderAggregateCoursePlanView(container, {
+        child,
+        onCreated: (form) => showFormEditor(child, form),
+        onBack: () => showFormList(child)
       }).catch(showRenderError);
     }
     function showFormEditor(child, form) {

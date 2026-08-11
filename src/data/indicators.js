@@ -223,12 +223,14 @@ const RAW_DOMAINS = [
   },
 ];
 
+// formLetter: the official per-tier form designation (Ⅰ→A表, Ⅱ→B表, ... Ⅴ→E表), used in the
+// 適性總表 docx export's downloaded filename.
 export const TIERS = [
-  { code: 'Ⅰ', label: '0-3個月', minMonths: 0, maxMonths: 3 },
-  { code: 'Ⅱ', label: '4-6個月', minMonths: 4, maxMonths: 6 },
-  { code: 'Ⅲ', label: '7-12個月', minMonths: 7, maxMonths: 12 },
-  { code: 'Ⅳ', label: '13-18個月', minMonths: 13, maxMonths: 18 },
-  { code: 'Ⅴ', label: '19-24個月', minMonths: 19, maxMonths: 24 },
+  { code: 'Ⅰ', label: '0-3個月', minMonths: 0, maxMonths: 3, formLetter: 'A' },
+  { code: 'Ⅱ', label: '4-6個月', minMonths: 4, maxMonths: 6, formLetter: 'B' },
+  { code: 'Ⅲ', label: '7-12個月', minMonths: 7, maxMonths: 12, formLetter: 'C' },
+  { code: 'Ⅳ', label: '13-18個月', minMonths: 13, maxMonths: 18, formLetter: 'D' },
+  { code: 'Ⅴ', label: '19-24個月', minMonths: 19, maxMonths: 24, formLetter: 'E' },
 ];
 
 export const DOMAINS = RAW_DOMAINS.map(({ domain, name, subdomain }) => ({

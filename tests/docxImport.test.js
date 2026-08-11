@@ -8,9 +8,9 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
   it('recovers child, tier, period and entries from a generated .docx', async () => {
     const indicators = getIndicatorsForTier('Ⅳ');
     const entries = [
-      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走' },
-      { indicatorCode: 'Ⅳ-1-1', date: '2026-02-26', achieved: true, note: '可穩定行走至戶外遊戲場' },
-      { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', achieved: false, note: '仍在練習中' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-02-26', status: 'developed', note: '可穩定行走至戶外遊戲場' },
+      { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', status: 'developing', note: '仍在練習中' },
     ];
 
     const blob = await generateDocxBlob({
@@ -54,8 +54,8 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
   it('rolls the inferred year forward when a later entry’s month is earlier (Dec -> Jan)', async () => {
     const indicators = getIndicatorsForTier('Ⅳ');
     const entries = [
-      { indicatorCode: 'Ⅳ-1-1', date: '2025-12-20', achieved: true, note: '十二月的紀錄' },
-      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', achieved: true, note: '一月的紀錄' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2025-12-20', status: 'developed', note: '十二月的紀錄' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: '一月的紀錄' },
     ];
 
     const blob = await generateDocxBlob({

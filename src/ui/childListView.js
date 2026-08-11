@@ -13,44 +13,43 @@ export async function renderChildListView(
   const isParentReport = reportType === 'parent-report';
 
   container.innerHTML = `
-    <div class="page-header">
+    <div class="page-header page-header--editor">
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
       <h2 class="page-header__title">幼兒列表</h2>
+      ${
+        isParentReport
+          ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">適性紀錄匯入</button>
+             <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>`
+          : `<button type="button" class="btn btn--purple" data-action="import-docx">適性總表匯入</button>
+             <input type="file" accept=".docx" data-field="import-file" hidden>`
+      }
     </div>
-    <ul class="card-list">
-      ${children
-        .map(
-          child =>
-            `<li class="card-list__row">
-              <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
-                <span class="card-list__name">${escapeHtml(child.name)}</span>
-                <span class="card-list__meta">出生日期：${escapeHtml(child.birthDate)}</span>
-              </button>
-              <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="刪除${escapeHtml(child.name)}">×</button>
-            </li>`
-        )
-        .join('')}
-    </ul>
-    <p class="field-error" data-error="delete"></p>
-    <form class="panel-form" data-action="add-child">
-      <h3 class="panel-form__title">新增幼兒</h3>
-      <label class="panel-form__field">姓名 <input data-field="name" required></label>
-      <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" required></label>
-      <button type="submit" class="btn btn--primary">新增</button>
-    </form>
-    ${
-      isParentReport
-        ? `<div class="import-trigger">
-            <button type="button" class="btn btn--outline" data-action="import-parent-report-docx">適性紀錄匯入</button>
-            <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>
-            <p class="field-error" data-error="import"></p>
-          </div>`
-        : `<div class="import-trigger">
-            <button type="button" class="btn btn--outline" data-action="import-docx">適性總表匯入</button>
-            <input type="file" accept=".docx" data-field="import-file" hidden>
-            <p class="field-error" data-error="import"></p>
-          </div>`
-    }
+    <p class="field-error field-error--center" data-error="import"></p>
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list">
+          ${children
+            .map(
+              child =>
+                `<li class="card-list__row">
+                  <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
+                    <span class="card-list__name">${escapeHtml(child.name)}</span>
+                    <span class="card-list__meta">出生日期：${escapeHtml(child.birthDate)}</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="刪除${escapeHtml(child.name)}">×</button>
+                </li>`
+            )
+            .join('')}
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      <form class="panel-form" data-action="add-child">
+        <h3 class="panel-form__title">新增幼兒</h3>
+        <label class="panel-form__field">姓名 <input data-field="name" required></label>
+        <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" required></label>
+        <button type="submit" class="btn btn--primary">新增</button>
+      </form>
+    </div>
   `;
 
   if (onBack) {
