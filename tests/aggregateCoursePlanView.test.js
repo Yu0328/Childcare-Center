@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllData, addChild } from '../src/storage/db.js';
+import { clearAllData, addChild, addForm, addEntry } from '../src/storage/db.js';
 import { addParentReport, addCoursePlanEntry, addCourseOccurrence } from '../src/storage/parentReportDb.js';
 import { renderAggregateCoursePlanView } from '../src/ui/aggregateCoursePlanView.js';
 import { waitFor } from './helpers.js';
@@ -35,6 +35,144 @@ describe('renderAggregateCoursePlanView', () => {
 
     expect(container.textContent).toContain('115年01月');
     expect(container.textContent).not.toContain('114年11月');
+  });
+
+  it('disables 合併進現有總表 when the selected tier has no existing forms', async () => {
+    await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+
+    const container = document.createElement('div');
+    await renderAggregateCoursePlanView(container, { child, onCreated: () => {}, onBack: () => {} });
+
+    expect(container.querySelector('[data-field="target-mode"][value="existing"]').disabled).toBe(true);
+    expect(container.querySelector('[data-field="target-form"]')).toBeNull();
+  });
+
+  it('lists existing forms for the tier once 合併進現有總表 is selected', async () => {
+    await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年03月' });
+
+    const container = document.createElement('div');
+    await renderAggregateCoursePlanView(container, { child, onCreated: () => {}, onBack: () => {} });
+
+    const existingRadio = container.querySelector('[data-field="target-mode"][value="existing"]');
+    expect(existingRadio.disabled).toBe(false);
+    existingRadio.checked = true;
+    existingRadio.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const options = [...container.querySelectorAll('[data-field="target-form"] option')].map(o => o.textContent);
+    expect(options).toContain('115年03月');
+  });
+
+  it('keeps a checked 適性紀錄 checked after switching to 合併進現有總表', async () => {
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年03月' });
+
+    const container = document.createElement('div');
+    await renderAggregateCoursePlanView(container, { child, onCreated: () => {}, onBack: () => {} });
+
+    const checkbox = container.querySelector(`[data-report-checkbox="${report.id}"]`);
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const existingRadio = container.querySelector('[data-field="target-mode"][value="existing"]');
+    existingRadio.checked = true;
+    existingRadio.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(container.querySelector(`[data-report-checkbox="${report.id}"]`).checked).toBe(true);
+  });
+
+  it('resets to 建立新總表 when switching to a tier with no existing forms', async () => {
+    // Tiers sort to ['Ⅳ', 'Ⅴ'], so the view's default selected tier is Ⅳ — explicitly switch to
+    // Ⅴ first (the tier that has an existing form) before exercising the existing-mode selection,
+    // then switch to Ⅳ (no existing form) to verify the reset.
+    await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addParentReport({ childId: child.id, tier: 'Ⅳ', period: '114年11月' });
+    await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年03月' });
+
+    const container = document.createElement('div');
+    await renderAggregateCoursePlanView(container, { child, onCreated: () => {}, onBack: () => {} });
+
+    container.querySelector('[data-field="tier"]').value = 'Ⅴ';
+    container.querySelector('[data-field="tier"]').dispatchEvent(new Event('change', { bubbles: true }));
+
+    const existingRadio = container.querySelector('[data-field="target-mode"][value="existing"]');
+    existingRadio.checked = true;
+    existingRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(container.querySelector('[data-field="target-form"]')).not.toBeNull();
+
+    container.querySelector('[data-field="tier"]').value = 'Ⅳ';
+    container.querySelector('[data-field="tier"]').dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(container.querySelector('[data-field="target-mode"][value="new"]').checked).toBe(true);
+    expect(container.querySelector('[data-field="target-form"]')).toBeNull();
+  });
+
+  it('requires selecting a target form when 合併進現有總表 is chosen', async () => {
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年03月' });
+
+    const container = document.createElement('div');
+    await renderAggregateCoursePlanView(container, { child, onCreated: () => {}, onBack: () => {} });
+
+    const existingRadio = container.querySelector('[data-field="target-mode"][value="existing"]');
+    existingRadio.checked = true;
+    existingRadio.dispatchEvent(new Event('change', { bubbles: true }));
+
+    container.querySelector(`[data-report-checkbox="${report.id}"]`).checked = true;
+    container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(container.querySelector('[data-action="aggregate"] [data-error]').textContent).toContain('請選擇要合併進去的總表');
+  });
+
+  it('merges into the selected existing form and calls onCreated directly when clean', async () => {
+    const existingForm = await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年02月' });
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-02-10', status: 'developed', absent: false, note: 'x' });
+
+    const container = document.createElement('div');
+    let created = null;
+    await renderAggregateCoursePlanView(container, { child, onCreated: form => { created = form; }, onBack: () => {} });
+
+    const existingRadio = container.querySelector('[data-field="target-mode"][value="existing"]');
+    existingRadio.checked = true;
+    existingRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    container.querySelector('[data-field="target-form"]').value = String(existingForm.id);
+
+    container.querySelector(`[data-report-checkbox="${report.id}"]`).checked = true;
+    container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => created !== null);
+    expect(created.id).toBe(existingForm.id);
+    expect(created.period).toBe('115年01月-115年02月');
+  });
+
+  it('shows the skipped-duplicates count and only navigates after "前往查看總表" is clicked', async () => {
+    const existingForm = await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addEntry({ formId: existingForm.id, indicatorCode: 'Ⅴ-1-6', date: '2026-01-10', status: 'developed', note: 'x' });
+
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+    const container = document.createElement('div');
+    let created = null;
+    await renderAggregateCoursePlanView(container, { child, onCreated: form => { created = form; }, onBack: () => {} });
+
+    const existingRadio = container.querySelector('[data-field="target-mode"][value="existing"]');
+    existingRadio.checked = true;
+    existingRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    container.querySelector('[data-field="target-form"]').value = String(existingForm.id);
+
+    container.querySelector(`[data-report-checkbox="${report.id}"]`).checked = true;
+    container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.querySelector('[data-action="go-to-form"]'));
+    expect(container.textContent).toContain('已跳過 1 筆重複資料');
+    expect(created).toBeNull();
+
+    container.querySelector('[data-action="go-to-form"]').click();
+    expect(created).not.toBeNull();
   });
 
   it('requires at least one report to be checked before submitting', async () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   addChild, listChildren, getChild, deleteChild, clearAllData,
-  addForm, listFormsForChild, getForm, deleteForm,
+  addForm, listFormsForChild, getForm, deleteForm, updateForm,
   addEntry, updateEntry, deleteEntry, listEntriesForForm,
 } from '../src/storage/db.js';
 import { addParentReport, listParentReportsForChild } from '../src/storage/parentReportDb.js';
@@ -94,6 +94,22 @@ describe('forms and entries storage', () => {
     const created = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
 
     expect(await getForm(created.id)).toEqual(created);
+  });
+
+  it('updates a form', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+
+    const updated = await updateForm(form.id, { period: '115年01月-115年02月' });
+    expect(updated.period).toBe('115年01月-115年02月');
+    expect(updated.tier).toBe('Ⅳ');
+    expect(updated.childId).toBe(child.id);
+
+    expect(await getForm(form.id)).toEqual(updated);
+  });
+
+  it('throws when updating a non-existent form', async () => {
+    await expect(updateForm(999, { period: 'x' })).rejects.toThrow('Form 999 not found');
   });
 
   it('adds, updates, lists and deletes entries for a form', async () => {

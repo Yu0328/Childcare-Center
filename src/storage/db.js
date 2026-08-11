@@ -51,6 +51,16 @@ export async function getForm(id) {
   return runRequest('forms', 'readonly', store => store.get(id));
 }
 
+export async function updateForm(id, changes) {
+  const existing = await runRequest('forms', 'readonly', store => store.get(id));
+  if (!existing) {
+    throw new Error(`Form ${id} not found`);
+  }
+  const updated = { ...existing, ...changes, id };
+  await runRequest('forms', 'readwrite', store => store.put(updated));
+  return updated;
+}
+
 // Cascades: deleting a form also deletes all of its entries.
 export async function deleteForm(id) {
   const entries = await listEntriesForForm(id);

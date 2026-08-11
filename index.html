@@ -403,6 +403,22 @@ button {
   color: var(--text-secondary);
 }
 
+/* When this class is applied to a <fieldset> (grouped checkboxes/radios) instead of a <label>,
+   strip the browser's default groove border + legend styling so it reads as a plain field like
+   every other .panel-form__field, not a boxed-off native fieldset. */
+fieldset.panel-form__field {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0; /* fieldsets default to min-width: min-content, which can force overflow in a flex layout */
+}
+
+fieldset.panel-form__field legend {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
 .panel-form input,
 .panel-form select,
 .panel-form textarea {
@@ -3653,6 +3669,18 @@ var CFormApp = (() => {
   }
   async function listFormsForChild(childId) {
     return runRequest("forms", "readonly", (store) => store.index("by_childId").getAll(childId));
+  }
+  async function getForm(id) {
+    return runRequest("forms", "readonly", (store) => store.get(id));
+  }
+  async function updateForm(id, changes) {
+    const existing = await runRequest("forms", "readonly", (store) => store.get(id));
+    if (!existing) {
+      throw new Error(`Form ${id} not found`);
+    }
+    const updated = { ...existing, ...changes, id };
+    await runRequest("forms", "readwrite", (store) => store.put(updated));
+    return updated;
   }
   async function deleteForm(id) {
     const entries = await listEntriesForForm(id);
@@ -25621,7 +25649,20 @@ var CFormApp = (() => {
   }
 
   // src/domain/aggregateCoursePlan.js
-  async function aggregateCoursePlanIntoForm({ childId, tier, reportIds }) {
+  function combinedPeriodRange(periods) {
+    if (periods.length === 0) return "";
+    const sorted = [...periods].sort();
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    return first === last ? first : `${first}-${last}`;
+  }
+  function periodRangeParts(period) {
+    return period.includes("-") ? period.split("-") : [period];
+  }
+  function entrySignature({ indicatorCode, date, status, note }) {
+    return JSON.stringify([indicatorCode, date, status, note]);
+  }
+  async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, targetFormId = null }) {
     const reports = [];
     for (const reportId of reportIds) {
       const report = await getParentReport(reportId);
@@ -25650,26 +25691,51 @@ var CFormApp = (() => {
         }
       }
     }
-    const firstPeriod = reports[0]?.period ?? "";
-    const lastPeriod = reports[reports.length - 1]?.period ?? "";
-    const period = firstPeriod === lastPeriod ? firstPeriod : `${firstPeriod}-${lastPeriod}`;
-    const form = await addForm({ childId, tier, period });
-    for (const row of toWrite) {
-      await addEntry({ formId: form.id, ...row });
+    let form;
+    let skippedDuplicates = 0;
+    if (targetFormId) {
+      form = await getForm(targetFormId);
+      const existingEntries = await listEntriesForForm(targetFormId);
+      const seen = new Set(existingEntries.map(entrySignature));
+      const rowsToWrite = [];
+      for (const row of toWrite) {
+        const signature = entrySignature(row);
+        if (seen.has(signature)) {
+          skippedDuplicates += 1;
+          continue;
+        }
+        seen.add(signature);
+        rowsToWrite.push(row);
+      }
+      const period = combinedPeriodRange([...periodRangeParts(form.period), ...reports.map((r) => r.period)]);
+      form = await updateForm(targetFormId, { period });
+      for (const row of rowsToWrite) {
+        await addEntry({ formId: form.id, ...row });
+      }
+    } else {
+      const period = combinedPeriodRange(reports.map((r) => r.period));
+      form = await addForm({ childId, tier, period });
+      for (const row of toWrite) {
+        await addEntry({ formId: form.id, ...row });
+      }
     }
-    return { form, failed };
+    return { form, failed, skippedDuplicates };
   }
 
   // src/ui/aggregateCoursePlanView.js
-  function failedListHtml(failed) {
-    return `
-    <div class="field-error" data-aggregate-failed>
-      <p>\u5DF2\u5EFA\u7ACB\u7E3D\u8868\uFF0C\u4F46\u4EE5\u4E0B ${failed.length} \u7B46\u56E0\u6545\u7121\u6CD5\u5E36\u5165\uFF1A</p>
-      <ul>
-        ${failed.map(
+  function resultSummaryHtml(failed, skippedDuplicates) {
+    const failedSection = failed.length > 0 ? `<p>\u4EE5\u4E0B ${failed.length} \u7B46\u56E0\u6545\u7121\u6CD5\u5E36\u5165\uFF1A</p>
+         <ul>
+           ${failed.map(
       (item) => `<li>${escapeHtml(item.reportPeriod)}\u3000${escapeHtml(item.indicatorCode)}\u3000\u3010${escapeHtml(item.activityName)}\u3011\u2014${escapeHtml(item.reason)}</li>`
     ).join("")}
-      </ul>
+         </ul>` : "";
+    const skippedSection = skippedDuplicates > 0 ? `<p>\u5DF2\u8DF3\u904E ${skippedDuplicates} \u7B46\u91CD\u8907\u8CC7\u6599</p>` : "";
+    return `
+    <div class="field-error" data-aggregate-result>
+      <p>\u5DF2\u5B8C\u6210\u5F59\u6574\uFF0C\u4F46\uFF1A</p>
+      ${failedSection}
+      ${skippedSection}
       <button type="button" class="btn btn--primary" data-action="go-to-form">\u524D\u5F80\u67E5\u770B\u7E3D\u8868</button>
     </div>
   `;
@@ -25687,13 +25753,21 @@ var CFormApp = (() => {
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
       return;
     }
+    const forms = await listFormsForChild(child.id);
     const tiers = [...new Set(reports.map((r) => r.tier))].sort();
     let selectedTier = tiers[0];
+    let selectedMode = "new";
+    let checkedReportIds = /* @__PURE__ */ new Set();
     function reportsForTier(tier) {
       return reports.filter((r) => r.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
     }
-    function render(failed = null, createdForm = null) {
+    function formsForTier(tier) {
+      return forms.filter((f) => f.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
+    }
+    function render(failed = null, createdForm = null, skippedDuplicates = 0) {
       const tierReports = reportsForTier(selectedTier);
+      const tierForms = formsForTier(selectedTier);
+      if (tierForms.length === 0) selectedMode = "new";
       container.innerHTML = `
       <div class="page-header">
         <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
@@ -25711,21 +25785,53 @@ var CFormApp = (() => {
           ${tierReports.map(
         (r) => `
                 <label class="panel-form__checkbox-row">
-                  <input type="checkbox" data-report-checkbox="${escapeHtml(r.id)}">
+                  <input type="checkbox" data-report-checkbox="${escapeHtml(r.id)}" ${checkedReportIds.has(String(r.id)) ? "checked" : ""}>
                   ${escapeHtml(r.period)}
                 </label>
               `
       ).join("")}
         </fieldset>
-        <button type="submit" class="btn btn--primary">\u5EFA\u7ACB\u7E3D\u8868</button>
+        <fieldset class="panel-form__field">
+          <legend>\u5F59\u6574\u65B9\u5F0F</legend>
+          <label class="panel-form__checkbox-row">
+            <input type="radio" name="target-mode" data-field="target-mode" value="new" ${selectedMode === "new" ? "checked" : ""}>
+            \u5EFA\u7ACB\u65B0\u7E3D\u8868
+          </label>
+          <label class="panel-form__checkbox-row">
+            <input type="radio" name="target-mode" data-field="target-mode" value="existing" ${selectedMode === "existing" ? "checked" : ""} ${tierForms.length === 0 ? "disabled" : ""}>
+            \u5408\u4F75\u9032\u73FE\u6709\u7E3D\u8868
+          </label>
+          ${selectedMode === "existing" ? `<label class="panel-form__field">
+                   \u9078\u64C7\u8981\u5408\u4F75\u9032\u53BB\u7684\u7E3D\u8868
+                   <select data-field="target-form">
+                     <option value="">\u8ACB\u9078\u64C7</option>
+                     ${tierForms.map((f) => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.period)}</option>`).join("")}
+                   </select>
+                 </label>` : ""}
+        </fieldset>
+        <button type="submit" class="btn btn--primary">${selectedMode === "existing" ? "\u5408\u4F75\u9032\u7E3D\u8868" : "\u5EFA\u7ACB\u7E3D\u8868"}</button>
         <p class="field-error" data-error></p>
       </form>
-      ${failed ? failedListHtml(failed) : ""}
+      ${failed ? resultSummaryHtml(failed, skippedDuplicates) : ""}
     `;
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
       container.querySelector('[data-field="tier"]').addEventListener("change", (event) => {
         selectedTier = event.target.value;
+        checkedReportIds = /* @__PURE__ */ new Set();
         render();
+      });
+      container.querySelectorAll('[data-field="target-mode"]').forEach((radio) => {
+        radio.addEventListener("change", (event) => {
+          selectedMode = event.target.value;
+          render();
+        });
+      });
+      container.querySelectorAll("[data-report-checkbox]").forEach((checkbox) => {
+        checkbox.addEventListener("change", () => {
+          const id = checkbox.dataset.reportCheckbox;
+          if (checkbox.checked) checkedReportIds.add(id);
+          else checkedReportIds.delete(id);
+        });
       });
       container.querySelector('[data-action="aggregate"]').addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -25735,12 +25841,30 @@ var CFormApp = (() => {
           errorEl.textContent = "\u8ACB\u81F3\u5C11\u52FE\u9078\u4E00\u7B46\u9069\u6027\u7D00\u9304";
           return;
         }
+        let targetFormId = null;
+        if (selectedMode === "existing") {
+          const targetFormValue = container.querySelector('[data-field="target-form"]').value;
+          if (!targetFormValue) {
+            errorEl.textContent = "\u8ACB\u9078\u64C7\u8981\u5408\u4F75\u9032\u53BB\u7684\u7E3D\u8868";
+            return;
+          }
+          targetFormId = Number(targetFormValue);
+        }
         try {
-          const { form, failed: failedResult } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: selectedTier, reportIds });
-          if (failedResult.length === 0) {
+          const {
+            form,
+            failed: failedResult,
+            skippedDuplicates: skippedResult
+          } = await aggregateCoursePlanIntoForm({
+            childId: child.id,
+            tier: selectedTier,
+            reportIds,
+            targetFormId
+          });
+          if (failedResult.length === 0 && skippedResult === 0) {
             onCreated(form);
           } else {
-            render(failedResult, form);
+            render(failedResult, form, skippedResult);
           }
         } catch (err) {
           errorEl.textContent = "\u5EFA\u7ACB\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";

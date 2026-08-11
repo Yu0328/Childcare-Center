@@ -392,6 +392,22 @@ button {
   color: var(--text-secondary);
 }
 
+/* When this class is applied to a <fieldset> (grouped checkboxes/radios) instead of a <label>,
+   strip the browser's default groove border + legend styling so it reads as a plain field like
+   every other .panel-form__field, not a boxed-off native fieldset. */
+fieldset.panel-form__field {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0; /* fieldsets default to min-width: min-content, which can force overflow in a flex layout */
+}
+
+fieldset.panel-form__field legend {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
 .panel-form input,
 .panel-form select,
 .panel-form textarea {
