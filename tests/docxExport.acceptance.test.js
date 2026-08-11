@@ -105,12 +105,12 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(headerXml).toContain('實施時間：115年05月-115年08月');
   });
 
-  it('shrinks the 幼兒姓名/出生日期/實際月齡/實施時間 line to 10pt so a long 實施時間 range stays on one line', async () => {
+  it('shrinks the 幼兒姓名/出生日期/實際月齡/實施時間 line to 11pt so a long 實施時間 range stays on one line', async () => {
     const { headerXml } = await exportParts();
 
     const nameIndex = headerXml.indexOf('幼兒姓名');
     const paragraph = headerXml.slice(headerXml.lastIndexOf('<w:p>', nameIndex), headerXml.indexOf('</w:p>', nameIndex));
-    expect(paragraph).toContain('<w:sz w:val="20"/>');
+    expect(paragraph).toContain('<w:sz w:val="22"/>');
   });
 
   it('builds a 6-column grid with a two-row merged header', async () => {
@@ -129,16 +129,6 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(documentXml).toContain('適性發展指標活動');
     expect(documentXml).toContain('課程實施日期【已發展○】');
     expect(documentXml).toContain('課程實施記錄');
-  });
-
-  it('sets every table border (outer + inside) to 2 1/4 pt (sz 18)', async () => {
-    const { documentXml } = await exportParts();
-
-    const tblPr = documentXml.slice(documentXml.indexOf('<w:tbl>'), documentXml.indexOf('<w:tblGrid>'));
-    expect(tblPr).toContain('<w:tblBorders>');
-    for (const edge of ['top', 'bottom', 'left', 'right', 'insideH', 'insideV']) {
-      expect(tblPr).toContain(`<w:${edge} w:val="single" w:color="auto" w:sz="18"/>`);
-    }
   });
 
   it('marks the header column with both status glyphs, matching the two possible row markers', async () => {

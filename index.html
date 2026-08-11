@@ -23920,19 +23920,10 @@ var CFormApp = (() => {
   var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
   var TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
   var TABLE_CELL_MARGIN_DXA = 115;
-  var TABLE_BORDER = { style: BorderStyle.SINGLE, size: 18, color: "auto" };
-  var TABLE_BORDERS = {
-    top: TABLE_BORDER,
-    bottom: TABLE_BORDER,
-    left: TABLE_BORDER,
-    right: TABLE_BORDER,
-    insideHorizontal: TABLE_BORDER,
-    insideVertical: TABLE_BORDER
-  };
   var SUBDOMAIN_SEPARATOR = "\u3001";
   var PAGE_MARGIN = { top: 851, right: 851, bottom: 851, left: 1134, header: 851, footer: 992 };
   var HEADER_TITLE_SIZE = 34;
-  var CHILD_INFO_LINE_SIZE = 20;
+  var CHILD_INFO_LINE_SIZE = 22;
   var HEADER_ICON_OFFSET_EMU = { horizontal: -(HEADER_ICON_EMU.width + 4e4), vertical: 8890 };
   var TABLE_HEADER_ROW_HEIGHTS = [438, 720];
   var CAREGIVER_SIGNATURE_LINE = "\u6258\u80B2\u4EBA\u54E1\uFF1A\u3000\u3000\u3000\u3000\u3000\u4E3B\u7BA1\u7C3D\u540D\uFF1A";
@@ -24142,7 +24133,6 @@ var CFormApp = (() => {
       layout: TableLayoutType.FIXED,
       alignment: AlignmentType.CENTER,
       margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-      borders: TABLE_BORDERS,
       rows: [...headerRows(), ...bodyRows]
     });
     const doc = new File({

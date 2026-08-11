@@ -1,6 +1,5 @@
 import {
   AlignmentType,
-  BorderStyle,
   Document,
   Header,
   HeightRule,
@@ -44,18 +43,6 @@ const TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
 // library default, which was leaving enough room for two characters per line in narrow columns.
 const TABLE_CELL_MARGIN_DXA = 115;
 
-// All table borders at 2 1/4 pt (Word's border-width dropdown preset). docx's `size` is in
-// eighths of a point, so 18 = 2.25pt.
-const TABLE_BORDER = { style: BorderStyle.SINGLE, size: 18, color: 'auto' };
-const TABLE_BORDERS = {
-  top: TABLE_BORDER,
-  bottom: TABLE_BORDER,
-  left: TABLE_BORDER,
-  right: TABLE_BORDER,
-  insideHorizontal: TABLE_BORDER,
-  insideVertical: TABLE_BORDER,
-};
-
 const SUBDOMAIN_SEPARATOR = '、';
 
 // Page geometry in twips, copied from the real form's <w:sectPr> (A4 with narrow margins).
@@ -67,8 +54,9 @@ const HEADER_TITLE_SIZE = 34;
 
 // Smaller than DEFAULT_TEXT_SIZE (24 = 12pt): the 幼兒姓名/出生日期/實際月齡/實施時間 line has grown
 // longer since a merged form's 實施時間 can be a "115年05月-115年08月" range, and at the default
-// size it wraps onto a second line. 20 half-points = 10pt keeps it on one line.
-const CHILD_INFO_LINE_SIZE = 20;
+// size it wraps onto a second line. 22 half-points = 11pt keeps it on one line while staying
+// close to the original size.
+const CHILD_INFO_LINE_SIZE = 22;
 
 // The original's decorative icon size floats in the left margin, offset far enough left that it
 // never overlaps the title's text line — that way the title can be centered on the full page
@@ -343,7 +331,6 @@ export async function generateDocxBlob({ child, form, indicators, entries }) {
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
     margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-    borders: TABLE_BORDERS,
     rows: [...headerRows(), ...bodyRows],
   });
 
