@@ -1,5 +1,21 @@
 import { runRequest } from './dbCore.js';
 
+// Serializes concurrent async calls that share the same key, so each call's read only ever starts
+// after the previous call's write for that key has fully committed. Needed anywhere the UI can
+// fire two calls for the same logical row with no coordination between them (one call per
+// checkbox/text-field `change` event, or two cells clicked in quick succession) — an unguarded
+// read-then-write (find existing row, then add/put/delete) would otherwise let both calls read
+// "no existing row" before either write lands, producing duplicate rows instead of one upsert.
+// Used by setChildItemOverride and getOrCreatePlanSlot below.
+const writeQueues = new Map();
+
+function serializeByKey(key, fn) {
+  const previous = writeQueues.get(key) || Promise.resolve();
+  const next = previous.catch(() => {}).then(fn);
+  writeQueues.set(key, next);
+  return next;
+}
+
 export async function addMonthlyCoursePlan({ period, childIds, childTiers }) {
   const createdAt = new Date().toISOString();
   const id = await runRequest('monthlyCoursePlans', 'readwrite', store => store.add({ period, childIds, childTiers, createdAt }));
@@ -40,7 +56,17 @@ export async function listPlanSlotsForPlan(planId) {
   return runRequest('planSlots', 'readonly', store => store.index('by_planId').getAll(planId));
 }
 
+// getOrCreatePlanSlot does the same unguarded read-then-write (find existing row, then add) as
+// setChildItemOverride below. The UI can fire two calls for the same (planId, tier, weekIndex,
+// weekday) in quick succession (e.g. selecting two different same-tier children's cells for the
+// same week/weekday before the first call resolves), and both would see "no existing slot" and
+// both `add()`, producing duplicate slot rows for one key — see serializeByKey.
 export async function getOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+  const key = `slot:${planId}:${tier}:${weekIndex}:${weekday}`;
+  return serializeByKey(key, () => writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }));
+}
+
+async function writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
   const slots = await listPlanSlotsForPlan(planId);
   const existing = slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
   if (existing) return existing;
@@ -97,29 +123,14 @@ export async function listChildItemOverridesForPlan(planId) {
   return runRequest('childItemOverrides', 'readonly', store => store.index('by_planId').getAll(planId));
 }
 
-// setChildItemOverride does an unguarded read-then-write (find existing row, then add/put/delete).
-// The UI fires one call per checkbox/text-field `change` event with no coordination between them,
-// so two calls for the same (planId, childId, itemId) can overlap — both reading "no existing row"
-// before either write lands — and produce duplicate rows instead of one upsert. This queue chains
-// each call for a given key onto the previous one's completion so its read only ever starts after
-// the prior call's write has fully committed, closing the race rather than just documenting it.
-const overrideWriteQueues = new Map();
-
-function overrideKey(planId, childId, itemId) {
-  return `${planId}:${childId}:${itemId}`;
-}
-
 // Upserts a child's mark on one item. Once both flags are false there is nothing left to
 // remember, so the row is deleted instead of kept around as a no-op default — every other
 // consumer can then treat "no matching row" as the single source of truth for "no override".
 export async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = '' }) {
-  const key = overrideKey(planId, childId, itemId);
-  const previous = overrideWriteQueues.get(key) || Promise.resolve();
-  const next = previous.catch(() => {}).then(() =>
+  const key = `override:${planId}:${childId}:${itemId}`;
+  return serializeByKey(key, () =>
     writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText })
   );
-  overrideWriteQueues.set(key, next);
-  return next;
 }
 
 async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText }) {

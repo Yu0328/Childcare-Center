@@ -61,6 +61,21 @@ describe('monthlyPlanDb: PlanSlot / PlanSlotItem', () => {
     expect(await listPlanSlotsForPlan(plan.id)).toHaveLength(1);
   });
 
+  it('two concurrent calls for the same (planId, tier, weekIndex, weekday) serialize into a single slot instead of racing into duplicates', async () => {
+    // Neither call is awaited before the other starts — this mirrors two same-tier children's
+    // cells being clicked in quick succession, before the first getOrCreatePlanSlot call's
+    // find-then-add has had a chance to complete. Mirrors the equivalent concurrency test for
+    // setChildItemOverride above (both go through the same serializeByKey helper now).
+    const [first, second] = await Promise.all([
+      getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 2, weekday: 2 }),
+      getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 2, weekday: 2 }),
+    ]);
+
+    expect(second).toEqual(first);
+    const slots = await listPlanSlotsForPlan(plan.id);
+    expect(slots.filter(s => s.tier === 'Ⅴ' && s.weekIndex === 2 && s.weekday === 2)).toHaveLength(1);
+  });
+
   it('different (tier, weekIndex, weekday) combos are different slots', async () => {
     await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
     await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 4 });
