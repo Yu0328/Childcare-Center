@@ -5,7 +5,15 @@ import {
   listChildItemOverridesForPlan, getMonthlyCoursePlan,
 } from '../src/storage/monthlyPlanDb.js';
 import { renderMonthlyPlanEditorView } from '../src/ui/monthlyPlanEditorView.js';
+import { generateMonthlyPlanDocxBlob } from '../src/export/monthlyPlanDocxExport.js';
 import { waitFor } from './helpers.js';
+
+// Mocked so the export-regression test below can inspect exactly what monthlyPlanEditorView.js's
+// export button passes as `itemsBySlotId`/`overrides` — the same closure state (`data`) every
+// other consumer reads — without needing to construct/parse a real docx Blob.
+vi.mock('../src/export/monthlyPlanDocxExport.js', () => ({
+  generateMonthlyPlanDocxBlob: vi.fn().mockResolvedValue(new Blob(['x'])),
+}));
 
 describe('monthlyPlanEditorView: rendering', () => {
   let container, child, plan;
@@ -307,5 +315,68 @@ describe('monthlyPlanEditorView: manage children', () => {
     expect(updated.childIds).toEqual([]);
     expect(await listChildItemOverridesForPlan(plan.id)).toEqual([]);
     expect(container.querySelector(`.monthly-calendar[data-child-id="${childA.id}"]`)).toBeNull();
+  });
+});
+
+// Regression test for the staleness bug flagged in Task 13 review: refreshCellAndPanel (Task 8)
+// used to redraw the calendar cell from a locally-scoped `freshData` copy without writing the
+// fresh slots/items/overrides back onto the outer `data` object that the export button (Task 13)
+// reads. That meant "add/edit an item, then click 匯出 Word without a full re-render" silently
+// exported stale (pre-edit) data. The fix makes refreshCellAndPanel mutate `data` itself.
+describe('monthlyPlanEditorView: export sees fresh data after a panel edit', () => {
+  let container, child, plan;
+
+  beforeEach(async () => {
+    await clearAllData();
+    generateMonthlyPlanDocxBlob.mockClear();
+    // jsdom doesn't implement URL.createObjectURL/revokeObjectURL; stub them the same way
+    // highlightsTabView.test.js does so the export handler's download step doesn't throw.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() });
+    container = document.createElement('div');
+    child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
+  });
+
+  it('exporting right after adding a panel item (no intervening full re-render) includes that item', async () => {
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector('[data-field="new-item-indicator"]'));
+
+    container.querySelector('[data-field="new-item-activity-name"]').value = '戶外教學';
+    container.querySelector('[data-action="add-item"]').dispatchEvent(new Event('submit', { cancelable: true }));
+    await waitFor(() => {
+      const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+      return cell && cell.textContent.includes('戶外教學');
+    });
+
+    // No "管理小朋友" save (the only thing that used to trigger a full renderMonthlyPlanEditorView
+    // re-render) happens between the edit above and the export click below.
+    container.querySelector('[data-action="export-docx"]').click();
+    await waitFor(() => generateMonthlyPlanDocxBlob.mock.calls.length === 1);
+
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const exportArgs = generateMonthlyPlanDocxBlob.mock.calls[0][0];
+    const exportedItems = exportArgs.itemsBySlotId[slot.id] || [];
+    expect(exportedItems.map(i => i.activityName)).toContain('戶外教學');
+  });
+
+  it('exporting right after toggling an override (no intervening full re-render) includes it', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '拼拼圖' });
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`));
+
+    const notAchievedBox = container.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
+    notAchievedBox.checked = true;
+    notAchievedBox.dispatchEvent(new Event('change'));
+    await waitFor(async () => (await listChildItemOverridesForPlan(plan.id)).length === 1);
+
+    container.querySelector('[data-action="export-docx"]').click();
+    await waitFor(() => generateMonthlyPlanDocxBlob.mock.calls.length === 1);
+
+    const exportArgs = generateMonthlyPlanDocxBlob.mock.calls[0][0];
+    const exportedOverride = exportArgs.overrides.find(o => o.childId === child.id && o.itemId === item.id);
+    expect(exportedOverride).toMatchObject({ notAchieved: true });
   });
 });

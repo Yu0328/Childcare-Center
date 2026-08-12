@@ -351,14 +351,19 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     }
     const freshOverrides = await listChildItemOverridesForPlan(plan.id);
     const freshOverrideByKey = new Map(freshOverrides.map(o => [`${o.childId}:${o.itemId}`, o]));
-    const freshData = { ...data, slots: freshSlots, itemsBySlotId: freshItemsBySlotId, overrideByKey: freshOverrideByKey };
+    // Write back onto the shared `data` object itself (not just a local copy) so every consumer
+    // of `data` — the export button included — sees post-edit state without needing a full
+    // renderMonthlyPlanEditorView re-render.
+    data.slots = freshSlots;
+    data.itemsBySlotId = freshItemsBySlotId;
+    data.overrideByKey = freshOverrideByKey;
 
     for (const child of data.children) {
       if (plan.childTiers[child.id] !== tier) continue;
       const cell = container.querySelector(
         `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
       );
-      cell.outerHTML = dayCellHtml(child, tier, week, day, freshData);
+      cell.outerHTML = dayCellHtml(child, tier, week, day, data);
       container
         .querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`)
         .addEventListener('click', () => selectCell(child, tier, week, day));
