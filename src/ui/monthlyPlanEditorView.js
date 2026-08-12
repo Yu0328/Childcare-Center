@@ -22,7 +22,12 @@ function tierFormLetter(tierCode) {
 // crashing the render), every slot+items for every tier in play, and every override for the
 // plan (grouped by "childId:itemId" for O(1) lookup while rendering cells).
 async function loadEditorData(plan) {
-  const childResults = await Promise.all(plan.childIds.map(id => getChild(id)));
+  // Belt-and-suspenders: childIds should never contain a falsy id (deleteChild in db.js cascades
+  // to plans, and backup.js's import filters dead references), but a null/undefined id reaching
+  // getChild() would throw synchronously (IndexedDB's store.get(null) raises a DataError) and take
+  // down the whole render, so it's dropped here too rather than trusted from upstream.
+  const validChildIds = plan.childIds.filter(Boolean);
+  const childResults = await Promise.all(validChildIds.map(id => getChild(id)));
   const children = childResults.filter(Boolean);
 
   const slots = await listPlanSlotsForPlan(plan.id);
@@ -117,6 +122,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       <button type="button" class="btn btn--purple" data-action="manage-children">管理小朋友</button>
       <button type="button" class="btn btn--purple" data-action="export-docx">匯出 Word</button>
     </div>
+    <p class="field-error field-error--center" data-error="export"></p>
     <form class="panel-form" data-manage-children-form hidden>
       <h3 class="panel-form__title">選擇本月計畫涵蓋的小朋友</h3>
       ${(await listChildren())
@@ -149,26 +155,32 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   });
 
   container.querySelector('[data-action="export-docx"]').addEventListener('click', async () => {
-    const blob = await generateMonthlyPlanDocxBlob({
-      plan, children: data.children, slots: data.slots, itemsBySlotId: data.itemsBySlotId,
-      overrides: [...data.overrideByKey.values()],
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${plan.period}課程月計畫.docx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const errorEl = container.querySelector('[data-error="export"]');
+    try {
+      const blob = await generateMonthlyPlanDocxBlob({
+        plan, children: data.children, slots: data.slots, itemsBySlotId: data.itemsBySlotId,
+        overrides: [...data.overrideByKey.values()],
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${plan.period}課程月計畫.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (errorEl) errorEl.textContent = '';
+    } catch (err) {
+      if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';
+    }
   });
 
   container.querySelector('[data-action="save-children"]').addEventListener('click', async () => {
-    const allChildren = await listChildren();
-    const newChildIds = allChildren.filter(c => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`).checked).map(c => c.id);
-    const removedChildIds = plan.childIds.filter(id => !newChildIds.includes(id));
-
     try {
+      const allChildren = await listChildren();
+      const newChildIds = allChildren.filter(c => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`).checked).map(c => c.id);
+      const removedChildIds = plan.childIds.filter(id => !newChildIds.includes(id));
+
       const { year, month } = parsePeriod(plan.period);
       const asOfDate = `${year + 1911}-${String(month).padStart(2, '0')}-01`;
       const newChildTiers = { ...plan.childTiers };

@@ -1073,4 +1073,11 @@ fieldset.panel-form__field legend {
 
 .monthly-calendar__replacement {
   font-size: 0.8rem;
+  /* Stops the parent .monthly-calendar__item--replaced's text-decoration: line-through from
+     propagating into this inline child — per CSS text-decoration rules, line-through paints
+     across the nearest ancestor block/inline-block box, and an inline-block child starts its own
+     such box, so its own (unset) text-decoration is what gets drawn instead. Without this the
+     replacement text reads as struck-through on screen even though the docx export deliberately
+     renders it as a separate, non-struck run. */
+  display: inline-block;
 }

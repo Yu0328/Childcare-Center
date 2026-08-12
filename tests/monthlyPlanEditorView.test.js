@@ -266,6 +266,38 @@ describe('monthlyPlanEditorView: per-child overrides', () => {
   });
 });
 
+// Regression test for the review gap flagged in the final whole-branch review: the existing
+// per-child override tests only assert a negative (child B's cell does NOT show child A's
+// override), which would pass even if child B's cell never re-rendered at all. This asserts the
+// feature's headline positive behavior — editing a slot's items via one child's panel must reach
+// EVERY same-tier child's calendar, including one that was never clicked.
+describe('monthlyPlanEditorView: shared-per-tier update reaches a second, never-clicked child', () => {
+  it('adding an item via child A\'s panel shows it in child B\'s (same-tier, never-selected) cell too', async () => {
+    await clearAllData();
+    const container = document.createElement('div');
+    const childA = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    const childB = await addChild({ name: '鍾晴妍', birthDate: '2024-08-01' });
+    const plan = await addMonthlyCoursePlan({
+      period: '115年06月',
+      childIds: [childA.id, childB.id],
+      childTiers: { [childA.id]: 'Ⅴ', [childB.id]: 'Ⅴ' },
+    });
+
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector('[data-field="new-item-indicator"]'));
+
+    container.querySelector('[data-field="new-item-activity-name"]').value = '大團體活動：拍手歌';
+    container.querySelector('[data-action="add-item"]').dispatchEvent(new Event('submit', { cancelable: true }));
+
+    const cellB = () =>
+      container.querySelector(`.monthly-calendar__day[data-child-id="${childB.id}"][data-week-index="1"][data-weekday="3"]`);
+    await waitFor(() => cellB() && cellB().textContent.includes('大團體活動：拍手歌'));
+
+    expect(cellB().textContent).toContain('大團體活動：拍手歌');
+  });
+});
+
 describe('monthlyPlanEditorView: manage children', () => {
   let container, childA, childB, plan;
 
