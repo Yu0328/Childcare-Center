@@ -16,6 +16,10 @@ import {
   listParentReportsForChild, listCoursePlanEntriesForReport, listCourseOccurrencesForEntry,
   listDevelopmentRecordEntriesForReport, listBehaviorObservationsForReport, listHighlightEntriesForReport,
 } from '../src/storage/parentReportDb.js';
+import {
+  addMonthlyCoursePlan, listMonthlyCoursePlans, getOrCreatePlanSlot, listPlanSlotsForPlan,
+  addPlanSlotItem, listPlanSlotItems, setChildItemOverride, listChildItemOverridesForPlan,
+} from '../src/storage/monthlyPlanDb.js';
 
 describe('backup export/import', () => {
   beforeEach(async () => {
@@ -30,7 +34,7 @@ describe('backup export/import', () => {
     const json = await exportBackup();
     const data = JSON.parse(json);
 
-    expect(data.version).toBe(2);
+    expect(data.version).toBe(3);
     expect(data.children).toHaveLength(1);
     expect(data.forms).toHaveLength(1);
     expect(data.entries).toHaveLength(1);
@@ -59,8 +63,8 @@ describe('backup export/import', () => {
   });
 
   it('rejects an unsupported backup version', async () => {
-    await expect(importBackup(JSON.stringify({ version: 3, children: [], forms: [], entries: [] })))
-      .rejects.toThrow('Unsupported backup version: 3');
+    await expect(importBackup(JSON.stringify({ version: 4, children: [], forms: [], entries: [] })))
+      .rejects.toThrow('Unsupported backup version: 4');
   });
 
   it('round-trips a parent report with course plan entries, occurrences, and a photo through export/import', async () => {
@@ -128,5 +132,33 @@ describe('backup export/import', () => {
     const forms = await listFormsForChild(restoredChild.id);
     const entries = await listEntriesForForm(forms[0].id);
     expect(entries[0].status).toBe('developed');
+  });
+
+  it('round-trips a monthly course plan, including slot items and per-child overrides', async () => {
+    const child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類' });
+    await setChildItemOverride({ planId: plan.id, childId: child.id, itemId: item.id, notAchieved: true, replaced: false });
+
+    const json = await exportBackup();
+    await clearAllData();
+    await importBackup(json);
+
+    const [restoredChild] = await listChildren();
+    const [restoredPlan] = await listMonthlyCoursePlans();
+    expect(restoredPlan.period).toBe('115年06月');
+    expect(restoredPlan.childIds).toEqual([restoredChild.id]);
+    expect(restoredPlan.childTiers[restoredChild.id]).toBe('Ⅴ');
+
+    const restoredSlots = await listPlanSlotsForPlan(restoredPlan.id);
+    expect(restoredSlots).toHaveLength(1);
+    const restoredItems = await listPlanSlotItems(restoredSlots[0].id);
+    expect(restoredItems).toHaveLength(1);
+    expect(restoredItems[0]).toMatchObject({ indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲' });
+
+    const restoredOverrides = await listChildItemOverridesForPlan(restoredPlan.id);
+    expect(restoredOverrides).toHaveLength(1);
+    expect(restoredOverrides[0]).toMatchObject({ childId: restoredChild.id, itemId: restoredItems[0].id, notAchieved: true });
   });
 });
