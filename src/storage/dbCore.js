@@ -1,5 +1,5 @@
 export const DB_NAME = 'c-form-db';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -41,6 +41,21 @@ export function openDatabase() {
       if (!db.objectStoreNames.contains('highlightEntries')) {
         const highlightEntries = db.createObjectStore('highlightEntries', { keyPath: 'id', autoIncrement: true });
         highlightEntries.createIndex('by_reportId', 'reportId');
+      }
+      if (!db.objectStoreNames.contains('monthlyCoursePlans')) {
+        db.createObjectStore('monthlyCoursePlans', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('planSlots')) {
+        const planSlots = db.createObjectStore('planSlots', { keyPath: 'id', autoIncrement: true });
+        planSlots.createIndex('by_planId', 'planId');
+      }
+      if (!db.objectStoreNames.contains('planSlotItems')) {
+        const planSlotItems = db.createObjectStore('planSlotItems', { keyPath: 'id', autoIncrement: true });
+        planSlotItems.createIndex('by_slotId', 'slotId');
+      }
+      if (!db.objectStoreNames.contains('childItemOverrides')) {
+        const childItemOverrides = db.createObjectStore('childItemOverrides', { keyPath: 'id', autoIncrement: true });
+        childItemOverrides.createIndex('by_planId', 'planId');
       }
     };
 
