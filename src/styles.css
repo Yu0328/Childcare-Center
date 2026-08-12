@@ -1006,3 +1006,71 @@ fieldset.panel-form__field legend {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
+
+/* ---------- Monthly course plan editor ---------- */
+.monthly-calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.monthly-calendar__title {
+  margin-bottom: 0.5rem;
+}
+
+.monthly-calendar__weeks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.monthly-calendar__week-range {
+  font-weight: 600;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.monthly-calendar__days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.monthly-calendar__day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  border: 1px solid #e2e4de;
+  border-radius: 6px;
+  padding: 0.4rem;
+  background: none;
+  cursor: pointer;
+  min-height: 4.5rem;
+}
+
+.monthly-calendar__day--selected {
+  border-color: #6b46a8;
+  border-width: 2px;
+}
+
+.monthly-calendar__date {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.monthly-calendar__item {
+  font-size: 0.8rem;
+}
+
+.monthly-calendar__item--not-achieved {
+  color: #d32f2f;
+}
+
+.monthly-calendar__item--replaced {
+  text-decoration: line-through;
+}
+
+.monthly-calendar__replacement {
+  font-size: 0.8rem;
+}
