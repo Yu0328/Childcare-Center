@@ -161,4 +161,29 @@ describe('backup export/import', () => {
     expect(restoredOverrides).toHaveLength(1);
     expect(restoredOverrides[0]).toMatchObject({ childId: restoredChild.id, itemId: restoredItems[0].id, notAchieved: true });
   });
+
+  it('drops a monthly-plan childId that has no matching child in the backup, instead of restoring a null/undefined reference', async () => {
+    const child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
+
+    const json = await exportBackup();
+    const data = JSON.parse(json);
+    // Simulate a stale backup where a plan still references a child no longer present in
+    // `children` — e.g. one written before deleteChild cascaded to monthly plans (see db.js),
+    // or hand-edited/corrupted. The import must not carry that dead reference forward as
+    // null/undefined (which would crash the editor view's per-child IndexedDB lookups on open).
+    const ghostChildId = 999999;
+    data.monthlyCoursePlans[0].childIds.push(ghostChildId);
+    data.monthlyCoursePlans[0].childTiers[ghostChildId] = 'Ⅴ';
+
+    await clearAllData();
+    await importBackup(JSON.stringify(data));
+
+    const [restoredPlan] = await listMonthlyCoursePlans();
+    expect(restoredPlan.childIds).not.toContain(null);
+    expect(restoredPlan.childIds).not.toContain(undefined);
+    expect(restoredPlan.childIds).toHaveLength(1);
+    expect(Object.keys(restoredPlan.childTiers)).not.toContain('undefined');
+    expect(Object.values(restoredPlan.childTiers)).not.toContain(undefined);
+  });
 });

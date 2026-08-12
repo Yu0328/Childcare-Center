@@ -189,9 +189,15 @@ async function importParentReports(data, childIdMap) {
 async function importMonthlyCoursePlans(data, childIdMap) {
   const planIdMap = new Map();
   for (const plan of data.monthlyCoursePlans ?? []) {
-    const childIds = plan.childIds.map(id => childIdMap.get(id));
+    // A childId with no matching entry in childIdMap belongs to a child missing from this
+    // backup's `children` (e.g. a dead reference written before deleteChild cascaded to plans —
+    // see db.js). Drop it here rather than restoring a null/undefined child reference that would
+    // later crash the editor view's per-child IndexedDB lookups.
+    const childIds = plan.childIds.map(id => childIdMap.get(id)).filter(id => id !== undefined);
     const childTiers = Object.fromEntries(
-      Object.entries(plan.childTiers).map(([oldChildId, tier]) => [childIdMap.get(Number(oldChildId)), tier])
+      Object.entries(plan.childTiers)
+        .map(([oldChildId, tier]) => [childIdMap.get(Number(oldChildId)), tier])
+        .filter(([newChildId]) => newChildId !== undefined)
     );
     const created = await addMonthlyCoursePlan({ period: plan.period, childIds, childTiers });
     planIdMap.set(plan.id, created.id);
@@ -214,9 +220,11 @@ async function importMonthlyCoursePlans(data, childIdMap) {
   }
 
   for (const override of data.childItemOverrides ?? []) {
+    const childId = childIdMap.get(override.childId);
+    if (childId === undefined) continue; // same dead-child guard as childIds/childTiers above
     await setChildItemOverride({
       planId: planIdMap.get(override.planId),
-      childId: childIdMap.get(override.childId),
+      childId,
       itemId: itemIdMap.get(override.itemId),
       notAchieved: override.notAchieved,
       replaced: override.replaced,
