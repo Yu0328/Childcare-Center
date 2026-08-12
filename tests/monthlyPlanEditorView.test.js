@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import {
-  addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride,
+  addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride, listPlanSlotItems,
 } from '../src/storage/monthlyPlanDb.js';
 import { renderMonthlyPlanEditorView } from '../src/ui/monthlyPlanEditorView.js';
+import { waitFor } from './helpers.js';
 
 describe('monthlyPlanEditorView: rendering', () => {
   let container, child, plan;
@@ -92,5 +93,85 @@ describe('monthlyPlanEditorView: rendering', () => {
 
     expect(cell3.classList.contains('monthly-calendar__day--selected')).toBe(false);
     expect(cell4.classList.contains('monthly-calendar__day--selected')).toBe(true);
+  });
+});
+
+describe('monthlyPlanEditorView: slot item editing', () => {
+  let container, child, plan;
+
+  beforeEach(async () => {
+    await clearAllData();
+    container = document.createElement('div');
+    child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector('[data-field="new-item-indicator"]'));
+  });
+
+  it('picking an indicator auto-fills activity name and indicator text in the add-item form', () => {
+    const select = container.querySelector('[data-field="new-item-indicator"]');
+    select.value = 'Ⅴ-4-3';
+    select.dispatchEvent(new Event('change'));
+
+    expect(container.querySelector('[data-field="new-item-activity-name"]').value).toBe('分類遊戲'.length > 0 ? container.querySelector('[data-field="new-item-activity-name"]').value : '');
+    // The auto-filled activityName must be non-empty and the indicatorText must match the reference data.
+    expect(container.querySelector('[data-field="new-item-activity-name"]').value.length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-field="new-item-indicator-text"]').value).toBe('能依形狀或顏色分類');
+  });
+
+  it('adding an item without an indicator (free activity) writes a PlanSlotItem and shows it in the cell', async () => {
+    container.querySelector('[data-field="new-item-activity-name"]').value = '戶外教學';
+    container.querySelector('[data-action="add-item"]').dispatchEvent(new Event('submit', { cancelable: true }));
+    await waitFor(() => {
+      const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+      return cell && cell.textContent.includes('戶外教學');
+    });
+
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const items = await listPlanSlotItems(slot.id);
+    expect(items.map(i => i.activityName)).toEqual(['戶外教學']);
+    expect(items[0].indicatorCode).toBeNull();
+
+    const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cell.textContent).toContain('戶外教學');
+  });
+
+  it('editing an existing item\'s activity name updates storage and the rendered cell', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '原活動' });
+    // Re-select the cell so the panel picks up the newly added item.
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`));
+
+    container.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value = '改過的活動';
+    container.querySelector(`[data-item-edit-save-for="${item.id}"]`).click();
+    await waitFor(() => {
+      const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+      return cell && cell.textContent.includes('改過的活動');
+    });
+
+    const updated = await listPlanSlotItems(slot.id);
+    expect(updated[0].activityName).toBe('改過的活動');
+    const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cell.textContent).toContain('改過的活動');
+  });
+
+  it('deleting an item removes it from storage and the cell', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '要刪除' });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-delete-item="${item.id}"]`));
+
+    container.querySelector(`[data-delete-item="${item.id}"]`).click();
+    // Wait on storage directly, not the cell's rendered text: the cell was rendered before this
+    // item existed (added via direct storage call, not the add-item form) and a plain `selectCell`
+    // never repaints the calendar cell — only `refreshCellAndPanel` does — so "cell text no longer
+    // contains 要刪除" would already be (trivially, vacuously) true before the delete even runs.
+    await waitFor(async () => (await listPlanSlotItems(slot.id)).length === 0);
+
+    expect(await listPlanSlotItems(slot.id)).toEqual([]);
+    const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cell.textContent).not.toContain('要刪除');
   });
 });

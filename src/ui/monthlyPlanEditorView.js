@@ -1,8 +1,11 @@
 import { getChild } from '../storage/db.js';
-import { listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan } from '../storage/monthlyPlanDb.js';
+import {
+  listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
+  getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem,
+} from '../storage/monthlyPlanDb.js';
 import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from './periodFields.js';
-import { TIERS } from '../data/indicators.js';
+import { TIERS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 
@@ -102,6 +105,7 @@ function childCalendarHtml(child, tier, data) {
 
 export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   const data = await loadEditorData(plan);
+  let selected = null; // { child, tier, week, day }
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -121,17 +125,141 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
+  async function selectCell(child, tier, week, day) {
+    selected = { child, tier, week, day };
+    container.querySelectorAll('.monthly-calendar__day--selected').forEach(el => el.classList.remove('monthly-calendar__day--selected'));
+    container.querySelector(
+      `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+    ).classList.add('monthly-calendar__day--selected');
+    container.querySelector('[data-panel-header]').textContent = `${child.name}　第${week.weekIndex}週　${day.dateLabel}`;
+    await renderPanelItems();
+  }
+
+  function indicatorOptionsHtml(tier) {
+    const indicators = getIndicatorsForTier(tier);
+    const byDomain = new Map();
+    for (const indicator of indicators) {
+      if (!byDomain.has(indicator.domainName)) byDomain.set(indicator.domainName, []);
+      byDomain.get(indicator.domainName).push(indicator);
+    }
+    return (
+      '<option value="">（不選指標，純活動）</option>' +
+      [...byDomain.entries()]
+        .map(
+          ([domainName, group]) =>
+            `<optgroup label="${escapeHtml(domainName)}">
+              ${group.map(i => `<option value="${escapeHtml(i.code)}">${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`).join('')}
+            </optgroup>`
+        )
+        .join('')
+    );
+  }
+
+  function panelItemRowHtml(item) {
+    return `
+      <div class="indicator-block" data-panel-item="${item.id}">
+        <div class="indicator-block__title">
+          ${item.indicatorCode ? `<span class="indicator-block__code">${escapeHtml(item.indicatorCode)}</span>` : ''}
+          <input data-item-edit-field="activityName" data-item-id="${item.id}" value="${escapeHtml(item.activityName)}">
+          <button type="button" class="btn btn--primary btn--small" data-item-edit-save-for="${item.id}">儲存</button>
+          <button type="button" class="btn--delete-circle" data-delete-item="${item.id}" aria-label="刪除${escapeHtml(item.activityName)}">×</button>
+        </div>
+        <textarea data-item-edit-field="indicatorText" data-item-id="${item.id}" rows="2">${escapeHtml(item.indicatorText || '')}</textarea>
+      </div>
+    `;
+  }
+
+  async function renderPanelItems() {
+    const panelItems = container.querySelector('[data-panel-items]');
+    if (!selected) {
+      panelItems.innerHTML = '';
+      return;
+    }
+    const { tier, week, day } = selected;
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: week.weekIndex, weekday: day.weekday });
+    const items = await listPlanSlotItems(slot.id);
+
+    panelItems.innerHTML = `
+      ${items.map(panelItemRowHtml).join('')}
+      <form class="entry-form" data-action="add-item">
+        <label class="panel-form__field">
+          指標
+          <select data-field="new-item-indicator">${indicatorOptionsHtml(tier)}</select>
+        </label>
+        <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name" required></label>
+        <label class="panel-form__field">指標內容 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
+        <button type="submit" class="btn btn--primary btn--small">新增項目</button>
+        <p class="field-error" data-error></p>
+      </form>
+    `;
+
+    panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener('change', event => {
+      const indicator = getIndicator(event.target.value);
+      if (!indicator) return;
+      panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.description;
+      panelItems.querySelector('[data-field="new-item-indicator-text"]').value = indicator.description;
+    });
+
+    panelItems.querySelector('[data-action="add-item"]').addEventListener('submit', async event => {
+      event.preventDefault();
+      const indicatorCode = panelItems.querySelector('[data-field="new-item-indicator"]').value || null;
+      const activityName = panelItems.querySelector('[data-field="new-item-activity-name"]').value;
+      const indicatorText = panelItems.querySelector('[data-field="new-item-indicator-text"]').value;
+      try {
+        await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
+        await refreshCellAndPanel();
+      } catch (err) {
+        panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = '新增失敗，請再試一次';
+      }
+    });
+
+    for (const item of items) {
+      panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', async () => {
+        const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value;
+        const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${item.id}"]`).value;
+        await updatePlanSlotItem(item.id, { activityName, indicatorText });
+        await refreshCellAndPanel();
+      });
+      panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener('click', async () => {
+        await deletePlanSlotItem(item.id);
+        await refreshCellAndPanel();
+      });
+    }
+  }
+
+  // Re-reads this one (tier, week, weekday) slot and rewrites every child's cell that shares it
+  // (same tier → same slot, per the shared-per-tier design), then redraws the panel.
+  async function refreshCellAndPanel() {
+    const { tier, week, day } = selected;
+    const freshSlots = await listPlanSlotsForPlan(plan.id);
+    const freshItemsBySlotId = {};
+    for (const slot of freshSlots) {
+      freshItemsBySlotId[slot.id] = await listPlanSlotItems(slot.id);
+    }
+    const freshOverrides = await listChildItemOverridesForPlan(plan.id);
+    const freshOverrideByKey = new Map(freshOverrides.map(o => [`${o.childId}:${o.itemId}`, o]));
+    const freshData = { ...data, slots: freshSlots, itemsBySlotId: freshItemsBySlotId, overrideByKey: freshOverrideByKey };
+
+    for (const child of data.children) {
+      if (plan.childTiers[child.id] !== tier) continue;
+      const cell = container.querySelector(
+        `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+      );
+      cell.outerHTML = dayCellHtml(child, tier, week, day, freshData);
+      container
+        .querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`)
+        .addEventListener('click', () => selectCell(child, tier, week, day));
+    }
+    await renderPanelItems();
+  }
+
   for (const child of data.children) {
     for (const week of data.weeks) {
       for (const day of week.days) {
         const cell = container.querySelector(
           `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
         );
-        cell.addEventListener('click', () => {
-          container.querySelectorAll('.monthly-calendar__day--selected').forEach(el => el.classList.remove('monthly-calendar__day--selected'));
-          cell.classList.add('monthly-calendar__day--selected');
-          container.querySelector('[data-panel-header]').textContent = `${child.name}　第${week.weekIndex}週　${day.dateLabel}`;
-        });
+        cell.addEventListener('click', () => selectCell(child, plan.childTiers[child.id], week, day));
       }
     }
   }
