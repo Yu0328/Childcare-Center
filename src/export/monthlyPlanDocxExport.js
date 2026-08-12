@@ -1,17 +1,64 @@
 import {
-  AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow, TableLayoutType, TextRun, WidthType,
+  AlignmentType, BorderStyle, Document, Header, Packer, Paragraph, Table, TableCell, TableRow,
+  TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
 import { TIERS } from '../data/indicators.js';
-import { FONT, DEFAULT_TEXT_SIZE, PAGE_SIZE, textParagraph, emptyParagraph } from './docxShared.js';
+import { DEFAULT_TEXT_SIZE, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
 import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from '../ui/periodFields.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 
-const PAGE_MARGIN = { top: 720, right: 720, bottom: 720, left: 720, header: 851, footer: 992 };
-// Date/name column + up to 5 week columns. buildMonthlyCalendar legitimately returns fewer than 5
-// weeks for some months (e.g. most Februaries), so callers must slice this to the actual week
-// count via columnWidthsFor rather than assuming all 6 entries are used.
-const COLUMN_WIDTHS = [1200, 1800, 1800, 1800, 1800, 1800];
+// This document type ("課程月計畫") is issued with a different font variant than every other
+// export's shared FONT ('標楷體') — copied verbatim from the real reference sample's <w:rFonts>
+// (115年03月西瓜班月計畫-2.docx). Do not "fix" this to reuse docxShared.js's FONT; that constant
+// is correct for the other document types, not this one. Because of this, this file defines its
+// own textParagraph-equivalent helpers instead of importing docxShared.js's (which bake in the
+// wrong font) — only font-agnostic helpers (emptyParagraph, headerIconRunInFrontOfText, PAGE_SIZE)
+// are shared.
+const FONT = '標楷體-港澳';
+
+// Page margins in twips, copied from the real reference sample's <w:pgMar> — narrower than both
+// 適性總表's and 適性紀錄's margins. Do not reuse either of those PAGE_MARGIN constants.
+const PAGE_MARGIN = { top: 1134, right: 567, bottom: 1134, left: 567, header: 680, footer: 283 };
+
+// The real sample's header carries this full institution + commissioning-agency line, longer than
+// parentReportDocxExport.js's INSTITUTION_NAME — a different (longer) string for this document
+// type, not a typo of that one.
+const INSTITUTION_NAME = '屏東縣內埔鄉育英公設民營托嬰中心-屏東縣政府委託中華頭心手希望教育協會辦理';
+
+// Title size in half-points: 32 = 16pt, copied from the real sample's <w:sz w:val="32"/> on the
+// "{period}課程計畫" title run (適性總表 uses 34, 適性紀錄 uses 36 — different documents,
+// different verified values, do not "align" them).
+const TITLE_SIZE = 32;
+
+// The "日期/姓名" corner header cell only, per the real sample's <w:sz w:val="18"/> on that one
+// cell's runs (18 half-points = 9pt) — every other header/body cell uses the document default
+// (DEFAULT_TEXT_SIZE, 24 = 12pt).
+const CORNER_LABEL_SIZE = 18;
+
+// Column widths in DXA, copied verbatim from the real sample's <w:tblGrid>: 日期/姓名 column +
+// up to 5 week columns. buildMonthlyCalendar legitimately returns fewer than 5 weeks for some
+// months (e.g. most Februaries), so callers must slice this to the actual week count via
+// columnWidthsFor rather than assuming all 6 entries are used.
+const COLUMN_WIDTHS = [995, 1977, 2268, 2126, 1985, 1879];
+const TABLE_CELL_MARGIN_DXA = 100;
+
+// Every border in the real sample's <w:tblBorders> is this same single 0.5pt (sz=4) black line,
+// on all four table edges and both inside directions — a plain uniform grid, no double lines or
+// shading tricks.
+const TABLE_BORDER = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+const TABLE_BORDERS = {
+  top: TABLE_BORDER, bottom: TABLE_BORDER, left: TABLE_BORDER, right: TABLE_BORDER,
+  insideHorizontal: TABLE_BORDER, insideVertical: TABLE_BORDER,
+};
+
+// Reused for the icon's position in this document's header, tuned the same way
+// parentReportDocxExport.js's HEADER_ICON_OFFSET_EMU was (visual iteration against a rendered
+// sample) — the two documents share the same icon-near-title-start layout intent.
+const HEADER_ICON_OFFSET_EMU = { horizontal: -325000, vertical: -40000 };
+
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const CENTERED = { alignment: AlignmentType.CENTER };
 
 function columnWidthsFor(weekCount) {
   return COLUMN_WIDTHS.slice(0, weekCount + 1);
@@ -49,6 +96,13 @@ function runFont() {
   return { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT };
 }
 
+function textParagraph(text, { size = DEFAULT_TEXT_SIZE, alignment } = {}) {
+  return new Paragraph({
+    ...(alignment ? { alignment } : {}),
+    children: [new TextRun({ text: String(text ?? ''), font: runFont(), size })],
+  });
+}
+
 function cellParagraphsFromRuns(runs) {
   if (runs.length === 0) return [emptyParagraph()];
   return runs.map(run => {
@@ -72,16 +126,39 @@ function cellWidth(widths, index) {
   return { size: widths[index], type: WidthType.DXA };
 }
 
+function documentHeader(period) {
+  return new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          headerIconRunInFrontOfText(HEADER_ICON_OFFSET_EMU),
+          new TextRun({ text: INSTITUTION_NAME, font: runFont(), size: DEFAULT_TEXT_SIZE }),
+        ],
+      }),
+      textParagraph(`${period}課程計畫`, { size: TITLE_SIZE, alignment: AlignmentType.CENTER }),
+    ],
+  });
+}
+
 function weekHeaderRow(weeks, widths) {
   return new TableRow({
     children: [
-      new TableCell({ width: cellWidth(widths, 0), children: [textParagraph('日期/姓名', { alignment: AlignmentType.CENTER })] }),
+      new TableCell({
+        width: cellWidth(widths, 0),
+        verticalAlign: VerticalAlign.CENTER,
+        children: [
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '日期/', font: runFont(), size: CORNER_LABEL_SIZE })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '姓名', font: runFont(), size: CORNER_LABEL_SIZE })] }),
+        ],
+      }),
       ...weeks.map((week, index) =>
         new TableCell({
           width: cellWidth(widths, index + 1),
+          verticalAlign: VerticalAlign.CENTER,
           children: [
-            textParagraph(`第${week.weekIndex}週`, { alignment: AlignmentType.CENTER }),
-            textParagraph(week.dateRange, { alignment: AlignmentType.CENTER }),
+            textParagraph(`第${week.weekIndex}週`, CENTERED),
+            textParagraph(week.dateRange, CENTERED),
           ],
         })
       ),
@@ -93,12 +170,32 @@ function findSlot(slots, tier, weekIndex, weekday) {
   return slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
 }
 
-function dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByItemId, widths) {
-  const dateCells = weeks.map((week, index) => {
-    const day = week.days.find(d => d.weekday === weekday);
-    return new TableCell({ width: cellWidth(widths, index + 1), children: [textParagraph(day ? day.dateLabel : '', { alignment: AlignmentType.CENTER })] });
+// The child's name+age+tier occupies the first column once, vertically merged down through every
+// date/content row pair (per the real sample's <w:vMerge>) rather than repeated per row — restart
+// on the very first body row, continue (empty) on every row after it.
+function nameCell(widths, isFirstBodyRow, nameContent) {
+  return new TableCell({
+    width: cellWidth(widths, 0),
+    verticalAlign: VerticalAlign.CENTER,
+    verticalMerge: isFirstBodyRow ? VerticalMergeType.RESTART : VerticalMergeType.CONTINUE,
+    children: isFirstBodyRow ? nameContent : [emptyParagraph()],
   });
-  const contentCells = weeks.map((week, index) => {
+}
+
+function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
+  const cells = weeks.map((week, index) => {
+    const day = week.days.find(d => d.weekday === weekday);
+    return new TableCell({
+      width: cellWidth(widths, index + 1),
+      verticalAlign: VerticalAlign.CENTER,
+      children: [textParagraph(day ? day.dateLabel : '', CENTERED)],
+    });
+  });
+  return new TableRow({ children: [nameCell(widths, isFirstBodyRow, nameContent), ...cells] });
+}
+
+function contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId) {
+  const cells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
     if (!day) return new TableCell({ width: cellWidth(widths, index + 1), children: [emptyParagraph()] });
     const slot = findSlot(slots, tier, week.weekIndex, weekday);
@@ -106,11 +203,23 @@ function dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByIt
     const runs = buildDayCellRuns(items, overrideByItemId);
     return new TableCell({ width: cellWidth(widths, index + 1), children: cellParagraphsFromRuns(runs) });
   });
+  return new TableRow({ children: [nameCell(widths, false, null), ...cells] });
+}
 
-  return [
-    new TableRow({ children: [new TableCell({ width: cellWidth(widths, 0), children: [emptyParagraph()] }), ...dateCells] }),
-    new TableRow({ children: [new TableCell({ width: cellWidth(widths, 0), children: [emptyParagraph()] }), ...contentCells] }),
-  ];
+// The real sample ends every child's table with a "節氣／其他" label row, empty across every
+// week — a trailing notes row in the original template. No data in this app's model backs it;
+// reproduced as a static empty row purely for structural fidelity to the reference document.
+function trailingNoteRow(widths) {
+  return new TableRow({
+    children: [
+      new TableCell({
+        width: cellWidth(widths, 0),
+        verticalAlign: VerticalAlign.CENTER,
+        children: [textParagraph('節氣', CENTERED), textParagraph('其他', CENTERED)],
+      }),
+      ...widths.slice(1).map(width => new TableCell({ width: { size: width, type: WidthType.DXA }, children: [emptyParagraph()] })),
+    ],
+  });
 }
 
 function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides) {
@@ -120,24 +229,21 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
   );
   const asOfIso = weeks[0].days[0].isoDate;
   const ageMonths = calculateAgeInMonths(child.birthDate, asOfIso);
+  const nameContent = [textParagraph(child.name, CENTERED), textParagraph(`${ageMonths}M　${tierFormLetter(tier)}表`, CENTERED)];
 
-  const nameRow = new TableRow({
-    children: [
-      new TableCell({
-        width: cellWidth(widths, 0),
-        children: [textParagraph(`${child.name}`), textParagraph(`${ageMonths}M ${tierFormLetter(tier)}表`)],
-      }),
-      ...weeks.map((week, index) => new TableCell({ width: cellWidth(widths, index + 1), children: [emptyParagraph()] })),
-    ],
-  });
-
-  const bodyRows = [1, 2, 3, 4, 5].flatMap(weekday => dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByItemId, widths));
+  const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [
+    dateRow(weeks, weekday, widths, nameContent, weekdayIndex === 0),
+    contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId),
+  ]);
 
   return new Table({
     width: { size: tableWidthDxa(widths), type: WidthType.DXA },
     columnWidths: widths,
     layout: TableLayoutType.FIXED,
-    rows: [weekHeaderRow(weeks, widths), nameRow, ...bodyRows],
+    alignment: AlignmentType.CENTER,
+    margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
+    borders: TABLE_BORDERS,
+    rows: [weekHeaderRow(weeks, widths), ...bodyRows, trailingNoteRow(widths)],
   });
 }
 
@@ -155,7 +261,8 @@ export async function generateMonthlyPlanDocxBlob({ plan, children, slots, items
     sections: [
       {
         properties: { page: { size: PAGE_SIZE, margin: PAGE_MARGIN } },
-        children: [textParagraph(`${plan.period}課程月計畫`, { bold: true, alignment: AlignmentType.CENTER }), emptyParagraph(), ...tables],
+        headers: { default: documentHeader(plan.period) },
+        children: tables.length > 0 ? tables : [emptyParagraph()],
       },
     ],
   });
