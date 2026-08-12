@@ -1,7 +1,7 @@
 import { getChild } from '../storage/db.js';
 import {
   listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
-  getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem,
+  getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem, setChildItemOverride,
 } from '../storage/monthlyPlanDb.js';
 import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from './periodFields.js';
@@ -155,7 +155,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     );
   }
 
-  function panelItemRowHtml(item) {
+  function panelItemRowHtml(item, override) {
     return `
       <div class="indicator-block" data-panel-item="${item.id}">
         <div class="indicator-block__title">
@@ -165,6 +165,22 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
           <button type="button" class="btn--delete-circle" data-delete-item="${item.id}" aria-label="刪除${escapeHtml(item.activityName)}">×</button>
         </div>
         <textarea data-item-edit-field="indicatorText" data-item-id="${item.id}" rows="2">${escapeHtml(item.indicatorText || '')}</textarea>
+        <div class="entry-form__checkbox-row">
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-override-field="notAchieved" data-item-id="${item.id}" ${override?.notAchieved ? 'checked' : ''}> 未達成
+          </label>
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-override-field="replaced" data-item-id="${item.id}" ${override?.replaced ? 'checked' : ''}> 請假／其他活動代替
+          </label>
+          <input
+            type="text"
+            data-override-field="replacementText"
+            data-item-id="${item.id}"
+            placeholder="替代活動內容"
+            value="${escapeHtml(override?.replacementText || '')}"
+            ${override?.replaced ? '' : 'disabled'}
+          >
+        </div>
       </div>
     `;
   }
@@ -175,12 +191,14 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       panelItems.innerHTML = '';
       return;
     }
-    const { tier, week, day } = selected;
+    const { child, tier, week, day } = selected;
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: week.weekIndex, weekday: day.weekday });
     const items = await listPlanSlotItems(slot.id);
+    const allOverrides = await listChildItemOverridesForPlan(plan.id);
+    const overrideByItemId = new Map(allOverrides.filter(o => o.childId === child.id).map(o => [o.itemId, o]));
 
     panelItems.innerHTML = `
-      ${items.map(panelItemRowHtml).join('')}
+      ${items.map(item => panelItemRowHtml(item, overrideByItemId.get(item.id))).join('')}
       <form class="entry-form" data-action="add-item">
         <label class="panel-form__field">
           指標
@@ -224,6 +242,29 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         await deletePlanSlotItem(item.id);
         await refreshCellAndPanel();
       });
+
+      const notAchievedBox = panelItems.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
+      const replacedBox = panelItems.querySelector(`[data-override-field="replaced"][data-item-id="${item.id}"]`);
+      const replacementInput = panelItems.querySelector(`[data-override-field="replacementText"][data-item-id="${item.id}"]`);
+
+      async function saveOverride() {
+        await setChildItemOverride({
+          planId: plan.id,
+          childId: child.id,
+          itemId: item.id,
+          notAchieved: notAchievedBox.checked,
+          replaced: replacedBox.checked,
+          replacementText: replacementInput.value,
+        });
+        await refreshCellAndPanel();
+      }
+
+      notAchievedBox.addEventListener('change', saveOverride);
+      replacedBox.addEventListener('change', () => {
+        replacementInput.disabled = !replacedBox.checked;
+        saveOverride();
+      });
+      replacementInput.addEventListener('change', saveOverride);
     }
   }
 

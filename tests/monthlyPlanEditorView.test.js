@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import {
   addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride, listPlanSlotItems,
+  listChildItemOverridesForPlan,
 } from '../src/storage/monthlyPlanDb.js';
 import { renderMonthlyPlanEditorView } from '../src/ui/monthlyPlanEditorView.js';
 import { waitFor } from './helpers.js';
@@ -173,5 +174,86 @@ describe('monthlyPlanEditorView: slot item editing', () => {
     expect(await listPlanSlotItems(slot.id)).toEqual([]);
     const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
     expect(cell.textContent).not.toContain('要刪除');
+  });
+});
+
+describe('monthlyPlanEditorView: per-child overrides', () => {
+  let container, childA, childB, plan, item;
+
+  beforeEach(async () => {
+    await clearAllData();
+    container = document.createElement('div');
+    childA = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    childB = await addChild({ name: '鍾晴妍', birthDate: '2024-08-01' });
+    plan = await addMonthlyCoursePlan({
+      period: '115年06月',
+      childIds: [childA.id, childB.id],
+      childTiers: { [childA.id]: 'Ⅴ', [childB.id]: 'Ⅴ' },
+    });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    item = await addPlanSlotItem({ slotId: slot.id, activityName: '拼拼圖' });
+
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`));
+  });
+
+  it('checking 未達成 for one child marks only that child\'s cell red', async () => {
+    const notAchievedBox = container.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
+    notAchievedBox.checked = true;
+    notAchievedBox.dispatchEvent(new Event('change'));
+    await waitFor(async () => (await listChildItemOverridesForPlan(plan.id)).length === 1);
+
+    const overrides = await listChildItemOverridesForPlan(plan.id);
+    expect(overrides).toHaveLength(1);
+    expect(overrides[0]).toMatchObject({ childId: childA.id, itemId: item.id, notAchieved: true, replaced: false });
+
+    const cellA = container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cellA.querySelector('.monthly-calendar__item--not-achieved')).not.toBeNull();
+    const cellB = container.querySelector(`.monthly-calendar__day[data-child-id="${childB.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cellB.querySelector('.monthly-calendar__item--not-achieved')).toBeNull();
+  });
+
+  it('checking 請假 enables the replacement text field, and saving it shows the replacement in the cell', async () => {
+    const replacedCheckbox = container.querySelector(`[data-override-field="replaced"][data-item-id="${item.id}"]`);
+    replacedCheckbox.checked = true;
+    replacedCheckbox.dispatchEvent(new Event('change'));
+    // Wait on the actual persisted state, not just the input's `disabled` flag: that flag flips
+    // synchronously inside the change handler as a UX nicety, well before the async
+    // setChildItemOverride() write (and the refreshCellAndPanel() re-render that follows it)
+    // actually completes. Waiting on the DOM flag alone lets this test's next interaction race
+    // the first write's read-modify-write cycle and create a duplicate override row.
+    await waitFor(async () => (await listChildItemOverridesForPlan(plan.id)).some(o => o.itemId === item.id && o.replaced === true));
+
+    const replacementInput = container.querySelector(`[data-override-field="replacementText"][data-item-id="${item.id}"]`);
+    expect(replacementInput.disabled).toBe(false);
+    replacementInput.value = '請假';
+    replacementInput.dispatchEvent(new Event('change'));
+    // Wait on the rendered cell, not just the storage write: setChildItemOverride() resolving
+    // only means the write landed, not that refreshCellAndPanel()'s subsequent (also async)
+    // calendar-cell rewrite has completed yet.
+    await waitFor(() => {
+      const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`);
+      return cell && cell.textContent.includes('請假');
+    });
+
+    const overrides = await listChildItemOverridesForPlan(plan.id);
+    expect(overrides[0]).toMatchObject({ replaced: true, replacementText: '請假' });
+
+    const cellA = container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cellA.textContent).toContain('請假');
+  });
+
+  it('unchecking both flags removes the override row', async () => {
+    const notAchievedBox = container.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
+    notAchievedBox.checked = true;
+    notAchievedBox.dispatchEvent(new Event('change'));
+    await waitFor(async () => (await listChildItemOverridesForPlan(plan.id)).length === 1);
+
+    notAchievedBox.checked = false;
+    notAchievedBox.dispatchEvent(new Event('change'));
+    await waitFor(async () => (await listChildItemOverridesForPlan(plan.id)).length === 0);
+
+    expect(await listChildItemOverridesForPlan(plan.id)).toEqual([]);
   });
 });
