@@ -130,6 +130,24 @@ describe('monthlyPlanDb: ChildItemOverride', () => {
     expect(second.replacementText).toBe('請假');
   });
 
+  it('two concurrent calls for the same key serialize into a single row instead of racing into duplicates', async () => {
+    // Neither call is awaited before the other starts — this mirrors two `change` events firing
+    // back-to-back in the UI (e.g. a double-click toggling a checkbox) before the first call's
+    // read-modify-write has had a chance to complete. Semantics: calls serialize in the order
+    // they were made, so the second call's values win and exactly one row survives.
+    const [, second] = await Promise.all([
+      setChildItemOverride({ planId: plan.id, childId: 1, itemId: item.id, notAchieved: true, replaced: false }),
+      setChildItemOverride({
+        planId: plan.id, childId: 1, itemId: item.id, notAchieved: false, replaced: true, replacementText: '請假',
+      }),
+    ]);
+
+    const all = await listChildItemOverridesForPlan(plan.id);
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ notAchieved: false, replaced: true, replacementText: '請假' });
+    expect(second).toMatchObject({ notAchieved: false, replaced: true, replacementText: '請假' });
+  });
+
   it('deletes the row once both flags are cleared', async () => {
     await setChildItemOverride({ planId: plan.id, childId: 1, itemId: item.id, notAchieved: true, replaced: false });
     const result = await setChildItemOverride({ planId: plan.id, childId: 1, itemId: item.id, notAchieved: false, replaced: false });

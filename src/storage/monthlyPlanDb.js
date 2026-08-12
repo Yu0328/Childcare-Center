@@ -97,10 +97,32 @@ export async function listChildItemOverridesForPlan(planId) {
   return runRequest('childItemOverrides', 'readonly', store => store.index('by_planId').getAll(planId));
 }
 
+// setChildItemOverride does an unguarded read-then-write (find existing row, then add/put/delete).
+// The UI fires one call per checkbox/text-field `change` event with no coordination between them,
+// so two calls for the same (planId, childId, itemId) can overlap — both reading "no existing row"
+// before either write lands — and produce duplicate rows instead of one upsert. This queue chains
+// each call for a given key onto the previous one's completion so its read only ever starts after
+// the prior call's write has fully committed, closing the race rather than just documenting it.
+const overrideWriteQueues = new Map();
+
+function overrideKey(planId, childId, itemId) {
+  return `${planId}:${childId}:${itemId}`;
+}
+
 // Upserts a child's mark on one item. Once both flags are false there is nothing left to
 // remember, so the row is deleted instead of kept around as a no-op default — every other
 // consumer can then treat "no matching row" as the single source of truth for "no override".
 export async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = '' }) {
+  const key = overrideKey(planId, childId, itemId);
+  const previous = overrideWriteQueues.get(key) || Promise.resolve();
+  const next = previous.catch(() => {}).then(() =>
+    writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText })
+  );
+  overrideWriteQueues.set(key, next);
+  return next;
+}
+
+async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText }) {
   const existing = (await listChildItemOverridesForPlan(planId)).find(o => o.childId === childId && o.itemId === itemId);
 
   if (!notAchieved && !replaced) {
