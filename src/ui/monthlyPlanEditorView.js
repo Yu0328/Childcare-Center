@@ -10,6 +10,7 @@ import { parsePeriod } from './periodFields.js';
 import { TIERS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
+import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 
 function tierFormLetter(tierCode) {
   const tier = TIERS.find(t => t.code === tierCode);
@@ -114,6 +115,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       <button type="button" class="btn btn--ghost" data-action="back">← 返回課程月計畫列表</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} 課程月計畫</h2>
       <button type="button" class="btn btn--purple" data-action="manage-children">管理小朋友</button>
+      <button type="button" class="btn btn--purple" data-action="export-docx">匯出 Word</button>
     </div>
     <form class="panel-form" data-manage-children-form hidden>
       <h3 class="panel-form__title">選擇本月計畫涵蓋的小朋友</h3>
@@ -144,6 +146,21 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   container.querySelector('[data-action="manage-children"]').addEventListener('click', () => {
     const form = container.querySelector('[data-manage-children-form]');
     form.hidden = !form.hidden;
+  });
+
+  container.querySelector('[data-action="export-docx"]').addEventListener('click', async () => {
+    const blob = await generateMonthlyPlanDocxBlob({
+      plan, children: data.children, slots: data.slots, itemsBySlotId: data.itemsBySlotId,
+      overrides: [...data.overrideByKey.values()],
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${plan.period}課程月計畫.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 
   container.querySelector('[data-action="save-children"]').addEventListener('click', async () => {
