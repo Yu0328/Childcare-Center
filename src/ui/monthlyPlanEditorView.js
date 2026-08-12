@@ -1,12 +1,14 @@
-import { getChild } from '../storage/db.js';
+import { getChild, listChildren } from '../storage/db.js';
 import {
   listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
   getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem, setChildItemOverride,
+  updateMonthlyCoursePlan, deleteChildItemOverridesForChild,
 } from '../storage/monthlyPlanDb.js';
 import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
+import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
 import { parsePeriod } from './periodFields.js';
 import { TIERS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
-import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 
 function tierFormLetter(tierCode) {
@@ -111,7 +113,21 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">← 返回課程月計畫列表</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} 課程月計畫</h2>
+      <button type="button" class="btn btn--purple" data-action="manage-children">管理小朋友</button>
     </div>
+    <form class="panel-form" data-manage-children-form hidden>
+      <h3 class="panel-form__title">選擇本月計畫涵蓋的小朋友</h3>
+      ${(await listChildren())
+        .map(
+          c =>
+            `<label class="panel-form__checkbox">
+              <input type="checkbox" data-manage-child-checkbox="${escapeHtml(c.id)}" ${plan.childIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.name)}
+            </label>`
+        )
+        .join('')}
+      <button type="button" class="btn btn--primary" data-action="save-children">儲存</button>
+      <p class="field-error" data-error="manage-children"></p>
+    </form>
     <div class="tab-layout">
       <div class="monthly-calendar-list">
         ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data)).join('')}
@@ -124,6 +140,45 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   `;
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
+
+  container.querySelector('[data-action="manage-children"]').addEventListener('click', () => {
+    const form = container.querySelector('[data-manage-children-form]');
+    form.hidden = !form.hidden;
+  });
+
+  container.querySelector('[data-action="save-children"]').addEventListener('click', async () => {
+    const allChildren = await listChildren();
+    const newChildIds = allChildren.filter(c => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`).checked).map(c => c.id);
+    const removedChildIds = plan.childIds.filter(id => !newChildIds.includes(id));
+
+    try {
+      const { year, month } = parsePeriod(plan.period);
+      const asOfDate = `${year + 1911}-${String(month).padStart(2, '0')}-01`;
+      const newChildTiers = { ...plan.childTiers };
+      for (const childId of newChildIds) {
+        if (newChildTiers[childId]) continue;
+        const child = allChildren.find(c => c.id === childId);
+        newChildTiers[childId] = suggestTier(child.birthDate, asOfDate);
+      }
+      for (const childId of removedChildIds) {
+        delete newChildTiers[childId];
+      }
+
+      const updatedPlan = await updateMonthlyCoursePlan(plan.id, { childIds: newChildIds, childTiers: newChildTiers });
+
+      const weeks = buildMonthlyCalendar(year + 1911, month);
+      const tiers = [...new Set(Object.values(newChildTiers))];
+      await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
+
+      for (const childId of removedChildIds) {
+        await deleteChildItemOverridesForChild(plan.id, childId);
+      }
+
+      await renderMonthlyPlanEditorView(container, { plan: updatedPlan, onBack });
+    } catch (err) {
+      container.querySelector('[data-error="manage-children"]').textContent = '更新失敗，請再試一次';
+    }
+  });
 
   async function selectCell(child, tier, week, day) {
     selected = { child, tier, week, day };

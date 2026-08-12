@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import {
   addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride, listPlanSlotItems,
-  listChildItemOverridesForPlan,
+  listChildItemOverridesForPlan, getMonthlyCoursePlan,
 } from '../src/storage/monthlyPlanDb.js';
 import { renderMonthlyPlanEditorView } from '../src/ui/monthlyPlanEditorView.js';
 import { waitFor } from './helpers.js';
@@ -255,5 +255,57 @@ describe('monthlyPlanEditorView: per-child overrides', () => {
     await waitFor(async () => (await listChildItemOverridesForPlan(plan.id)).length === 0);
 
     expect(await listChildItemOverridesForPlan(plan.id)).toEqual([]);
+  });
+});
+
+describe('monthlyPlanEditorView: manage children', () => {
+  let container, childA, childB, plan;
+
+  beforeEach(async () => {
+    await clearAllData();
+    container = document.createElement('div');
+    childA = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    childB = await addChild({ name: '張珏銨', birthDate: '2024-12-01' }); // different tier
+    plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [childA.id], childTiers: { [childA.id]: 'Ⅴ' } });
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+  });
+
+  it('adding a child recomputes their tier and seeds Mon/Tue defaults for a new tier', async () => {
+    container.querySelector('[data-action="manage-children"]').click();
+    container.querySelector(`[data-manage-child-checkbox="${childB.id}"]`).checked = true;
+    container.querySelector('[data-action="save-children"]').click();
+    // Wait for the recursive re-render (the save handler's last step, after updateMonthlyCoursePlan
+    // AND seedDefaultPlanSlots have both completed) rather than on the plan's childIds alone: the
+    // plan update resolves before seeding even starts, so polling only childIds would let the
+    // assertion below race the seed write and read an empty slot.
+    await waitFor(() => container.querySelector(`.monthly-calendar[data-child-id="${childB.id}"]`));
+
+    const updated = await getMonthlyCoursePlan(plan.id);
+    expect(updated.childIds.sort()).toEqual([childA.id, childB.id].sort());
+    expect(updated.childTiers[childB.id]).toBeTypeOf('string');
+
+    const bSlot = await getOrCreatePlanSlot({ planId: plan.id, tier: updated.childTiers[childB.id], weekIndex: 1, weekday: 1 });
+    expect((await listPlanSlotItems(bSlot.id)).map(i => i.activityName)).toEqual(['大團體活動']);
+
+    expect(container.querySelector(`.monthly-calendar[data-child-id="${childB.id}"]`)).not.toBeNull();
+  });
+
+  it('removing a child clears their overrides for this plan and their calendar block', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: 'x' });
+    await setChildItemOverride({ planId: plan.id, childId: childA.id, itemId: item.id, notAchieved: true, replaced: false });
+
+    container.querySelector('[data-action="manage-children"]').click();
+    container.querySelector(`[data-manage-child-checkbox="${childA.id}"]`).checked = false;
+    container.querySelector('[data-action="save-children"]').click();
+    // Wait for the recursive re-render (the save handler's last step, after
+    // deleteChildItemOverridesForChild has already completed) rather than on the plan's childIds
+    // alone, for the same reason as the "adding a child" test above.
+    await waitFor(() => !container.querySelector(`.monthly-calendar[data-child-id="${childA.id}"]`));
+
+    const updated = await getMonthlyCoursePlan(plan.id);
+    expect(updated.childIds).toEqual([]);
+    expect(await listChildItemOverridesForPlan(plan.id)).toEqual([]);
+    expect(container.querySelector(`.monthly-calendar[data-child-id="${childA.id}"]`)).toBeNull();
   });
 });
