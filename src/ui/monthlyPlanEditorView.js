@@ -119,20 +119,27 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">← 返回課程月計畫列表</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} 課程月計畫</h2>
-      <button type="button" class="btn btn--purple" data-action="manage-children">管理小朋友</button>
-      <button type="button" class="btn btn--purple" data-action="export-docx">匯出 Word</button>
+      <div class="page-header__actions">
+        <button type="button" class="btn btn--purple" data-action="manage-children">管理小朋友</button>
+        <button type="button" class="btn btn--purple" data-action="export-docx">匯出 Word</button>
+      </div>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <form class="panel-form" data-manage-children-form hidden>
       <h3 class="panel-form__title">選擇本月計畫涵蓋的小朋友</h3>
-      ${(await listChildren())
-        .map(
-          c =>
-            `<label class="panel-form__checkbox">
-              <input type="checkbox" data-manage-child-checkbox="${escapeHtml(c.id)}" ${plan.childIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.name)}
-            </label>`
-        )
-        .join('')}
+      <fieldset class="panel-form__field">
+        <legend>小朋友</legend>
+        <div class="panel-form__checkbox-list">
+          ${(await listChildren())
+            .map(
+              c =>
+                `<label class="panel-form__checkbox">
+                  <input type="checkbox" data-manage-child-checkbox="${escapeHtml(c.id)}" ${plan.childIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.name)}
+                </label>`
+            )
+            .join('')}
+        </div>
+      </fieldset>
       <button type="button" class="btn btn--primary" data-action="save-children">儲存</button>
       <p class="field-error" data-error="manage-children"></p>
     </form>

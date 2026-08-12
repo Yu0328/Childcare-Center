@@ -51,14 +51,16 @@ export async function renderMonthlyPlanListView(
         </label>
         <fieldset class="panel-form__field">
           <legend>小朋友</legend>
-          ${children
-            .map(
-              child =>
-                `<label class="panel-form__checkbox">
-                  <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
-                </label>`
-            )
-            .join('')}
+          <div class="panel-form__checkbox-list">
+            ${children
+              .map(
+                child =>
+                  `<label class="panel-form__checkbox">
+                    <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
+                  </label>`
+              )
+              .join('')}
+          </div>
         </fieldset>
         <button type="submit" class="btn btn--primary">新增</button>
         <p class="field-error" data-error></p>
