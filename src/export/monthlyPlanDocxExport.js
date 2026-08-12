@@ -8,8 +8,18 @@ import { parsePeriod } from '../ui/periodFields.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 
 const PAGE_MARGIN = { top: 720, right: 720, bottom: 720, left: 720, header: 851, footer: 992 };
+// Date/name column + up to 5 week columns. buildMonthlyCalendar legitimately returns fewer than 5
+// weeks for some months (e.g. most Februaries), so callers must slice this to the actual week
+// count via columnWidthsFor rather than assuming all 6 entries are used.
 const COLUMN_WIDTHS = [1200, 1800, 1800, 1800, 1800, 1800];
-const TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, w) => sum + w, 0);
+
+function columnWidthsFor(weekCount) {
+  return COLUMN_WIDTHS.slice(0, weekCount + 1);
+}
+
+function tableWidthDxa(widths) {
+  return widths.reduce((sum, w) => sum + w, 0);
+}
 
 function tierFormLetter(tierCode) {
   const tier = TIERS.find(t => t.code === tierCode);
@@ -58,17 +68,17 @@ function cellParagraphsFromRuns(runs) {
   });
 }
 
-function cellWidth(index) {
-  return { size: COLUMN_WIDTHS[index], type: WidthType.DXA };
+function cellWidth(widths, index) {
+  return { size: widths[index], type: WidthType.DXA };
 }
 
-function weekHeaderRow(weeks) {
+function weekHeaderRow(weeks, widths) {
   return new TableRow({
     children: [
-      new TableCell({ width: cellWidth(0), children: [textParagraph('日期/姓名', { alignment: AlignmentType.CENTER })] }),
+      new TableCell({ width: cellWidth(widths, 0), children: [textParagraph('日期/姓名', { alignment: AlignmentType.CENTER })] }),
       ...weeks.map((week, index) =>
         new TableCell({
-          width: cellWidth(index + 1),
+          width: cellWidth(widths, index + 1),
           children: [
             textParagraph(`第${week.weekIndex}週`, { alignment: AlignmentType.CENTER }),
             textParagraph(week.dateRange, { alignment: AlignmentType.CENTER }),
@@ -83,27 +93,28 @@ function findSlot(slots, tier, weekIndex, weekday) {
   return slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
 }
 
-function dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByItemId) {
+function dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByItemId, widths) {
   const dateCells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
-    return new TableCell({ width: cellWidth(index + 1), children: [textParagraph(day ? day.dateLabel : '', { alignment: AlignmentType.CENTER })] });
+    return new TableCell({ width: cellWidth(widths, index + 1), children: [textParagraph(day ? day.dateLabel : '', { alignment: AlignmentType.CENTER })] });
   });
   const contentCells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
-    if (!day) return new TableCell({ width: cellWidth(index + 1), children: [emptyParagraph()] });
+    if (!day) return new TableCell({ width: cellWidth(widths, index + 1), children: [emptyParagraph()] });
     const slot = findSlot(slots, tier, week.weekIndex, weekday);
     const items = slot ? itemsBySlotId[slot.id] || [] : [];
     const runs = buildDayCellRuns(items, overrideByItemId);
-    return new TableCell({ width: cellWidth(index + 1), children: cellParagraphsFromRuns(runs) });
+    return new TableCell({ width: cellWidth(widths, index + 1), children: cellParagraphsFromRuns(runs) });
   });
 
   return [
-    new TableRow({ children: [new TableCell({ width: cellWidth(0), children: [emptyParagraph()] }), ...dateCells] }),
-    new TableRow({ children: [new TableCell({ width: cellWidth(0), children: [emptyParagraph()] }), ...contentCells] }),
+    new TableRow({ children: [new TableCell({ width: cellWidth(widths, 0), children: [emptyParagraph()] }), ...dateCells] }),
+    new TableRow({ children: [new TableCell({ width: cellWidth(widths, 0), children: [emptyParagraph()] }), ...contentCells] }),
   ];
 }
 
 function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides) {
+  const widths = columnWidthsFor(weeks.length);
   const overrideByItemId = new Map(
     allOverrides.filter(o => o.childId === child.id).map(o => [o.itemId, o])
   );
@@ -113,20 +124,20 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
   const nameRow = new TableRow({
     children: [
       new TableCell({
-        width: cellWidth(0),
+        width: cellWidth(widths, 0),
         children: [textParagraph(`${child.name}`), textParagraph(`${ageMonths}M ${tierFormLetter(tier)}表`)],
       }),
-      ...weeks.map((week, index) => new TableCell({ width: cellWidth(index + 1), children: [emptyParagraph()] })),
+      ...weeks.map((week, index) => new TableCell({ width: cellWidth(widths, index + 1), children: [emptyParagraph()] })),
     ],
   });
 
-  const bodyRows = [1, 2, 3, 4, 5].flatMap(weekday => dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByItemId));
+  const bodyRows = [1, 2, 3, 4, 5].flatMap(weekday => dayRows(child, tier, weeks, weekday, slots, itemsBySlotId, overrideByItemId, widths));
 
   return new Table({
-    width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
-    columnWidths: COLUMN_WIDTHS,
+    width: { size: tableWidthDxa(widths), type: WidthType.DXA },
+    columnWidths: widths,
     layout: TableLayoutType.FIXED,
-    rows: [weekHeaderRow(weeks), nameRow, ...bodyRows],
+    rows: [weekHeaderRow(weeks, widths), nameRow, ...bodyRows],
   });
 }
 
