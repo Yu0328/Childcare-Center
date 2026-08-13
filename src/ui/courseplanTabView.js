@@ -20,10 +20,11 @@ function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
 
 function occurrenceRow(occurrence) {
   const statusLabel = occurrence.absent ? '請假' : occurrence.status === 'developed' ? '已發展○' : '發展中△';
+  const isFlagged = occurrence.absent || occurrence.status === 'developing';
   return `
     <li class="entry-row${occurrence.absent ? ' entry-row--absent' : ''}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date">${escapeHtml(occurrence.date)}　${statusLabel}</span>
+        <span class="entry-row__date${isFlagged ? ' entry-row__date--flag' : ''}">${escapeHtml(occurrence.date)}　${statusLabel}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="編輯實施紀錄：${escapeHtml(occurrence.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="刪除實施紀錄：${escapeHtml(occurrence.date)}">×</button>

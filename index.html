@@ -663,7 +663,13 @@ fieldset.panel-form__field legend {
 .entry-row--absent .entry-row__date,
 .entry-row--absent .entry-row__note {
   text-decoration: line-through;
-  color: var(--text-secondary);
+}
+
+/* 未發展(發展中△) or 請假 occurrences read as red text so they stand out from a plain 已發展○
+   row at a glance — added to .entry-row__date instead of relying on .entry-row--absent's color
+   alone so 發展中△ (not absent) gets the same red treatment. */
+.entry-row__date--flag {
+  color: var(--danger);
 }
 
 .entry-row__top {
@@ -1093,6 +1099,37 @@ fieldset.panel-form__field legend {
   flex-shrink: 0;
 }
 
+/* ---------- Tier switch (課程月計畫's 新增項目 indicator-tier picker) ----------
+   Lets a teacher browse another tier's indicators (e.g. a child hasn't caught up to their own
+   tier yet) without leaving the cell they're planning for. Same pill-button language as
+   .panel-form__checkbox above, but plain buttons (single-select, not a checkbox list). */
+.tier-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tier-switch__btn {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.tier-switch__btn:hover {
+  border-color: var(--brand);
+}
+
+.tier-switch__btn--active {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+
 /* ---------- Monthly course plan editor ----------
    This view needs far more horizontal room than the 960px default (sized for narrow forms):
    each child gets a full-width day-by-day calendar, and 5 week-columns of indicator text need
@@ -1195,29 +1232,33 @@ fieldset.panel-form__field legend {
   border-color: var(--brand);
 }
 
-/* Monday/Tuesday carry the fixed 大團體活動/節氣 defaults rather than free planning content —
-   a warm tint marks them as "already filled in" at a glance, distinct from the plain Wed-Fri
-   planning cells, without needing a text label to explain it. */
+/* Monday/Tuesday/Friday carry the fixed 大團體活動/節氣 defaults rather than free planning
+   content — a warm tint marks them as "already filled in" at a glance, distinct from the plain
+   Wed/Thu planning cells, without needing a text label to explain it. */
 .monthly-calendar__day[data-weekday="1"],
-.monthly-calendar__day[data-weekday="2"] {
+.monthly-calendar__day[data-weekday="2"],
+.monthly-calendar__day[data-weekday="5"] {
   background: var(--warm-tint);
   border-color: var(--warm-border);
 }
 
 .monthly-calendar__day[data-weekday="1"]:hover,
-.monthly-calendar__day[data-weekday="2"]:hover {
+.monthly-calendar__day[data-weekday="2"]:hover,
+.monthly-calendar__day[data-weekday="5"]:hover {
   border-color: var(--warm-accent);
 }
 
 .monthly-calendar__day[data-weekday="1"] .monthly-calendar__date,
-.monthly-calendar__day[data-weekday="2"] .monthly-calendar__date {
+.monthly-calendar__day[data-weekday="2"] .monthly-calendar__date,
+.monthly-calendar__day[data-weekday="5"] .monthly-calendar__date {
   color: var(--warm-accent);
 }
 
-/* Wed-Fri cells are free-planning (no default content), so a filled one needs its own visual cue
-   to stand out from the still-empty ones at a glance — Mon/Tue are excluded since they're already
-   tinted warm above (they're never "empty" in the first place, so a second color would be noise). */
-.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):has(.monthly-calendar__item) {
+/* Wed/Thu cells are free-planning (no default content), so a filled one needs its own visual cue
+   to stand out from the still-empty ones at a glance — Mon/Tue/Fri are excluded since they're
+   already tinted warm above (they're never "empty" in the first place, so a second color would be
+   noise). */
+.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):not([data-weekday="5"]):has(.monthly-calendar__item) {
   background: var(--filled-tint);
   border-color: var(--filled-border);
 }
@@ -4143,47 +4184,71 @@ var CFormApp = (() => {
       subdomain: "\u7C97\u52D5\u4F5C\u3001\u7CBE\u7D30\u52D5\u4F5C",
       byTier: {
         "\u2160": [
-          "\u4FEF\u81E5\u6642\u53EF\u62AC\u8D77\u982D\u53CA\u9838\u90E8",
-          "\u80FD\u96D9\u624B\u78B0\u5728\u4E00\u8D77",
-          "\u80FD\u6293\u63E1\u653E\u5728\u624B\u5FC3\u7684\u7269\u54C1",
-          "\u80FD\u8A66\u5716\u4F38\u624B\u62FF\u773C\u524D\u7269\u54C1",
-          "\u80FD\u4F38\u5C55\u80A2\u9AD4"
+          ["\u4FEF\u81E5\u6642\u53EF\u62AC\u8D77\u982D\u53CA\u9838\u90E8", "\u62AC\u982D\u5C0F\u5A03"],
+          ["\u80FD\u96D9\u624B\u78B0\u5728\u4E00\u8D77", "\u7D66\u81EA\u5DF1\u62B1\u62B1"],
+          ["\u80FD\u6293\u63E1\u653E\u5728\u624B\u5FC3\u7684\u7269\u54C1", "\u63E1\u7DCA\u62F3\u982D"],
+          ["\u80FD\u8A66\u5716\u4F38\u624B\u62FF\u773C\u524D\u7269\u54C1", "\u4F86\u62FF\u73A9\u5177"],
+          ["\u80FD\u4F38\u5C55\u80A2\u9AD4", "\u8212\u6D3B\u6642\u9593"]
         ],
         "\u2161": [
-          "\u4FEF\u81E5\u6642\u80FD\u4EE5\u624B\u81C2\u6490\u8D77\u80F8\u90E8",
-          "\u80FD\u81EA\u5DF1\u7FFB\u8EAB",
-          "\u80FD\u5728\u5354\u52A9\u4E0B\u5750\u7A69",
-          "\u80FD\u4F38\u624B\u62C9\u6216\u8019\u6293\u7269\u54C1",
-          "\u80FD\u6416\u6643\u624B\u4E2D\u7684\u7269\u54C1",
-          "\u80FD\u62AC\u817F\u78B0\u89F8\u7269\u54C1",
-          "\u80FD\u530D\u5310\u79FB\u52D5"
+          ["\u4FEF\u81E5\u6642\u80FD\u4EE5\u624B\u81C2\u6490\u8D77\u80F8\u90E8", "\u6211\u6703\u8DB4"],
+          ["\u80FD\u81EA\u5DF1\u7FFB\u8EAB", "\u7FFB\u8EAB\u904B\u52D5"],
+          ["\u80FD\u5728\u5354\u52A9\u4E0B\u5750\u7A69", "\u5750\u7A69\u56C9"],
+          ["\u80FD\u4F38\u624B\u62C9\u6216\u8019\u6293\u7269\u54C1", "\u6293\u6293\u6A02"],
+          ["\u80FD\u6416\u6643\u624B\u4E2D\u7684\u7269\u54C1", "\u53EE\u53EE\u5679"],
+          ["\u80FD\u62AC\u817F\u78B0\u89F8\u7269\u54C1", "\u8E22\u8E22\u6A02"],
+          ["\u80FD\u530D\u5310\u79FB\u52D5", "\u530D\u5310\u79FB\u52D5"]
         ],
         "\u2162": [
-          "\u80FD\u81EA\u5DF1\u5750\u7A69",
-          "\u6703\u6490\u8D77\u8EAB\u9AD4\u5411\u524D\u722C\u884C",
-          "\u80FD\u5728\u5354\u52A9\u4E0B\u7AD9\u7ACB\u8207\u884C\u8D70",
-          "\u80FD\u7368\u7ACB\u7AD9\u7ACB\u5E7E\u79D2",
-          "\u80FD\u5C07\u7269\u54C1\u7531\u4E00\u624B\u63DB\u5230\u53E6\u4E00\u624B",
-          "\u80FD\u7528\u62C7\u6307\u914D\u5408\u5176\u4ED6\u624B\u6307\u9257\u63E1\u7269\u54C1",
-          "\u80FD\u4EE5\u96D9\u624B\u62CD\u624B"
+          ["\u80FD\u81EA\u5DF1\u5750\u7A69", "\u80FD\u81EA\u5DF1\u5750"],
+          ["\u6703\u6490\u8D77\u8EAB\u9AD4\u5411\u524D\u722C\u884C", "\u722C\u722C\u6A02"],
+          ["\u80FD\u5728\u5354\u52A9\u4E0B\u7AD9\u7ACB\u8207\u884C\u8D70", "\u7AD9\u8D77\u4F86\u56C9"],
+          ["\u80FD\u7368\u7ACB\u7AD9\u7ACB\u5E7E\u79D2", "\u7AD9\u8D77\u4F86\u56C9"],
+          ["\u80FD\u5C07\u7269\u54C1\u7531\u4E00\u624B\u63DB\u5230\u53E6\u4E00\u624B", "\u63DB\u4E00\u96BB\u624B"],
+          ["\u80FD\u7528\u62C7\u6307\u914D\u5408\u5176\u4ED6\u624B\u6307\u9257\u63E1\u7269\u54C1", "\u63DB\u4E00\u96BB\u624B"],
+          ["\u80FD\u4EE5\u96D9\u624B\u62CD\u624B", "\u62CD\u62CD\u624B"]
         ],
         "\u2163": [
-          "\u80FD\u7368\u7ACB\u7A69\u5B9A\u884C\u8D70",
-          "\u80FD\u4FDD\u6301\u5E73\u8861\u64BF\u62FE\u5730\u4E0A\u7269\u54C1",
-          "\u6703\u62FF\u6216\u62D6\u62C9\u7269\u54C1\u884C\u8D70",
-          "\u80FD\u5C07\u73A9\u5177\u653E\u5165\u6216\u5012\u51FA\u5BB9\u5668",
-          "\u80FD\u7FFB\u786C\u7D19\u677F\u66F8",
-          "\u80FD\u4E1F\u64F2\u73A9\u5177",
-          "\u80FD\u4EE5\u5169\u6307(\u62C7\u6307\u3001\u98DF\u6307)\u64BF\u62FE\u7269\u54C1"
+          ["\u80FD\u7368\u7ACB\u7A69\u5B9A\u884C\u8D70", "\u8D70\u904E\u4F86"],
+          ["\u80FD\u4FDD\u6301\u5E73\u8861\u64BF\u62FE\u5730\u4E0A\u7269\u54C1", "\u64BF\u8D77\u4F86"],
+          ["\u6703\u62FF\u6216\u62D6\u62C9\u7269\u54C1\u884C\u8D70", "\u62C9\u8457\u73A9\u5177\u8D70"],
+          ["\u80FD\u5C07\u73A9\u5177\u653E\u5165\u6216\u5012\u51FA\u5BB9\u5668", "\u653E\u9032\u53BB\u62FF\u51FA\u4F86"],
+          ["\u80FD\u7FFB\u786C\u7D19\u677F\u66F8", "\u5BF6\u5BF6\u7FFB\u7FFB\u66F8"],
+          ["\u80FD\u4E1F\u64F2\u73A9\u5177", "\u73A9\u4E1F\u4E1F\u6A02"],
+          ["\u80FD\u4EE5\u5169\u6307(\u62C7\u6307\u3001\u98DF\u6307)\u64BF\u62FE\u7269\u54C1", "\u64BF\u62FE\u8461\u8404\u4E7E"]
         ],
         "\u2164": [
-          "\u80FD\u7368\u7ACB\u5730\u8D70\u4E0A\u6A13\u68AF",
-          "\u80FD\u5954\u8DD1",
-          "\u80FD\u539F\u5730\u8DF3\u8D77",
-          "\u80FD\u8E22\u7403",
-          "\u80FD\u5806\u758A\u6578\u500B\u5C0F\u7A4D\u6728",
-          "\u80FD\u62FF\u7B46\u5857\u9D09",
-          "\u80FD\u4E00\u9801\u4E00\u9801\u5730\u7FFB\u66F8"
+          ["\u80FD\u7368\u7ACB\u5730\u8D70\u4E0A\u6A13\u68AF", "\u4E0A\u6A13\u68AF"],
+          ["\u80FD\u5954\u8DD1", "\u6211\u6703\u8DD1"],
+          ["\u80FD\u539F\u5730\u8DF3\u8D77", "\u8DF3\u8DF3\u864E"],
+          ["\u80FD\u8E22\u7403", "\u8E22\u7403\u6A02"],
+          ["\u80FD\u5806\u758A\u6578\u500B\u5C0F\u7A4D\u6728", "\u7A4D\u6728\u758A\u758A\u6A02"],
+          ["\u80FD\u62FF\u7B46\u5857\u9D09", "\u6211\u6703\u5857\u9D09"],
+          ["\u80FD\u4E00\u9801\u4E00\u9801\u5730\u7FFB\u66F8", "\u5C0F\u5C0F\u611B\u66F8\u4EBA"]
+        ],
+        // 25個月以上 (適性活動發展實施計畫-25個月 A4.docx). Ⅵ = 指標項次/發展活動 (base),
+        // Ⅶ = 延伸(進階)活動 (extension/advanced) — both belong to the same "25個月以上／E表"
+        // tier (see TIER_DATA_KEYS below), kept as separate byTier keys only to preserve their
+        // original Ⅵ-x-y / Ⅶ-x-y codes from the source document. No activityName in this source.
+        "\u2165": [
+          ["\u6703\u624B\u5FC3\u671D\u4E0B\u4E1F\u7403\u6216\u6771\u897F", ""],
+          ["\u7528\u6574\u500B\u8173\u638C\u8DD1\u6B65\u4E26\u53EF\u907F\u958B\u969C\u7919\u7269", ""],
+          ["\u80FD\u4E0D\u9808\u6276\u6771\u897F\uFF0C\u81EA\u5DF1\u8E72\u4E0B\u6216\u5F4E\u8170\u5F8C\u7AD9\u8D77\u4F86", ""],
+          ["\u53EF\u4EE5\u6276\u7246\u58C1\u3001\u6B04\u6746\u4E0A\u6A13\u68AF", ""],
+          ["\u53EF\u5012\u9000\u8D7010\u516C\u5C3A", ""],
+          ["\u4E0D\u6276\u7269\uFF0C\u55AE\u8173\u7AD91\u79D2\u4EE5\u4E0A", ""],
+          ["\u6A21\u4EFF\u756B\u6A6B\u7DDA", ""],
+          ["\u53EF\u4F9D\u6A23\u7528\u4E09\u584A\u7A4D\u6728\u6392\u76F4\u7DDA", ""],
+          ["\u6703\u958B\u5C0F\u74F6\u84CB(\u5BF6\u7279\u74F6\u5927\u5C0F\uFF0C\u5927\u4EBA\u53EF\u4EE5\u5354\u52A9\u5148\u65CB\u958B\u4E00\u9EDE\u9EDE)", ""],
+          ["\u53EF\u4E00\u9801\u4E00\u9801\u7FFB\u8584\u66F8", ""]
+        ],
+        "\u2166": [
+          ["\u53EF\u4EE5\u96D9\u8173\u4E00\u8D77\u8DF3\uFF0C\u9700\u8DF3\u9AD8\u96E2\u958B\u5730\u9762", ""],
+          ["\u96D9\u8173\u8F03\u9060\u8DDD\u96E2\u8DF3\u8E8D\uFF0C\u5411\u524D\u7FFB\u8DDF\u6597", ""],
+          ["\u55AE\u8173\u53EF\u8DF3\u8E8D2\u6B21\u4EE5\u4E0A", ""],
+          ["\u6703\u758A\u9AD8\u516D\u500B\u5230\u516B\u500B\u7A4D\u6728", ""],
+          ["\u6703\u7528\u6253\u86CB\u5668\u5E6B\u5FD9\u6253\u86CB", ""],
+          ["\u6703\u73A9\u9ECF\u571F\uFF0C\u4E26\u81EA\u5DF1\u70BA\u4F5C\u54C1\u547D\u540D", ""]
         ]
       }
     },
@@ -4193,42 +4258,52 @@ var CFormApp = (() => {
       subdomain: "\u81EA\u6211\u6982\u5FF5\u3001\u793E\u6703\u95DC\u4FC2\u3001\u60C5\u7DD2",
       byTier: {
         "\u2160": [
-          "\u80FD\u767C\u51FA\u793E\u6703\u6027\u5FAE\u7B11",
-          "\u6703\u56DE\u61C9\u6210\u4EBA\u7684\u9017\u5F04",
-          "\u6703\u4F7F\u7528\u5982\u5438\u62C7\u6307\u6216\u5403\u5976\u5634\u7684\u65B9\u5F0F\u5B89\u64AB\u81EA\u5DF1"
+          ["\u80FD\u767C\u51FA\u793E\u6703\u6027\u5FAE\u7B11", "\u7B11\u4E00\u500B\u3001\u93E1\u4E2D\u4EBA"],
+          ["\u6703\u56DE\u61C9\u6210\u4EBA\u7684\u9017\u5F04", "\u6211\u73FE\u5728\u7684\u5FC3\u60C5"],
+          ["\u6703\u4F7F\u7528\u5982\u5438\u62C7\u6307\u6216\u5403\u5976\u5634\u7684\u65B9\u5F0F\u5B89\u64AB\u81EA\u5DF1", "\u7D66\u81EA\u5DF1\u60DC\u60DC\uFF08\u53F0\u8A9E\u767C\u97F3\uFF09"]
         ],
         "\u2161": [
-          "\u6703\u73A9\u81EA\u5DF1\u7684\u624B\u8173",
-          "\u5C0D\u93E1\u4E2D\u7684\u81EA\u5DF1\u611F\u8208\u8DA3",
-          "\u80FD\u8868\u73FE\u6109\u6085\u7684\u60C5\u7DD2",
-          "\u5C0D\u8207\u4EBA\u4E92\u52D5\u8868\u73FE\u6B63\u5411\u53CD\u61C9",
-          "\u6703\u7528\u7C21\u55AE\u65B9\u5F0F\u5438\u5F15\u6210\u4EBA\u6CE8\u610F"
+          ["\u6703\u73A9\u81EA\u5DF1\u7684\u624B\u8173", "\u5403\u96DE\u817F"],
+          ["\u5C0D\u93E1\u4E2D\u7684\u81EA\u5DF1\u611F\u8208\u8DA3", "\u8AB0\u5728\u93E1\u5B50\u88E1"],
+          ["\u80FD\u8868\u73FE\u6109\u6085\u7684\u60C5\u7DD2", "\u98DB\u5929\u6BDB\u6BEF"],
+          ["\u5C0D\u8207\u4EBA\u4E92\u52D5\u8868\u73FE\u6B63\u5411\u53CD\u61C9", "\u98DB\u5929\u6BDB\u6BEF"],
+          ["\u6703\u7528\u7C21\u55AE\u65B9\u5F0F\u5438\u5F15\u6210\u4EBA\u6CE8\u610F", "\u548C\u6211\u4E00\u8D77\u73A9"]
         ],
         "\u2162": [
-          "\u6703\u63EE\u624B\u8868\u793A\u518D\u898B",
-          "\u80FD\u548C\u6210\u4EBA\u73A9\u7C21\u55AE\u91CD\u8986\u904A\u6232(\u5982\u8EB2\u8C93\u8C93)",
-          "\u80FD\u7C21\u55AE\u8868\u9054\u81EA\u6211\u9700\u6C42\u53CA\u60C5\u7DD2",
-          "\u80FD\u5340\u8FA8\u7167\u9867\u8005\u7684\u8A9E\u6C23\u53CA\u60C5\u7DD2",
-          "\u80FD\u8207\u7167\u9867\u8005\u5EFA\u7ACB\u60C5\u611F\u4F9D\u9644(\u5982\u4E3B\u52D5\u4F38\u624B\u8981\u62B1)",
-          "\u7DF4\u7FD2\u8655\u7406\u964C\u751F\u4EBA\u7126\u616E(\u4F8B\u5982\u6709\u964C\u751F\u4EBA\u4F86\u8A2A\u6642)"
+          ["\u6703\u63EE\u624B\u8868\u793A\u518D\u898B", "\u6253\u62DB\u547C"],
+          ["\u80FD\u548C\u6210\u4EBA\u73A9\u7C21\u55AE\u91CD\u8986\u904A\u6232(\u5982\u8EB2\u8C93\u8C93)", "\u8EB2\u8C93\u8C93"],
+          ["\u80FD\u7C21\u55AE\u8868\u9054\u81EA\u6211\u9700\u6C42\u53CA\u60C5\u7DD2", "\u5FC3\u60C5\u8868\u60C5"],
+          ["\u80FD\u5340\u8FA8\u7167\u9867\u8005\u7684\u8A9E\u6C23\u53CA\u60C5\u7DD2", "\u5FC3\u60C5\u8868\u60C5"],
+          ["\u80FD\u8207\u7167\u9867\u8005\u5EFA\u7ACB\u60C5\u611F\u4F9D\u9644(\u5982\u4E3B\u52D5\u4F38\u624B\u8981\u62B1)", "\u5EFA\u7ACB\u611F\u60C5"],
+          ["\u7DF4\u7FD2\u8655\u7406\u964C\u751F\u4EBA\u7126\u616E(\u4F8B\u5982\u6709\u964C\u751F\u4EBA\u4F86\u8A2A\u6642)", "\u6709\u964C\u751F\u4EBA"]
         ],
         "\u2163": [
-          "\u80FD\u8207\u5225\u7684\u5B69\u5B50\u5750\u5728\u4E00\u8D77\u73A9",
-          "\u80FD\u5728\u63D0\u793A\u4E0B\u505A\u57FA\u672C\u793E\u4EA4\u52D5\u4F5C(\u5982\u8B1D\u8B1D\u3001\u62DC\u62DC)",
-          "\u6703\u5C0D\u559C\u611B\u73A9\u5076\u8868\u73FE\u51FA\u75BC\u611B\u6216\u7167\u9867\u7684\u884C\u70BA",
-          "\u6703\u5C0D\u719F\u6089\u6210\u4EBA\u8868\u9054\u597D\u611F(\u5982\u64C1\u62B1\u89AA\u543B)",
-          "\u6703\u7528\u884C\u70BA\u6216\u8A9E\u8A00\u8868\u9054\u81EA\u4E3B\u6027(\u5982\u6416\u982D\u8868\u793A\u4E0D\u8981)",
-          "\u7DF4\u7FD2\u8655\u7406\u5206\u96E2\u7126\u616E"
+          ["\u80FD\u8207\u5225\u7684\u5B69\u5B50\u5750\u5728\u4E00\u8D77\u73A9", "\u5750\u5728\u4E00\u8D77"],
+          ["\u80FD\u5728\u63D0\u793A\u4E0B\u505A\u57FA\u672C\u793E\u4EA4\u52D5\u4F5C(\u5982\u8B1D\u8B1D\u3001\u62DC\u62DC)", "\u63EE\u624B\u62DC\u62DC"],
+          ["\u6703\u5C0D\u559C\u611B\u73A9\u5076\u8868\u73FE\u51FA\u75BC\u611B\u6216\u7167\u9867\u7684\u884C\u70BA", "\u7167\u9867\u5C0F\u5A03\u5A03"],
+          ["\u6703\u5C0D\u719F\u6089\u6210\u4EBA\u8868\u9054\u597D\u611F(\u5982\u64C1\u62B1\u89AA\u543B)", "\u7167\u9867\u5C0F\u5A03\u5A03"],
+          ["\u6703\u7528\u884C\u70BA\u6216\u8A9E\u8A00\u8868\u9054\u81EA\u4E3B\u6027(\u5982\u6416\u982D\u8868\u793A\u4E0D\u8981)", "\u6211\u4E0D\u8981"],
+          ["\u7DF4\u7FD2\u8655\u7406\u5206\u96E2\u7126\u616E", "\u6211\u60F3\u62B1\u62B1"]
         ],
         "\u2164": [
-          "\u80FD\u5728\u7167\u7247\u4E2D\u6216\u93E1\u5B50\u4E2D\u8A8D\u51FA\u81EA\u5DF1",
-          "\u80FD\u53C3\u8207\u5718\u9AD4\u6027\u7684\u6D3B\u52D5",
-          "\u80FD\u8FA8\u8B58\u4E26\u8AAA\u51FA\u4ED6\u4EBA\u4E0D\u540C\u7684\u60C5\u7DD2",
-          "\u6703\u4EE5\u81EA\u5DF1\u7684\u540D\u5B57\u7A31\u547C\u81EA\u5DF1",
-          "\u6703\u7528\u52D5\u4F5C\u53BB\u5B89\u6170\u4ED6\u4EBA",
-          "\u6703\u8AAA\u51FA\u89AA\u53CB\u3001\u540C\u4F34\u7684\u540D\u5B57\u6216\u7A31\u547C",
-          "\u80FD\u8A8D\u8B58\u81EA\u5DF1\u3001\u670B\u53CB\u6216\u5BB6\u5EAD\u6210\u54E1\u7684\u7167\u7247",
-          "\u6703\u8207\u73A9\u5076\u5C0D\u8A71"
+          ["\u80FD\u5728\u7167\u7247\u4E2D\u6216\u93E1\u5B50\u4E2D\u8A8D\u51FA\u81EA\u5DF1", "\u90A3\u662F\u8AB0\uFF1F"],
+          ["\u80FD\u53C3\u8207\u5718\u9AD4\u6027\u7684\u6D3B\u52D5", "\u4E00\u8D77\u4E1F\u5E03\u7403"],
+          ["\u80FD\u8FA8\u8B58\u4E26\u8AAA\u51FA\u4ED6\u4EBA\u4E0D\u540C\u7684\u60C5\u7DD2", "\u559C\u6012\u54C0\u6A02"],
+          ["\u6703\u4EE5\u81EA\u5DF1\u7684\u540D\u5B57\u7A31\u547C\u81EA\u5DF1", "\u6211\u662F\u8AB0"],
+          ["\u6703\u7528\u52D5\u4F5C\u53BB\u5B89\u6170\u4ED6\u4EBA", "\u5B89\u6170\u5225\u4EBA"],
+          ["\u6703\u8AAA\u51FA\u89AA\u53CB\u3001\u540C\u4F34\u7684\u540D\u5B57\u6216\u7A31\u547C", "\u6253\u62DB\u547C"],
+          ["\u80FD\u8A8D\u8B58\u81EA\u5DF1\u3001\u670B\u53CB\u6216\u5BB6\u5EAD\u6210\u54E1\u7684\u7167\u7247", "\u4ECB\u7D39\u7167\u7247"],
+          ["\u6703\u8207\u73A9\u5076\u5C0D\u8A71", "\u626E\u5BB6\u5BB6\u9152"]
+        ],
+        // 25個月以上. Unlike every other domain in this document, 社會情緒's four items here are
+        // all Ⅵ (the source document's own Ⅶ-2-3/Ⅶ-2-4 labels on the last two are a numbering
+        // slip in that document, not a genuine 延伸/進階 sub-tier for this domain) — kept as one
+        // Ⅵ array rather than split into Ⅵ/Ⅶ like the other four domains.
+        "\u2165": [
+          ["\u6703\u53BB\u5E6B\u52A9\u5225\u4EBA\u6216\u4FDD\u8B77\u8F03\u5C0F\u7684\u5B69\u5B50", ""],
+          ["\u6703\u8207\u5176\u4ED6\u5B69\u5B50\u5408\u4F5C\uFF0C\u505A\u4E00\u4EF6\u4E8B\u6216\u4E00\u500B\u6771\u897F", ""],
+          ["\u5C0D\u5E7C\u5C0F\u7684\u6703\u4FDD\u8B77\uFF0C\u5C0D\u932F\u7684\u6703\u544A\u72C0", ""],
+          ["\u81EA\u5DF1\u73A9\u73A9\u5177\u6642\uFF0C\u53EB\u540D\u5B57\u6703\u6709\u300C\u62AC\u982D\u300D\u3001\u300C\u8F49\u982D\u770B\u300D\u6216\u300C\u56DE\u5230\u5927\u4EBA\u8EAB\u908A\u300D\u7684\u53CD\u61C9", ""]
         ]
       }
     },
@@ -4238,39 +4313,53 @@ var CFormApp = (() => {
       subdomain: "\u8868\u9054\u6027\u8A9E\u8A00\u3001\u63A5\u6536\u6027\u8A9E\u8A00\u3001\u80A2\u9AD4\u8A9E\u8A00",
       byTier: {
         "\u2160": [
-          "\u6703\u671D\u767C\u51FA\u8072\u97F3\u7684\u65B9\u5411\u8F49\u982D",
-          "\u80FD\u6CE8\u8996\u7167\u9867\u8005\u7684\u53E3\u578B\u8B8A\u5316",
-          "\u6703\u767C\u51FA\u8072\u97F3\u81EA\u5A1B",
-          "\u6703\u56DE\u61C9\u6210\u4EBA\u7684\u8072\u97F3"
+          ["\u6703\u671D\u767C\u51FA\u8072\u97F3\u7684\u65B9\u5411\u8F49\u982D", "\u8072\u97F3\u5728\u54EA\u88E1"],
+          ["\u80FD\u6CE8\u8996\u7167\u9867\u8005\u7684\u53E3\u578B\u8B8A\u5316", "\u770B\u8AB0\u5728\u5531\u6B4C"],
+          ["\u6703\u767C\u51FA\u8072\u97F3\u81EA\u5A1B", "\u767C\u8072\u904A\u6232"],
+          ["\u6703\u56DE\u61C9\u6210\u4EBA\u7684\u8072\u97F3", "\u73FE\u5728\u5728\u505A\u4EC0\u9EBC"]
         ],
         "\u2161": [
-          "\u5690\u8A66\u767C\u51FA\u4E0D\u540C\u7684\u8072\u97F3",
-          "\u80FD\u767C\u51FA\u8072\u97F3\u56DE\u61C9\u6210\u4EBA\u7684\u8A71\u8A9E",
-          "\u5C0D\u719F\u6089\u7684\u7AE5\u8B20\u6216\u97F3\u6A02\u6709\u53CD\u61C9",
-          "\u6703\u6CE8\u8996\u8AAA\u8A71\u7684\u4EBA"
+          ["\u5690\u8A66\u767C\u51FA\u4E0D\u540C\u7684\u8072\u97F3", "\u9019\u662F\u4EC0\u9EBC"],
+          ["\u80FD\u767C\u51FA\u8072\u97F3\u56DE\u61C9\u6210\u4EBA\u7684\u8A71\u8A9E", "\u5BF6\u5BF6\u5B78\u8AAA\u8A71"],
+          ["\u5C0D\u719F\u6089\u7684\u7AE5\u8B20\u6216\u97F3\u6A02\u6709\u53CD\u61C9", "\u5BF6\u5BF6\u6703\u5531\u6B4C"],
+          ["\u6703\u6CE8\u8996\u8AAA\u8A71\u7684\u4EBA", "\u770B\u8AB0\u5728\u8AAA\u8A71"]
         ],
         "\u2162": [
-          "\u80FD\u6A21\u4EFF\u5927\u4EBA\u7684\u7C21\u55AE\u8A71\u8A9E(\u5982\u3105\u311A\u3105\u311A)",
-          "\u5728\u7259\u7259\u5B78\u8A9E\u4E2D\u51FA\u73FE\u8072\u91CF\u3001\u9AD8\u4F4E\u548C\u7BC0\u594F\u7684\u8B8A\u5316",
-          "\u6703\u4EE5\u80A2\u9AD4\u52D5\u4F5C\u9032\u884C\u6E9D\u901A(\u5982\u4EE5\u624B\u6307\u7269\u6216\u6416\u982D\u3001\u9EDE\u982D)",
-          "\u6703\u8207\u4EBA\u8F2A\u6D41\u5C0D\u8A71",
-          "\u80FD\u7406\u89E3\u7C21\u55AE\u8A9E\u5F59\u7684\u610F\u601D(\u5982\u310B\u311F\u310B\u311F)"
+          ["\u80FD\u6A21\u4EFF\u5927\u4EBA\u7684\u7C21\u55AE\u8A71\u8A9E(\u5982\u3105\u311A\u3105\u311A)", "\u8DDF\u6211\u4E00\u8D77\u8AAA"],
+          ["\u5728\u7259\u7259\u5B78\u8A9E\u4E2D\u51FA\u73FE\u8072\u91CF\u3001\u9AD8\u4F4E\u548C\u7BC0\u594F\u7684\u8B8A\u5316", "\u52D5\u7269\u5927\u96C6\u5408"],
+          ["\u6703\u4EE5\u80A2\u9AD4\u52D5\u4F5C\u9032\u884C\u6E9D\u901A(\u5982\u4EE5\u624B\u6307\u7269\u6216\u6416\u982D\u3001\u9EDE\u982D)", "\u8868\u793A\u610F\u898B"],
+          ["\u6703\u8207\u4EBA\u8F2A\u6D41\u5C0D\u8A71", "\u804A\u804A\u5929"],
+          ["\u80FD\u7406\u89E3\u7C21\u55AE\u8A9E\u5F59\u7684\u610F\u601D(\u5982\u310B\u311F\u310B\u311F)", "\u6211\u807D\u61C2\u4E86"]
         ],
         "\u2163": [
-          "\u80FD\u8B1B\u81F3\u5C11\u5341\u500B\u55AE\u5B57",
-          "\u80FD\u7D50\u5408\u4E8C\u500B\u5B57\u51FA\u73FE\u96FB\u5831\u5F0F\u7684\u8A71\u8A9E(\u5982\u72D7\u72D7\u6C6A\u6C6A)",
-          "\u80FD\u7528\u8A9E\u8A00\u8868\u9054\u60F3\u8981\u7684\u6771\u897F",
-          "\u80FD\u7406\u89E3\u7C21\u55AE\u65E5\u5E38\u751F\u6D3B\u7528\u8A9E",
-          "\u80FD\u6307\u8A8D\u6216\u8AAA\u51FA\u719F\u6089\u7269\u54C1/\u52D5\u7269\u7684\u540D\u7A31",
-          "\u80FD\u56DE\u7B54\u7C21\u55AE\u554F\u984C"
+          ["\u80FD\u8B1B\u81F3\u5C11\u5341\u500B\u55AE\u5B57", "\u8AAA\u8AAA\u770B"],
+          ["\u80FD\u7D50\u5408\u4E8C\u500B\u5B57\u51FA\u73FE\u96FB\u5831\u5F0F\u7684\u8A71\u8A9E(\u5982\u72D7\u72D7\u6C6A\u6C6A)", "\u72D7\u72D7\u6C6A\u6C6A"],
+          ["\u80FD\u7528\u8A9E\u8A00\u8868\u9054\u60F3\u8981\u7684\u6771\u897F", "\u4F60\u8981\u4EC0\u9EBC\u6771\u897F"],
+          ["\u80FD\u7406\u89E3\u7C21\u55AE\u65E5\u5E38\u751F\u6D3B\u7528\u8A9E", "\u6307\u8A8D\u7269\u54C1"],
+          ["\u80FD\u6307\u8A8D\u6216\u8AAA\u51FA\u719F\u6089\u7269\u54C1/\u52D5\u7269\u7684\u540D\u7A31", "\u6307\u8A8D\u7269\u54C1"],
+          ["\u80FD\u56DE\u7B54\u7C21\u55AE\u554F\u984C", "\u8981\u4E0D\u8981"]
         ],
         "\u2164": [
-          "\u53EF\u8AAA\u51FA20\u500B\u4EE5\u4E0A\u7684\u5B57\u5F59",
-          "\u80FD\u4EE5\u77ED\u53E5\u8207\u4ED6\u4EBA\u5C0D\u8A71",
-          "\u80FD\u8AAA\u51FA\u7C21\u55AE\u7684\u8EAB\u9AD4\u90E8\u4F4D\u540D\u7A31",
-          "\u80FD\u81EA\u5DF1\u95B1\u8B80\u5716\u756B\u66F8",
-          "\u807D\u5230\u559C\u6B61\u7684\u97F3\u6A02\u6216\u6B4C\u8B20\u6703\u8DDF\u8457\u624B\u821E\u8DB3\u8E48\u6216\u54FC\u5531",
-          "\u7DF4\u7FD2\u8AAA\u7591\u554F\u53E5(\u5982\u554F\uFF1A\u7238\u7238\u5462\uFF1F)"
+          ["\u53EF\u8AAA\u51FA20\u500B\u4EE5\u4E0A\u7684\u5B57\u5F59", "\u5C0F\u535A\u58EB"],
+          ["\u80FD\u4EE5\u77ED\u53E5\u8207\u4ED6\u4EBA\u5C0D\u8A71", "\u4EE5\u8A9E\u8A00\u8868\u9054"],
+          ["\u80FD\u8AAA\u51FA\u7C21\u55AE\u7684\u8EAB\u9AD4\u90E8\u4F4D\u540D\u7A31", "\u8A8D\u8B58\u81EA\u5DF1\u7684\u8EAB\u9AD4"],
+          ["\u80FD\u81EA\u5DF1\u95B1\u8B80\u5716\u756B\u66F8", "\u6545\u4E8B\u9B54\u6BEF"],
+          ["\u807D\u5230\u559C\u6B61\u7684\u97F3\u6A02\u6216\u6B4C\u8B20\u6703\u8DDF\u8457\u624B\u821E\u8DB3\u8E48\u6216\u54FC\u5531", "\u8F09\u6B4C\u8F09\u821E"],
+          ["\u7DF4\u7FD2\u8AAA\u7591\u554F\u53E5(\u5982\u554F\uFF1A\u7238\u7238\u5462\uFF1F)", "\u6211\u6703\u554F"]
+        ],
+        "\u2165": [
+          ["\u61C2\u5F97\u7C21\u55AE\u7684\u6578\u91CF(\u591A\u3001\u5C11)\uFF0C\u6240\u6709\u6B0A(\u8AB0\u7684)\u3001\u5730\u9EDE(\u88E1\u9762\u3001\u4E0A\u9762)\u7684\u89C0\u5FF5", ""],
+          ['\u7A0D\u5FAE\u6709\u4E00\u9EDE"\u904E\u53BB"\u7684\u89C0\u5FF5', ""],
+          ["\u6703\u554F\u300C\u8AB0\u3001\u5728\u54EA\u88E1\u3001\u505A\u4EC0\u9EBC\u300D\u7684\u554F\u984C", ""],
+          ['\u4E86\u89E3"\u4E0A\u3001\u4E0B\u3001\u88E1\u9762\uFF0E\u65C1\u908A"\u2025\u4F4D\u7F6E\u89C0\u5FF5', ""],
+          ["\u77E5\u9053\u5728\u4EC0\u9EBC\u5834\u5408\u901A\u5E38\u90FD\u4F5C\u4EC0\u9EBC\u4E8B", ""]
+        ],
+        "\u2166": [
+          ["\u5927\u591A\u6642\u5F8C\u53EF\u4EE5\u7528\u5169\u500B\u6709\u95DC\u806F\u7684\u8A5E\uFF0C\u8B8A\u6210\u53E5\u5B50\uFF0C\u8868\u9054\u610F\u601D(\u5982\u5ABD\u5ABD-\u62B1\u62B1)", ""],
+          ["\u80FD\u7528\u53E5\u5B50\u8868\u9054\u610F\u601D\uFF0C\u5982\uFF1A\u5ABD\u5ABD(\u8001\u5E2B)\uFF0C\u6211\u8981\u559D\u6C34", ""],
+          ["\u6703\u554F\u300C\u9019\u662F\u4EC0\u9EBC\uFF1F\u300D", ""],
+          ['\u6703\u7528"\u9019\u500B;\u90A3\u500B"\u2026\u51A0\u8A5E', ""],
+          ["\u80FD\u56DE\u7B54\u8AB0\u5728\u54EA\u88E1\u3001\u505A\u4EC0\u9EBC\u7B49\u554F\u984C", ""]
         ]
       }
     },
@@ -4280,42 +4369,51 @@ var CFormApp = (() => {
       subdomain: "\u611F\u5B98\u77E5\u89BA\u3001\u6982\u5FF5\u767C\u5C55\u3001\u89E3\u6C7A\u554F\u984C\u3001\u5275\u610F\u8868\u73FE",
       byTier: {
         "\u2160": [
-          "\u773C\u775B\u80FD\u8FFD\u96A8\u7269\u54C1\u79FB\u52D5",
-          "\u5C0D\u5149\u7DDA\u53CA\u8072\u91CF\u7684\u8B8A\u5316\u6709\u53CD\u61C9",
-          "\u80FD\u5C0D\u4E0D\u540C\u89F8\u611F\u6709\u53CD\u61C9",
-          "\u6703\u6A21\u4EFF\u6210\u4EBA\u7684\u81C9\u90E8\u8868\u60C5",
-          "\u6703\u63A2\u7D22\u81EA\u5DF1\u96D9\u624B"
+          ["\u773C\u775B\u80FD\u8FFD\u96A8\u7269\u54C1\u79FB\u52D5", "\u8FFD\u8996\u7269\u54C1"],
+          ["\u5C0D\u5149\u7DDA\u53CA\u8072\u91CF\u7684\u8B8A\u5316\u6709\u53CD\u61C9", "\u611F\u53D7\u660E\u6697\u8B8A\u5316"],
+          ["\u80FD\u5C0D\u4E0D\u540C\u89F8\u611F\u6709\u53CD\u61C9", "\u6414\u7662\u904A\u6232"],
+          ["\u6703\u6A21\u4EFF\u6210\u4EBA\u7684\u81C9\u90E8\u8868\u60C5", "\u8868\u60C5\u6A21\u4EFF\u79C0"],
+          ["\u6703\u63A2\u7D22\u81EA\u5DF1\u96D9\u624B", "\u5C0F\u624B\u5728\u54EA\u88E1"]
         ],
         "\u2161": [
-          "\u6703\u91CD\u8986\u9032\u884C\u6709\u76EE\u7684\u6027\u7684\u884C\u70BA(\u4F8B\u5982\u91CD\u8907\u6416\u624B\u6416\u9234)",
-          "\u80FD\u7528\u773C\u775B\u641C\u5C0B\u8072\u97F3\u7684\u4F86\u6E90",
-          "\u80FD\u6A21\u4EFF\u7C21\u55AE\u7684\u52D5\u4F5C",
-          "\u6703\u7528\u5634\u5DF4\u63A2\u7D22\u7269\u54C1",
-          "\u6703\u6CE8\u8996\u984F\u8272\u6216\u5716\u6848\u9BAE\u660E\u7684\u5716\u7247/\u73A9\u5177"
+          ["\u6703\u91CD\u8986\u9032\u884C\u6709\u76EE\u7684\u6027\u7684\u884C\u70BA(\u4F8B\u5982\u91CD\u8907\u6416\u624B\u6416\u9234)", "\u6416\u4E00\u6416"],
+          ["\u80FD\u7528\u773C\u775B\u641C\u5C0B\u8072\u97F3\u7684\u4F86\u6E90", "\u4EC0\u9EBC\u8072\u97F3"],
+          ["\u80FD\u6A21\u4EFF\u7C21\u55AE\u7684\u52D5\u4F5C", "\u8DDF\u6211\u9019\u6A23\u73A9"],
+          ["\u6703\u7528\u5634\u5DF4\u63A2\u7D22\u7269\u54C1", "\u54AC\u54AC\u770B"],
+          ["\u6703\u6CE8\u8996\u984F\u8272\u6216\u5716\u6848\u9BAE\u660E\u7684\u5716\u7247/\u73A9\u5177", "\u77A7\u4E00\u77A7"]
         ],
         "\u2162": [
-          "\u6703\u5206\u8FA8\u719F\u6089\u5BB6\u4EBA\u8207\u964C\u751F\u4EBA",
-          "\u6703\u5C0B\u627E\u5B8C\u5168\u88AB\u85CF\u8457\u7684\u7269\u54C1(\u4FDD\u7559\u6982\u5FF5)",
-          "\u80FD\u9810\u671F\u4E8B\u4EF6\u7684\u767C\u751F(\u5982\u5976\u74F6\u51FA\u73FE\u77E5\u9053\u8981\u559D\u5976\u4E86)",
-          "\u547C\u53EB\u4ED6\u7684\u540D\u5B57\u6642\u6703\u6709\u53CD\u61C9",
-          "\u80FD\u8A2D\u6CD5\u63A5\u8FD1\u60F3\u8981\u7684\u4E8B\u7269",
-          "\u80FD\u64CD\u4F5C\u7C21\u55AE\u73A9\u5177"
+          ["\u6703\u5206\u8FA8\u719F\u6089\u5BB6\u4EBA\u8207\u964C\u751F\u4EBA", "\u6211\u8A8D\u8B58\u7684\u4EBA"],
+          ["\u6703\u5C0B\u627E\u5B8C\u5168\u88AB\u85CF\u8457\u7684\u7269\u54C1(\u4FDD\u7559\u6982\u5FF5)", "\u4E0D\u898B\u4E86"],
+          ["\u80FD\u9810\u671F\u4E8B\u4EF6\u7684\u767C\u751F(\u5982\u5976\u74F6\u51FA\u73FE\u77E5\u9053\u8981\u559D\u5976\u4E86)", "\u7B49\u4E00\u4E0B\u505A\u4EC0\u9EBC"],
+          ["\u547C\u53EB\u4ED6\u7684\u540D\u5B57\u6642\u6703\u6709\u53CD\u61C9", "\u7403\u5152\u6EFE\u4F86\u6EFE\u53BB"],
+          ["\u80FD\u8A2D\u6CD5\u63A5\u8FD1\u60F3\u8981\u7684\u4E8B\u7269", "\u7403\u5152\u6EFE\u4F86\u6EFE\u53BB"],
+          ["\u80FD\u64CD\u4F5C\u7C21\u55AE\u73A9\u5177", "\u6211\u6703\u73A9"]
         ],
         "\u2163": [
-          "\u80FD\u9075\u5F9E\u7C21\u55AE\u7684\u6307\u4EE4",
-          "\u80FD\u6307\u8A8D\u5E38\u898B\u7269\u54C1\u8207\u7C21\u55AE\u8EAB\u9AD4\u90E8\u4F4D",
-          "\u80FD\u914D\u5C0D\u7C21\u55AE\u5F62\u72C0",
-          "\u80FD\u4E86\u89E3\u5E38\u898B\u7269\u54C1\u7684\u7528\u9014",
-          "\u80FD\u4EE5\u65B0\u7684\u65B9\u5F0F\u63A2\u7D22\u7269\u54C1\u7684\u7279\u6027",
-          "\u80FD\u5C0B\u627E\u51FA\u6307\u5B9A\u7269\u54C1"
+          ["\u80FD\u9075\u5F9E\u7C21\u55AE\u7684\u6307\u4EE4", "\u624B\u5728\u54EA\u88E1"],
+          ["\u80FD\u6307\u8A8D\u5E38\u898B\u7269\u54C1\u8207\u7C21\u55AE\u8EAB\u9AD4\u90E8\u4F4D", "\u624B\u5728\u54EA\u88E1"],
+          ["\u80FD\u914D\u5C0D\u7C21\u55AE\u5F62\u72C0", "\u914D\u5C0D\u904A\u6232"],
+          ["\u80FD\u4E86\u89E3\u5E38\u898B\u7269\u54C1\u7684\u7528\u9014", "\u5BF6\u5BF6\u7684\u6771\u897F\u5728\u54EA\u88E1"],
+          ["\u80FD\u4EE5\u65B0\u7684\u65B9\u5F0F\u63A2\u7D22\u7269\u54C1\u7684\u7279\u6027", "\u65B0\u73A9\u6CD5"],
+          ["\u80FD\u5C0B\u627E\u51FA\u6307\u5B9A\u7269\u54C1", "\u627E\u51FA\u6307\u5B9A\u7269\u54C1"]
         ],
         "\u2164": [
-          "\u80FD\u5206\u8FA8\u51B7\u71B1\u3001\u8EDF\u786C\u3001\u4E7E\u6FD5\u7B49",
-          "\u6703\u5047\u88DD\u9935\u6D0B\u5A03\u5A03\u5403\u6771\u897F",
-          "\u80FD\u4F9D\u5F62\u72C0\u6216\u984F\u8272\u5206\u985E",
-          "\u80FD\u5206\u8FA8\u5927\u5C0F",
-          "\u80FD\u62FC\u7C21\u55AE\u62FC\u5716",
-          "\u5C0D\u5857\u984F\u8272\u6D3B\u52D5\u611F\u8208\u8DA3"
+          ["\u80FD\u5206\u8FA8\u51B7\u71B1\u3001\u8EDF\u786C\u3001\u4E7E\u6FD5\u7B49", "\u611F\u89BA\u4E00\u4E0B"],
+          ["\u6703\u5047\u88DD\u9935\u6D0B\u5A03\u5A03\u5403\u6771\u897F", "\u7167\u9867\u5C0F\u5A03\u5A03"],
+          ["\u80FD\u4F9D\u5F62\u72C0\u6216\u984F\u8272\u5206\u985E", "\u5206\u985E\u904A\u6232"],
+          ["\u80FD\u5206\u8FA8\u5927\u5C0F", "\u5927\u5927\u5C0F\u5C0F"],
+          ["\u80FD\u62FC\u7C21\u55AE\u62FC\u5716", "\u6211\u6703\u62FC\u5716"],
+          ["\u5C0D\u5857\u984F\u8272\u6D3B\u52D5\u611F\u8208\u8DA3", "\u81EA\u7531\u4F5C\u756B"]
+        ],
+        "\u2165": [
+          ["\u80FD\u6B63\u78BA\u7684\u6307\u51FA\u8EAB\u9AD4\u90E8\u4F4D\u6216\u4E94\u5B98(\u81F3\u5C116\u500B\u5730\u65B9)", ""],
+          ["\u77E5\u9053\u4E0A\u4E0B\u3001\u88E1\u9762\u3001\u65C1\u908A\u7684\u4F4D\u7F6E\u6982\u5FF5", ""],
+          ["\u80FD\u6B63\u78BA\u8AAA\u51FA\u5716\u7247\u6216\u5716\u756B\u66F8\u4E2D\uFF0C\u65E5\u5E38\u751F\u6D3B\u4E2D\u5E38\u898B\u7269\u54C1\u7684\u540D\u7A31\uFF0C\u81F3\u5C11\u56DB\u6A23(\u4F8B:\u676F\u5B50\u3001\u978B\u5B50\u3001\u8ECA\u5B50\u3001\u98DB\u6A5F\u2026\u7B49)", ""]
+        ],
+        "\u2166": [
+          ["\u77E5\u9053\u73FE\u5728\u3001\u660E\u5929\uFF0C\u9084\u6628\u5929\u3001\u5F9E\u524D\u6709\u4E9B\u8A31\u6982\u5FF5(\u4F8B\u5982:\u77E5\u9053\u300C\u660E\u5929\u300D\u4E0D\u662F\u6307\u300C\u73FE\u5728\u300D)", ""],
+          ["\u77E5\u9053\u4E00\u4E9B\u898F\u5247\u548C\u662F\u975E\u89C0\u5FF5", ""]
         ]
       }
     },
@@ -4325,48 +4423,65 @@ var CFormApp = (() => {
       subdomain: "\u81EA\u52A9\u6280\u80FD\u3001\u5065\u5EB7\u7FD2\u6163\u3001\u6E05\u6F54\u885B\u751F",
       byTier: {
         "\u2160": [
-          "\u80FD\u5438\u542E\u5976\u5634"
+          ["\u80FD\u5438\u542E\u5976\u5634", "\u5403\u5976\u5634"]
         ],
         "\u2161": [
-          "\u6703\u4F38\u624B\u5E6B\u5FD9\u62FF\u5976\u74F6",
-          "\u80FD\u63A5\u53D7\u7528\u6E6F\u5319\u9935\u98DF"
+          ["\u6703\u4F38\u624B\u5E6B\u5FD9\u62FF\u5976\u74F6", "\u4E00\u8D77\u62FF\u5976\u74F6"],
+          ["\u80FD\u63A5\u53D7\u7528\u6E6F\u5319\u9935\u98DF", "\u7528\u6E6F\u5319\u559D\u679C\u6C41"]
         ],
         "\u2162": [
-          "\u80FD\u81EA\u5DF1\u62FF\u4F4F\u5976\u74F6\u9032\u98DF",
-          "\u80FD\u541E\u56A5\u7CCA\u72C0\u526F\u98DF\u54C1",
-          "\u80FD\u81EA\u5DF1\u62FF\u98DF\u7269\u5403",
-          "\u80FD\u62C9\u4E0B\u982D\u4E0A\u7684\u5E3D\u5B50",
-          "\u6703\u8868\u793A\u8981\u5403\u6771\u897F"
+          ["\u80FD\u81EA\u5DF1\u62FF\u4F4F\u5976\u74F6\u9032\u98DF", "\u5E6B\u5FD9\u62FF\u5976\u74F6"],
+          ["\u80FD\u541E\u56A5\u7CCA\u72C0\u526F\u98DF\u54C1", "\u9EA5\u7247\u6642\u9593"],
+          ["\u80FD\u81EA\u5DF1\u62FF\u98DF\u7269\u5403", "\u6211\u6703\u81EA\u5DF1\u62FF"],
+          ["\u80FD\u62C9\u4E0B\u982D\u4E0A\u7684\u5E3D\u5B50", "\u812B\u5E3D\u5B50"],
+          ["\u6703\u8868\u793A\u8981\u5403\u6771\u897F", "\u6211\u8981\u5403\u6771\u897F"]
         ],
         "\u2163": [
-          "\u80FD\u7528\u5B78\u7FD2\u676F\u559D\u6C34",
-          "\u80FD\u7528\u5438\u7BA1\u559D\u6C34",
-          "\u7DF4\u7FD2\u7528\u6E6F\u5319/\u53C9\u5B50",
-          "\u6703\u8868\u793A\u5C3F\u6FD5\u4E86\u6216\u5DF2\u6392\u4FBF",
-          "\u7DF4\u7FD2\u6D17\u624B\u7684\u6280\u5DE7",
-          "\u80FD\u7C97\u7565\u4EE5\u6BDB\u5DFE\u64E6\u5634",
-          "\u7DF4\u7FD2\u5480\u56BC\u534A\u56FA\u614B\u98DF\u7269"
+          ["\u80FD\u7528\u5B78\u7FD2\u676F\u559D\u6C34", "\u6211\u6703\u559D\u6C34"],
+          ["\u80FD\u7528\u5438\u7BA1\u559D\u6C34", "\u6211\u6703\u559D\u6C34"],
+          ["\u7DF4\u7FD2\u7528\u6E6F\u5319/\u53C9\u5B50", "\u6211\u6703\u81EA\u5DF1\u9935"],
+          ["\u6703\u8868\u793A\u5C3F\u6FD5\u4E86\u6216\u5DF2\u6392\u4FBF", "\u6211\u5927\u5927\u4E86"],
+          ["\u7DF4\u7FD2\u6D17\u624B\u7684\u6280\u5DE7", "\u6E05\u6F54\u5BF6\u5BF6"],
+          ["\u80FD\u7C97\u7565\u4EE5\u6BDB\u5DFE\u64E6\u5634", "\u6E05\u6F54\u5BF6\u5BF6"],
+          ["\u7DF4\u7FD2\u5480\u56BC\u534A\u56FA\u614B\u98DF\u7269", "\u7DF4\u7FD2\u54AC\u4E00\u54AC"]
         ],
         "\u2164": [
-          "\u80FD\u7528\u6E6F\u5319\u9032\u98DF",
-          "\u80FD\u5480\u56BC\u56FA\u9AD4\u98DF\u7269",
-          "\u80FD\u81EA\u5DF1\u812B\u8932\u5B50\u53CA\u978B\u5B50",
-          "\u80FD\u5728\u5354\u52A9\u4E0B\u7DF4\u7FD2\u7A7F\u8863\u670D",
-          "\u80FD\u5728\u5354\u52A9\u4E0B\u7DF4\u7FD2\u5237\u7259",
-          "\u80FD\u5E6B\u5FD9\u6536\u62FE\u73A9\u5177\u53CA\u7269\u54C1",
-          "\u80FD\u7DF4\u7FD2\u505A\u7C21\u55AE\u5BB6\u4E8B(\u5982\u64E6\u684C\u5B50\u3001\u6536\u7897)",
-          "\u80FD\u7DF4\u7FD2\u5982\u5EC1\u53CA\u8868\u9054\u9700\u6C42"
+          ["\u80FD\u7528\u6E6F\u5319\u9032\u98DF", "\u7528\u6E6F\u5319\u5403\u6771\u897F"],
+          ["\u80FD\u5480\u56BC\u56FA\u9AD4\u98DF\u7269", "\u54AC\u4E00\u54AC"],
+          ["\u80FD\u81EA\u5DF1\u812B\u8932\u5B50\u53CA\u978B\u5B50", "\u81EA\u5DF1\u812B"],
+          ["\u80FD\u5728\u5354\u52A9\u4E0B\u7DF4\u7FD2\u7A7F\u8863\u670D", "\u7DF4\u7FD2\u7A7F\u8863\u670D"],
+          ["\u80FD\u5728\u5354\u52A9\u4E0B\u7DF4\u7FD2\u5237\u7259", "\u81EA\u5DF1\u5237\u7259"],
+          ["\u80FD\u5E6B\u5FD9\u6536\u62FE\u73A9\u5177\u53CA\u7269\u54C1", "\u81EA\u5DF1\u6536\u73A9\u5177"],
+          ["\u80FD\u7DF4\u7FD2\u505A\u7C21\u55AE\u5BB6\u4E8B(\u5982\u64E6\u684C\u5B50\u3001\u6536\u7897)", "\u81EA\u5DF1\u6536\u73A9\u5177"],
+          ["\u80FD\u7DF4\u7FD2\u5982\u5EC1\u53CA\u8868\u9054\u9700\u6C42", "\u5750\u5C0F\u99AC\u6876"]
+        ],
+        "\u2165": [
+          ["\u5728\u5E6B\u5FD9\u4E0B\u6703\u7528\u80A5\u7682\u6D17\u624B\u4E26\u64E6\u4E7E\u4E86", ""],
+          ["\u80FD\u7528\u6E6F\u5319\u5403\u559D\u6771\u897F", ""]
+        ],
+        "\u2166": [
+          ["\u6703\u62C9\u4E0B\u8932\u5B50\uFF0C\u6E96\u5099\u5927\u3001\u5C0F\u4FBF", ""],
+          ["\u6703\u81EA\u5DF1\u7A7F\u812B\u6C92\u6709\u978B\u5E36\u7684\u978B\u5B50", ""],
+          ["\u6703\u6253\u958B\u7CD6\u679C\u7D19", ""],
+          ["\u767D\u5929\u53EF\u63A7\u5236\u5927\u3001\u5C0F\u4FBF", ""]
         ]
       }
     }
   ];
   var TIERS = [
-    { code: "\u2160", label: "0-3\u500B\u6708", minMonths: 0, maxMonths: 3, formLetter: "A" },
-    { code: "\u2161", label: "4-6\u500B\u6708", minMonths: 4, maxMonths: 6, formLetter: "B" },
-    { code: "\u2162", label: "7-12\u500B\u6708", minMonths: 7, maxMonths: 12, formLetter: "C" },
-    { code: "\u2163", label: "13-18\u500B\u6708", minMonths: 13, maxMonths: 18, formLetter: "D" },
-    { code: "\u2164", label: "19-24\u500B\u6708", minMonths: 19, maxMonths: 24, formLetter: "E" }
+    { code: "\u2160", label: "0-3\u500B\u6708", minMonths: 0, maxMonths: 3, formLetter: null },
+    { code: "\u2161", label: "4-6\u500B\u6708", minMonths: 4, maxMonths: 6, formLetter: "A" },
+    { code: "\u2162", label: "7-12\u500B\u6708", minMonths: 7, maxMonths: 12, formLetter: "B" },
+    { code: "\u2163", label: "13-18\u500B\u6708", minMonths: 13, maxMonths: 18, formLetter: "C" },
+    { code: "\u2164", label: "19-24\u500B\u6708", minMonths: 19, maxMonths: 24, formLetter: "D" },
+    { code: "\u2165", label: "25\u500B\u6708\u4EE5\u4E0A", minMonths: 25, maxMonths: Infinity, formLetter: "E" }
   ];
+  var TIER_DATA_KEYS = { "\u2165": ["\u2165", "\u2166"] };
+  function tierFormLabel(tierCode) {
+    const tier = TIERS.find((t) => t.code === tierCode);
+    if (!tier) return "";
+    return tier.formLetter ? `${tier.formLetter}\u8868` : tier.label;
+  }
   var DOMAINS = RAW_DOMAINS.map(({ domain, name, subdomain }) => ({
     id: domain,
     name,
@@ -4374,18 +4489,24 @@ var CFormApp = (() => {
   }));
   var INDICATORS = RAW_DOMAINS.flatMap(
     ({ domain, name, subdomain, byTier }) => Object.entries(byTier).flatMap(
-      ([tier, descriptions]) => descriptions.map((description, index) => ({
+      ([tier, entries]) => entries.map(([description, activityName], index) => ({
         code: `${tier}-${domain}-${index + 1}`,
         tier,
         domain,
         domainName: name,
         subdomain,
-        description
+        description,
+        activityName,
+        // 25個月以上's source document has no short 【活動名稱】 label at all (empty string
+        // above), unlike tiers Ⅰ-Ⅴ — flagged so UI code can skip auto-filling an activity-name
+        // field for those instead of writing an empty string into it.
+        noActivityName: !activityName
       }))
     )
   );
   function getIndicatorsForTier(tierCode) {
-    return INDICATORS.filter((indicator) => indicator.tier === tierCode);
+    const dataKeys = TIER_DATA_KEYS[tierCode] || [tierCode];
+    return INDICATORS.filter((indicator) => dataKeys.includes(indicator.tier));
   }
   function getIndicator(code) {
     return INDICATORS.find((indicator) => indicator.code === code);
@@ -5004,6 +5125,65 @@ var CFormApp = (() => {
     });
   }
 
+  // src/ui/birthDateField.js
+  var CURRENT_YEAR = (/* @__PURE__ */ new Date()).getFullYear();
+  var YEAR_RANGE_BACK = 6;
+  function daysInMonth(year, month) {
+    return new Date(year, month, 0).getDate();
+  }
+  function birthDateYearOptions() {
+    const years = [];
+    for (let year = CURRENT_YEAR; year >= CURRENT_YEAR - YEAR_RANGE_BACK; year -= 1) years.push(year);
+    return years;
+  }
+  function dayOptionsHtml(dayCount, selectedDay) {
+    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}</option>`).join("");
+  }
+  function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldName, value }) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
+    const selectedYear = match ? Number(match[1]) : "";
+    const selectedMonth = match ? Number(match[2]) : "";
+    const selectedDay = match ? Number(match[3]) : "";
+    const dayCount = selectedYear && selectedMonth ? daysInMonth(selectedYear, selectedMonth) : 31;
+    return `
+    <span class="panel-form__period-row">
+      <select data-field="${yearFieldName}">
+        <option value="">\u5E74</option>
+        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}</option>`).join("")}
+      </select>
+      <select data-field="${monthFieldName}">
+        <option value="">\u6708</option>
+        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}</option>`).join("")}
+      </select>
+      <select data-field="${dayFieldName}">
+        <option value="">\u65E5</option>
+        ${dayOptionsHtml(dayCount, selectedDay)}
+      </select>
+    </span>
+  `;
+  }
+  function wireBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
+    const yearEl = container.querySelector(`[data-field="${yearFieldName}"]`);
+    const monthEl = container.querySelector(`[data-field="${monthFieldName}"]`);
+    const dayEl = container.querySelector(`[data-field="${dayFieldName}"]`);
+    const refreshDayOptions = () => {
+      const year = Number(yearEl.value) || CURRENT_YEAR;
+      const month = Number(monthEl.value) || 1;
+      const dayCount = daysInMonth(year, month);
+      const selectedDay = Math.min(Number(dayEl.value) || 0, dayCount) || "";
+      dayEl.innerHTML = `<option value="">\u65E5</option>${dayOptionsHtml(dayCount, selectedDay)}`;
+    };
+    yearEl.addEventListener("change", refreshDayOptions);
+    monthEl.addEventListener("change", refreshDayOptions);
+  }
+  function parseBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
+    const year = container.querySelector(`[data-field="${yearFieldName}"]`).value;
+    const month = container.querySelector(`[data-field="${monthFieldName}"]`).value;
+    const day = container.querySelector(`[data-field="${dayFieldName}"]`).value;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
   // src/ui/childListView.js
   async function renderChildListView(container, { onSelectChild, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false, onBack, reportType }) {
     const children = await listChildren();
@@ -5035,7 +5215,10 @@ var CFormApp = (() => {
       <form class="panel-form" data-action="add-child">
         <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
         <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
-        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" required></label>
+        <label class="panel-form__field">
+          \u51FA\u751F\u65E5\u671F
+          ${birthDateSelectsHtml({ yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" })}
+        </label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
       </form>
     </div>
@@ -5043,6 +5226,7 @@ var CFormApp = (() => {
     if (onBack) {
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     }
+    wireBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
     for (const child of children) {
       container.querySelector(`[data-child-id="${child.id}"]`).addEventListener("click", () => onSelectChild(child));
     }
@@ -5060,7 +5244,19 @@ var CFormApp = (() => {
     container.querySelector('[data-action="add-child"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const name = container.querySelector('[data-field="name"]').value;
-      const birthDate = container.querySelector('[data-field="birthDate"]').value;
+      const birthDate = parseBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
+      if (!birthDate) {
+        const form = container.querySelector('[data-action="add-child"]');
+        let errorEl = form.querySelector("[data-error]");
+        if (!errorEl) {
+          errorEl = document.createElement("p");
+          errorEl.dataset.error = "";
+          errorEl.className = "field-error";
+          form.insertAdjacentElement("afterbegin", errorEl);
+        }
+        errorEl.textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
+        return;
+      }
       try {
         await addChild({ name, birthDate });
         await renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType });
@@ -24680,8 +24876,7 @@ var CFormApp = (() => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
         const blob = await generateDocxBlob({ child, form, indicators, entries: await listEntriesForForm(form.id) });
-        const formLetter = TIERS.find((t) => t.code === form.tier)?.formLetter ?? "C";
-        downloadDocx(blob, `${child.name}-${formLetter}\u8868-${form.period}.docx`);
+        downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
         if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -24923,19 +25118,23 @@ var CFormApp = (() => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
     const formatted = match ? `${match[2]}/${match[3]}` : row.date;
     const glyph = row.absent ? "" : row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
+    const isFlagged = row.absent || row.status === "developing";
     return new TextRun({
       text: `${formatted}${glyph}`,
       font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
       size: DEFAULT_TEXT_SIZE,
-      ...row.absent ? { strike: true } : {}
+      ...row.absent ? { strike: true } : {},
+      ...isFlagged ? { color: "FF0000" } : {}
     });
   }
   function occurrenceNoteRun(row) {
+    const isFlagged = row.absent || row.status === "developing";
     return new TextRun({
       text: String(row.note ?? ""),
       font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
       size: DEFAULT_TEXT_SIZE,
-      ...row.absent ? { strike: true } : {}
+      ...row.absent ? { strike: true } : {},
+      ...isFlagged ? { color: "FF0000" } : {}
     });
   }
   function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }) {
@@ -25262,10 +25461,11 @@ var CFormApp = (() => {
   }
   function occurrenceRow(occurrence) {
     const statusLabel = occurrence.absent ? "\u8ACB\u5047" : occurrence.status === "developed" ? "\u5DF2\u767C\u5C55\u25CB" : "\u767C\u5C55\u4E2D\u25B3";
+    const isFlagged = occurrence.absent || occurrence.status === "developing";
     return `
     <li class="entry-row${occurrence.absent ? " entry-row--absent" : ""}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date">${escapeHtml(occurrence.date)}\u3000${statusLabel}</span>
+        <span class="entry-row__date${isFlagged ? " entry-row__date--flag" : ""}">${escapeHtml(occurrence.date)}\u3000${statusLabel}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u7DE8\u8F2F\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u522A\u9664\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\xD7</button>
@@ -26295,10 +26495,10 @@ var CFormApp = (() => {
     return String(n).padStart(2, "0");
   }
   function buildMonthlyCalendar(year, month) {
-    const daysInMonth = new Date(year, month, 0).getDate();
+    const daysInMonth2 = new Date(year, month, 0).getDate();
     const weeks = [];
     let currentWeek = null;
-    for (let day = 1; day <= daysInMonth; day += 1) {
+    for (let day = 1; day <= daysInMonth2; day += 1) {
       const date = new Date(year, month - 1, day);
       const dow = date.getDay();
       if (dow === 0 || dow === 6) continue;
@@ -26327,7 +26527,8 @@ var CFormApp = (() => {
   // src/domain/monthlyCoursePlan.js
   var DEFAULTS = [
     [1, "\u5927\u5718\u9AD4\u6D3B\u52D5"],
-    [2, "\u7BC0\u6C23"]
+    [2, "\u7BC0\u6C23"],
+    [5, "\u5927\u5718\u9AD4\u6D3B\u52D5"]
   ];
   async function seedDefaultPlanSlots({ planId, tiers, weeks }) {
     for (const tier of tiers) {
@@ -26475,16 +26676,12 @@ var CFormApp = (() => {
   function tableWidthDxa(widths) {
     return widths.reduce((sum, w) => sum + w, 0);
   }
-  function tierFormLetter(tierCode) {
-    const tier = TIERS.find((t) => t.code === tierCode);
-    return tier ? tier.formLetter : "";
-  }
   function buildDayCellRuns(items, overrideByItemId) {
     return items.map((item) => {
       const override = overrideByItemId.get(item.id);
-      const text = item.indicatorCode ? `${item.indicatorCode}\u3010${item.activityName}\u3011${item.indicatorText || ""}` : item.activityName;
+      const lines = item.indicatorCode ? [item.indicatorCode, item.activityName && `\u3010${item.activityName}\u3011`, item.indicatorText].filter(Boolean) : [item.activityName];
       return {
-        text,
+        lines,
         notAchieved: Boolean(override?.notAchieved),
         replaced: Boolean(override?.replaced),
         replacementText: override?.replacementText || ""
@@ -26503,15 +26700,16 @@ var CFormApp = (() => {
   function cellParagraphsFromRuns(runs) {
     if (runs.length === 0) return [emptyParagraph()];
     return runs.map((run) => {
-      const children = [
-        new TextRun({
-          text: run.text,
+      const children = run.lines.map(
+        (line, index) => new TextRun({
+          text: line,
           font: runFont2(),
           size: DEFAULT_TEXT_SIZE,
+          ...index > 0 ? { break: 1 } : {},
           ...run.notAchieved ? { color: "FF0000" } : {},
           ...run.replaced ? { strike: true } : {}
         })
-      ];
+      );
       if (run.replaced && run.replacementText) {
         children.push(new TextRun({ text: run.replacementText, font: runFont2(), size: DEFAULT_TEXT_SIZE }));
       }
@@ -26634,7 +26832,7 @@ var CFormApp = (() => {
     const nameContent = [
       textParagraph2(child.name, CENTERED3),
       textParagraph2(`${ageMonths}M`, CENTERED3),
-      textParagraph2(`${tierFormLetter(tier)}\u8868`, CENTERED3)
+      textParagraph2(tierFormLabel(tier), CENTERED3)
     ];
     const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [
       dateRow(weeks, weekday, widths, nameContent, weekdayIndex === 0),
@@ -26677,10 +26875,6 @@ var CFormApp = (() => {
   }
 
   // src/ui/monthlyPlanEditorView.js
-  function tierFormLetter2(tierCode) {
-    const tier = TIERS.find((t) => t.code === tierCode);
-    return tier ? tier.formLetter : "";
-  }
   async function loadEditorData(plan) {
     const validChildIds = plan.childIds.filter(Boolean);
     const childResults = await Promise.all(validChildIds.map((id) => getChild(id)));
@@ -26703,7 +26897,7 @@ var CFormApp = (() => {
     const classes = ["monthly-calendar__item"];
     if (override?.notAchieved) classes.push("monthly-calendar__item--not-achieved");
     if (override?.replaced) classes.push("monthly-calendar__item--replaced");
-    const label = item.indicatorCode ? `${escapeHtml(item.indicatorCode)}\u3010${escapeHtml(item.activityName)}\u3011${escapeHtml(item.indicatorText || "")}` : escapeHtml(item.activityName);
+    const label = item.indicatorCode ? item.activityName ? `${escapeHtml(item.indicatorCode)}\u3010${escapeHtml(item.activityName)}\u3011${escapeHtml(item.indicatorText || "")}` : `${escapeHtml(item.indicatorCode)}${escapeHtml(item.indicatorText || "")}` : escapeHtml(item.activityName);
     const replacementHtml = override?.replaced && override.replacementText ? `<span class="monthly-calendar__replacement">${escapeHtml(override.replacementText)}</span>` : "";
     return `<div class="${classes.join(" ")}" data-item-id="${escapeHtml(item.id)}">${label}${replacementHtml}</div>`;
   }
@@ -26729,7 +26923,7 @@ var CFormApp = (() => {
     const ageMonths = calculateAgeInMonths(child.birthDate, `${data.weeks[0].days[0].isoDate}`);
     return `
     <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}">
-      <h3 class="monthly-calendar__title">${escapeHtml(child.name)}\u3000${ageMonths}M\u3000${escapeHtml(tierFormLetter2(tier))}\u8868</h3>
+      <h3 class="monthly-calendar__title">${escapeHtml(child.name)}\u3000${ageMonths}M\u3000${escapeHtml(tierFormLabel(tier))}</h3>
       <div class="monthly-calendar__weeks">
         ${data.weeks.map(
       (week) => `
@@ -26870,7 +27064,7 @@ var CFormApp = (() => {
       ).join("");
     }
     function panelItemRowHtml(item, override) {
-      const summaryText = item.indicatorCode ? `\u3010${escapeHtml(item.activityName)}\u3011${escapeHtml(item.indicatorText || "")}` : escapeHtml(item.activityName);
+      const summaryText = item.indicatorCode ? item.activityName ? `\u3010${escapeHtml(item.activityName)}\u3011${escapeHtml(item.indicatorText || "")}` : escapeHtml(item.indicatorText || "") : escapeHtml(item.activityName);
       return `
       <div class="indicator-block" data-panel-item="${item.id}">
         <h4 class="indicator-block__title">
@@ -26925,23 +27119,39 @@ var CFormApp = (() => {
       const items = await listPlanSlotItems(slot.id);
       const allOverrides = await listChildItemOverridesForPlan(plan.id);
       const overrideByItemId = new Map(allOverrides.filter((o) => o.childId === child.id).map((o) => [o.itemId, o]));
+      let indicatorTier = tier;
       panelItems.innerHTML = `
       ${items.map((item) => panelItemRowHtml(item, overrideByItemId.get(item.id))).join("")}
       <form class="entry-form" data-action="add-item">
+        <div class="panel-form__field">
+          \u6307\u6A19\u6240\u5C6C\u5E74\u9F61\u5C64
+          <div class="tier-switch">
+            ${TIERS.map(
+        (t) => `<button type="button" class="tier-switch__btn${t.code === tier ? " tier-switch__btn--active" : ""}" data-indicator-tier="${escapeHtml(t.code)}">${escapeHtml(t.label)}</button>`
+      ).join("")}
+          </div>
+        </div>
         <label class="panel-form__field">
           \u6307\u6A19
           <select data-field="new-item-indicator">${indicatorOptionsHtml2(tier)}</select>
         </label>
-        <label class="panel-form__field">\u6D3B\u52D5\u540D\u7A31 <input data-field="new-item-activity-name" required></label>
+        <label class="panel-form__field">\u6D3B\u52D5\u540D\u7A31 <input data-field="new-item-activity-name"></label>
         <label class="panel-form__field">\u6307\u6A19\u5167\u5BB9 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
         <button type="submit" class="btn btn--primary btn--small">\u65B0\u589E\u9805\u76EE</button>
         <p class="field-error" data-error></p>
       </form>
     `;
+      panelItems.querySelectorAll("[data-indicator-tier]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          indicatorTier = btn.dataset.indicatorTier;
+          panelItems.querySelectorAll("[data-indicator-tier]").forEach((b) => b.classList.toggle("tier-switch__btn--active", b === btn));
+          panelItems.querySelector('[data-field="new-item-indicator"]').innerHTML = indicatorOptionsHtml2(indicatorTier);
+        });
+      });
       panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener("change", (event) => {
         const indicator = getIndicator(event.target.value);
         if (!indicator) return;
-        panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.description;
+        panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.activityName;
         panelItems.querySelector('[data-field="new-item-indicator-text"]').value = indicator.description;
       });
       panelItems.querySelector('[data-action="add-item"]').addEventListener("submit", async (event) => {
@@ -26949,6 +27159,10 @@ var CFormApp = (() => {
         const indicatorCode = panelItems.querySelector('[data-field="new-item-indicator"]').value || null;
         const activityName = panelItems.querySelector('[data-field="new-item-activity-name"]').value;
         const indicatorText = panelItems.querySelector('[data-field="new-item-indicator-text"]').value;
+        if (!indicatorCode && !activityName) {
+          panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = "\u8ACB\u8F38\u5165\u6D3B\u52D5\u540D\u7A31\u6216\u9078\u64C7\u6307\u6A19";
+          return;
+        }
         try {
           await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
           await refreshCellAndPanel();
@@ -27392,8 +27606,10 @@ var CFormApp = (() => {
         a.download = `c-form-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 1e3);
         showMessage("");
       } catch (err) {
         showMessage(EXPORT_FAILED_MESSAGE);

@@ -6,18 +6,24 @@ import { buildDayCellRuns, generateMonthlyPlanDocxBlob } from '../src/export/mon
 import { buildMonthlyCalendar } from '../src/domain/monthlyCalendar.js';
 
 describe('buildDayCellRuns', () => {
-  it('formats an indicator item as 代碼【活動名稱】指標內容, with no override flags by default', () => {
+  it('formats an indicator item as three lines: 指標代號／【活動名稱】／活動內容, with no override flags by default', () => {
     const items = [{ id: 1, indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類' }];
     const runs = buildDayCellRuns(items, new Map());
     expect(runs).toEqual([
-      { text: 'Ⅴ-4-3【分類遊戲】能依形狀或顏色分類', notAchieved: false, replaced: false, replacementText: '' },
+      { lines: ['Ⅴ-4-3', '【分類遊戲】', '能依形狀或顏色分類'], notAchieved: false, replaced: false, replacementText: '' },
     ]);
   });
 
-  it('formats a free (no-indicator) item as just its activity name', () => {
+  it('formats an indicator item with no activity name (25個月以上 tier) as just 指標代號／活動內容, no blank middle line', () => {
+    const items = [{ id: 1, indicatorCode: 'Ⅵ-1-1', activityName: '', indicatorText: '會手心朝下丟球或東西' }];
+    const runs = buildDayCellRuns(items, new Map());
+    expect(runs[0].lines).toEqual(['Ⅵ-1-1', '會手心朝下丟球或東西']);
+  });
+
+  it('formats a free (no-indicator) item as a single line: just its activity name', () => {
     const items = [{ id: 1, indicatorCode: null, activityName: '大團體活動', indicatorText: '' }];
     const runs = buildDayCellRuns(items, new Map());
-    expect(runs[0].text).toBe('大團體活動');
+    expect(runs[0].lines).toEqual(['大團體活動']);
   });
 
   it('carries notAchieved/replaced/replacementText through from a matching override', () => {
@@ -33,7 +39,7 @@ describe('buildDayCellRuns', () => {
       { id: 2, indicatorCode: null, activityName: 'b', indicatorText: '' },
     ];
     const runs = buildDayCellRuns(items, new Map());
-    expect(runs.map(r => r.text)).toEqual(['a', 'b']);
+    expect(runs.map(r => r.lines)).toEqual([['a'], ['b']]);
   });
 });
 

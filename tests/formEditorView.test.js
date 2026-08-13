@@ -150,7 +150,7 @@ describe('renderFormEditorView', () => {
     expect(updated.status).toBe('developing');
   });
 
-  it('exports with a filename using the tier-mapped form letter (Ⅳ 階段 → D表)', async () => {
+  it('exports with a filename using the tier-mapped form letter (Ⅳ 階段 → C表)', async () => {
     const docxExportModule = await import('../src/export/docxExport.js');
     const downloadSpy = vi.spyOn(docxExportModule, 'downloadDocx').mockImplementation(() => {});
 
@@ -160,7 +160,7 @@ describe('renderFormEditorView', () => {
     container.querySelector('[data-action="export"]').click();
     await waitFor(() => downloadSpy.mock.calls.length > 0);
 
-    expect(downloadSpy).toHaveBeenCalledWith(expect.anything(), '陳小安-D表-115年01月.docx');
+    expect(downloadSpy).toHaveBeenCalledWith(expect.anything(), '陳小安-C表-115年01月.docx');
 
     vi.restoreAllMocks();
   });

@@ -4,6 +4,7 @@ import { parseDocxImport } from '../import/docxImport.js';
 import { renderImportPreviewView } from './importPreviewView.js';
 import { parseParentReportDocxImport } from '../import/parentReportDocxImport.js';
 import { renderParentReportImportPreviewView } from './parentReportImportPreviewView.js';
+import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 
 export async function renderChildListView(
   container,
@@ -46,7 +47,10 @@ export async function renderChildListView(
       <form class="panel-form" data-action="add-child">
         <h3 class="panel-form__title">新增幼兒</h3>
         <label class="panel-form__field">姓名 <input data-field="name" required></label>
-        <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" required></label>
+        <label class="panel-form__field">
+          出生日期
+          ${birthDateSelectsHtml({ yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' })}
+        </label>
         <button type="submit" class="btn btn--primary">新增</button>
       </form>
     </div>
@@ -55,6 +59,8 @@ export async function renderChildListView(
   if (onBack) {
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);
   }
+
+  wireBirthDateSelects(container, { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' });
 
   for (const child of children) {
     container.querySelector(`[data-child-id="${child.id}"]`).addEventListener('click', () => onSelectChild(child));
@@ -75,7 +81,19 @@ export async function renderChildListView(
   container.querySelector('[data-action="add-child"]').addEventListener('submit', async event => {
     event.preventDefault();
     const name = container.querySelector('[data-field="name"]').value;
-    const birthDate = container.querySelector('[data-field="birthDate"]').value;
+    const birthDate = parseBirthDateSelects(container, { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' });
+    if (!birthDate) {
+      const form = container.querySelector('[data-action="add-child"]');
+      let errorEl = form.querySelector('[data-error]');
+      if (!errorEl) {
+        errorEl = document.createElement('p');
+        errorEl.dataset.error = '';
+        errorEl.className = 'field-error';
+        form.insertAdjacentElement('afterbegin', errorEl);
+      }
+      errorEl.textContent = '請選擇完整的出生日期';
+      return;
+    }
     try {
       await addChild({ name, birthDate });
       await renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType });

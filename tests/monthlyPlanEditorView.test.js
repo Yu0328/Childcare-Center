@@ -123,9 +123,7 @@ describe('monthlyPlanEditorView: slot item editing', () => {
     select.value = 'Ⅴ-4-3';
     select.dispatchEvent(new Event('change'));
 
-    expect(container.querySelector('[data-field="new-item-activity-name"]').value).toBe('分類遊戲'.length > 0 ? container.querySelector('[data-field="new-item-activity-name"]').value : '');
-    // The auto-filled activityName must be non-empty and the indicatorText must match the reference data.
-    expect(container.querySelector('[data-field="new-item-activity-name"]').value.length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-field="new-item-activity-name"]').value).toBe('分類遊戲');
     expect(container.querySelector('[data-field="new-item-indicator-text"]').value).toBe('能依形狀或顏色分類');
   });
 

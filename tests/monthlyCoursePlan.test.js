@@ -13,7 +13,7 @@ describe('seedDefaultPlanSlots', () => {
     weeks = buildMonthlyCalendar(2026, 6); // 5 weeks, last week is Mon+Tue only (06/29-06/30)
   });
 
-  it('fills every week\'s Monday with 大團體活動 and Tuesday with 節氣, for the given tier', async () => {
+  it('fills every week\'s Monday and Friday with 大團體活動 and Tuesday with 節氣, for the given tier', async () => {
     await seedDefaultPlanSlots({ planId: plan.id, tiers: ['Ⅴ'], weeks });
 
     for (const week of weeks) {
@@ -24,6 +24,11 @@ describe('seedDefaultPlanSlots', () => {
       const tuesdaySlot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: week.weekIndex, weekday: 2 });
       const tuesdayItems = await listPlanSlotItems(tuesdaySlot.id);
       expect(tuesdayItems.map(i => i.activityName)).toEqual(['節氣']);
+
+      if (!week.days.some(d => d.weekday === 5)) continue;
+      const fridaySlot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: week.weekIndex, weekday: 5 });
+      const fridayItems = await listPlanSlotItems(fridaySlot.id);
+      expect(fridayItems.map(i => i.activityName)).toEqual(['大團體活動']);
     }
   });
 

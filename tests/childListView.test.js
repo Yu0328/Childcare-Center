@@ -11,6 +11,20 @@ function selectFile(input, file) {
   input.dispatchEvent(new Event('change'));
 }
 
+function setBirthDate(container, iso) {
+  const [year, month, day] = iso.split('-').map(Number);
+  container.querySelector('[data-field="birthDate-year"]').value = String(year);
+  container.querySelector('[data-field="birthDate-month"]').value = String(month);
+  container.querySelector('[data-field="birthDate-day"]').value = String(day);
+}
+
+function getBirthDate(container) {
+  const year = container.querySelector('[data-field="birthDate-year"]').value;
+  const month = container.querySelector('[data-field="birthDate-month"]').value;
+  const day = container.querySelector('[data-field="birthDate-day"]').value;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 async function buildSampleDocxFile() {
   const indicators = getIndicatorsForTier('Ⅳ');
   return generateDocxBlob({
@@ -55,7 +69,7 @@ describe('renderChildListView', () => {
     await renderChildListView(container, { onSelectChild: () => {} });
 
     container.querySelector('[data-field="name"]').value = '林小晴';
-    container.querySelector('[data-field="birthDate"]').value = '2024-07-19';
+    setBirthDate(container, '2024-07-19');
     container.querySelector('[data-action="add-child"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => container.textContent.includes('林小晴'));
@@ -87,7 +101,7 @@ describe('renderChildListView', () => {
     vi.spyOn(dbModule, 'addChild').mockRejectedValueOnce(new Error('Database error'));
 
     container.querySelector('[data-field="name"]').value = '失敗測試';
-    container.querySelector('[data-field="birthDate"]').value = '2024-07-19';
+    setBirthDate(container, '2024-07-19');
     container.querySelector('[data-action="add-child"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => container.textContent.includes('新增失敗，請再試一次'));
@@ -97,7 +111,7 @@ describe('renderChildListView', () => {
 
     // Form inputs should still have values (not cleared)
     expect(container.querySelector('[data-field="name"]').value).toBe('失敗測試');
-    expect(container.querySelector('[data-field="birthDate"]').value).toBe('2024-07-19');
+    expect(getBirthDate(container)).toBe('2024-07-19');
 
     // Restore original function
     vi.restoreAllMocks();

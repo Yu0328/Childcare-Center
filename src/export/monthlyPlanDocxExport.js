@@ -2,7 +2,7 @@ import {
   AlignmentType, BorderStyle, Document, Header, HeightRule, Packer, Paragraph, ShadingType, Table,
   TableCell, TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
-import { TIERS } from '../data/indicators.js';
+import { tierFormLabel } from '../data/indicators.js';
 import { DEFAULT_TEXT_SIZE, FONT, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from '../ui/periodFields.js';
@@ -89,23 +89,23 @@ function tableWidthDxa(widths) {
   return widths.reduce((sum, w) => sum + w, 0);
 }
 
-function tierFormLetter(tierCode) {
-  const tier = TIERS.find(t => t.code === tierCode);
-  return tier ? tier.formLetter : '';
-}
-
 // Pure formatting core, unit-tested directly (mirrors docxExport.js's buildIndicatorRows):
 // turns a day cell's items + this child's overrides into plain descriptors, with no `docx`
 // package types involved, so the red/strike/replacement-text logic is testable without
-// constructing a real Document.
+// constructing a real Document. Each item renders as its own line stack — 指標代號, then
+// 【活動名稱】(bracketed, same convention as the UI card and the courseplanTabView.js entry
+// card use for an indicator's activity name), then 活動內容 — each on its own line within the
+// same paragraph (not word-wrapped prose). `lines` holds exactly those parts that exist for this
+// item (a free/no-indicator item is just its plain, unbracketed activity name; a 25個月以上 item
+// with no activity name skips that line entirely rather than showing empty brackets).
 export function buildDayCellRuns(items, overrideByItemId) {
   return items.map(item => {
     const override = overrideByItemId.get(item.id);
-    const text = item.indicatorCode
-      ? `${item.indicatorCode}【${item.activityName}】${item.indicatorText || ''}`
-      : item.activityName;
+    const lines = item.indicatorCode
+      ? [item.indicatorCode, item.activityName && `【${item.activityName}】`, item.indicatorText].filter(Boolean)
+      : [item.activityName];
     return {
-      text,
+      lines,
       notAchieved: Boolean(override?.notAchieved),
       replaced: Boolean(override?.replaced),
       replacementText: override?.replacementText || '',
@@ -125,19 +125,23 @@ function textParagraph(text, { size = DEFAULT_TEXT_SIZE, alignment, bold } = {})
 }
 
 // Content cells are center-aligned in the real sample (verified via its per-paragraph
-// <w:jc w:val="center"/>), matching the date row above them.
+// <w:jc w:val="center"/>), matching the date row above them. Each item's 指標代號/活動名稱/
+// 活動內容 lines render as one line break per line within a single paragraph (not separate
+// paragraphs — that would add unwanted inter-paragraph spacing between what's really one item).
 function cellParagraphsFromRuns(runs) {
   if (runs.length === 0) return [emptyParagraph()];
   return runs.map(run => {
-    const children = [
-      new TextRun({
-        text: run.text,
-        font: runFont(),
-        size: DEFAULT_TEXT_SIZE,
-        ...(run.notAchieved ? { color: 'FF0000' } : {}),
-        ...(run.replaced ? { strike: true } : {}),
-      }),
-    ];
+    const children = run.lines.map(
+      (line, index) =>
+        new TextRun({
+          text: line,
+          font: runFont(),
+          size: DEFAULT_TEXT_SIZE,
+          ...(index > 0 ? { break: 1 } : {}),
+          ...(run.notAchieved ? { color: 'FF0000' } : {}),
+          ...(run.replaced ? { strike: true } : {}),
+        })
+    );
     if (run.replaced && run.replacementText) {
       children.push(new TextRun({ text: run.replacementText, font: runFont(), size: DEFAULT_TEXT_SIZE }));
     }
@@ -288,7 +292,7 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
   const nameContent = [
     textParagraph(child.name, CENTERED),
     textParagraph(`${ageMonths}M`, CENTERED),
-    textParagraph(`${tierFormLetter(tier)}表`, CENTERED),
+    textParagraph(tierFormLabel(tier), CENTERED),
   ];
 
   const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [

@@ -125,8 +125,15 @@ export function wireBackupControls({
       a.download = `c-form-backup-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Safari has been observed to drop the download entirely, with no error, when the object
+      // URL is revoked (and the element removed) synchronously right after click() — its download
+      // handling can still be starting asynchronously at that point, unlike Chrome/Edge, which
+      // capture the blob's data immediately. A short delay avoids that race; it's harmless
+      // everywhere else since nothing else depends on the URL being revoked immediately.
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
       showMessage('');
     } catch (err) {
       showMessage(EXPORT_FAILED_MESSAGE);
