@@ -1084,10 +1084,14 @@ fieldset.panel-form__field legend {
     grid-template-columns: 1fr minmax(340px, 420px);
   }
 
-  /* The calendar list can run much taller than the side column — keep the editing panel in view
-     while scrolling past earlier children instead of leaving it stranded at the top of the page.
-     The manage-children card below it scrolls along normally (only the cell-editing panel sticks). */
-  .tab-layout:has(.monthly-calendar-list) .monthly-plan-side > .panel-form[data-panel] {
+  /* The calendar list can run much taller than the side column — keep the whole side column in
+     view while scrolling past earlier children instead of leaving it stranded at the top of the
+     page. Sticky must go on the .monthly-plan-side wrapper itself, not on the inner panel-form:
+     a sticky element's "stuck" screen position doesn't push its normal-flow siblings down, so
+     with the manage-children card as a flex sibling below it (not inside it), scrolling could
+     drag that sibling up underneath the stuck panel and produce a visible overlap. Making the
+     wrapper the sticky/scroll boundary keeps both cards as one unit with no sibling to overlap. */
+  .tab-layout:has(.monthly-calendar-list) .monthly-plan-side {
     position: sticky;
     top: 1.5rem;
     max-height: calc(100vh - 3rem);
