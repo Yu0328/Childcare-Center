@@ -2,7 +2,7 @@ import {
   AlignmentType, BorderStyle, Document, Header, HeightRule, Packer, Paragraph, ShadingType, Table,
   TableCell, TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
-import { TIERS } from '../data/indicators.js';
+import { tierFormLabel } from '../data/indicators.js';
 import { DEFAULT_TEXT_SIZE, FONT, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from '../ui/periodFields.js';
@@ -89,11 +89,6 @@ function tableWidthDxa(widths) {
   return widths.reduce((sum, w) => sum + w, 0);
 }
 
-function tierFormLetter(tierCode) {
-  const tier = TIERS.find(t => t.code === tierCode);
-  return tier ? tier.formLetter : '';
-}
-
 // Pure formatting core, unit-tested directly (mirrors docxExport.js's buildIndicatorRows):
 // turns a day cell's items + this child's overrides into plain descriptors, with no `docx`
 // package types involved, so the red/strike/replacement-text logic is testable without
@@ -102,7 +97,9 @@ export function buildDayCellRuns(items, overrideByItemId) {
   return items.map(item => {
     const override = overrideByItemId.get(item.id);
     const text = item.indicatorCode
-      ? `${item.indicatorCode}【${item.activityName}】${item.indicatorText || ''}`
+      ? item.activityName
+        ? `${item.indicatorCode}${item.indicatorText || ''}【${item.activityName}】`
+        : `${item.indicatorCode}${item.indicatorText || ''}`
       : item.activityName;
     return {
       text,
@@ -288,7 +285,7 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
   const nameContent = [
     textParagraph(child.name, CENTERED),
     textParagraph(`${ageMonths}M`, CENTERED),
-    textParagraph(`${tierFormLetter(tier)}表`, CENTERED),
+    textParagraph(tierFormLabel(tier), CENTERED),
   ];
 
   const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [

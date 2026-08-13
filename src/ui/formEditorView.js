@@ -1,4 +1,4 @@
-import { getIndicatorsForTier, TIERS } from '../data/indicators.js';
+import { getIndicatorsForTier, tierFormLabel } from '../data/indicators.js';
 import { addEntry, deleteEntry, listEntriesForForm, updateEntry } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
@@ -107,8 +107,7 @@ export async function renderFormEditorView(
     const errorEl = container.querySelector('[data-error="export"]');
     try {
       const blob = await generateDocxBlob({ child, form, indicators, entries: await listEntriesForForm(form.id) });
-      const formLetter = TIERS.find(t => t.code === form.tier)?.formLetter ?? 'C';
-      downloadDocx(blob, `${child.name}-${formLetter}表-${form.period}.docx`);
+      downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {
       if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';

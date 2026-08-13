@@ -20,10 +20,11 @@ function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
 
 function occurrenceRow(occurrence) {
   const statusLabel = occurrence.absent ? '請假' : occurrence.status === 'developed' ? '已發展○' : '發展中△';
+  const isFlagged = occurrence.absent || occurrence.status === 'developing';
   return `
     <li class="entry-row${occurrence.absent ? ' entry-row--absent' : ''}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date">${escapeHtml(occurrence.date)}　${statusLabel}</span>
+        <span class="entry-row__date${isFlagged ? ' entry-row__date--flag' : ''}">${escapeHtml(occurrence.date)}　${statusLabel}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="編輯實施紀錄：${escapeHtml(occurrence.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="刪除實施紀錄：${escapeHtml(occurrence.date)}">×</button>
@@ -52,7 +53,7 @@ function entryCard(entry, indicator, occurrences, tier) {
     <div class="indicator-block" data-course-entry="${escapeHtml(entry.id)}">
       <h4 class="indicator-block__title">
         <span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>
-        【${escapeHtml(entry.activityName)}】${escapeHtml(entry.indicatorText || '')}
+        ${escapeHtml(entry.indicatorText || '')}【${escapeHtml(entry.activityName)}】
         <span class="indicator-block__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯課程計畫項目：${escapeHtml(entry.activityName)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除課程計畫項目：${escapeHtml(entry.activityName)}">×</button>

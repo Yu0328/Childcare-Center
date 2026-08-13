@@ -652,7 +652,13 @@ fieldset.panel-form__field legend {
 .entry-row--absent .entry-row__date,
 .entry-row--absent .entry-row__note {
   text-decoration: line-through;
-  color: var(--text-secondary);
+}
+
+/* 未發展(發展中△) or 請假 occurrences read as red text so they stand out from a plain 已發展○
+   row at a glance — added to .entry-row__date instead of relying on .entry-row--absent's color
+   alone so 發展中△ (not absent) gets the same red treatment. */
+.entry-row__date--flag {
+  color: var(--danger);
 }
 
 .entry-row__top {
@@ -1082,6 +1088,37 @@ fieldset.panel-form__field legend {
   flex-shrink: 0;
 }
 
+/* ---------- Tier switch (課程月計畫's 新增項目 indicator-tier picker) ----------
+   Lets a teacher browse another tier's indicators (e.g. a child hasn't caught up to their own
+   tier yet) without leaving the cell they're planning for. Same pill-button language as
+   .panel-form__checkbox above, but plain buttons (single-select, not a checkbox list). */
+.tier-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tier-switch__btn {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.tier-switch__btn:hover {
+  border-color: var(--brand);
+}
+
+.tier-switch__btn--active {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+
 /* ---------- Monthly course plan editor ----------
    This view needs far more horizontal room than the 960px default (sized for narrow forms):
    each child gets a full-width day-by-day calendar, and 5 week-columns of indicator text need
@@ -1184,29 +1221,33 @@ fieldset.panel-form__field legend {
   border-color: var(--brand);
 }
 
-/* Monday/Tuesday carry the fixed 大團體活動/節氣 defaults rather than free planning content —
-   a warm tint marks them as "already filled in" at a glance, distinct from the plain Wed-Fri
-   planning cells, without needing a text label to explain it. */
+/* Monday/Tuesday/Friday carry the fixed 大團體活動/節氣 defaults rather than free planning
+   content — a warm tint marks them as "already filled in" at a glance, distinct from the plain
+   Wed/Thu planning cells, without needing a text label to explain it. */
 .monthly-calendar__day[data-weekday="1"],
-.monthly-calendar__day[data-weekday="2"] {
+.monthly-calendar__day[data-weekday="2"],
+.monthly-calendar__day[data-weekday="5"] {
   background: var(--warm-tint);
   border-color: var(--warm-border);
 }
 
 .monthly-calendar__day[data-weekday="1"]:hover,
-.monthly-calendar__day[data-weekday="2"]:hover {
+.monthly-calendar__day[data-weekday="2"]:hover,
+.monthly-calendar__day[data-weekday="5"]:hover {
   border-color: var(--warm-accent);
 }
 
 .monthly-calendar__day[data-weekday="1"] .monthly-calendar__date,
-.monthly-calendar__day[data-weekday="2"] .monthly-calendar__date {
+.monthly-calendar__day[data-weekday="2"] .monthly-calendar__date,
+.monthly-calendar__day[data-weekday="5"] .monthly-calendar__date {
   color: var(--warm-accent);
 }
 
-/* Wed-Fri cells are free-planning (no default content), so a filled one needs its own visual cue
-   to stand out from the still-empty ones at a glance — Mon/Tue are excluded since they're already
-   tinted warm above (they're never "empty" in the first place, so a second color would be noise). */
-.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):has(.monthly-calendar__item) {
+/* Wed/Thu cells are free-planning (no default content), so a filled one needs its own visual cue
+   to stand out from the still-empty ones at a glance — Mon/Tue/Fri are excluded since they're
+   already tinted warm above (they're never "empty" in the first place, so a second color would be
+   noise). */
+.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):not([data-weekday="5"]):has(.monthly-calendar__item) {
   background: var(--filled-tint);
   border-color: var(--filled-border);
 }

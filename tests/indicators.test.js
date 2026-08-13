@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator } from '../src/data/indicators.js';
 
 describe('indicator reference data', () => {
-  it('has 5 tiers in order Ⅰ through Ⅴ', () => {
-    expect(TIERS.map(t => t.code)).toEqual(['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ']);
+  it('has 6 tiers in order Ⅰ through Ⅵ', () => {
+    expect(TIERS.map(t => t.code)).toEqual(['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ']);
   });
 
   it('has 5 domains', () => {
@@ -13,8 +13,8 @@ describe('indicator reference data', () => {
     ]);
   });
 
-  it('has 137 total indicators', () => {
-    expect(INDICATORS).toHaveLength(137);
+  it('has 178 total indicators', () => {
+    expect(INDICATORS).toHaveLength(178);
   });
 
   it('every indicator code matches its tier and domain', () => {
@@ -34,6 +34,13 @@ describe('indicator reference data', () => {
     }
   });
 
+  it('getIndicatorsForTier(\'Ⅵ\') combines the Ⅵ (base) and Ⅶ (延伸/進階) source codings under one 25個月以上 tier', () => {
+    const indicators = getIndicatorsForTier('Ⅵ');
+    expect(indicators).toHaveLength(41);
+    expect(indicators.every(i => i.tier === 'Ⅵ' || i.tier === 'Ⅶ')).toBe(true);
+    expect(indicators.every(i => i.noActivityName)).toBe(true);
+  });
+
   it('getIndicator looks up a known indicator by code', () => {
     expect(getIndicator('Ⅳ-1-1')).toEqual({
       code: 'Ⅳ-1-1',
@@ -42,6 +49,7 @@ describe('indicator reference data', () => {
       domainName: '身體動作',
       subdomain: '粗動作、精細動作',
       description: '能獨立穩定行走',
+      noActivityName: false,
     });
   });
 

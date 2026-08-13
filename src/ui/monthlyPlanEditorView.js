@@ -7,15 +7,10 @@ import {
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
 import { parsePeriod } from './periodFields.js';
-import { TIERS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
+import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../data/indicators.js';
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
-
-function tierFormLetter(tierCode) {
-  const tier = TIERS.find(t => t.code === tierCode);
-  return tier ? tier.formLetter : '';
-}
 
 // Loads everything the render pass needs in one pass: the plan's still-existing children (a
 // child deleted elsewhere after being added to this plan is silently skipped rather than
@@ -55,7 +50,9 @@ function itemHtml(item, override) {
   if (override?.replaced) classes.push('monthly-calendar__item--replaced');
 
   const label = item.indicatorCode
-    ? `${escapeHtml(item.indicatorCode)}【${escapeHtml(item.activityName)}】${escapeHtml(item.indicatorText || '')}`
+    ? item.activityName
+      ? `${escapeHtml(item.indicatorCode)}${escapeHtml(item.indicatorText || '')}【${escapeHtml(item.activityName)}】`
+      : `${escapeHtml(item.indicatorCode)}${escapeHtml(item.indicatorText || '')}`
     : escapeHtml(item.activityName);
 
   const replacementHtml =
@@ -92,7 +89,7 @@ function childCalendarHtml(child, tier, data) {
   const ageMonths = calculateAgeInMonths(child.birthDate, `${data.weeks[0].days[0].isoDate}`);
   return `
     <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}">
-      <h3 class="monthly-calendar__title">${escapeHtml(child.name)}　${ageMonths}M　${escapeHtml(tierFormLetter(tier))}表</h3>
+      <h3 class="monthly-calendar__title">${escapeHtml(child.name)}　${ageMonths}M　${escapeHtml(tierFormLabel(tier))}</h3>
       <div class="monthly-calendar__weeks">
         ${data.weeks
           .map(
@@ -263,7 +260,9 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   // a fixed, low-key spot instead of wrapping onto its own line.
   function panelItemRowHtml(item, override) {
     const summaryText = item.indicatorCode
-      ? `【${escapeHtml(item.activityName)}】${escapeHtml(item.indicatorText || '')}`
+      ? item.activityName
+        ? `${escapeHtml(item.indicatorText || '')}【${escapeHtml(item.activityName)}】`
+        : escapeHtml(item.indicatorText || '')
       : escapeHtml(item.activityName);
 
     return `
@@ -322,24 +321,51 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     const allOverrides = await listChildItemOverridesForPlan(plan.id);
     const overrideByItemId = new Map(allOverrides.filter(o => o.childId === child.id).map(o => [o.itemId, o]));
 
+    // Lets staff pick an indicator from a tier other than this cell's own tier — a child may not
+    // have caught up to their assigned tier yet, so the teacher plans with an earlier tier's
+    // indicator instead. Starts on the cell's own tier and only affects which options the 指標
+    // select shows; the item is still saved into this cell's own slot regardless of which tier
+    // its indicator came from.
+    let indicatorTier = tier;
+
     panelItems.innerHTML = `
       ${items.map(item => panelItemRowHtml(item, overrideByItemId.get(item.id))).join('')}
       <form class="entry-form" data-action="add-item">
+        <div class="panel-form__field">
+          指標所屬年齡層
+          <div class="tier-switch">
+            ${TIERS.map(
+              t =>
+                `<button type="button" class="tier-switch__btn${t.code === tier ? ' tier-switch__btn--active' : ''}" data-indicator-tier="${escapeHtml(t.code)}">${escapeHtml(t.label)}</button>`
+            ).join('')}
+          </div>
+        </div>
         <label class="panel-form__field">
           指標
           <select data-field="new-item-indicator">${indicatorOptionsHtml(tier)}</select>
         </label>
-        <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name" required></label>
+        <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name"></label>
         <label class="panel-form__field">指標內容 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
         <button type="submit" class="btn btn--primary btn--small">新增項目</button>
         <p class="field-error" data-error></p>
       </form>
     `;
 
+    panelItems.querySelectorAll('[data-indicator-tier]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        indicatorTier = btn.dataset.indicatorTier;
+        panelItems.querySelectorAll('[data-indicator-tier]').forEach(b => b.classList.toggle('tier-switch__btn--active', b === btn));
+        panelItems.querySelector('[data-field="new-item-indicator"]').innerHTML = indicatorOptionsHtml(indicatorTier);
+      });
+    });
+
     panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener('change', event => {
       const indicator = getIndicator(event.target.value);
       if (!indicator) return;
-      panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.description;
+      // 25個月以上's indicators (tier Ⅵ/Ⅶ) have no short 【活動名稱】 label in the source
+      // document — only the description — so activity name is left blank rather than duplicating
+      // the description into both fields.
+      panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.noActivityName ? '' : indicator.description;
       panelItems.querySelector('[data-field="new-item-indicator-text"]').value = indicator.description;
     });
 
@@ -348,6 +374,13 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       const indicatorCode = panelItems.querySelector('[data-field="new-item-indicator"]').value || null;
       const activityName = panelItems.querySelector('[data-field="new-item-activity-name"]').value;
       const indicatorText = panelItems.querySelector('[data-field="new-item-indicator-text"]').value;
+      // Activity name is only mandatory when no indicator is picked (it's then the item's only
+      // label) — an indicator-backed item can rely on the indicator's own description instead
+      // (25個月以上's indicators have no activity name to fill in at all).
+      if (!indicatorCode && !activityName) {
+        panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = '請輸入活動名稱或選擇指標';
+        return;
+      }
       try {
         await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
         await refreshCellAndPanel();

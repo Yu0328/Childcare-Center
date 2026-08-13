@@ -28,7 +28,7 @@ describe('suggestTier', () => {
     expect(suggestTier('2024-07-19', '2026-03-01')).toBe('Ⅴ');
   });
 
-  it('returns null when the child is older than 24 months', () => {
-    expect(suggestTier('2023-01-01', '2026-03-01')).toBeNull();
+  it('suggests Ⅵ for a child older than 24 months', () => {
+    expect(suggestTier('2023-01-01', '2026-03-01')).toBe('Ⅵ');
   });
 });
