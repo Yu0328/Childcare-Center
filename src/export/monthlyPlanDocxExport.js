@@ -98,7 +98,7 @@ export function buildDayCellRuns(items, overrideByItemId) {
     const override = overrideByItemId.get(item.id);
     const text = item.indicatorCode
       ? item.activityName
-        ? `${item.indicatorCode}${item.indicatorText || ''}【${item.activityName}】`
+        ? `${item.indicatorCode}【${item.activityName}】${item.indicatorText || ''}`
         : `${item.indicatorCode}${item.indicatorText || ''}`
       : item.activityName;
     return {

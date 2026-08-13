@@ -116,15 +116,13 @@ const RAW_DOMAINS = [
         '能認識自己、朋友或家庭成員的照片',
         '會與玩偶對話',
       ],
-      // 25個月以上. NOTE: the source document numbers these Ⅶ-2-3/Ⅶ-2-4 (continuing the count
-      // from Ⅵ-2's 2 items instead of restarting at 1, unlike every other domain in this
-      // document) — auto-derived here as Ⅶ-2-1/Ⅶ-2-2 instead, for consistency with how every
-      // other tier's codes are generated in this file. Content is identical either way.
+      // 25個月以上. Unlike every other domain in this document, 社會情緒's four items here are
+      // all Ⅵ (the source document's own Ⅶ-2-3/Ⅶ-2-4 labels on the last two are a numbering
+      // slip in that document, not a genuine 延伸/進階 sub-tier for this domain) — kept as one
+      // Ⅵ array rather than split into Ⅵ/Ⅶ like the other four domains.
       'Ⅵ': [
         '會去幫助別人或保護較小的孩子',
         '會與其他孩子合作，做一件事或一個東西',
-      ],
-      'Ⅶ': [
         '對幼小的會保護，對錯的會告狀',
         '自己玩玩具時，叫名字會有「抬頭」、「轉頭看」或「回到大人身邊」的反應',
       ],

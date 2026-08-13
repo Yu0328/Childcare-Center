@@ -53,7 +53,7 @@ function entryCard(entry, indicator, occurrences, tier) {
     <div class="indicator-block" data-course-entry="${escapeHtml(entry.id)}">
       <h4 class="indicator-block__title">
         <span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>
-        ${escapeHtml(entry.indicatorText || '')}【${escapeHtml(entry.activityName)}】
+        【${escapeHtml(entry.activityName)}】${escapeHtml(entry.indicatorText || '')}
         <span class="indicator-block__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯課程計畫項目：${escapeHtml(entry.activityName)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除課程計畫項目：${escapeHtml(entry.activityName)}">×</button>

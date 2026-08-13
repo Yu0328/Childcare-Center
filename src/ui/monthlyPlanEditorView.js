@@ -51,7 +51,7 @@ function itemHtml(item, override) {
 
   const label = item.indicatorCode
     ? item.activityName
-      ? `${escapeHtml(item.indicatorCode)}${escapeHtml(item.indicatorText || '')}【${escapeHtml(item.activityName)}】`
+      ? `${escapeHtml(item.indicatorCode)}【${escapeHtml(item.activityName)}】${escapeHtml(item.indicatorText || '')}`
       : `${escapeHtml(item.indicatorCode)}${escapeHtml(item.indicatorText || '')}`
     : escapeHtml(item.activityName);
 
@@ -261,7 +261,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   function panelItemRowHtml(item, override) {
     const summaryText = item.indicatorCode
       ? item.activityName
-        ? `${escapeHtml(item.indicatorText || '')}【${escapeHtml(item.activityName)}】`
+        ? `【${escapeHtml(item.activityName)}】${escapeHtml(item.indicatorText || '')}`
         : escapeHtml(item.indicatorText || '')
       : escapeHtml(item.activityName);
 
