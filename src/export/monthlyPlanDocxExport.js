@@ -42,6 +42,9 @@ const CORNER_LABEL_SIZE = 18;
 // columnWidthsFor rather than assuming all 6 entries are used.
 const COLUMN_WIDTHS = [995, 1977, 2268, 2126, 1985, 1879];
 const TABLE_CELL_MARGIN_DXA = 100;
+// Vertical cell padding, requested separately from the horizontal margin above to loosen up the
+// table's overall spacing — the default (no top/bottom margin) read as too cramped.
+const TABLE_CELL_MARGIN_DXA_VERTICAL = 120;
 
 // Every border in the real sample's <w:tblBorders> is this same single 0.5pt (sz=4) black line,
 // on all four table edges and both inside directions — a plain uniform grid, no double lines or
@@ -267,7 +270,11 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
   );
   const asOfIso = weeks[0].days[0].isoDate;
   const ageMonths = calculateAgeInMonths(child.birthDate, asOfIso);
-  const nameContent = [textParagraph(child.name, CENTERED), textParagraph(`${ageMonths}M　${tierFormLetter(tier)}表`, CENTERED)];
+  const nameContent = [
+    textParagraph(child.name, CENTERED),
+    textParagraph(`${ageMonths}M`, CENTERED),
+    textParagraph(`${tierFormLetter(tier)}表`, CENTERED),
+  ];
 
   const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [
     dateRow(weeks, weekday, widths, nameContent, weekdayIndex === 0),
@@ -279,7 +286,13 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
     columnWidths: widths,
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
-    margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
+    margins: {
+      top: TABLE_CELL_MARGIN_DXA_VERTICAL,
+      bottom: TABLE_CELL_MARGIN_DXA_VERTICAL,
+      left: TABLE_CELL_MARGIN_DXA,
+      right: TABLE_CELL_MARGIN_DXA,
+      marginUnitType: WidthType.DXA,
+    },
     borders: TABLE_BORDERS,
     rows: [weekHeaderRow(weeks, widths), ...bodyRows, trailingNoteRow(widths)],
   });
