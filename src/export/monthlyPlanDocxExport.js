@@ -93,14 +93,16 @@ function tableWidthDxa(widths) {
 // turns a day cell's items + this child's overrides into plain descriptors, with no `docx`
 // package types involved, so the red/strike/replacement-text logic is testable without
 // constructing a real Document. Each item renders as its own line stack — 指標代號, then
-// 活動名稱, then 活動內容, each on its own line within the same paragraph (not word-wrapped
-// prose) — `lines` holds exactly those parts that exist for this item (a free/no-indicator item
-// is just its activity name; a 25個月以上 item with no activity name skips that line).
+// 【活動名稱】(bracketed, same convention as the UI card and the courseplanTabView.js entry
+// card use for an indicator's activity name), then 活動內容 — each on its own line within the
+// same paragraph (not word-wrapped prose). `lines` holds exactly those parts that exist for this
+// item (a free/no-indicator item is just its plain, unbracketed activity name; a 25個月以上 item
+// with no activity name skips that line entirely rather than showing empty brackets).
 export function buildDayCellRuns(items, overrideByItemId) {
   return items.map(item => {
     const override = overrideByItemId.get(item.id);
     const lines = item.indicatorCode
-      ? [item.indicatorCode, item.activityName, item.indicatorText].filter(Boolean)
+      ? [item.indicatorCode, item.activityName && `【${item.activityName}】`, item.indicatorText].filter(Boolean)
       : [item.activityName];
     return {
       lines,

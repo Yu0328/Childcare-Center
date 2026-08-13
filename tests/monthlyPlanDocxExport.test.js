@@ -6,11 +6,11 @@ import { buildDayCellRuns, generateMonthlyPlanDocxBlob } from '../src/export/mon
 import { buildMonthlyCalendar } from '../src/domain/monthlyCalendar.js';
 
 describe('buildDayCellRuns', () => {
-  it('formats an indicator item as three lines: 指標代號／活動名稱／活動內容, with no override flags by default', () => {
+  it('formats an indicator item as three lines: 指標代號／【活動名稱】／活動內容, with no override flags by default', () => {
     const items = [{ id: 1, indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類' }];
     const runs = buildDayCellRuns(items, new Map());
     expect(runs).toEqual([
-      { lines: ['Ⅴ-4-3', '分類遊戲', '能依形狀或顏色分類'], notAchieved: false, replaced: false, replacementText: '' },
+      { lines: ['Ⅴ-4-3', '【分類遊戲】', '能依形狀或顏色分類'], notAchieved: false, replaced: false, replacementText: '' },
     ]);
   });
 
