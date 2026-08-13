@@ -130,10 +130,6 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data)).join('')}
       </div>
       <div class="monthly-plan-side">
-        <div class="panel-form" data-panel>
-          <h3 class="panel-form__title" data-panel-header>點選左側的日期格子開始規劃</h3>
-          <div data-panel-items></div>
-        </div>
         <form class="panel-form" data-manage-children-form hidden>
           <h3 class="panel-form__title">選擇本月計畫涵蓋的幼兒</h3>
           <fieldset class="panel-form__field">
@@ -155,6 +151,10 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
           </div>
           <p class="field-error" data-error="manage-children"></p>
         </form>
+        <div class="panel-form" data-panel>
+          <h3 class="panel-form__title" data-panel-header>點選左側的日期格子開始規劃</h3>
+          <div data-panel-items></div>
+        </div>
       </div>
     </div>
   `;

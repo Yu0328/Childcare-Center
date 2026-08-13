@@ -80,7 +80,7 @@ const CONTENT_CELL_SHADING = { type: ShadingType.CLEAR, color: 'auto', fill: 'FF
 // true left margin; the offset's magnitude is reduced accordingly so the icon doesn't overlap the
 // text. Best-effort estimate — not visually verified in real Word, since this environment has no
 // way to render/screenshot docx output. Confirm and re-tune against an actual export if it's off.
-const HEADER_ICON_OFFSET_EMU = { horizontal: -60000, vertical: -40000 };
+const HEADER_ICON_OFFSET_EMU = { horizontal: -20000, vertical: -40000 };
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const CENTERED = { alignment: AlignmentType.CENTER };
@@ -209,6 +209,11 @@ function nameCell(widths, isFirstBodyRow, nameContent) {
   });
 }
 
+// Date cells only ever hold one short line ("08/03(一)"), unlike the multi-line content/name
+// cells, so they use their own (much smaller) vertical margin instead of the table-wide default —
+// otherwise they read as tall, mostly-empty boxes.
+const DATE_CELL_MARGINS = { top: 20, bottom: 20, left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA };
+
 function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
   const cells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
@@ -217,6 +222,7 @@ function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
       verticalAlign: VerticalAlign.CENTER,
       borders: DATE_CELL_BORDERS,
       shading: DATE_CELL_SHADING,
+      margins: DATE_CELL_MARGINS,
       children: [textParagraph(day ? day.dateLabel : '', { ...CENTERED, bold: true })],
     });
   });

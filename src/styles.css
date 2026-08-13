@@ -690,6 +690,13 @@ fieldset.panel-form__field legend {
   display: none;
 }
 
+/* .panel-form always sets display: flex (an author rule), which otherwise beats the browser's
+   default [hidden] { display: none } (a lower-priority UA rule) — without this, toggling the
+   `hidden` attribute on a .panel-form (e.g. the manage-children card) has no visual effect at all. */
+.panel-form[hidden] {
+  display: none;
+}
+
 /* Redesigned to read as a distinct, self-contained panel — same visual family as
    .panel-form (light card, generous spacing, clearly grouped buttons) rather than a bare
    cluster of unstyled inline inputs. Used for both the "新增..." sub-forms (occurrence/entry
