@@ -1,6 +1,6 @@
 import {
-  AlignmentType, BorderStyle, Document, Header, Packer, Paragraph, ShadingType, Table, TableCell,
-  TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
+  AlignmentType, BorderStyle, Document, Header, HeightRule, Packer, Paragraph, ShadingType, Table,
+  TableCell, TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
 import { TIERS } from '../data/indicators.js';
 import { DEFAULT_TEXT_SIZE, FONT, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
@@ -212,6 +212,14 @@ function nameCell(widths, isFirstBodyRow, nameContent) {
 // cells. Matched here exactly rather than reusing TABLE_CELL_MARGIN_DXA_VERTICAL.
 const DATE_CELL_MARGINS = { top: 0, bottom: 0, left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA };
 
+// Zero cell margins alone weren't enough to reliably shrink the row in Word — auto-fit height
+// still varies with rendering engine/font metrics. The real sample's date rows carry an explicit
+// <w:trHeight> (5 sampled values ranged 234-393 dxa across its 5 weekdays); 280 sits in that
+// range as a single representative minimum, applied the same way docxExport.js's
+// TABLE_HEADER_ROW_HEIGHTS already does elsewhere in this codebase (HeightRule.ATLEAST — a floor,
+// not a fixed height, so it never clips the text if a taller font ever gets substituted in).
+const DATE_ROW_HEIGHT_DXA = 280;
+
 function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
   const cells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
@@ -224,7 +232,10 @@ function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
       children: [textParagraph(day ? day.dateLabel : '', { ...CENTERED, bold: true })],
     });
   });
-  return new TableRow({ children: [nameCell(widths, isFirstBodyRow, nameContent), ...cells] });
+  return new TableRow({
+    height: { value: DATE_ROW_HEIGHT_DXA, rule: HeightRule.ATLEAST },
+    children: [nameCell(widths, isFirstBodyRow, nameContent), ...cells],
+  });
 }
 
 function contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId) {
