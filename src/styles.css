@@ -29,6 +29,13 @@
   --edit-accent: #6b46a8;
   --edit-border: #d7c3f2;
 
+  /* "This day already has planned content" indicator for the monthly-plan calendar's free
+     Wed-Fri cells — a different green from any --domain-N color so it doesn't collide with
+     those cards' unrelated meaning (發展領域 identity) elsewhere in the app. */
+  --filled-tint: #ddf0dd;
+  --filled-accent: #2f8f4e;
+  --filled-border: #b9dfbb;
+
   /* Domain identity colors — one per 發展領域, ordered for adjacent-pair
      colorblind-safe contrast (see dataviz palette reference). Tints are deliberately a shade
      deeper than a barely-there pastel so each card reads as colored against the page, not white. */
@@ -1194,6 +1201,14 @@ fieldset.panel-form__field legend {
 .monthly-calendar__day[data-weekday="1"] .monthly-calendar__date,
 .monthly-calendar__day[data-weekday="2"] .monthly-calendar__date {
   color: var(--warm-accent);
+}
+
+/* Wed-Fri cells are free-planning (no default content), so a filled one needs its own visual cue
+   to stand out from the still-empty ones at a glance — Mon/Tue are excluded since they're already
+   tinted warm above (they're never "empty" in the first place, so a second color would be noise). */
+.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):has(.monthly-calendar__item) {
+  background: var(--filled-tint);
+  border-color: var(--filled-border);
 }
 
 .monthly-calendar__day--selected {
