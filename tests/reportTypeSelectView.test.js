@@ -19,4 +19,13 @@ describe('renderReportTypeSelectView', () => {
     container.querySelector('[data-type="parent-report"]').click();
     expect(selected).toBe('parent-report');
   });
+
+  it('calls onSelectType with "monthly-plan" when 課程月計畫 is clicked', async () => {
+    const container = document.createElement('div');
+    let selected = null;
+    await renderReportTypeSelectView(container, { onSelectType: type => { selected = type; } });
+
+    container.querySelector('[data-type="monthly-plan"]').click();
+    expect(selected).toBe('monthly-plan');
+  });
 });

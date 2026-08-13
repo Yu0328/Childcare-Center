@@ -64,6 +64,30 @@ describe('mountApp navigation', () => {
     expect(container.textContent).toContain('選擇要填寫的表');
   });
 
+  it('routes 課程月計畫 -> list -> editor -> back to list -> back to type select', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    mountApp(container);
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+
+    container.querySelector('[data-type="monthly-plan"]').click();
+    await waitFor(() => container.querySelector('[data-action="add-plan"]'));
+
+    container.querySelector(`[data-child-checkbox="${child.id}"]`).checked = true;
+    container.querySelector('[data-action="add-plan"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => container.querySelector('.monthly-calendar-list'));
+    expect(container.querySelector('.monthly-calendar-list')).not.toBeNull();
+
+    container.querySelector('[data-action="back"]').click();
+    await waitFor(() => container.querySelector('[data-action="add-plan"]'));
+    expect(container.querySelector('[data-action="add-plan"]')).not.toBeNull();
+
+    container.querySelector('[data-action="back"]').click();
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    expect(container.textContent).toContain('選擇要填寫的表');
+  });
+
   it('navigates from the form list to the aggregate-from-parent-reports screen and back', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
 

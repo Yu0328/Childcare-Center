@@ -40,6 +40,13 @@
   --edit-accent: #6b46a8;
   --edit-border: #d7c3f2;
 
+  /* "This day already has planned content" indicator for the monthly-plan calendar's free
+     Wed-Fri cells — a different green from any --domain-N color so it doesn't collide with
+     those cards' unrelated meaning (發展領域 identity) elsewhere in the app. */
+  --filled-tint: #ddf0dd;
+  --filled-accent: #2f8f4e;
+  --filled-border: #b9dfbb;
+
   /* Domain identity colors — one per 發展領域, ordered for adjacent-pair
      colorblind-safe contrast (see dataviz palette reference). Tints are deliberately a shade
      deeper than a barely-there pastel so each card reads as colored against the page, not white. */
@@ -273,6 +280,23 @@ button {
   position: absolute;
   right: 0;
   left: auto;
+}
+
+/* Groups multiple right-side header actions (課程月計畫 editor: 管理小朋友 + 匯出 Word) as one
+   unit instead of extending the single-button data-action allowlist above — each new button
+   there would otherwise land at the same right:0 spot and stack on itself. The wrapper takes
+   the absolute right positioning; buttons inside it fall back to normal flex flow (overriding
+   the base `.page-header .btn { position: absolute; left: 0 }` rule, which would otherwise win
+   here too since it's a plain descendant selector). */
+.page-header--editor .page-header__actions {
+  position: absolute;
+  right: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.page-header--editor .page-header__actions .btn {
+  position: static;
 }
 
 /* ---------- Report-type select screen ---------- */
@@ -684,6 +708,13 @@ fieldset.panel-form__field legend {
   display: none;
 }
 
+/* .panel-form always sets display: flex (an author rule), which otherwise beats the browser's
+   default [hidden] { display: none } (a lower-priority UA rule) — without this, toggling the
+   `hidden` attribute on a .panel-form (e.g. the manage-children card) has no visual effect at all. */
+.panel-form[hidden] {
+  display: none;
+}
+
 /* Redesigned to read as a distinct, self-contained panel — same visual family as
    .panel-form (light card, generous spacing, clearly grouped buttons) rather than a bare
    cluster of unstyled inline inputs. Used for both the "新增..." sub-forms (occurrence/entry
@@ -1007,7 +1038,8 @@ fieldset.panel-form__field legend {
   .page-header--editor .btn[data-action="export"],
   .page-header--editor .btn[data-action="aggregate"],
   .page-header--editor .btn[data-action="import-docx"],
-  .page-header--editor .btn[data-action="import-parent-report-docx"] {
+  .page-header--editor .btn[data-action="import-parent-report-docx"],
+  .page-header--editor .page-header__actions {
     position: static;
   }
   .tab-layout {
@@ -1015,6 +1047,231 @@ fieldset.panel-form__field legend {
   }
   .domain-grid--row {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
+/* ---------- Checkbox lists (課程月計畫's child-selection: create form + 管理小朋友) ----------
+   .panel-form__checkbox is used as a <label> wrapping a checkbox + name; previously unstyled, it
+   fell back to bare browser flow (no spacing/border), which read as broken/unpolished next to the
+   rest of this app's cards-and-pills visual language. */
+.panel-form__checkbox-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.15rem;
+}
+
+.panel-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.panel-form__checkbox:hover {
+  border-color: var(--brand);
+}
+
+.panel-form__checkbox:has(input:checked) {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+}
+
+.panel-form__checkbox input[type="checkbox"] {
+  width: 1.05em;
+  height: 1.05em;
+  accent-color: var(--brand);
+  flex-shrink: 0;
+}
+
+/* ---------- Monthly course plan editor ----------
+   This view needs far more horizontal room than the 960px default (sized for narrow forms):
+   each child gets a full-width day-by-day calendar, and 5 week-columns of indicator text need
+   real space to stay readable. Scoped via :has() (same technique as #app:has(.domain-grid--row)
+   above) so no other view's width changes. Guarded to min-width so it never fights the mobile
+   single-column collapse below, which has lower specificity and would otherwise lose to this
+   unconditional :has() rule regardless of viewport. */
+@media (min-width: 641px) {
+  #app:has(.monthly-calendar-list) {
+    max-width: 1680px;
+  }
+
+  .tab-layout:has(.monthly-calendar-list) {
+    grid-template-columns: 1fr minmax(340px, 420px);
+  }
+
+  /* The calendar list can run much taller than the side column — keep the whole side column in
+     view while scrolling past earlier children instead of leaving it stranded at the top of the
+     page. Sticky must go on the .monthly-plan-side wrapper itself, not on the inner panel-form:
+     a sticky element's "stuck" screen position doesn't push its normal-flow siblings down, so
+     with the manage-children card as a flex sibling below it (not inside it), scrolling could
+     drag that sibling up underneath the stuck panel and produce a visible overlap. Making the
+     wrapper the sticky/scroll boundary keeps both cards as one unit with no sibling to overlap. */
+  .tab-layout:has(.monthly-calendar-list) .monthly-plan-side {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+  }
+}
+
+/* The manage-children card now lives inside this wrapper alongside the cell-editing panel
+   (previously a direct .tab-layout child, which the old `> .panel-form { order: 2 }` rule targeted
+   — it no longer applies here since panel-form isn't a direct child anymore). */
+.tab-layout > .monthly-plan-side {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.monthly-calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Each child's calendar reads as its own card (matching .domain-card/.card-list__item), so
+   several children stacked in the list stay visually separated instead of running together. */
+.monthly-calendar {
+  padding: 1.1rem 1.2rem 1.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.monthly-calendar__title {
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.monthly-calendar__weeks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.monthly-calendar__week-range {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.monthly-calendar__days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.monthly-calendar__day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+  background: var(--page-bg);
+  cursor: pointer;
+  min-height: 3.5rem;
+  /* Grid items default to min-width: auto, which lets long unbroken indicator text push the
+     cell wider than its track instead of wrapping — this is what caused the crushed/overflowing
+     layout. min-width: 0 lets the wrap rules below actually take effect. */
+  min-width: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.monthly-calendar__day:hover {
+  border-color: var(--brand);
+}
+
+/* Monday/Tuesday carry the fixed 大團體活動/節氣 defaults rather than free planning content —
+   a warm tint marks them as "already filled in" at a glance, distinct from the plain Wed-Fri
+   planning cells, without needing a text label to explain it. */
+.monthly-calendar__day[data-weekday="1"],
+.monthly-calendar__day[data-weekday="2"] {
+  background: var(--warm-tint);
+  border-color: var(--warm-border);
+}
+
+.monthly-calendar__day[data-weekday="1"]:hover,
+.monthly-calendar__day[data-weekday="2"]:hover {
+  border-color: var(--warm-accent);
+}
+
+.monthly-calendar__day[data-weekday="1"] .monthly-calendar__date,
+.monthly-calendar__day[data-weekday="2"] .monthly-calendar__date {
+  color: var(--warm-accent);
+}
+
+/* Wed-Fri cells are free-planning (no default content), so a filled one needs its own visual cue
+   to stand out from the still-empty ones at a glance — Mon/Tue are excluded since they're already
+   tinted warm above (they're never "empty" in the first place, so a second color would be noise). */
+.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):has(.monthly-calendar__item) {
+  background: var(--filled-tint);
+  border-color: var(--filled-border);
+}
+
+.monthly-calendar__day--selected {
+  border-color: var(--edit-accent);
+  border-width: 2px;
+  padding: calc(0.55rem - 1px) calc(0.6rem - 1px); /* keep the cell's outer box size stable when the border thickens */
+  box-shadow: 0 2px 8px rgba(107, 70, 168, 0.18);
+}
+
+.monthly-calendar__date {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.monthly-calendar__item {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.monthly-calendar__item--not-achieved {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: #f3c8c8;
+}
+
+.monthly-calendar__item--replaced {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.monthly-calendar__replacement {
+  font-size: 0.78rem;
+  /* Stops the parent .monthly-calendar__item--replaced's text-decoration: line-through from
+     propagating into this inline child — per CSS text-decoration rules, line-through paints
+     across the nearest ancestor block/inline-block box, and an inline-block child starts its own
+     such box, so its own (unset) text-decoration is what gets drawn instead. Without this the
+     replacement text reads as struck-through on screen even though the docx export deliberately
+     renders it as a separate, non-struck run. */
+  display: inline-block;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 640px) {
+  .monthly-calendar__days {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
 
@@ -1068,9 +1325,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/jszip/dist/jszip.min.js
+  // ../../../node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -3443,7 +3700,7 @@ var CFormApp = (() => {
 
   // src/storage/dbCore.js
   var DB_NAME = "c-form-db";
-  var DB_VERSION = 2;
+  var DB_VERSION = 3;
   function openDatabase() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -3483,6 +3740,21 @@ var CFormApp = (() => {
         if (!db.objectStoreNames.contains("highlightEntries")) {
           const highlightEntries = db.createObjectStore("highlightEntries", { keyPath: "id", autoIncrement: true });
           highlightEntries.createIndex("by_reportId", "reportId");
+        }
+        if (!db.objectStoreNames.contains("monthlyCoursePlans")) {
+          db.createObjectStore("monthlyCoursePlans", { keyPath: "id", autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains("planSlots")) {
+          const planSlots = db.createObjectStore("planSlots", { keyPath: "id", autoIncrement: true });
+          planSlots.createIndex("by_planId", "planId");
+        }
+        if (!db.objectStoreNames.contains("planSlotItems")) {
+          const planSlotItems = db.createObjectStore("planSlotItems", { keyPath: "id", autoIncrement: true });
+          planSlotItems.createIndex("by_slotId", "slotId");
+        }
+        if (!db.objectStoreNames.contains("childItemOverrides")) {
+          const childItemOverrides = db.createObjectStore("childItemOverrides", { keyPath: "id", autoIncrement: true });
+          childItemOverrides.createIndex("by_planId", "planId");
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -3635,6 +3907,128 @@ var CFormApp = (() => {
     await runRequest("highlightEntries", "readwrite", (store) => store.delete(id));
   }
 
+  // src/storage/monthlyPlanDb.js
+  var writeQueues = /* @__PURE__ */ new Map();
+  function serializeByKey(key, fn) {
+    const previous = writeQueues.get(key) || Promise.resolve();
+    const next = previous.catch(() => {
+    }).then(fn);
+    writeQueues.set(key, next);
+    return next;
+  }
+  async function addMonthlyCoursePlan({ period, childIds, childTiers }) {
+    const createdAt = (/* @__PURE__ */ new Date()).toISOString();
+    const id = await runRequest("monthlyCoursePlans", "readwrite", (store) => store.add({ period, childIds, childTiers, createdAt }));
+    return { id, period, childIds, childTiers, createdAt };
+  }
+  async function listMonthlyCoursePlans() {
+    return runRequest("monthlyCoursePlans", "readonly", (store) => store.getAll());
+  }
+  async function updateMonthlyCoursePlan(id, changes) {
+    const existing = await runRequest("monthlyCoursePlans", "readonly", (store) => store.get(id));
+    if (!existing) throw new Error(`MonthlyCoursePlan ${id} not found`);
+    const updated = { ...existing, ...changes, id };
+    await runRequest("monthlyCoursePlans", "readwrite", (store) => store.put(updated));
+    return updated;
+  }
+  async function deleteMonthlyCoursePlan(id) {
+    const slots = await listPlanSlotsForPlan(id);
+    for (const slot of slots) {
+      await deletePlanSlot(slot.id);
+    }
+    const overrides = await listChildItemOverridesForPlan(id);
+    for (const override of overrides) {
+      await runRequest("childItemOverrides", "readwrite", (store) => store.delete(override.id));
+    }
+    await runRequest("monthlyCoursePlans", "readwrite", (store) => store.delete(id));
+  }
+  async function listPlanSlotsForPlan(planId) {
+    return runRequest("planSlots", "readonly", (store) => store.index("by_planId").getAll(planId));
+  }
+  async function getOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+    const key = `slot:${planId}:${tier}:${weekIndex}:${weekday}`;
+    return serializeByKey(key, () => writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }));
+  }
+  async function writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+    const slots = await listPlanSlotsForPlan(planId);
+    const existing = slots.find((s) => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
+    if (existing) return existing;
+    const id = await runRequest("planSlots", "readwrite", (store) => store.add({ planId, tier, weekIndex, weekday }));
+    return { id, planId, tier, weekIndex, weekday };
+  }
+  async function deletePlanSlot(id) {
+    const items = await listPlanSlotItems(id);
+    for (const item of items) {
+      await deletePlanSlotItem(item.id);
+    }
+    await runRequest("planSlots", "readwrite", (store) => store.delete(id));
+  }
+  async function listPlanSlotItems(slotId) {
+    return runRequest("planSlotItems", "readonly", (store) => store.index("by_slotId").getAll(slotId));
+  }
+  async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = "" }) {
+    const id = await runRequest("planSlotItems", "readwrite", (store) => store.add({ slotId, indicatorCode, activityName, indicatorText }));
+    return { id, slotId, indicatorCode, activityName, indicatorText };
+  }
+  async function updatePlanSlotItem(id, changes) {
+    const existing = await runRequest("planSlotItems", "readonly", (store) => store.get(id));
+    if (!existing) throw new Error(`PlanSlotItem ${id} not found`);
+    const updated = { ...existing, ...changes, id };
+    await runRequest("planSlotItems", "readwrite", (store) => store.put(updated));
+    return updated;
+  }
+  async function deletePlanSlotItem(id) {
+    const item = await runRequest("planSlotItems", "readonly", (store) => store.get(id));
+    if (item) {
+      const slot = await runRequest("planSlots", "readonly", (store) => store.get(item.slotId));
+      if (slot) {
+        const overrides = await listChildItemOverridesForPlan(slot.planId);
+        for (const override of overrides) {
+          if (override.itemId === id) {
+            await runRequest("childItemOverrides", "readwrite", (store) => store.delete(override.id));
+          }
+        }
+      }
+    }
+    await runRequest("planSlotItems", "readwrite", (store) => store.delete(id));
+  }
+  async function listChildItemOverridesForPlan(planId) {
+    return runRequest("childItemOverrides", "readonly", (store) => store.index("by_planId").getAll(planId));
+  }
+  async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = "" }) {
+    const key = `override:${planId}:${childId}:${itemId}`;
+    return serializeByKey(
+      key,
+      () => writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText })
+    );
+  }
+  async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText }) {
+    const existing = (await listChildItemOverridesForPlan(planId)).find((o) => o.childId === childId && o.itemId === itemId);
+    if (!notAchieved && !replaced) {
+      if (existing) await runRequest("childItemOverrides", "readwrite", (store) => store.delete(existing.id));
+      return null;
+    }
+    if (existing) {
+      const updated = { ...existing, notAchieved, replaced, replacementText };
+      await runRequest("childItemOverrides", "readwrite", (store) => store.put(updated));
+      return updated;
+    }
+    const id = await runRequest(
+      "childItemOverrides",
+      "readwrite",
+      (store) => store.add({ planId, childId, itemId, notAchieved, replaced, replacementText })
+    );
+    return { id, planId, childId, itemId, notAchieved, replaced, replacementText };
+  }
+  async function deleteChildItemOverridesForChild(planId, childId) {
+    const overrides = await listChildItemOverridesForPlan(planId);
+    for (const override of overrides) {
+      if (override.childId === childId) {
+        await runRequest("childItemOverrides", "readwrite", (store) => store.delete(override.id));
+      }
+    }
+  }
+
   // src/storage/db.js
   async function addChild({ name, birthDate }) {
     const id = await runRequest("children", "readwrite", (store) => store.add({ name, birthDate }));
@@ -3642,6 +4036,9 @@ var CFormApp = (() => {
   }
   async function listChildren() {
     return runRequest("children", "readonly", (store) => store.getAll());
+  }
+  async function getChild(id) {
+    return runRequest("children", "readonly", (store) => store.get(id));
   }
   async function deleteChild(id) {
     const forms = await listFormsForChild(id);
@@ -3651,6 +4048,15 @@ var CFormApp = (() => {
     const parentReports = await listParentReportsForChild(id);
     for (const report of parentReports) {
       await deleteParentReport(report.id);
+    }
+    const plans = await listMonthlyCoursePlans();
+    for (const plan of plans) {
+      if (!plan.childIds.includes(id)) continue;
+      const childIds = plan.childIds.filter((childId) => childId !== id);
+      const childTiers = { ...plan.childTiers };
+      delete childTiers[id];
+      await updateMonthlyCoursePlan(plan.id, { childIds, childTiers });
+      await deleteChildItemOverridesForChild(plan.id, id);
     }
     await runRequest("children", "readwrite", (store) => store.delete(id));
   }
@@ -4319,10 +4725,10 @@ var CFormApp = (() => {
     const blocks = [];
     for (let i = 0; i < rows.length; i += 2) {
       const headerRow = rows[i];
-      const contentRow = rows[i + 1];
-      if (!contentRow) break;
+      const contentRow2 = rows[i + 1];
+      if (!contentRow2) break;
       const label = [...headerRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
-      const paragraphs = [...contentRow.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(
+      const paragraphs = [...contentRow2.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(
         (p) => [...p[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("")
       );
       const rawText = paragraphs.join("\n").trim();
@@ -4816,7 +5222,7 @@ var CFormApp = (() => {
     });
   }
 
-  // node_modules/docx/dist/index.mjs
+  // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -24354,11 +24760,13 @@ var CFormApp = (() => {
       <div class="type-select">
         <button type="button" class="btn btn--primary type-select__option" data-type="assessment">\u9069\u6027\u7E3D\u8868</button>
         <button type="button" class="btn btn--primary type-select__option" data-type="parent-report">\u9069\u6027\u7D00\u9304(\u5BB6\u9577\u7248)</button>
+        <button type="button" class="btn btn--primary type-select__option" data-type="monthly-plan">\u8AB2\u7A0B\u6708\u8A08\u756B</button>
       </div>
     </div>
   `;
     container.querySelector('[data-type="assessment"]').addEventListener("click", () => onSelectType("assessment"));
     container.querySelector('[data-type="parent-report"]').addEventListener("click", () => onSelectType("parent-report"));
+    container.querySelector('[data-type="monthly-plan"]').addEventListener("click", () => onSelectType("monthly-plan"));
   }
 
   // src/ui/parentReportListView.js
@@ -25877,8 +26285,753 @@ var CFormApp = (() => {
     render();
   }
 
+  // src/domain/monthlyCalendar.js
+  var WEEKDAY_LABELS = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94"];
+  var WEEK_ORDINAL_LABELS = ["\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94"];
+  function weekIndexLabel(weekIndex) {
+    return WEEK_ORDINAL_LABELS[weekIndex - 1] ?? String(weekIndex);
+  }
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+  function buildMonthlyCalendar(year, month) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const weeks = [];
+    let currentWeek = null;
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month - 1, day);
+      const dow = date.getDay();
+      if (dow === 0 || dow === 6) continue;
+      const weekday = dow;
+      if (!currentWeek || weekday === 1) {
+        currentWeek = { weekIndex: weeks.length + 1, days: [] };
+        weeks.push(currentWeek);
+      }
+      currentWeek.days.push({
+        weekday,
+        isoDate: `${year}-${pad2(month)}-${pad2(day)}`,
+        dateLabel: `${pad2(month)}/${pad2(day)}(${WEEKDAY_LABELS[weekday - 1]})`
+      });
+    }
+    return weeks.map((week) => {
+      const first = week.days[0];
+      const last = week.days[week.days.length - 1];
+      return {
+        weekIndex: week.weekIndex,
+        dateRange: `${first.isoDate.slice(5).replace("-", "/")}-${last.isoDate.slice(5).replace("-", "/")}`,
+        days: week.days
+      };
+    });
+  }
+
+  // src/domain/monthlyCoursePlan.js
+  var DEFAULTS = [
+    [1, "\u5927\u5718\u9AD4\u6D3B\u52D5"],
+    [2, "\u7BC0\u6C23"]
+  ];
+  async function seedDefaultPlanSlots({ planId, tiers, weeks }) {
+    for (const tier of tiers) {
+      for (const week of weeks) {
+        for (const [weekday, activityName] of DEFAULTS) {
+          if (!week.days.some((d) => d.weekday === weekday)) continue;
+          const slot = await getOrCreatePlanSlot({ planId, tier, weekIndex: week.weekIndex, weekday });
+          const existingItems = await listPlanSlotItems(slot.id);
+          if (existingItems.length === 0) {
+            await addPlanSlotItem({ slotId: slot.id, indicatorCode: null, activityName, indicatorText: "" });
+          }
+        }
+      }
+    }
+  }
+
+  // src/ui/monthlyPlanListView.js
+  async function renderMonthlyPlanListView(container, { onSelectPlan, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
+    const plans = await listMonthlyCoursePlans();
+    const children = await listChildren();
+    const defaultYear = currentRocYear();
+    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
+    container.innerHTML = `
+    <div class="page-header page-header--editor">
+      ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
+      <h2 class="page-header__title">\u8AB2\u7A0B\u6708\u8A08\u756B</h2>
+    </div>
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list">
+          ${plans.map(
+      (plan) => `<li class="card-list__row">
+                  <button type="button" class="card-list__item" data-plan-id="${escapeHtml(plan.id)}">
+                    <span class="card-list__name">${escapeHtml(plan.period)}</span>
+                    <span class="card-list__meta">${plan.childIds.length} \u4F4D\u5E7C\u5152</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="\u522A\u9664${escapeHtml(plan.period)}\u7684\u8AB2\u7A0B\u6708\u8A08\u756B">\xD7</button>
+                </li>`
+    ).join("")}
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      <form class="panel-form" data-action="add-plan">
+        <h3 class="panel-form__title">\u65B0\u589E\u8AB2\u7A0B\u6708\u8A08\u756B</h3>
+        <label class="panel-form__field">
+          \u5E74\u6708
+          ${periodSelectsHtml({
+      yearFieldName: "period-year",
+      monthFieldName: "period-month",
+      selectedYear: defaultYear,
+      selectedMonth: defaultMonth
+    })}
+        </label>
+        <fieldset class="panel-form__field">
+          <legend>\u5E7C\u5152</legend>
+          <div class="panel-form__checkbox-list">
+            ${children.map(
+      (child) => `<label class="panel-form__checkbox">
+                    <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
+                  </label>`
+    ).join("")}
+          </div>
+        </fieldset>
+        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+        <p class="field-error" data-error></p>
+      </form>
+    </div>
+  `;
+    if (onBack) {
+      container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    }
+    for (const plan of plans) {
+      container.querySelector(`[data-plan-id="${plan.id}"]`).addEventListener("click", () => onSelectPlan(plan));
+      container.querySelector(`[data-delete-plan="${plan.id}"]`).addEventListener("click", async () => {
+        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${plan.period}\u300D\u9019\u4EFD\u8AB2\u7A0B\u6708\u8A08\u756B\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
+        try {
+          await deleteMonthlyCoursePlan(plan.id);
+          await renderMonthlyPlanListView(container, { onSelectPlan, onBack, confirmDelete });
+        } catch (err) {
+          container.querySelector('[data-error="delete"]').textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+    }
+    container.querySelector('[data-action="add-plan"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorEl = container.querySelector('[data-action="add-plan"] [data-error]');
+      errorEl.textContent = "";
+      const year = container.querySelector('[data-field="period-year"]').value;
+      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
+      const period = `${year}\u5E74${month}\u6708`;
+      const childIds = children.filter((child) => container.querySelector(`[data-child-checkbox="${child.id}"]`).checked).map((child) => child.id);
+      if (childIds.length === 0) {
+        errorEl.textContent = "\u8ACB\u81F3\u5C11\u9078\u64C7\u4E00\u4F4D\u5E7C\u5152";
+        return;
+      }
+      try {
+        const { year: gYear, month: gMonth } = parsePeriod(period);
+        const asOfDate = `${gYear + 1911}-${String(gMonth).padStart(2, "0")}-01`;
+        const childTiers = {};
+        for (const childId of childIds) {
+          const child = children.find((c) => c.id === childId);
+          childTiers[childId] = suggestTier(child.birthDate, asOfDate);
+        }
+        const plan = await addMonthlyCoursePlan({ period, childIds, childTiers });
+        const weeks = buildMonthlyCalendar(gYear + 1911, gMonth);
+        const tiers = [...new Set(Object.values(childTiers))];
+        await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
+        onSelectPlan(plan);
+      } catch (err) {
+        errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      }
+    });
+  }
+
+  // src/export/monthlyPlanDocxExport.js
+  var PAGE_MARGIN3 = { top: 1134, right: 567, bottom: 1134, left: 567, header: 680, footer: 283 };
+  var INSTITUTION_NAME3 = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u80B2\u82F1\u516C\u8A2D\u6C11\u71DF\u6258\u5B30\u4E2D\u5FC3-\u5C4F\u6771\u7E23\u653F\u5E9C\u59D4\u8A17\u4E2D\u83EF\u982D\u5FC3\u624B\u5E0C\u671B\u6559\u80B2\u5354\u6703\u8FA6\u7406";
+  var TITLE_SIZE2 = 32;
+  var CORNER_LABEL_SIZE = 18;
+  var COLUMN_WIDTHS2 = [995, 1977, 2268, 2126, 1985, 1879];
+  var TABLE_CELL_MARGIN_DXA3 = 100;
+  var TABLE_CELL_MARGIN_DXA_VERTICAL = 120;
+  var TABLE_BORDER = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
+  var TABLE_BORDERS = {
+    top: TABLE_BORDER,
+    bottom: TABLE_BORDER,
+    left: TABLE_BORDER,
+    right: TABLE_BORDER,
+    insideHorizontal: TABLE_BORDER,
+    insideVertical: TABLE_BORDER
+  };
+  var SOLID_SIDE = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
+  var DASHED_SIDE = { style: BorderStyle.DASHED, size: 4, color: "000000" };
+  var DASH_SMALL_GAP_SIDE = { style: BorderStyle.DASH_SMALL_GAP, size: 4, color: "000000" };
+  var DATE_CELL_BORDERS = { top: SOLID_SIDE, left: SOLID_SIDE, right: SOLID_SIDE, bottom: DASHED_SIDE };
+  var DATE_CELL_SHADING = { type: ShadingType.CLEAR, color: "auto", fill: "F2F2F2" };
+  var CONTENT_CELL_BORDERS = { top: DASH_SMALL_GAP_SIDE, left: SOLID_SIDE, right: SOLID_SIDE, bottom: SOLID_SIDE };
+  var CONTENT_CELL_SHADING = { type: ShadingType.CLEAR, color: "auto", fill: "FFFFFF" };
+  var HEADER_ICON_OFFSET_EMU3 = { horizontal: 6e4, vertical: -4e4 };
+  var WEEKDAYS = [1, 2, 3, 4, 5];
+  var CENTERED3 = { alignment: AlignmentType.CENTER };
+  function columnWidthsFor(weekCount) {
+    return COLUMN_WIDTHS2.slice(0, weekCount + 1);
+  }
+  function tableWidthDxa(widths) {
+    return widths.reduce((sum, w) => sum + w, 0);
+  }
+  function tierFormLetter(tierCode) {
+    const tier = TIERS.find((t) => t.code === tierCode);
+    return tier ? tier.formLetter : "";
+  }
+  function buildDayCellRuns(items, overrideByItemId) {
+    return items.map((item) => {
+      const override = overrideByItemId.get(item.id);
+      const text = item.indicatorCode ? `${item.indicatorCode}\u3010${item.activityName}\u3011${item.indicatorText || ""}` : item.activityName;
+      return {
+        text,
+        notAchieved: Boolean(override?.notAchieved),
+        replaced: Boolean(override?.replaced),
+        replacementText: override?.replacementText || ""
+      };
+    });
+  }
+  function runFont2() {
+    return { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT };
+  }
+  function textParagraph2(text, { size = DEFAULT_TEXT_SIZE, alignment, bold } = {}) {
+    return new Paragraph({
+      ...alignment ? { alignment } : {},
+      children: [new TextRun({ text: String(text ?? ""), font: runFont2(), size, ...bold ? { bold: true } : {} })]
+    });
+  }
+  function cellParagraphsFromRuns(runs) {
+    if (runs.length === 0) return [emptyParagraph()];
+    return runs.map((run) => {
+      const children = [
+        new TextRun({
+          text: run.text,
+          font: runFont2(),
+          size: DEFAULT_TEXT_SIZE,
+          ...run.notAchieved ? { color: "FF0000" } : {},
+          ...run.replaced ? { strike: true } : {}
+        })
+      ];
+      if (run.replaced && run.replacementText) {
+        children.push(new TextRun({ text: run.replacementText, font: runFont2(), size: DEFAULT_TEXT_SIZE }));
+      }
+      return new Paragraph({ alignment: AlignmentType.CENTER, children });
+    });
+  }
+  function cellWidth3(widths, index) {
+    return { size: widths[index], type: WidthType.DXA };
+  }
+  function documentHeader(period) {
+    return new Header({
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            headerIconRunInFrontOfText(HEADER_ICON_OFFSET_EMU3),
+            new TextRun({ text: INSTITUTION_NAME3, font: runFont2(), size: DEFAULT_TEXT_SIZE })
+          ]
+        }),
+        textParagraph2(`${period}\u8AB2\u7A0B\u8A08\u756B`, { size: TITLE_SIZE2, alignment: AlignmentType.CENTER })
+      ]
+    });
+  }
+  function weekHeaderRow(weeks, widths) {
+    return new TableRow({
+      children: [
+        new TableCell({
+          width: cellWidth3(widths, 0),
+          verticalAlign: VerticalAlign.CENTER,
+          children: [
+            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "\u65E5\u671F/", font: runFont2(), size: CORNER_LABEL_SIZE })] }),
+            new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "\u59D3\u540D", font: runFont2(), size: CORNER_LABEL_SIZE })] })
+          ]
+        }),
+        ...weeks.map(
+          (week, index) => new TableCell({
+            width: cellWidth3(widths, index + 1),
+            verticalAlign: VerticalAlign.CENTER,
+            children: [
+              textParagraph2(`\u7B2C${weekIndexLabel(week.weekIndex)}\u9031`, CENTERED3),
+              textParagraph2(week.dateRange, CENTERED3)
+            ]
+          })
+        )
+      ]
+    });
+  }
+  function findSlot(slots, tier, weekIndex, weekday) {
+    return slots.find((s) => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
+  }
+  function nameCell(widths, isFirstBodyRow, nameContent) {
+    return new TableCell({
+      width: cellWidth3(widths, 0),
+      verticalAlign: VerticalAlign.CENTER,
+      verticalMerge: isFirstBodyRow ? VerticalMergeType.RESTART : VerticalMergeType.CONTINUE,
+      children: isFirstBodyRow ? nameContent : [emptyParagraph()]
+    });
+  }
+  var DATE_CELL_MARGINS = { top: 0, bottom: 0, left: TABLE_CELL_MARGIN_DXA3, right: TABLE_CELL_MARGIN_DXA3, marginUnitType: WidthType.DXA };
+  var DATE_ROW_HEIGHT_DXA = 280;
+  function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
+    const cells = weeks.map((week, index) => {
+      const day = week.days.find((d) => d.weekday === weekday);
+      return new TableCell({
+        width: cellWidth3(widths, index + 1),
+        verticalAlign: VerticalAlign.CENTER,
+        borders: DATE_CELL_BORDERS,
+        shading: DATE_CELL_SHADING,
+        margins: DATE_CELL_MARGINS,
+        children: [textParagraph2(day ? day.dateLabel : "", { ...CENTERED3, bold: true })]
+      });
+    });
+    return new TableRow({
+      height: { value: DATE_ROW_HEIGHT_DXA, rule: HeightRule.ATLEAST },
+      children: [nameCell(widths, isFirstBodyRow, nameContent), ...cells]
+    });
+  }
+  function contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId) {
+    const cells = weeks.map((week, index) => {
+      const day = week.days.find((d) => d.weekday === weekday);
+      if (!day) {
+        return new TableCell({
+          width: cellWidth3(widths, index + 1),
+          borders: CONTENT_CELL_BORDERS,
+          shading: CONTENT_CELL_SHADING,
+          children: [emptyParagraph()]
+        });
+      }
+      const slot = findSlot(slots, tier, week.weekIndex, weekday);
+      const items = slot ? itemsBySlotId[slot.id] || [] : [];
+      const runs = buildDayCellRuns(items, overrideByItemId);
+      return new TableCell({
+        width: cellWidth3(widths, index + 1),
+        borders: CONTENT_CELL_BORDERS,
+        shading: CONTENT_CELL_SHADING,
+        children: cellParagraphsFromRuns(runs)
+      });
+    });
+    return new TableRow({ children: [nameCell(widths, false, null), ...cells] });
+  }
+  function trailingNoteRow(widths) {
+    return new TableRow({
+      children: [
+        new TableCell({
+          width: cellWidth3(widths, 0),
+          verticalAlign: VerticalAlign.CENTER,
+          children: [textParagraph2("\u7BC0\u6C23", CENTERED3), textParagraph2("\u5176\u4ED6", CENTERED3)]
+        }),
+        ...widths.slice(1).map((width) => new TableCell({ width: { size: width, type: WidthType.DXA }, children: [emptyParagraph()] }))
+      ]
+    });
+  }
+  function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides) {
+    const widths = columnWidthsFor(weeks.length);
+    const overrideByItemId = new Map(
+      allOverrides.filter((o) => o.childId === child.id).map((o) => [o.itemId, o])
+    );
+    const asOfIso = weeks[0].days[0].isoDate;
+    const ageMonths = calculateAgeInMonths(child.birthDate, asOfIso);
+    const nameContent = [
+      textParagraph2(child.name, CENTERED3),
+      textParagraph2(`${ageMonths}M`, CENTERED3),
+      textParagraph2(`${tierFormLetter(tier)}\u8868`, CENTERED3)
+    ];
+    const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [
+      dateRow(weeks, weekday, widths, nameContent, weekdayIndex === 0),
+      contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId)
+    ]);
+    return new Table({
+      width: { size: tableWidthDxa(widths), type: WidthType.DXA },
+      columnWidths: widths,
+      layout: TableLayoutType.FIXED,
+      alignment: AlignmentType.CENTER,
+      margins: {
+        top: TABLE_CELL_MARGIN_DXA_VERTICAL,
+        bottom: TABLE_CELL_MARGIN_DXA_VERTICAL,
+        left: TABLE_CELL_MARGIN_DXA3,
+        right: TABLE_CELL_MARGIN_DXA3,
+        marginUnitType: WidthType.DXA
+      },
+      borders: TABLE_BORDERS,
+      rows: [weekHeaderRow(weeks, widths), ...bodyRows, trailingNoteRow(widths)]
+    });
+  }
+  async function generateMonthlyPlanDocxBlob({ plan, children, slots, itemsBySlotId, overrides }) {
+    const { year, month } = parsePeriod(plan.period);
+    const weeks = buildMonthlyCalendar(year + 1911, month);
+    const children_ = children.filter((c) => plan.childIds.includes(c.id));
+    const tables = children_.flatMap((child) => [
+      buildChildTable(child, plan.childTiers[child.id], weeks, slots, itemsBySlotId, overrides),
+      emptyParagraph()
+    ]);
+    const doc = new File({
+      sections: [
+        {
+          properties: { page: { size: PAGE_SIZE, margin: PAGE_MARGIN3 } },
+          headers: { default: documentHeader(plan.period) },
+          children: tables.length > 0 ? tables : [emptyParagraph()]
+        }
+      ]
+    });
+    return Packer.toBlob(doc);
+  }
+
+  // src/ui/monthlyPlanEditorView.js
+  function tierFormLetter2(tierCode) {
+    const tier = TIERS.find((t) => t.code === tierCode);
+    return tier ? tier.formLetter : "";
+  }
+  async function loadEditorData(plan) {
+    const validChildIds = plan.childIds.filter(Boolean);
+    const childResults = await Promise.all(validChildIds.map((id) => getChild(id)));
+    const children = childResults.filter(Boolean);
+    const slots = await listPlanSlotsForPlan(plan.id);
+    const itemsBySlotId = {};
+    for (const slot of slots) {
+      itemsBySlotId[slot.id] = await listPlanSlotItems(slot.id);
+    }
+    const overrides = await listChildItemOverridesForPlan(plan.id);
+    const overrideByKey = new Map(overrides.map((o) => [`${o.childId}:${o.itemId}`, o]));
+    const { year, month } = parsePeriod(plan.period);
+    const weeks = buildMonthlyCalendar(year + 1911, month);
+    return { children, slots, itemsBySlotId, overrideByKey, weeks };
+  }
+  function findSlot2(slots, tier, weekIndex, weekday) {
+    return slots.find((s) => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
+  }
+  function itemHtml(item, override) {
+    const classes = ["monthly-calendar__item"];
+    if (override?.notAchieved) classes.push("monthly-calendar__item--not-achieved");
+    if (override?.replaced) classes.push("monthly-calendar__item--replaced");
+    const label = item.indicatorCode ? `${escapeHtml(item.indicatorCode)}\u3010${escapeHtml(item.activityName)}\u3011${escapeHtml(item.indicatorText || "")}` : escapeHtml(item.activityName);
+    const replacementHtml = override?.replaced && override.replacementText ? `<span class="monthly-calendar__replacement">${escapeHtml(override.replacementText)}</span>` : "";
+    return `<div class="${classes.join(" ")}" data-item-id="${escapeHtml(item.id)}">${label}${replacementHtml}</div>`;
+  }
+  function dayCellHtml(child, tier, week, day, data) {
+    const slot = findSlot2(data.slots, tier, week.weekIndex, day.weekday);
+    const items = slot ? data.itemsBySlotId[slot.id] || [] : [];
+    const itemsHtml = items.map((item) => itemHtml(item, data.overrideByKey.get(`${child.id}:${item.id}`))).join("");
+    return `
+    <button
+      type="button"
+      class="monthly-calendar__day"
+      data-child-id="${escapeHtml(child.id)}"
+      data-tier="${escapeHtml(tier)}"
+      data-week-index="${week.weekIndex}"
+      data-weekday="${day.weekday}"
+    >
+      <span class="monthly-calendar__date">${escapeHtml(day.dateLabel)}</span>
+      ${itemsHtml}
+    </button>
+  `;
+  }
+  function childCalendarHtml(child, tier, data) {
+    const ageMonths = calculateAgeInMonths(child.birthDate, `${data.weeks[0].days[0].isoDate}`);
+    return `
+    <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}">
+      <h3 class="monthly-calendar__title">${escapeHtml(child.name)}\u3000${ageMonths}M\u3000${escapeHtml(tierFormLetter2(tier))}\u8868</h3>
+      <div class="monthly-calendar__weeks">
+        ${data.weeks.map(
+      (week) => `
+              <div class="monthly-calendar__week">
+                <div class="monthly-calendar__week-range">\u7B2C${weekIndexLabel(week.weekIndex)}\u9031\u3000${escapeHtml(week.dateRange)}</div>
+                <div class="monthly-calendar__days">
+                  ${week.days.map((day) => dayCellHtml(child, tier, week, day, data)).join("")}
+                </div>
+              </div>
+            `
+    ).join("")}
+      </div>
+    </section>
+  `;
+  }
+  async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
+    const data = await loadEditorData(plan);
+    let selected = null;
+    container.innerHTML = `
+    <div class="page-header page-header--editor">
+      <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u8AB2\u7A0B\u6708\u8A08\u756B\u5217\u8868</button>
+      <h2 class="page-header__title">${escapeHtml(plan.period)} \u8AB2\u7A0B\u6708\u8A08\u756B</h2>
+      <div class="page-header__actions">
+        <button type="button" class="btn btn--purple" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
+        <button type="button" class="btn btn--purple" data-action="export-docx">\u532F\u51FA Word</button>
+      </div>
+    </div>
+    <p class="field-error field-error--center" data-error="export"></p>
+    <div class="tab-layout">
+      <div class="monthly-calendar-list">
+        ${data.children.map((child) => childCalendarHtml(child, plan.childTiers[child.id], data)).join("")}
+      </div>
+      <div class="monthly-plan-side">
+        <form class="panel-form" data-manage-children-form hidden>
+          <h3 class="panel-form__title">\u9078\u64C7\u672C\u6708\u8A08\u756B\u6DB5\u84CB\u7684\u5E7C\u5152</h3>
+          <fieldset class="panel-form__field">
+            <legend>\u5E7C\u5152</legend>
+            <div class="panel-form__checkbox-list">
+              ${(await listChildren()).map(
+      (c) => `<label class="panel-form__checkbox">
+                      <input type="checkbox" data-manage-child-checkbox="${escapeHtml(c.id)}" ${plan.childIds.includes(c.id) ? "checked" : ""}> ${escapeHtml(c.name)}
+                    </label>`
+    ).join("")}
+            </div>
+          </fieldset>
+          <div class="entry-form__actions">
+            <button type="button" class="btn btn--primary btn--small" data-action="save-children">\u5132\u5B58</button>
+            <button type="button" class="btn btn--outline btn--small" data-action="cancel-manage-children">\u53D6\u6D88</button>
+          </div>
+          <p class="field-error" data-error="manage-children"></p>
+        </form>
+        <div class="panel-form" data-panel>
+          <h3 class="panel-form__title" data-panel-header>\u9EDE\u9078\u5DE6\u5074\u7684\u65E5\u671F\u683C\u5B50\u958B\u59CB\u898F\u5283</h3>
+          <div data-panel-items></div>
+        </div>
+      </div>
+    </div>
+  `;
+    container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    const manageChildrenForm = container.querySelector("[data-manage-children-form]");
+    container.querySelector('[data-action="manage-children"]').addEventListener("click", () => {
+      manageChildrenForm.hidden = !manageChildrenForm.hidden;
+    });
+    container.querySelector('[data-action="cancel-manage-children"]').addEventListener("click", () => {
+      manageChildrenForm.hidden = true;
+    });
+    container.querySelector('[data-action="export-docx"]').addEventListener("click", async () => {
+      const errorEl = container.querySelector('[data-error="export"]');
+      try {
+        const blob = await generateMonthlyPlanDocxBlob({
+          plan,
+          children: data.children,
+          slots: data.slots,
+          itemsBySlotId: data.itemsBySlotId,
+          overrides: [...data.overrideByKey.values()]
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${plan.period}\u8AB2\u7A0B\u6708\u8A08\u756B.docx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        if (errorEl) errorEl.textContent = "";
+      } catch (err) {
+        if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      }
+    });
+    container.querySelector('[data-action="save-children"]').addEventListener("click", async () => {
+      try {
+        const allChildren = await listChildren();
+        const newChildIds = allChildren.filter((c) => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`).checked).map((c) => c.id);
+        const removedChildIds = plan.childIds.filter((id) => !newChildIds.includes(id));
+        const { year, month } = parsePeriod(plan.period);
+        const asOfDate = `${year + 1911}-${String(month).padStart(2, "0")}-01`;
+        const newChildTiers = { ...plan.childTiers };
+        for (const childId of newChildIds) {
+          if (newChildTiers[childId]) continue;
+          const child = allChildren.find((c) => c.id === childId);
+          newChildTiers[childId] = suggestTier(child.birthDate, asOfDate);
+        }
+        for (const childId of removedChildIds) {
+          delete newChildTiers[childId];
+        }
+        const updatedPlan = await updateMonthlyCoursePlan(plan.id, { childIds: newChildIds, childTiers: newChildTiers });
+        const weeks = buildMonthlyCalendar(year + 1911, month);
+        const tiers = [...new Set(Object.values(newChildTiers))];
+        await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
+        for (const childId of removedChildIds) {
+          await deleteChildItemOverridesForChild(plan.id, childId);
+        }
+        await renderMonthlyPlanEditorView(container, { plan: updatedPlan, onBack });
+      } catch (err) {
+        container.querySelector('[data-error="manage-children"]').textContent = "\u66F4\u65B0\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      }
+    });
+    async function selectCell(child, tier, week, day) {
+      selected = { child, tier, week, day };
+      container.querySelectorAll(".monthly-calendar__day--selected").forEach((el) => el.classList.remove("monthly-calendar__day--selected"));
+      container.querySelector(
+        `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+      ).classList.add("monthly-calendar__day--selected");
+      container.querySelector("[data-panel-header]").textContent = `${child.name}\u3000\u7B2C${weekIndexLabel(week.weekIndex)}\u9031\u3000${day.dateLabel}`;
+      await renderPanelItems();
+    }
+    function indicatorOptionsHtml2(tier) {
+      const indicators = getIndicatorsForTier(tier);
+      const byDomain = /* @__PURE__ */ new Map();
+      for (const indicator of indicators) {
+        if (!byDomain.has(indicator.domainName)) byDomain.set(indicator.domainName, []);
+        byDomain.get(indicator.domainName).push(indicator);
+      }
+      return '<option value="">\uFF08\u4E0D\u9078\u6307\u6A19\uFF0C\u7D14\u6D3B\u52D5\uFF09</option>' + [...byDomain.entries()].map(
+        ([domainName, group]) => `<optgroup label="${escapeHtml(domainName)}">
+              ${group.map((i) => `<option value="${escapeHtml(i.code)}">${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`).join("")}
+            </optgroup>`
+      ).join("");
+    }
+    function panelItemRowHtml(item, override) {
+      const summaryText = item.indicatorCode ? `\u3010${escapeHtml(item.activityName)}\u3011${escapeHtml(item.indicatorText || "")}` : escapeHtml(item.activityName);
+      return `
+      <div class="indicator-block" data-panel-item="${item.id}">
+        <h4 class="indicator-block__title">
+          ${item.indicatorCode ? `<span class="indicator-block__code">${escapeHtml(item.indicatorCode)}</span>` : ""}
+          ${summaryText}
+          <span class="indicator-block__actions">
+            <button type="button" class="btn btn--edit btn--small" data-edit-item="${item.id}" aria-label="\u7DE8\u8F2F${escapeHtml(item.activityName)}">\u7DE8\u8F2F</button>
+            <button type="button" class="btn--delete-circle" data-delete-item="${item.id}" aria-label="\u522A\u9664${escapeHtml(item.activityName)}">\xD7</button>
+          </span>
+        </h4>
+        <div class="entry-form" data-item-edit-form-for="${item.id}" hidden>
+          <label class="panel-form__field">
+            \u6D3B\u52D5\u540D\u7A31
+            <input data-item-edit-field="activityName" data-item-id="${item.id}" value="${escapeHtml(item.activityName)}">
+          </label>
+          <label class="panel-form__field">
+            \u6307\u6A19\u5167\u5BB9\uFF0F\u8AAA\u660E
+            <textarea data-item-edit-field="indicatorText" data-item-id="${item.id}" rows="2">${escapeHtml(item.indicatorText || "")}</textarea>
+          </label>
+          <div class="entry-form__actions">
+            <button type="button" class="btn btn--primary btn--small" data-item-edit-save-for="${item.id}">\u5132\u5B58</button>
+            <button type="button" class="btn btn--outline btn--small" data-item-edit-cancel-for="${item.id}">\u53D6\u6D88</button>
+          </div>
+        </div>
+        <div class="entry-form__checkbox-row">
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-override-field="notAchieved" data-item-id="${item.id}" ${override?.notAchieved ? "checked" : ""}> \u672A\u9054\u6210
+          </label>
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-override-field="replaced" data-item-id="${item.id}" ${override?.replaced ? "checked" : ""}> \u8ACB\u5047\uFF0F\u5176\u4ED6\u6D3B\u52D5\u4EE3\u66FF
+          </label>
+          <input
+            type="text"
+            data-override-field="replacementText"
+            data-item-id="${item.id}"
+            placeholder="\u66FF\u4EE3\u6D3B\u52D5\u5167\u5BB9"
+            value="${escapeHtml(override?.replacementText || "")}"
+            ${override?.replaced ? "" : "disabled"}
+          >
+        </div>
+      </div>
+    `;
+    }
+    async function renderPanelItems() {
+      const panelItems = container.querySelector("[data-panel-items]");
+      if (!selected) {
+        panelItems.innerHTML = "";
+        return;
+      }
+      const { child, tier, week, day } = selected;
+      const slot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: week.weekIndex, weekday: day.weekday });
+      const items = await listPlanSlotItems(slot.id);
+      const allOverrides = await listChildItemOverridesForPlan(plan.id);
+      const overrideByItemId = new Map(allOverrides.filter((o) => o.childId === child.id).map((o) => [o.itemId, o]));
+      panelItems.innerHTML = `
+      ${items.map((item) => panelItemRowHtml(item, overrideByItemId.get(item.id))).join("")}
+      <form class="entry-form" data-action="add-item">
+        <label class="panel-form__field">
+          \u6307\u6A19
+          <select data-field="new-item-indicator">${indicatorOptionsHtml2(tier)}</select>
+        </label>
+        <label class="panel-form__field">\u6D3B\u52D5\u540D\u7A31 <input data-field="new-item-activity-name" required></label>
+        <label class="panel-form__field">\u6307\u6A19\u5167\u5BB9 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
+        <button type="submit" class="btn btn--primary btn--small">\u65B0\u589E\u9805\u76EE</button>
+        <p class="field-error" data-error></p>
+      </form>
+    `;
+      panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener("change", (event) => {
+        const indicator = getIndicator(event.target.value);
+        if (!indicator) return;
+        panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.description;
+        panelItems.querySelector('[data-field="new-item-indicator-text"]').value = indicator.description;
+      });
+      panelItems.querySelector('[data-action="add-item"]').addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const indicatorCode = panelItems.querySelector('[data-field="new-item-indicator"]').value || null;
+        const activityName = panelItems.querySelector('[data-field="new-item-activity-name"]').value;
+        const indicatorText = panelItems.querySelector('[data-field="new-item-indicator-text"]').value;
+        try {
+          await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
+          await refreshCellAndPanel();
+        } catch (err) {
+          panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+      for (const item of items) {
+        panelItems.querySelector(`[data-edit-item="${item.id}"]`).addEventListener("click", () => {
+          const form = panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`);
+          form.hidden = !form.hidden;
+        });
+        panelItems.querySelector(`[data-item-edit-cancel-for="${item.id}"]`).addEventListener("click", () => {
+          panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`).hidden = true;
+        });
+        panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener("click", async () => {
+          const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value;
+          const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${item.id}"]`).value;
+          await updatePlanSlotItem(item.id, { activityName, indicatorText });
+          await refreshCellAndPanel();
+        });
+        panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener("click", async () => {
+          await deletePlanSlotItem(item.id);
+          await refreshCellAndPanel();
+        });
+        const notAchievedBox = panelItems.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
+        const replacedBox = panelItems.querySelector(`[data-override-field="replaced"][data-item-id="${item.id}"]`);
+        const replacementInput = panelItems.querySelector(`[data-override-field="replacementText"][data-item-id="${item.id}"]`);
+        async function saveOverride() {
+          await setChildItemOverride({
+            planId: plan.id,
+            childId: child.id,
+            itemId: item.id,
+            notAchieved: notAchievedBox.checked,
+            replaced: replacedBox.checked,
+            replacementText: replacementInput.value
+          });
+          await refreshCellAndPanel();
+        }
+        notAchievedBox.addEventListener("change", saveOverride);
+        replacedBox.addEventListener("change", () => {
+          replacementInput.disabled = !replacedBox.checked;
+          saveOverride();
+        });
+        replacementInput.addEventListener("change", saveOverride);
+      }
+    }
+    async function refreshCellAndPanel() {
+      const { tier, week, day } = selected;
+      const freshSlots = await listPlanSlotsForPlan(plan.id);
+      const freshItemsBySlotId = {};
+      for (const slot of freshSlots) {
+        freshItemsBySlotId[slot.id] = await listPlanSlotItems(slot.id);
+      }
+      const freshOverrides = await listChildItemOverridesForPlan(plan.id);
+      const freshOverrideByKey = new Map(freshOverrides.map((o) => [`${o.childId}:${o.itemId}`, o]));
+      data.slots = freshSlots;
+      data.itemsBySlotId = freshItemsBySlotId;
+      data.overrideByKey = freshOverrideByKey;
+      for (const child of data.children) {
+        if (plan.childTiers[child.id] !== tier) continue;
+        const cell = container.querySelector(
+          `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+        );
+        cell.outerHTML = dayCellHtml(child, tier, week, day, data);
+        container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`).addEventListener("click", () => selectCell(child, tier, week, day));
+      }
+      await renderPanelItems();
+    }
+    for (const child of data.children) {
+      for (const week of data.weeks) {
+        for (const day of week.days) {
+          const cell = container.querySelector(
+            `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+          );
+          cell.addEventListener("click", () => selectCell(child, plan.childTiers[child.id], week, day));
+        }
+      }
+    }
+  }
+
   // src/storage/backup.js
-  var BACKUP_VERSION = 2;
+  var BACKUP_VERSION = 3;
   async function blobToBase64(blob) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const chunkSize = 32768;
@@ -25934,6 +27087,20 @@ var CFormApp = (() => {
         }
       }
     }
+    const monthlyCoursePlans = await listMonthlyCoursePlans();
+    const planSlots = [];
+    const planSlotItems = [];
+    for (const plan of monthlyCoursePlans) {
+      const slots = await listPlanSlotsForPlan(plan.id);
+      planSlots.push(...slots);
+      for (const slot of slots) {
+        planSlotItems.push(...await listPlanSlotItems(slot.id));
+      }
+    }
+    const childItemOverrides = [];
+    for (const plan of monthlyCoursePlans) {
+      childItemOverrides.push(...await listChildItemOverridesForPlan(plan.id));
+    }
     return JSON.stringify(
       {
         version: BACKUP_VERSION,
@@ -25945,7 +27112,11 @@ var CFormApp = (() => {
         courseOccurrences,
         developmentRecordEntries,
         behaviorObservations,
-        highlightEntries
+        highlightEntries,
+        monthlyCoursePlans,
+        planSlots,
+        planSlotItems,
+        childItemOverrides
       },
       null,
       2
@@ -26022,15 +27193,61 @@ var CFormApp = (() => {
       await addHighlightEntry({ reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption });
     }
   }
+  async function importMonthlyCoursePlans(data, childIdMap) {
+    const planIdMap = /* @__PURE__ */ new Map();
+    for (const plan of data.monthlyCoursePlans ?? []) {
+      const childIds = plan.childIds.map((id) => childIdMap.get(id)).filter((id) => id !== void 0);
+      const childTiers = Object.fromEntries(
+        Object.entries(plan.childTiers).map(([oldChildId, tier]) => [childIdMap.get(Number(oldChildId)), tier]).filter(([newChildId]) => newChildId !== void 0)
+      );
+      const created = await addMonthlyCoursePlan({ period: plan.period, childIds, childTiers });
+      planIdMap.set(plan.id, created.id);
+    }
+    const slotIdMap = /* @__PURE__ */ new Map();
+    for (const slot of data.planSlots ?? []) {
+      const created = await getOrCreatePlanSlot({
+        planId: planIdMap.get(slot.planId),
+        tier: slot.tier,
+        weekIndex: slot.weekIndex,
+        weekday: slot.weekday
+      });
+      slotIdMap.set(slot.id, created.id);
+    }
+    const itemIdMap = /* @__PURE__ */ new Map();
+    for (const item of data.planSlotItems ?? []) {
+      const created = await addPlanSlotItem({
+        slotId: slotIdMap.get(item.slotId),
+        indicatorCode: item.indicatorCode,
+        activityName: item.activityName,
+        indicatorText: item.indicatorText
+      });
+      itemIdMap.set(item.id, created.id);
+    }
+    for (const override of data.childItemOverrides ?? []) {
+      const childId = childIdMap.get(override.childId);
+      if (childId === void 0) continue;
+      await setChildItemOverride({
+        planId: planIdMap.get(override.planId),
+        childId,
+        itemId: itemIdMap.get(override.itemId),
+        notAchieved: override.notAchieved,
+        replaced: override.replaced,
+        replacementText: override.replacementText
+      });
+    }
+  }
   async function importBackup(json) {
     const data = JSON.parse(json);
-    if (data.version !== 1 && data.version !== 2) {
+    if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
       throw new Error(`Unsupported backup version: ${data.version}`);
     }
     await clearAllData();
     const childIdMap = await importV1Or2Children(data);
-    if (data.version === 2) {
+    if (data.version === 2 || data.version === 3) {
       await importParentReports(data, childIdMap);
+    }
+    if (data.version === 3) {
+      await importMonthlyCoursePlans(data, childIdMap);
     }
   }
 
@@ -26090,7 +27307,18 @@ var CFormApp = (() => {
       container.appendChild(message);
     }
     function showReportTypeSelect() {
-      renderReportTypeSelectView(container, { onSelectType: (type) => showChildList(type) }).catch(showRenderError);
+      renderReportTypeSelectView(container, {
+        onSelectType: (type) => type === "monthly-plan" ? showMonthlyPlanList() : showChildList(type)
+      }).catch(showRenderError);
+    }
+    function showMonthlyPlanList() {
+      renderMonthlyPlanListView(container, {
+        onSelectPlan: (plan) => showMonthlyPlanEditor(plan),
+        onBack: showReportTypeSelect
+      }).catch(showRenderError);
+    }
+    function showMonthlyPlanEditor(plan) {
+      renderMonthlyPlanEditorView(container, { plan, onBack: showMonthlyPlanList }).catch(showRenderError);
     }
     function showChildList(reportType) {
       renderChildListView(container, {

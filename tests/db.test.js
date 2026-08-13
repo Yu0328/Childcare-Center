@@ -5,6 +5,10 @@ import {
   addEntry, updateEntry, deleteEntry, listEntriesForForm,
 } from '../src/storage/db.js';
 import { addParentReport, listParentReportsForChild } from '../src/storage/parentReportDb.js';
+import {
+  addMonthlyCoursePlan, getMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem,
+  setChildItemOverride, listChildItemOverridesForPlan,
+} from '../src/storage/monthlyPlanDb.js';
 import { runRequest } from '../src/storage/dbCore.js';
 
 describe('children storage', () => {
@@ -60,6 +64,30 @@ describe('children storage', () => {
     await deleteChild(child.id);
 
     expect(await listParentReportsForChild(child.id)).toEqual([]);
+  });
+
+  it('deleting a child also cascades to monthly course plans they are in, dropping them from childIds/childTiers and clearing their overrides', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const otherChild = await addChild({ name: '林小晴', birthDate: '2024-07-19' });
+    const plan = await addMonthlyCoursePlan({
+      period: '115年06月',
+      childIds: [child.id, otherChild.id],
+      childTiers: { [child.id]: 'Ⅴ', [otherChild.id]: 'Ⅴ' },
+    });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '拼拼圖' });
+    await setChildItemOverride({ planId: plan.id, childId: child.id, itemId: item.id, notAchieved: true, replaced: false });
+    await setChildItemOverride({ planId: plan.id, childId: otherChild.id, itemId: item.id, notAchieved: true, replaced: false });
+
+    await deleteChild(child.id);
+
+    const updatedPlan = await getMonthlyCoursePlan(plan.id);
+    expect(updatedPlan.childIds).toEqual([otherChild.id]);
+    expect(updatedPlan.childTiers).toEqual({ [otherChild.id]: 'Ⅴ' });
+
+    const remainingOverrides = await listChildItemOverridesForPlan(plan.id);
+    expect(remainingOverrides).toHaveLength(1);
+    expect(remainingOverrides[0].childId).toBe(otherChild.id);
   });
 });
 

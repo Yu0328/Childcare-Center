@@ -8,8 +8,12 @@ import {
   addParentReport, addCoursePlanEntry, addCourseOccurrence,
   addDevelopmentRecordEntry, addBehaviorObservation, addHighlightEntry,
 } from './parentReportDb.js';
+import {
+  listMonthlyCoursePlans, listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
+  addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride,
+} from './monthlyPlanDb.js';
 
-const BACKUP_VERSION = 2;
+const BACKUP_VERSION = 3;
 
 // Chunked to avoid call-stack overflows from spreading a huge byte array into String.fromCharCode.
 async function blobToBase64(blob) {
@@ -73,12 +77,28 @@ export async function exportBackup() {
     }
   }
 
+  const monthlyCoursePlans = await listMonthlyCoursePlans();
+  const planSlots = [];
+  const planSlotItems = [];
+  for (const plan of monthlyCoursePlans) {
+    const slots = await listPlanSlotsForPlan(plan.id);
+    planSlots.push(...slots);
+    for (const slot of slots) {
+      planSlotItems.push(...(await listPlanSlotItems(slot.id)));
+    }
+  }
+  const childItemOverrides = [];
+  for (const plan of monthlyCoursePlans) {
+    childItemOverrides.push(...(await listChildItemOverridesForPlan(plan.id)));
+  }
+
   return JSON.stringify(
     {
       version: BACKUP_VERSION,
       children, forms, entries,
       parentReports, coursePlanEntries, courseOccurrences,
       developmentRecordEntries, behaviorObservations, highlightEntries,
+      monthlyCoursePlans, planSlots, planSlotItems, childItemOverrides,
     },
     null,
     2
@@ -166,16 +186,66 @@ async function importParentReports(data, childIdMap) {
   }
 }
 
+async function importMonthlyCoursePlans(data, childIdMap) {
+  const planIdMap = new Map();
+  for (const plan of data.monthlyCoursePlans ?? []) {
+    // A childId with no matching entry in childIdMap belongs to a child missing from this
+    // backup's `children` (e.g. a dead reference written before deleteChild cascaded to plans —
+    // see db.js). Drop it here rather than restoring a null/undefined child reference that would
+    // later crash the editor view's per-child IndexedDB lookups.
+    const childIds = plan.childIds.map(id => childIdMap.get(id)).filter(id => id !== undefined);
+    const childTiers = Object.fromEntries(
+      Object.entries(plan.childTiers)
+        .map(([oldChildId, tier]) => [childIdMap.get(Number(oldChildId)), tier])
+        .filter(([newChildId]) => newChildId !== undefined)
+    );
+    const created = await addMonthlyCoursePlan({ period: plan.period, childIds, childTiers });
+    planIdMap.set(plan.id, created.id);
+  }
+
+  const slotIdMap = new Map();
+  for (const slot of data.planSlots ?? []) {
+    const created = await getOrCreatePlanSlot({
+      planId: planIdMap.get(slot.planId), tier: slot.tier, weekIndex: slot.weekIndex, weekday: slot.weekday,
+    });
+    slotIdMap.set(slot.id, created.id);
+  }
+
+  const itemIdMap = new Map();
+  for (const item of data.planSlotItems ?? []) {
+    const created = await addPlanSlotItem({
+      slotId: slotIdMap.get(item.slotId), indicatorCode: item.indicatorCode, activityName: item.activityName, indicatorText: item.indicatorText,
+    });
+    itemIdMap.set(item.id, created.id);
+  }
+
+  for (const override of data.childItemOverrides ?? []) {
+    const childId = childIdMap.get(override.childId);
+    if (childId === undefined) continue; // same dead-child guard as childIds/childTiers above
+    await setChildItemOverride({
+      planId: planIdMap.get(override.planId),
+      childId,
+      itemId: itemIdMap.get(override.itemId),
+      notAchieved: override.notAchieved,
+      replaced: override.replaced,
+      replacementText: override.replacementText,
+    });
+  }
+}
+
 export async function importBackup(json) {
   const data = JSON.parse(json);
-  if (data.version !== 1 && data.version !== 2) {
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
     throw new Error(`Unsupported backup version: ${data.version}`);
   }
 
   await clearAllData();
 
   const childIdMap = await importV1Or2Children(data);
-  if (data.version === 2) {
+  if (data.version === 2 || data.version === 3) {
     await importParentReports(data, childIdMap);
+  }
+  if (data.version === 3) {
+    await importMonthlyCoursePlans(data, childIdMap);
   }
 }

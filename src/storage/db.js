@@ -1,5 +1,6 @@
 import { DB_NAME, runRequest } from './dbCore.js';
 import { deleteParentReport, listParentReportsForChild } from './parentReportDb.js';
+import { listMonthlyCoursePlans, updateMonthlyCoursePlan, deleteChildItemOverridesForChild } from './monthlyPlanDb.js';
 
 export async function addChild({ name, birthDate }) {
   const id = await runRequest('children', 'readwrite', store => store.add({ name, birthDate }));
@@ -15,7 +16,12 @@ export async function getChild(id) {
 }
 
 // Cascades: deleting a child also deletes all of their forms (and, via deleteForm, those
-// forms' entries) — an orphaned form pointing at a missing childId would otherwise linger.
+// forms' entries), their parent reports, and — for every monthly course plan that includes
+// them — removes them from that plan's childIds/childTiers and deletes their overrides on it.
+// Without this last part, a plan would keep referencing a dead childId forever: harmless until
+// an export/import backup round-trip serializes that dead reference as `null`/`undefined`,
+// which then crashes the editor view's IndexedDB lookups on open (see monthlyPlanEditorView.js
+// and backup.js's importMonthlyCoursePlans for the belt-and-suspenders guards on that path too).
 export async function deleteChild(id) {
   const forms = await listFormsForChild(id);
   for (const form of forms) {
@@ -24,6 +30,15 @@ export async function deleteChild(id) {
   const parentReports = await listParentReportsForChild(id);
   for (const report of parentReports) {
     await deleteParentReport(report.id);
+  }
+  const plans = await listMonthlyCoursePlans();
+  for (const plan of plans) {
+    if (!plan.childIds.includes(id)) continue;
+    const childIds = plan.childIds.filter(childId => childId !== id);
+    const childTiers = { ...plan.childTiers };
+    delete childTiers[id];
+    await updateMonthlyCoursePlan(plan.id, { childIds, childTiers });
+    await deleteChildItemOverridesForChild(plan.id, id);
   }
   await runRequest('children', 'readwrite', store => store.delete(id));
 }

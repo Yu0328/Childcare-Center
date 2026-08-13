@@ -59,3 +59,22 @@ describe('dbCore migration from a pre-existing version-1 database', () => {
     db.close();
   });
 });
+
+describe('dbCore monthly course plan stores', () => {
+  beforeEach(deleteDb);
+
+  it('creates the monthly course plan stores with their indexes', async () => {
+    const { openDatabase } = await import('../src/storage/dbCore.js');
+    const db = await openDatabase();
+    expect(db.objectStoreNames.contains('monthlyCoursePlans')).toBe(true);
+    expect(db.objectStoreNames.contains('planSlots')).toBe(true);
+    expect(db.objectStoreNames.contains('planSlotItems')).toBe(true);
+    expect(db.objectStoreNames.contains('childItemOverrides')).toBe(true);
+
+    const tx = db.transaction(['planSlots', 'planSlotItems', 'childItemOverrides'], 'readonly');
+    expect(tx.objectStore('planSlots').indexNames.contains('by_planId')).toBe(true);
+    expect(tx.objectStore('planSlotItems').indexNames.contains('by_slotId')).toBe(true);
+    expect(tx.objectStore('childItemOverrides').indexNames.contains('by_planId')).toBe(true);
+    db.close();
+  });
+});

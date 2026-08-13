@@ -5,6 +5,8 @@ import { renderReportTypeSelectView } from './ui/reportTypeSelectView.js';
 import { renderParentReportListView } from './ui/parentReportListView.js';
 import { renderParentReportEditorView } from './ui/parentReportEditorView.js';
 import { renderAggregateCoursePlanView } from './ui/aggregateCoursePlanView.js';
+import { renderMonthlyPlanListView } from './ui/monthlyPlanListView.js';
+import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
 import { exportBackup, importBackup } from './storage/backup.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 
@@ -24,7 +26,20 @@ export function mountApp(container) {
   }
 
   function showReportTypeSelect() {
-    renderReportTypeSelectView(container, { onSelectType: type => showChildList(type) }).catch(showRenderError);
+    renderReportTypeSelectView(container, {
+      onSelectType: type => (type === 'monthly-plan' ? showMonthlyPlanList() : showChildList(type)),
+    }).catch(showRenderError);
+  }
+
+  function showMonthlyPlanList() {
+    renderMonthlyPlanListView(container, {
+      onSelectPlan: plan => showMonthlyPlanEditor(plan),
+      onBack: showReportTypeSelect,
+    }).catch(showRenderError);
+  }
+
+  function showMonthlyPlanEditor(plan) {
+    renderMonthlyPlanEditorView(container, { plan, onBack: showMonthlyPlanList }).catch(showRenderError);
   }
 
   function showChildList(reportType) {
