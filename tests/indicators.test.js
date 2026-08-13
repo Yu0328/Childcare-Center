@@ -49,8 +49,15 @@ describe('indicator reference data', () => {
       domainName: '身體動作',
       subdomain: '粗動作、精細動作',
       description: '能獨立穩定行走',
+      activityName: '走過來',
       noActivityName: false,
     });
+  });
+
+  it('25個月以上 indicators have an empty activityName and noActivityName: true', () => {
+    const indicator = getIndicator('Ⅵ-1-1');
+    expect(indicator.activityName).toBe('');
+    expect(indicator.noActivityName).toBe(true);
   });
 
   it('getIndicator returns undefined for an unknown code', () => {

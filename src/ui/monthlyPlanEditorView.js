@@ -362,10 +362,10 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener('change', event => {
       const indicator = getIndicator(event.target.value);
       if (!indicator) return;
-      // 25個月以上's indicators (tier Ⅵ/Ⅶ) have no short 【活動名稱】 label in the source
-      // document — only the description — so activity name is left blank rather than duplicating
-      // the description into both fields.
-      panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.noActivityName ? '' : indicator.description;
+      // activityName is the indicator's own official 【活動名稱】 label (not a copy of the
+      // description) — 25個月以上's indicators have none in their source document, so this is ''
+      // for those and the field is left blank rather than duplicating the description into it.
+      panelItems.querySelector('[data-field="new-item-activity-name"]').value = indicator.activityName;
       panelItems.querySelector('[data-field="new-item-indicator-text"]').value = indicator.description;
     });
 
