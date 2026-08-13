@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildMonthlyCalendar } from '../src/domain/monthlyCalendar.js';
+import { buildMonthlyCalendar, weekIndexLabel } from '../src/domain/monthlyCalendar.js';
+
+describe('weekIndexLabel', () => {
+  it('renders week ordinals as Chinese numerals, matching the reference document', () => {
+    expect([1, 2, 3, 4, 5].map(weekIndexLabel)).toEqual(['一', '二', '三', '四', '五']);
+  });
+});
 
 describe('buildMonthlyCalendar', () => {
   it('splits a month that starts on Monday and ends on Tuesday into 5 weeks, last one partial', () => {

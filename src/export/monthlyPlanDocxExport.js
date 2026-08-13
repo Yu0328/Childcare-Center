@@ -1,10 +1,10 @@
 import {
-  AlignmentType, BorderStyle, Document, Header, Packer, Paragraph, Table, TableCell, TableRow,
-  TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
+  AlignmentType, BorderStyle, Document, Header, Packer, Paragraph, ShadingType, Table, TableCell,
+  TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
 import { TIERS } from '../data/indicators.js';
 import { DEFAULT_TEXT_SIZE, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
-import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
+import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from '../ui/periodFields.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 
@@ -52,10 +52,32 @@ const TABLE_BORDERS = {
   insideHorizontal: TABLE_BORDER, insideVertical: TABLE_BORDER,
 };
 
+// Per-cell border overrides for the date/content row pairs, copied from the real sample's
+// per-cell <w:tcBorders> (verified via OOXML extraction — these differ from the plain
+// TABLE_BORDERS grid above, which only covers the table's own default borders). All four sides
+// are specified explicitly on every cell rather than partially overriding, since docx.js's merge
+// behavior for unspecified sides against the table default isn't something this codebase has a
+// precedent for and isn't worth relying on.
+const SOLID_SIDE = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+const DASHED_SIDE = { style: BorderStyle.DASHED, size: 4, color: '000000' };
+const DASH_SMALL_GAP_SIDE = { style: BorderStyle.DASH_SMALL_GAP, size: 4, color: '000000' };
+// Date-label cells (e.g. "3/3(二)") sit on a light gray band with a dashed line separating them
+// from the content row below.
+const DATE_CELL_BORDERS = { top: SOLID_SIDE, left: SOLID_SIDE, right: SOLID_SIDE, bottom: DASHED_SIDE };
+const DATE_CELL_SHADING = { type: ShadingType.CLEAR, color: 'auto', fill: 'F2F2F2' };
+// Content cells pick up the dashed line as their top border (shared with the date row above) and
+// sit on an explicit white fill.
+const CONTENT_CELL_BORDERS = { top: DASH_SMALL_GAP_SIDE, left: SOLID_SIDE, right: SOLID_SIDE, bottom: SOLID_SIDE };
+const CONTENT_CELL_SHADING = { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFFFF' };
+
 // Reused for the icon's position in this document's header, tuned the same way
 // parentReportDocxExport.js's HEADER_ICON_OFFSET_EMU was (visual iteration against a rendered
-// sample) — the two documents share the same icon-near-title-start layout intent.
-const HEADER_ICON_OFFSET_EMU = { horizontal: -325000, vertical: -40000 };
+// sample) — the two documents share the same icon-near-title-start layout intent. This document's
+// INSTITUTION_NAME is much longer than that one's, so its centered text starts much closer to the
+// true left margin; the offset's magnitude is reduced accordingly so the icon doesn't overlap the
+// text. Best-effort estimate — not visually verified in real Word, since this environment has no
+// way to render/screenshot docx output. Confirm and re-tune against an actual export if it's off.
+const HEADER_ICON_OFFSET_EMU = { horizontal: -60000, vertical: -40000 };
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const CENTERED = { alignment: AlignmentType.CENTER };
@@ -96,13 +118,15 @@ function runFont() {
   return { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT };
 }
 
-function textParagraph(text, { size = DEFAULT_TEXT_SIZE, alignment } = {}) {
+function textParagraph(text, { size = DEFAULT_TEXT_SIZE, alignment, bold } = {}) {
   return new Paragraph({
     ...(alignment ? { alignment } : {}),
-    children: [new TextRun({ text: String(text ?? ''), font: runFont(), size })],
+    children: [new TextRun({ text: String(text ?? ''), font: runFont(), size, ...(bold ? { bold: true } : {}) })],
   });
 }
 
+// Content cells are center-aligned in the real sample (verified via its per-paragraph
+// <w:jc w:val="center"/>), matching the date row above them.
 function cellParagraphsFromRuns(runs) {
   if (runs.length === 0) return [emptyParagraph()];
   return runs.map(run => {
@@ -118,7 +142,7 @@ function cellParagraphsFromRuns(runs) {
     if (run.replaced && run.replacementText) {
       children.push(new TextRun({ text: run.replacementText, font: runFont(), size: DEFAULT_TEXT_SIZE }));
     }
-    return new Paragraph({ children });
+    return new Paragraph({ alignment: AlignmentType.CENTER, children });
   });
 }
 
@@ -157,7 +181,7 @@ function weekHeaderRow(weeks, widths) {
           width: cellWidth(widths, index + 1),
           verticalAlign: VerticalAlign.CENTER,
           children: [
-            textParagraph(`第${week.weekIndex}週`, CENTERED),
+            textParagraph(`第${weekIndexLabel(week.weekIndex)}週`, CENTERED),
             textParagraph(week.dateRange, CENTERED),
           ],
         })
@@ -188,7 +212,9 @@ function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
     return new TableCell({
       width: cellWidth(widths, index + 1),
       verticalAlign: VerticalAlign.CENTER,
-      children: [textParagraph(day ? day.dateLabel : '', CENTERED)],
+      borders: DATE_CELL_BORDERS,
+      shading: DATE_CELL_SHADING,
+      children: [textParagraph(day ? day.dateLabel : '', { ...CENTERED, bold: true })],
     });
   });
   return new TableRow({ children: [nameCell(widths, isFirstBodyRow, nameContent), ...cells] });
@@ -197,11 +223,23 @@ function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
 function contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId) {
   const cells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
-    if (!day) return new TableCell({ width: cellWidth(widths, index + 1), children: [emptyParagraph()] });
+    if (!day) {
+      return new TableCell({
+        width: cellWidth(widths, index + 1),
+        borders: CONTENT_CELL_BORDERS,
+        shading: CONTENT_CELL_SHADING,
+        children: [emptyParagraph()],
+      });
+    }
     const slot = findSlot(slots, tier, week.weekIndex, weekday);
     const items = slot ? itemsBySlotId[slot.id] || [] : [];
     const runs = buildDayCellRuns(items, overrideByItemId);
-    return new TableCell({ width: cellWidth(widths, index + 1), children: cellParagraphsFromRuns(runs) });
+    return new TableCell({
+      width: cellWidth(widths, index + 1),
+      borders: CONTENT_CELL_BORDERS,
+      shading: CONTENT_CELL_SHADING,
+      children: cellParagraphsFromRuns(runs),
+    });
   });
   return new TableRow({ children: [nameCell(widths, false, null), ...cells] });
 }

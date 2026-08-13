@@ -29,7 +29,7 @@ export async function renderMonthlyPlanListView(
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-plan-id="${escapeHtml(plan.id)}">
                     <span class="card-list__name">${escapeHtml(plan.period)}</span>
-                    <span class="card-list__meta">${plan.childIds.length} 位小朋友</span>
+                    <span class="card-list__meta">${plan.childIds.length} 位幼兒</span>
                   </button>
                   <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="刪除${escapeHtml(plan.period)}的課程月計畫">×</button>
                 </li>`
@@ -50,7 +50,7 @@ export async function renderMonthlyPlanListView(
           })}
         </label>
         <fieldset class="panel-form__field">
-          <legend>小朋友</legend>
+          <legend>幼兒</legend>
           <div class="panel-form__checkbox-list">
             ${children
               .map(
@@ -99,7 +99,7 @@ export async function renderMonthlyPlanListView(
       .map(child => child.id);
 
     if (childIds.length === 0) {
-      errorEl.textContent = '請至少選擇一位小朋友';
+      errorEl.textContent = '請至少選擇一位幼兒';
       return;
     }
 

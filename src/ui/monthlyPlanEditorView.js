@@ -4,7 +4,7 @@ import {
   getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem, setChildItemOverride,
   updateMonthlyCoursePlan, deleteChildItemOverridesForChild,
 } from '../storage/monthlyPlanDb.js';
-import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
+import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
 import { parsePeriod } from './periodFields.js';
 import { TIERS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
@@ -98,7 +98,7 @@ function childCalendarHtml(child, tier, data) {
           .map(
             week => `
               <div class="monthly-calendar__week">
-                <div class="monthly-calendar__week-range">第${week.weekIndex}週　${escapeHtml(week.dateRange)}</div>
+                <div class="monthly-calendar__week-range">第${weekIndexLabel(week.weekIndex)}週　${escapeHtml(week.dateRange)}</div>
                 <div class="monthly-calendar__days">
                   ${week.days.map(day => dayCellHtml(child, tier, week, day, data)).join('')}
                 </div>
@@ -120,45 +120,55 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       <button type="button" class="btn btn--ghost" data-action="back">← 返回課程月計畫列表</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} 課程月計畫</h2>
       <div class="page-header__actions">
-        <button type="button" class="btn btn--purple" data-action="manage-children">管理小朋友</button>
+        <button type="button" class="btn btn--purple" data-action="manage-children">管理幼兒</button>
         <button type="button" class="btn btn--purple" data-action="export-docx">匯出 Word</button>
       </div>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
-    <form class="panel-form" data-manage-children-form hidden>
-      <h3 class="panel-form__title">選擇本月計畫涵蓋的小朋友</h3>
-      <fieldset class="panel-form__field">
-        <legend>小朋友</legend>
-        <div class="panel-form__checkbox-list">
-          ${(await listChildren())
-            .map(
-              c =>
-                `<label class="panel-form__checkbox">
-                  <input type="checkbox" data-manage-child-checkbox="${escapeHtml(c.id)}" ${plan.childIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.name)}
-                </label>`
-            )
-            .join('')}
-        </div>
-      </fieldset>
-      <button type="button" class="btn btn--primary" data-action="save-children">儲存</button>
-      <p class="field-error" data-error="manage-children"></p>
-    </form>
     <div class="tab-layout">
       <div class="monthly-calendar-list">
         ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data)).join('')}
       </div>
-      <div class="panel-form" data-panel>
-        <h3 class="panel-form__title" data-panel-header>點選左側的日期格子開始規劃</h3>
-        <div data-panel-items></div>
+      <div class="monthly-plan-side">
+        <div class="panel-form" data-panel>
+          <h3 class="panel-form__title" data-panel-header>點選左側的日期格子開始規劃</h3>
+          <div data-panel-items></div>
+        </div>
+        <form class="panel-form" data-manage-children-form hidden>
+          <h3 class="panel-form__title">選擇本月計畫涵蓋的幼兒</h3>
+          <fieldset class="panel-form__field">
+            <legend>幼兒</legend>
+            <div class="panel-form__checkbox-list">
+              ${(await listChildren())
+                .map(
+                  c =>
+                    `<label class="panel-form__checkbox">
+                      <input type="checkbox" data-manage-child-checkbox="${escapeHtml(c.id)}" ${plan.childIds.includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.name)}
+                    </label>`
+                )
+                .join('')}
+            </div>
+          </fieldset>
+          <div class="entry-form__actions">
+            <button type="button" class="btn btn--primary btn--small" data-action="save-children">儲存</button>
+            <button type="button" class="btn btn--outline btn--small" data-action="cancel-manage-children">取消</button>
+          </div>
+          <p class="field-error" data-error="manage-children"></p>
+        </form>
       </div>
     </div>
   `;
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
+  const manageChildrenForm = container.querySelector('[data-manage-children-form]');
+
   container.querySelector('[data-action="manage-children"]').addEventListener('click', () => {
-    const form = container.querySelector('[data-manage-children-form]');
-    form.hidden = !form.hidden;
+    manageChildrenForm.hidden = !manageChildrenForm.hidden;
+  });
+
+  container.querySelector('[data-action="cancel-manage-children"]').addEventListener('click', () => {
+    manageChildrenForm.hidden = true;
   });
 
   container.querySelector('[data-action="export-docx"]').addEventListener('click', async () => {
@@ -222,7 +232,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     container.querySelector(
       `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
     ).classList.add('monthly-calendar__day--selected');
-    container.querySelector('[data-panel-header]').textContent = `${child.name}　第${week.weekIndex}週　${day.dateLabel}`;
+    container.querySelector('[data-panel-header]').textContent = `${child.name}　第${weekIndexLabel(week.weekIndex)}週　${day.dateLabel}`;
     await renderPanelItems();
   }
 
@@ -246,16 +256,40 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     );
   }
 
+  // Read-only summary by default (code badge + activity + description, corner 編輯/× actions —
+  // same card pattern as courseplanTabView.js's entryCard) with the actual editable fields tucked
+  // into a hidden form revealed by 編輯, rather than always-open inputs: keeps the panel from
+  // reading as a wall of unlabeled boxes when nothing is being edited, and gives the delete button
+  // a fixed, low-key spot instead of wrapping onto its own line.
   function panelItemRowHtml(item, override) {
+    const summaryText = item.indicatorCode
+      ? `【${escapeHtml(item.activityName)}】${escapeHtml(item.indicatorText || '')}`
+      : escapeHtml(item.activityName);
+
     return `
       <div class="indicator-block" data-panel-item="${item.id}">
-        <div class="indicator-block__title">
+        <h4 class="indicator-block__title">
           ${item.indicatorCode ? `<span class="indicator-block__code">${escapeHtml(item.indicatorCode)}</span>` : ''}
-          <input data-item-edit-field="activityName" data-item-id="${item.id}" value="${escapeHtml(item.activityName)}">
-          <button type="button" class="btn btn--primary btn--small" data-item-edit-save-for="${item.id}">儲存</button>
-          <button type="button" class="btn--delete-circle" data-delete-item="${item.id}" aria-label="刪除${escapeHtml(item.activityName)}">×</button>
+          ${summaryText}
+          <span class="indicator-block__actions">
+            <button type="button" class="btn btn--edit btn--small" data-edit-item="${item.id}" aria-label="編輯${escapeHtml(item.activityName)}">編輯</button>
+            <button type="button" class="btn--delete-circle" data-delete-item="${item.id}" aria-label="刪除${escapeHtml(item.activityName)}">×</button>
+          </span>
+        </h4>
+        <div class="entry-form" data-item-edit-form-for="${item.id}" hidden>
+          <label class="panel-form__field">
+            活動名稱
+            <input data-item-edit-field="activityName" data-item-id="${item.id}" value="${escapeHtml(item.activityName)}">
+          </label>
+          <label class="panel-form__field">
+            指標內容／說明
+            <textarea data-item-edit-field="indicatorText" data-item-id="${item.id}" rows="2">${escapeHtml(item.indicatorText || '')}</textarea>
+          </label>
+          <div class="entry-form__actions">
+            <button type="button" class="btn btn--primary btn--small" data-item-edit-save-for="${item.id}">儲存</button>
+            <button type="button" class="btn btn--outline btn--small" data-item-edit-cancel-for="${item.id}">取消</button>
+          </div>
         </div>
-        <textarea data-item-edit-field="indicatorText" data-item-id="${item.id}" rows="2">${escapeHtml(item.indicatorText || '')}</textarea>
         <div class="entry-form__checkbox-row">
           <label class="entry-form__checkbox">
             <input type="checkbox" data-override-field="notAchieved" data-item-id="${item.id}" ${override?.notAchieved ? 'checked' : ''}> 未達成
@@ -323,6 +357,13 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     });
 
     for (const item of items) {
+      panelItems.querySelector(`[data-edit-item="${item.id}"]`).addEventListener('click', () => {
+        const form = panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`);
+        form.hidden = !form.hidden;
+      });
+      panelItems.querySelector(`[data-item-edit-cancel-for="${item.id}"]`).addEventListener('click', () => {
+        panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`).hidden = true;
+      });
       panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', async () => {
         const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value;
         const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${item.id}"]`).value;

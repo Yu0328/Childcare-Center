@@ -1,5 +1,14 @@
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五']; // index 0 = weekday 1 (Mon)
 
+// Week ordinals ("第一週"..."第五週") per the reference sample, which uses Chinese numerals, not
+// Arabic digits ("第1週"). A Monday-start month never produces more than 5 week buckets, so this
+// never needs to go past 五.
+const WEEK_ORDINAL_LABELS = ['一', '二', '三', '四', '五'];
+
+export function weekIndexLabel(weekIndex) {
+  return WEEK_ORDINAL_LABELS[weekIndex - 1] ?? String(weekIndex);
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
