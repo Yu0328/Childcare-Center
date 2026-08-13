@@ -3,19 +3,15 @@ import {
   TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
 import { TIERS } from '../data/indicators.js';
-import { DEFAULT_TEXT_SIZE, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
+import { DEFAULT_TEXT_SIZE, FONT, PAGE_SIZE, emptyParagraph, headerIconRunInFrontOfText } from './docxShared.js';
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from '../ui/periodFields.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 
-// This document type ("課程月計畫") is issued with a different font variant than every other
-// export's shared FONT ('標楷體') — copied verbatim from the real reference sample's <w:rFonts>
-// (115年03月西瓜班月計畫-2.docx). Do not "fix" this to reuse docxShared.js's FONT; that constant
-// is correct for the other document types, not this one. Because of this, this file defines its
-// own textParagraph-equivalent helpers instead of importing docxShared.js's (which bake in the
-// wrong font) — only font-agnostic helpers (emptyParagraph, headerIconRunInFrontOfText, PAGE_SIZE)
-// are shared.
-const FONT = '標楷體-港澳';
+// This document's local textParagraph-equivalent helpers are kept separate from docxShared.js's
+// (rather than importing those directly) purely because this file's cell-shading/border logic
+// doesn't match the other export types' — not because of a font difference (this uses the same
+// shared FONT as every other export now).
 
 // Page margins in twips, copied from the real reference sample's <w:pgMar> — narrower than both
 // 適性總表's and 適性紀錄's margins. Do not reuse either of those PAGE_MARGIN constants.
@@ -80,7 +76,7 @@ const CONTENT_CELL_SHADING = { type: ShadingType.CLEAR, color: 'auto', fill: 'FF
 // true left margin; the offset's magnitude is reduced accordingly so the icon doesn't overlap the
 // text. Best-effort estimate — not visually verified in real Word, since this environment has no
 // way to render/screenshot docx output. Confirm and re-tune against an actual export if it's off.
-const HEADER_ICON_OFFSET_EMU = { horizontal: -20000, vertical: -40000 };
+const HEADER_ICON_OFFSET_EMU = { horizontal: 60000, vertical: -40000 };
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const CENTERED = { alignment: AlignmentType.CENTER };
@@ -209,10 +205,12 @@ function nameCell(widths, isFirstBodyRow, nameContent) {
   });
 }
 
-// Date cells only ever hold one short line ("08/03(一)"), unlike the multi-line content/name
-// cells, so they use their own (much smaller) vertical margin instead of the table-wide default —
-// otherwise they read as tall, mostly-empty boxes.
-const DATE_CELL_MARGINS = { top: 20, bottom: 20, left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA };
+// The real sample sets no vertical cell margin at all on date cells (verified: no <w:tcMar> or
+// <w:tblCellMar> anywhere in its XML, so Word's built-in default of 0 top/bottom applies) — its
+// date rows stay compact (~234-393 dxa tall) purely from the single line of text they hold, with
+// none of the table-wide vertical padding this file adds elsewhere for the taller content/name
+// cells. Matched here exactly rather than reusing TABLE_CELL_MARGIN_DXA_VERTICAL.
+const DATE_CELL_MARGINS = { top: 0, bottom: 0, left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA };
 
 function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
   const cells = weeks.map((week, index) => {
