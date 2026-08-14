@@ -1,4 +1,5 @@
 import esbuild from 'esbuild';
+import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 mkdirSync('dist', { recursive: true });
@@ -14,6 +15,9 @@ const result = await esbuild.build({
 
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles.css', 'utf-8');
+
+// Version = total commit count reachable from HEAD, i.e. every change since the project began.
+const version = execSync('git rev-list --count HEAD').toString().trim();
 
 const html = `<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -43,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+<footer class="app-version">v${version}</footer>
 </body>
 </html>
 `;

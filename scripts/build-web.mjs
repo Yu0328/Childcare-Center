@@ -1,5 +1,6 @@
 import esbuild from 'esbuild';
 import { createHash } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 
 // This builds the hosted (GitHub Pages) version — a small set of files instead of the desktop
@@ -19,6 +20,9 @@ const result = await esbuild.build({
 
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles.css', 'utf-8');
+
+// Version = total commit count reachable from HEAD, i.e. every change since the project began.
+const version = execSync('git rev-list --count HEAD').toString().trim();
 
 // Every rebuild gets a fresh cache name derived from the bundle's own content, so a redeploy
 // reliably invalidates old clients' cached copy instead of a cache-first Service Worker serving
@@ -66,6 +70,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
+<footer class="app-version">v${version}</footer>
 </body>
 </html>
 `;
