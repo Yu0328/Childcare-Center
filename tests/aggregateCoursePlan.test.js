@@ -21,7 +21,7 @@ describe('aggregateCoursePlanIntoForm', () => {
     const entryFeb = await addCoursePlanEntry({ reportId: reportFeb.id, indicatorCode: 'Ⅴ-1-7', activityName: '堆積木' });
     await addCourseOccurrence({ entryId: entryFeb.id, date: '2026-02-14', status: 'developing', absent: false, note: '二月的紀錄' });
 
-    const { form, failed, skippedDuplicates } = await aggregateCoursePlanIntoForm({
+    const { form, skippedDuplicates } = await aggregateCoursePlanIntoForm({
       childId: child.id,
       tier: 'Ⅴ',
       reportIds: [reportJan.id, reportFeb.id],
@@ -29,7 +29,6 @@ describe('aggregateCoursePlanIntoForm', () => {
 
     expect(form.childId).toBe(child.id);
     expect(form.tier).toBe('Ⅴ');
-    expect(failed).toEqual([]);
     expect(skippedDuplicates).toBe(0);
 
     const entries = await listEntriesForForm(form.id);
@@ -72,21 +71,21 @@ describe('aggregateCoursePlanIntoForm', () => {
     expect(entries[0].note).toBe('正常上課');
   });
 
-  it('lists entries whose indicator code cannot be resolved as failed, without blocking the rest', async () => {
+  it('writes an entry whose indicator code cannot be resolved at all onto the target form as-is, without blocking the rest', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     const badEntry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-9-9', activityName: '不存在的指標' });
     await addCourseOccurrence({ entryId: badEntry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
     const goodEntry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
     await addCourseOccurrence({ entryId: goodEntry.id, date: '2026-01-11', status: 'developed', absent: false, note: 'y' });
 
-    const { form, failed } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { form } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
-    expect(failed).toEqual([
-      { reportPeriod: '115年01月', indicatorCode: 'Ⅴ-9-9', activityName: '不存在的指標', reason: '找不到對應指標' },
-    ]);
     const entries = await listEntriesForForm(form.id);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].indicatorCode).toBe('Ⅴ-1-6');
+    expect(entries).toHaveLength(2);
+    expect(entries.find(e => e.indicatorCode === 'Ⅴ-1-6')).toBeDefined();
+    // Not discarded — written as-is even though it doesn't resolve to any of this tier's own
+    // indicators, so formEditorView's 備註 section picks it up when this form is exported.
+    expect(entries.find(e => e.indicatorCode === 'Ⅴ-9-9')).toMatchObject({ date: '2026-01-10', status: 'developed', note: 'x' });
   });
 
   it('sorts merged occurrences by date within an indicator, regardless of entry order', async () => {
@@ -107,9 +106,8 @@ describe('aggregateCoursePlanIntoForm', () => {
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
-    const { form, failed, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { form, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
-    expect(failed).toEqual([]);
     expect(reroutedCount).toBe(1);
     expect(await listEntriesForForm(form.id)).toEqual([]);
 
@@ -127,9 +125,8 @@ describe('aggregateCoursePlanIntoForm', () => {
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'IV-1-1', activityName: '走路練習' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
-    const { failed, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
-    expect(failed).toEqual([]);
     expect(reroutedCount).toBe(1);
 
     const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));

@@ -61,13 +61,15 @@ function indicatorBlock(indicator, entries) {
   `;
 }
 
-// Read-only: these entries live on a different (earlier) tier's form — edit them there, not here.
+// Read-only: a previous-tier entry lives on a different form (edit it there); an unresolved-code
+// entry has no indicator to look up at all (getIndicator returns undefined, left blank below).
 function remarkBlock(entry) {
   const indicator = getIndicator(entry.indicatorCode);
+  const mark = entry.status === 'developed' ? '○' : '△';
   return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
       <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? '')}</h4>
-      <p class="entry-row__date"><span class="entry-row__mark">△</span>${escapeHtml(entry.date)}</p>
+      <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
     </div>
   `;
@@ -84,20 +86,32 @@ async function previousTierDevelopingEntries(childId, tier) {
   return entriesPerForm.flat().filter(entry => entry.status === 'developing');
 }
 
+// Every remark source combined: this child's still-developing entries from their previous tier's
+// form, plus (see aggregateCoursePlan.js) any of THIS form's own entries whose indicator code
+// doesn't match one of this tier's own indicators at all — 彙整 files those onto the target form
+// as-is when it can't resolve them, rather than discarding them.
+async function remarkEntries(childId, tier, ownEntries, ownIndicatorCodes) {
+  const previousTierEntries = await previousTierDevelopingEntries(childId, tier);
+  const ownOrphaned = ownEntries.filter(entry => !ownIndicatorCodes.has(entry.indicatorCode));
+  return [...previousTierEntries, ...ownOrphaned];
+}
+
 export async function renderFormEditorView(
   container,
   { child, form, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
 ) {
   const indicators = getIndicatorsForTier(form.tier);
   const entries = await listEntriesForForm(form.id);
+  const ownIndicatorCodes = new Set(indicators.map(i => i.code));
+  const ownEntries = entries.filter(entry => ownIndicatorCodes.has(entry.indicatorCode));
 
   const entriesByIndicatorCode = {};
-  for (const entry of entries) {
+  for (const entry of ownEntries) {
     (entriesByIndicatorCode[entry.indicatorCode] ??= []).push(entry);
   }
 
   const domains = [...new Map(indicators.map(i => [i.domainName, i.domain])).entries()];
-  const remarks = await previousTierDevelopingEntries(child.id, form.tier);
+  const remarks = await remarkEntries(child.id, form.tier, entries, ownIndicatorCodes);
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -126,7 +140,7 @@ export async function renderFormEditorView(
         remarks.length > 0
           ? `
             <section class="domain-card" data-remark-section>
-              <h3 class="domain-card__title">備註（前一階段未完成）</h3>
+              <h3 class="domain-card__title">備註</h3>
               <div class="domain-card__body">
                 ${remarks.map(remarkBlock).join('')}
               </div>
@@ -142,10 +156,11 @@ export async function renderFormEditorView(
   container.querySelector('[data-action="export"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
+      const freshEntries = await listEntriesForForm(form.id);
       const blob = await generateDocxBlob({
         child, form, indicators,
-        entries: await listEntriesForForm(form.id),
-        previousTierEntries: await previousTierDevelopingEntries(child.id, form.tier),
+        entries: freshEntries,
+        previousTierEntries: await remarkEntries(child.id, form.tier, freshEntries, ownIndicatorCodes),
       });
       downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
       if (errorEl) errorEl.textContent = '';
@@ -177,7 +192,9 @@ export async function renderFormEditorView(
     });
   }
 
-  for (const entry of entries) {
+  // Only this tier's own entries got an indicator block rendered above — a remark (previous-tier,
+  // or an unresolved-code entry left on this form by 彙整) has no delete/edit buttons to wire.
+  for (const entry of ownEntries) {
     container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', async () => {
       if (!confirmDelete(`確定要刪除「${entry.indicatorCode} ${entry.date}」這筆觀察紀錄嗎？此操作無法復原。`)) return;
       try {

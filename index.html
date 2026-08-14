@@ -24620,7 +24620,7 @@ var CFormApp = (() => {
 
   // src/export/docxExport.js
   var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u793E\u5340\u516C\u5171\u6258\u80B2\u5BB6\u5712";
-  var COLUMN_WIDTHS = [565, 1557, 800, 992, 1984, 1560, 1643];
+  var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
   var TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
   var TABLE_CELL_MARGIN_DXA = 115;
   var SUBDOMAIN_SEPARATOR = "\u3001";
@@ -24688,20 +24688,14 @@ var CFormApp = (() => {
           children: [textParagraph("\u9818\u57DF\u7BC4\u7587", { bold: true, ...CENTERED })]
         }),
         new TableCell({
-          width: cellWidth(2),
-          verticalMerge: VerticalMergeType.RESTART,
-          verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
-        }),
-        new TableCell({
-          width: spannedWidth(3, 4),
+          width: spannedWidth(2, 3),
           columnSpan: 2,
           verticalAlign: VerticalAlign.CENTER,
           shading: { type: ShadingType.CLEAR, color: "auto", fill: "D9D9D9" },
           children: [textParagraph("\u6307\u6A19\u9805\u6B21/\u767C\u5C55\u6D3B\u52D5", { bold: true, ...CENTERED })]
         }),
         new TableCell({
-          width: spannedWidth(5, 6),
+          width: spannedWidth(4, 5),
           columnSpan: 2,
           verticalAlign: VerticalAlign.CENTER,
           shading: { type: ShadingType.CLEAR, color: "auto", fill: "D9D9D9" },
@@ -24723,18 +24717,13 @@ var CFormApp = (() => {
           children: [emptyParagraph()]
         }),
         new TableCell({
-          width: cellWidth(2),
-          verticalMerge: VerticalMergeType.CONTINUE,
-          children: [emptyParagraph()]
-        }),
-        new TableCell({
-          width: spannedWidth(3, 4),
+          width: spannedWidth(2, 3),
           columnSpan: 2,
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph("\u9069\u6027\u767C\u5C55\u6307\u6A19\u6D3B\u52D5", { bold: true, ...CENTERED })]
         }),
         new TableCell({
-          width: cellWidth(5),
+          width: cellWidth(4),
           verticalAlign: VerticalAlign.CENTER,
           children: [
             textParagraph("\u8AB2\u7A0B\u5BE6\u65BD\u65E5\u671F\u3010\u5DF2\u767C\u5C55\u25CB\u3011", { bold: true, ...CENTERED }),
@@ -24742,7 +24731,7 @@ var CFormApp = (() => {
           ]
         }),
         new TableCell({
-          width: cellWidth(6),
+          width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph("\u8AB2\u7A0B\u5BE6\u65BD\u8A18\u9304", { bold: true, ...CENTERED })]
         })
@@ -24763,28 +24752,43 @@ var CFormApp = (() => {
       children: isFirstRowOfMerge ? children : [emptyParagraph()]
     });
   }
-  function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, isRemark = false }) {
+  function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) {
     return new TableRow({
       children: [
         mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
         mergedCell(1, subdomainParagraphs(indicator.subdomain), isFirstRowOfDomain),
+        mergedCell(2, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
+        mergedCell(3, [textParagraph(row.description)], isFirstRowOfIndicator),
         new TableCell({
-          width: cellWidth(2),
-          verticalAlign: VerticalAlign.CENTER,
-          children: [isRemark ? textParagraph(row.note) : emptyParagraph()]
-        }),
-        mergedCell(3, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
-        mergedCell(4, [textParagraph(row.description)], isFirstRowOfIndicator),
-        new TableCell({
-          width: cellWidth(5),
+          width: cellWidth(4),
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph(formatDateCell(row), CENTERED)]
         }),
         new TableCell({
-          width: cellWidth(6),
+          width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
-          children: [isRemark ? emptyParagraph() : textParagraph(row.note)]
+          children: [textParagraph(row.note)]
         })
+      ]
+    });
+  }
+  function remarkDividerRow() {
+    return new TableRow({
+      children: [
+        new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })] }),
+        ...[1, 2, 3, 4, 5].map((index) => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] }))
+      ]
+    });
+  }
+  function remarkRow(row) {
+    return new TableRow({
+      children: [
+        new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.domainLabel, CENTERED)] }),
+        new TableCell({ width: cellWidth(1), verticalAlign: VerticalAlign.CENTER, children: subdomainParagraphs(row.subdomainText) }),
+        new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
+        new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
+        new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
+        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] })
       ]
     });
   }
@@ -24846,28 +24850,25 @@ var CFormApp = (() => {
         })
       )
     );
-    const remarkEntriesByCode = {};
-    for (const entry of previousTierEntries) {
-      (remarkEntriesByCode[entry.indicatorCode] ??= []).push(entry);
-    }
-    const remarkIndicators = [...new Set(previousTierEntries.map((e) => e.indicatorCode))].map(getIndicator).filter(Boolean);
-    const remarkGroups = buildIndicatorRowGroups(remarkIndicators, remarkEntriesByCode);
-    const remarkRows = remarkGroups.flatMap(
-      ({ indicator, rows, isFirstGroupOfDomain }) => rows.map(
-        (row, index) => bodyRow(indicator, row, {
-          isFirstRowOfDomain: isFirstGroupOfDomain && index === 0,
-          isFirstRowOfIndicator: index === 0,
-          isRemark: true
-        })
-      )
-    );
+    const remarkRows = previousTierEntries.map((entry) => {
+      const indicator = getIndicator(entry.indicatorCode);
+      return remarkRow({
+        domainLabel: indicator ? domainLabelFor(indicator) : "",
+        subdomainText: indicator ? indicator.subdomain : "",
+        code: entry.indicatorCode,
+        description: indicator ? indicator.description : "",
+        date: entry.date,
+        status: entry.status,
+        note: entry.note
+      });
+    });
     const table = new Table({
       width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
       columnWidths: COLUMN_WIDTHS,
       layout: TableLayoutType.FIXED,
       alignment: AlignmentType.CENTER,
       margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-      rows: [...headerRows(), ...bodyRows, ...remarkRows]
+      rows: [...headerRows(), ...bodyRows, ...remarkRows.length > 0 ? [remarkDividerRow(), ...remarkRows] : []]
     });
     const doc = new File({
       sections: [
@@ -24942,10 +24943,11 @@ var CFormApp = (() => {
   }
   function remarkBlock(entry) {
     const indicator = getIndicator(entry.indicatorCode);
+    const mark = entry.status === "developed" ? "\u25CB" : "\u25B3";
     return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
       <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? "")}</h4>
-      <p class="entry-row__date"><span class="entry-row__mark">\u25B3</span>${escapeHtml(entry.date)}</p>
+      <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
     </div>
   `;
@@ -24957,15 +24959,22 @@ var CFormApp = (() => {
     const entriesPerForm = await Promise.all(forms.map((f) => listEntriesForForm(f.id)));
     return entriesPerForm.flat().filter((entry) => entry.status === "developing");
   }
+  async function remarkEntries(childId, tier, ownEntries, ownIndicatorCodes) {
+    const previousTierEntries = await previousTierDevelopingEntries(childId, tier);
+    const ownOrphaned = ownEntries.filter((entry) => !ownIndicatorCodes.has(entry.indicatorCode));
+    return [...previousTierEntries, ...ownOrphaned];
+  }
   async function renderFormEditorView(container, { child, form, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
     const indicators = getIndicatorsForTier(form.tier);
     const entries = await listEntriesForForm(form.id);
+    const ownIndicatorCodes = new Set(indicators.map((i) => i.code));
+    const ownEntries = entries.filter((entry) => ownIndicatorCodes.has(entry.indicatorCode));
     const entriesByIndicatorCode = {};
-    for (const entry of entries) {
+    for (const entry of ownEntries) {
       (entriesByIndicatorCode[entry.indicatorCode] ??= []).push(entry);
     }
     const domains = [...new Map(indicators.map((i) => [i.domainName, i.domain])).entries()];
-    const remarks = await previousTierDevelopingEntries(child.id, form.tier);
+    const remarks = await remarkEntries(child.id, form.tier, entries, ownIndicatorCodes);
     container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
@@ -24986,7 +24995,7 @@ var CFormApp = (() => {
     ).join("")}
       ${remarks.length > 0 ? `
             <section class="domain-card" data-remark-section>
-              <h3 class="domain-card__title">\u5099\u8A3B\uFF08\u524D\u4E00\u968E\u6BB5\u672A\u5B8C\u6210\uFF09</h3>
+              <h3 class="domain-card__title">\u5099\u8A3B</h3>
               <div class="domain-card__body">
                 ${remarks.map(remarkBlock).join("")}
               </div>
@@ -24998,12 +25007,13 @@ var CFormApp = (() => {
     container.querySelector('[data-action="export"]').addEventListener("click", async () => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
+        const freshEntries = await listEntriesForForm(form.id);
         const blob = await generateDocxBlob({
           child,
           form,
           indicators,
-          entries: await listEntriesForForm(form.id),
-          previousTierEntries: await previousTierDevelopingEntries(child.id, form.tier)
+          entries: freshEntries,
+          previousTierEntries: await remarkEntries(child.id, form.tier, freshEntries, ownIndicatorCodes)
         });
         downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
         if (errorEl) errorEl.textContent = "";
@@ -25032,7 +25042,7 @@ var CFormApp = (() => {
         }
       });
     }
-    for (const entry of entries) {
+    for (const entry of ownEntries) {
       container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener("click", async () => {
         if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${entry.indicatorCode} ${entry.date}\u300D\u9019\u7B46\u89C0\u5BDF\u7D00\u9304\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
         try {
@@ -26401,27 +26411,17 @@ var CFormApp = (() => {
     reports.sort((a, b) => a.period.localeCompare(b.period));
     const toWrite = [];
     const rerouted = [];
-    const failed = [];
     for (const report of reports) {
       const entries = await listCoursePlanEntriesForReport(report.id);
       for (const entry of entries) {
         const indicatorCode = normalizeIndicatorCode(entry.indicatorCode);
         const indicator = getIndicator(indicatorCode);
-        if (!indicator) {
-          failed.push({
-            reportPeriod: report.period,
-            indicatorCode,
-            activityName: entry.activityName,
-            reason: "\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19"
-          });
-          continue;
-        }
+        const target = !indicator || indicator.tier === tier ? toWrite : rerouted;
         const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
-        const target = indicator.tier === tier ? toWrite : rerouted;
         for (const occurrence of occurrences) {
           if (occurrence.absent) continue;
           target.push({
-            tier: indicator.tier,
+            tier: indicator?.tier,
             indicatorCode,
             date: occurrence.date,
             status: occurrence.status,
@@ -26485,23 +26485,16 @@ var CFormApp = (() => {
         reroutedCount += 1;
       }
     }
-    return { form, failed, skippedDuplicates, reroutedCount };
+    return { form, skippedDuplicates, reroutedCount };
   }
 
   // src/ui/aggregateCoursePlanView.js
-  function resultSummaryHtml(failed, skippedDuplicates, reroutedCount) {
-    const failedSection = failed.length > 0 ? `<p>\u4EE5\u4E0B ${failed.length} \u7B46\u56E0\u6545\u7121\u6CD5\u5E36\u5165\uFF1A</p>
-         <ul>
-           ${failed.map(
-      (item) => `<li>${escapeHtml(item.reportPeriod)}\u3000${escapeHtml(item.indicatorCode)}\u3000\u3010${escapeHtml(item.activityName)}\u3011\u2014${escapeHtml(item.reason)}</li>`
-    ).join("")}
-         </ul>` : "";
-    const reroutedSection = reroutedCount > 0 ? `<p>\u53E6\u6709 ${reroutedCount} \u7B46\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\uFF0C\u5DF2\u4F9D\u5176\u5BE6\u969B\u968E\u6BB5\u6B78\u985E\u5230\u5C0D\u61C9\u7684\u9069\u6027\u7E3D\u8868\uFF08\u532F\u51FA\u7E3D\u8868 Word \u6642\u6703\u986F\u793A\u5728\u5099\u8A3B\u6B04\u4F4D\uFF09</p>` : "";
+  function resultSummaryHtml(skippedDuplicates, reroutedCount) {
+    const reroutedSection = reroutedCount > 0 ? `<p>\u53E6\u6709 ${reroutedCount} \u7B46\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\uFF08\u6216\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF09\uFF0C\u5DF2\u52A0\u9032\u5C0D\u61C9\u7E3D\u8868\u7684\u5099\u8A3B\uFF08\u532F\u51FA\u7E3D\u8868 Word \u6642\u6703\u986F\u793A\u5728\u6700\u5F8C\u7684\u5099\u8A3B\u5340\u584A\uFF09</p>` : "";
     const skippedSection = skippedDuplicates > 0 ? `<p>\u5DF2\u8DF3\u904E ${skippedDuplicates} \u7B46\u91CD\u8907\u8CC7\u6599</p>` : "";
     return `
     <div class="field-error" data-aggregate-result>
       <p>\u5DF2\u5B8C\u6210\u5F59\u6574\uFF0C\u4F46\uFF1A</p>
-      ${failedSection}
       ${reroutedSection}
       ${skippedSection}
       <button type="button" class="btn btn--primary" data-action="go-to-form">\u524D\u5F80\u67E5\u770B\u7E3D\u8868</button>
@@ -26532,7 +26525,7 @@ var CFormApp = (() => {
     function formsForTier(tier) {
       return forms.filter((f) => f.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
     }
-    function render(failed = null, createdForm = null, skippedDuplicates = 0, reroutedCount = 0) {
+    function render(showResult = false, createdForm = null, skippedDuplicates = 0, reroutedCount = 0) {
       const tierReports = reportsForTier(selectedTier);
       const tierForms = formsForTier(selectedTier);
       if (tierForms.length === 0) selectedMode = "new";
@@ -26580,7 +26573,7 @@ var CFormApp = (() => {
         <button type="submit" class="btn btn--primary">${selectedMode === "existing" ? "\u5408\u4F75\u9032\u7E3D\u8868" : "\u5EFA\u7ACB\u7E3D\u8868"}</button>
         <p class="field-error" data-error></p>
       </form>
-      ${failed ? resultSummaryHtml(failed, skippedDuplicates, reroutedCount) : ""}
+      ${showResult ? resultSummaryHtml(skippedDuplicates, reroutedCount) : ""}
     `;
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
       container.querySelector('[data-field="tier"]').addEventListener("change", (event) => {
@@ -26619,27 +26612,22 @@ var CFormApp = (() => {
           targetFormId = Number(targetFormValue);
         }
         try {
-          const {
-            form,
-            failed: failedResult,
-            skippedDuplicates: skippedResult,
-            reroutedCount: reroutedCount2
-          } = await aggregateCoursePlanIntoForm({
+          const { form, skippedDuplicates: skippedResult, reroutedCount: reroutedCount2 } = await aggregateCoursePlanIntoForm({
             childId: child.id,
             tier: selectedTier,
             reportIds,
             targetFormId
           });
-          if (failedResult.length === 0 && skippedResult === 0 && reroutedCount2 === 0) {
+          if (skippedResult === 0 && reroutedCount2 === 0) {
             onCreated(form);
           } else {
-            render(failedResult, form, skippedResult, reroutedCount2);
+            render(true, form, skippedResult, reroutedCount2);
           }
         } catch (err) {
           errorEl.textContent = "\u5EFA\u7ACB\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
         }
       });
-      if (failed && createdForm) {
+      if (showResult && createdForm) {
         container.querySelector('[data-action="go-to-form"]').addEventListener("click", () => onCreated(createdForm));
       }
     }
@@ -27872,6 +27860,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v54</footer>
+<footer class="app-version">v55</footer>
 </body>
 </html>
