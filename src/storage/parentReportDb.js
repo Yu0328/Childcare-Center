@@ -132,8 +132,22 @@ export async function addHighlightEntry({ reportId, photos, caption }) {
   return { id, reportId, photos, caption };
 }
 
+// Safari has a known bug where a Blob just read out of IndexedDB can throw "NotFoundError: The
+// object can not be found here" if it's actually read (e.g. .arrayBuffer()) later on, especially
+// once other async work has happened in between (backup export's many sequential DB reads before
+// reaching a photo blob is a textbook trigger). Rebuilding each blob immediately here, right after
+// the IndexedDB read, captures its bytes at the freshest possible moment — before that staleness
+// window opens — for every consumer (thumbnails, docx export, backup export) at once.
 export async function listHighlightEntriesForReport(reportId) {
-  return runRequest('highlightEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  const entries = await runRequest('highlightEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  return Promise.all(
+    entries.map(async entry => ({
+      ...entry,
+      photos: await Promise.all(
+        entry.photos.map(async photo => ({ ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) }))
+      ),
+    }))
+  );
 }
 
 export async function updateHighlightEntry(id, changes) {

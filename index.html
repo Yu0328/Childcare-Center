@@ -3950,7 +3950,15 @@ var CFormApp = (() => {
     return { id, reportId, photos, caption };
   }
   async function listHighlightEntriesForReport(reportId) {
-    return runRequest("highlightEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    const entries = await runRequest("highlightEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    return Promise.all(
+      entries.map(async (entry) => ({
+        ...entry,
+        photos: await Promise.all(
+          entry.photos.map(async (photo) => ({ ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) }))
+        )
+      }))
+    );
   }
   async function updateHighlightEntry(id, changes) {
     const existing = await runRequest("highlightEntries", "readonly", (store) => store.get(id));
@@ -27708,6 +27716,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v48</footer>
+<footer class="app-version">v49</footer>
 </body>
 </html>

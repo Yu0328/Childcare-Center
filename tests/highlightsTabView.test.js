@@ -1,8 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Blob as NodeBlob } from 'node:buffer';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import { addParentReport, addHighlightEntry } from '../src/storage/parentReportDb.js';
 import { renderHighlightsTab } from '../src/ui/highlightsTabView.js';
 import { waitFor } from './helpers.js';
+
+// jsdom's Blob polyfill isn't recognized by Node's native structuredClone (used internally by
+// fake-indexeddb to clone stored values), so a Blob round-tripped through IndexedDB in this
+// (jsdom) test environment comes back as a plain object missing methods like .arrayBuffer() —
+// which listHighlightEntriesForReport now calls on every photo blob it reads. Swap in the native
+// Blob, same as tests/backup.test.js and tests/parentReportDb.test.js. Safe here specifically
+// because URL.createObjectURL is stubbed below rather than calling jsdom's real (Blob-type-picky)
+// implementation.
+globalThis.Blob = NodeBlob;
 
 function selectFile(input, file) {
   Object.defineProperty(input, 'files', { configurable: true, value: [file] });
