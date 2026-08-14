@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
+import * as parentReportDb from '../src/storage/parentReportDb.js';
 import { addChild, addForm, addEntry, listChildren, listFormsForChild, listEntriesForForm, clearAllData } from '../src/storage/db.js';
 import { exportBackup, importBackup } from '../src/storage/backup.js';
 
@@ -185,5 +186,17 @@ describe('backup export/import', () => {
     expect(restoredPlan.childIds).toHaveLength(1);
     expect(Object.keys(restoredPlan.childTiers)).not.toContain('undefined');
     expect(Object.values(restoredPlan.childTiers)).not.toContain(undefined);
+  });
+
+  it('names which child and section failed when a read throws mid-export, instead of a bare generic error', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+    await addHighlightEntry({ reportId: report.id, photos: [{ blob: new Blob(['a']), width: 10, height: 10 }], caption: 'x' });
+
+    vi.spyOn(parentReportDb, 'listHighlightEntriesForReport').mockRejectedValueOnce(new Error('The object can not be found here.'));
+
+    await expect(exportBackup()).rejects.toThrow('讀取「陳小安」115年06月適性紀錄的點滴分享：The object can not be found here.');
+
+    vi.restoreAllMocks();
   });
 });

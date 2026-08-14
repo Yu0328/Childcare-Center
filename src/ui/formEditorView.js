@@ -1,4 +1,4 @@
-import { getIndicatorsForTier, tierFormLabel, previousTier } from '../data/indicators.js';
+import { getIndicatorsForTier, tierFormLabel, previousTier, getIndicator } from '../data/indicators.js';
 import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
@@ -61,6 +61,18 @@ function indicatorBlock(indicator, entries) {
   `;
 }
 
+// Read-only: these entries live on a different (earlier) tier's form — edit them there, not here.
+function remarkBlock(entry) {
+  const indicator = getIndicator(entry.indicatorCode);
+  return `
+    <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
+      <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? '')}</h4>
+      <p class="entry-row__date"><span class="entry-row__mark">△</span>${escapeHtml(entry.date)}</p>
+      <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+    </div>
+  `;
+}
+
 // This child's still-developing (未完成) entries recorded against their previous tier's
 // indicators — a child moving up a tier can still have open items from before, and they'd
 // otherwise never show up on any form again once the new tier's form takes over.
@@ -85,6 +97,7 @@ export async function renderFormEditorView(
   }
 
   const domains = [...new Map(indicators.map(i => [i.domainName, i.domain])).entries()];
+  const remarks = await previousTierDevelopingEntries(child.id, form.tier);
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -109,6 +122,18 @@ export async function renderFormEditorView(
           `
         )
         .join('')}
+      ${
+        remarks.length > 0
+          ? `
+            <section class="domain-card" data-remark-section>
+              <h3 class="domain-card__title">備註（前一階段未完成）</h3>
+              <div class="domain-card__body">
+                ${remarks.map(remarkBlock).join('')}
+              </div>
+            </section>
+          `
+          : ''
+      }
     </div>
   `;
 
