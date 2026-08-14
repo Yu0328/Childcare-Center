@@ -15,6 +15,18 @@ import {
 
 const BACKUP_VERSION = 3;
 
+// Re-throws with a label identifying which part of the export was in flight, so a generic
+// browser error (e.g. Safari's "NotFoundError: The object can not be found here", which several
+// unrelated APIs can throw) can actually be traced back to what data triggered it, instead of
+// needing devtools access the person hitting it may not have (especially on iOS).
+async function withContext(label, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    throw new Error(`${label}：${err?.message || err}`, { cause: err });
+  }
+}
+
 // Appends one character at a time rather than spreading bytes into String.fromCharCode: spreading
 // even a chunked subarray (this used to chunk at 0x8000) can exceed Safari's call-stack/argument-
 // spread limit, which is lower than Chrome's, for a real (non-trivial) photo. One argument per
@@ -47,51 +59,78 @@ export async function exportBackup() {
   const highlightEntries = [];
 
   for (const child of children) {
-    const childForms = await listFormsForChild(child.id);
+    const childForms = await withContext(`讀取「${child.name}」的適性總表`, () => listFormsForChild(child.id));
     forms.push(...childForms);
     for (const form of childForms) {
-      entries.push(...(await listEntriesForForm(form.id)));
+      const formEntries = await withContext(`讀取「${child.name}」${form.period}總表的觀察紀錄`, () => listEntriesForForm(form.id));
+      entries.push(...formEntries);
     }
 
-    const childReports = await listParentReportsForChild(child.id);
+    const childReports = await withContext(`讀取「${child.name}」的適性紀錄`, () => listParentReportsForChild(child.id));
     parentReports.push(...childReports);
     for (const report of childReports) {
-      const reportEntries = await listCoursePlanEntriesForReport(report.id);
+      const reportEntries = await withContext(
+        `讀取「${child.name}」${report.period}適性紀錄的課程計畫表`,
+        () => listCoursePlanEntriesForReport(report.id)
+      );
       coursePlanEntries.push(...reportEntries);
       for (const entry of reportEntries) {
-        courseOccurrences.push(...(await listCourseOccurrencesForEntry(entry.id)));
+        const occurrences = await withContext(
+          `讀取「${child.name}」${report.period}課程計畫表「${entry.indicatorCode}」的實施紀錄`,
+          () => listCourseOccurrencesForEntry(entry.id)
+        );
+        courseOccurrences.push(...occurrences);
       }
-      developmentRecordEntries.push(...(await listDevelopmentRecordEntriesForReport(report.id)));
-      behaviorObservations.push(...(await listBehaviorObservationsForReport(report.id)));
+      developmentRecordEntries.push(
+        ...(await withContext(
+          `讀取「${child.name}」${report.period}適性紀錄的適性發展紀錄表`,
+          () => listDevelopmentRecordEntriesForReport(report.id)
+        ))
+      );
+      behaviorObservations.push(
+        ...(await withContext(
+          `讀取「${child.name}」${report.period}適性紀錄的行為觀察`,
+          () => listBehaviorObservationsForReport(report.id)
+        ))
+      );
 
-      const reportHighlights = await listHighlightEntriesForReport(report.id);
+      const reportHighlights = await withContext(
+        `讀取「${child.name}」${report.period}適性紀錄的點滴分享`,
+        () => listHighlightEntriesForReport(report.id)
+      );
       for (const highlight of reportHighlights) {
-        const photos = await Promise.all(
-          highlight.photos.map(async photo => ({
-            base64: await blobToBase64(photo.blob),
-            type: photo.blob.type,
-            width: photo.width,
-            height: photo.height,
-          }))
+        const photos = await withContext(
+          `轉換「${child.name}」${report.period}點滴分享「${highlight.caption}」的照片`,
+          () =>
+            Promise.all(
+              highlight.photos.map(async photo => ({
+                base64: await blobToBase64(photo.blob),
+                type: photo.blob.type,
+                width: photo.width,
+                height: photo.height,
+              }))
+            )
         );
         highlightEntries.push({ ...highlight, photos });
       }
     }
   }
 
-  const monthlyCoursePlans = await listMonthlyCoursePlans();
+  const monthlyCoursePlans = await withContext('讀取課程月計畫', () => listMonthlyCoursePlans());
   const planSlots = [];
   const planSlotItems = [];
   for (const plan of monthlyCoursePlans) {
-    const slots = await listPlanSlotsForPlan(plan.id);
+    const slots = await withContext(`讀取課程月計畫「${plan.period}」的日曆格`, () => listPlanSlotsForPlan(plan.id));
     planSlots.push(...slots);
     for (const slot of slots) {
-      planSlotItems.push(...(await listPlanSlotItems(slot.id)));
+      planSlotItems.push(...(await withContext(`讀取課程月計畫「${plan.period}」的項目`, () => listPlanSlotItems(slot.id))));
     }
   }
   const childItemOverrides = [];
   for (const plan of monthlyCoursePlans) {
-    childItemOverrides.push(...(await listChildItemOverridesForPlan(plan.id)));
+    childItemOverrides.push(
+      ...(await withContext(`讀取課程月計畫「${plan.period}」的個別調整`, () => listChildItemOverridesForPlan(plan.id)))
+    );
   }
 
   return JSON.stringify(

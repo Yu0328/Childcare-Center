@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllData, addChild, addForm, addEntry } from '../src/storage/db.js';
+import { clearAllData, addChild, addForm, addEntry, listFormsForChild, listEntriesForForm } from '../src/storage/db.js';
 import { addParentReport, addCoursePlanEntry, addCourseOccurrence } from '../src/storage/parentReportDb.js';
 import { renderAggregateCoursePlanView } from '../src/ui/aggregateCoursePlanView.js';
 import { waitFor } from './helpers.js';
@@ -220,6 +220,29 @@ describe('renderAggregateCoursePlanView', () => {
 
     container.querySelector('[data-action="go-to-form"]').click();
     expect(created).not.toBeNull();
+  });
+
+  it('reports rerouted cross-tier entries instead of onCreated firing immediately, and files them into the right tier', async () => {
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    // Ⅳ-1-1 is a real indicator, but for the Ⅳ tier, not Ⅴ.
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+    const container = document.createElement('div');
+    let created = null;
+    await renderAggregateCoursePlanView(container, { child, onCreated: form => { created = form; }, onBack: () => {} });
+
+    container.querySelector(`[data-report-checkbox="${report.id}"]`).checked = true;
+    container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.querySelector('[data-action="go-to-form"]'));
+    expect(container.textContent).toContain('已依其實際階段歸類到對應的適性總表');
+    expect(created).toBeNull();
+
+    const forms = await listFormsForChild(child.id);
+    const ivForm = forms.find(f => f.tier === 'Ⅳ');
+    expect(ivForm).toBeDefined();
+    expect(await listEntriesForForm(ivForm.id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1' }]);
   });
 
   it('calls onBack when the back button is clicked', async () => {

@@ -101,18 +101,53 @@ describe('aggregateCoursePlanIntoForm', () => {
     expect(entries.map(e => e.date)).toEqual(['2026-01-05', '2026-01-20']);
   });
 
-  it('lists entries whose indicator belongs to a different tier as failed', async () => {
+  it('files an entry whose indicator belongs to a different tier into a form for its own tier, not the target form', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     // Ⅳ-1-1 is a real indicator, but for the Ⅳ tier, not Ⅴ.
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
-    const { form, failed } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { form, failed, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
-    expect(failed).toEqual([
-      { reportPeriod: '115年01月', indicatorCode: 'Ⅳ-1-1', activityName: '走路練習', reason: '指標不屬於此階段' },
-    ]);
+    expect(failed).toEqual([]);
+    expect(reroutedCount).toBe(1);
     expect(await listEntriesForForm(form.id)).toEqual([]);
+
+    const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
+    const ivForm = forms.find(f => f.tier === 'Ⅳ');
+    expect(ivForm).toBeDefined();
+    expect(ivForm.period).toBe('115年01月');
+    const ivEntries = await listEntriesForForm(ivForm.id);
+    expect(ivEntries).toMatchObject([{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' }]);
+  });
+
+  it('reuses an existing form for the rerouted tier instead of creating a second one', async () => {
+    const existingIvForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '114年10月' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+    await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+
+    const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
+    expect(forms.filter(f => f.tier === 'Ⅳ')).toHaveLength(1);
+    const ivEntries = await listEntriesForForm(existingIvForm.id);
+    expect(ivEntries).toHaveLength(1);
+  });
+
+  it('skips a rerouted row that exactly duplicates an entry already in that tier\'s form, and counts it', async () => {
+    const existingIvForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '114年10月' });
+    await addEntry({ formId: existingIvForm.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' });
+
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+    const { skippedDuplicates, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+
+    expect(skippedDuplicates).toBe(1);
+    expect(reroutedCount).toBe(0);
+    expect(await listEntriesForForm(existingIvForm.id)).toHaveLength(1);
   });
 
   describe('merging into an existing target form', () => {

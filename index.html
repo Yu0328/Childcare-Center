@@ -24907,6 +24907,16 @@ var CFormApp = (() => {
     </div>
   `;
   }
+  function remarkBlock(entry) {
+    const indicator = getIndicator(entry.indicatorCode);
+    return `
+    <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
+      <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? "")}</h4>
+      <p class="entry-row__date"><span class="entry-row__mark">\u25B3</span>${escapeHtml(entry.date)}</p>
+      <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+    </div>
+  `;
+  }
   async function previousTierDevelopingEntries(childId, tier) {
     const prevTier = previousTier(tier);
     if (!prevTier) return [];
@@ -24922,6 +24932,7 @@ var CFormApp = (() => {
       (entriesByIndicatorCode[entry.indicatorCode] ??= []).push(entry);
     }
     const domains = [...new Map(indicators.map((i) => [i.domainName, i.domain])).entries()];
+    const remarks = await previousTierDevelopingEntries(child.id, form.tier);
     container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
@@ -24940,6 +24951,14 @@ var CFormApp = (() => {
             </section>
           `
     ).join("")}
+      ${remarks.length > 0 ? `
+            <section class="domain-card" data-remark-section>
+              <h3 class="domain-card__title">\u5099\u8A3B\uFF08\u524D\u4E00\u968E\u6BB5\u672A\u5B8C\u6210\uFF09</h3>
+              <div class="domain-card__body">
+                ${remarks.map(remarkBlock).join("")}
+              </div>
+            </section>
+          ` : ""}
     </div>
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
@@ -26348,29 +26367,38 @@ var CFormApp = (() => {
     }
     reports.sort((a, b) => a.period.localeCompare(b.period));
     const toWrite = [];
+    const rerouted = [];
     const failed = [];
     for (const report of reports) {
       const entries = await listCoursePlanEntriesForReport(report.id);
       for (const entry of entries) {
         const indicator = getIndicator(entry.indicatorCode);
-        if (!indicator || indicator.tier !== tier) {
+        if (!indicator) {
           failed.push({
             reportPeriod: report.period,
             indicatorCode: entry.indicatorCode,
             activityName: entry.activityName,
-            reason: indicator ? "\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5" : "\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19"
+            reason: "\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19"
           });
           continue;
         }
         const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
+        const target = indicator.tier === tier ? toWrite : rerouted;
         for (const occurrence of occurrences) {
           if (occurrence.absent) continue;
-          toWrite.push({ indicatorCode: entry.indicatorCode, date: occurrence.date, status: occurrence.status, note: occurrence.note });
+          target.push({
+            tier: indicator.tier,
+            indicatorCode: entry.indicatorCode,
+            date: occurrence.date,
+            status: occurrence.status,
+            note: occurrence.note
+          });
         }
       }
     }
     let form;
     let skippedDuplicates = 0;
+    const period = combinedPeriodRange(reports.map((r) => r.period));
     if (targetFormId) {
       form = await getForm(targetFormId);
       const existingEntries = await listEntriesForForm(targetFormId);
@@ -26385,34 +26413,62 @@ var CFormApp = (() => {
         seen.add(signature);
         rowsToWrite.push(row);
       }
-      const period = combinedPeriodRange([...periodRangeParts(form.period), ...reports.map((r) => r.period)]);
-      form = await updateForm(targetFormId, { period });
+      const mergedPeriod = combinedPeriodRange([...periodRangeParts(form.period), ...reports.map((r) => r.period)]);
+      form = await updateForm(targetFormId, { period: mergedPeriod });
       for (const row of rowsToWrite) {
-        await addEntry({ formId: form.id, ...row });
+        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note });
       }
     } else {
-      const period = combinedPeriodRange(reports.map((r) => r.period));
       form = await addForm({ childId, tier, period });
       for (const row of toWrite) {
-        await addEntry({ formId: form.id, ...row });
+        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note });
       }
     }
-    return { form, failed, skippedDuplicates };
+    let reroutedCount = 0;
+    const reroutedByTier = /* @__PURE__ */ new Map();
+    for (const row of rerouted) {
+      if (!reroutedByTier.has(row.tier)) reroutedByTier.set(row.tier, []);
+      reroutedByTier.get(row.tier).push(row);
+    }
+    const childForms = rerouted.length > 0 ? await listFormsForChild(childId) : [];
+    for (const [rowTier, rows] of reroutedByTier) {
+      let rerouteForm = childForms.find((f) => f.tier === rowTier);
+      if (!rerouteForm) {
+        rerouteForm = await addForm({ childId, tier: rowTier, period });
+        childForms.push(rerouteForm);
+      }
+      const existingEntries = await listEntriesForForm(rerouteForm.id);
+      const seen = new Set(existingEntries.map(entrySignature));
+      for (const row of rows) {
+        const entryRow3 = { indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note };
+        const signature = entrySignature(entryRow3);
+        if (seen.has(signature)) {
+          skippedDuplicates += 1;
+          continue;
+        }
+        seen.add(signature);
+        await addEntry({ formId: rerouteForm.id, ...entryRow3 });
+        reroutedCount += 1;
+      }
+    }
+    return { form, failed, skippedDuplicates, reroutedCount };
   }
 
   // src/ui/aggregateCoursePlanView.js
-  function resultSummaryHtml(failed, skippedDuplicates) {
+  function resultSummaryHtml(failed, skippedDuplicates, reroutedCount) {
     const failedSection = failed.length > 0 ? `<p>\u4EE5\u4E0B ${failed.length} \u7B46\u56E0\u6545\u7121\u6CD5\u5E36\u5165\uFF1A</p>
          <ul>
            ${failed.map(
       (item) => `<li>${escapeHtml(item.reportPeriod)}\u3000${escapeHtml(item.indicatorCode)}\u3000\u3010${escapeHtml(item.activityName)}\u3011\u2014${escapeHtml(item.reason)}</li>`
     ).join("")}
          </ul>` : "";
+    const reroutedSection = reroutedCount > 0 ? `<p>\u53E6\u6709 ${reroutedCount} \u7B46\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\uFF0C\u5DF2\u4F9D\u5176\u5BE6\u969B\u968E\u6BB5\u6B78\u985E\u5230\u5C0D\u61C9\u7684\u9069\u6027\u7E3D\u8868\uFF08\u532F\u51FA\u7E3D\u8868 Word \u6642\u6703\u986F\u793A\u5728\u5099\u8A3B\u6B04\u4F4D\uFF09</p>` : "";
     const skippedSection = skippedDuplicates > 0 ? `<p>\u5DF2\u8DF3\u904E ${skippedDuplicates} \u7B46\u91CD\u8907\u8CC7\u6599</p>` : "";
     return `
     <div class="field-error" data-aggregate-result>
       <p>\u5DF2\u5B8C\u6210\u5F59\u6574\uFF0C\u4F46\uFF1A</p>
       ${failedSection}
+      ${reroutedSection}
       ${skippedSection}
       <button type="button" class="btn btn--primary" data-action="go-to-form">\u524D\u5F80\u67E5\u770B\u7E3D\u8868</button>
     </div>
@@ -26442,7 +26498,7 @@ var CFormApp = (() => {
     function formsForTier(tier) {
       return forms.filter((f) => f.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
     }
-    function render(failed = null, createdForm = null, skippedDuplicates = 0) {
+    function render(failed = null, createdForm = null, skippedDuplicates = 0, reroutedCount = 0) {
       const tierReports = reportsForTier(selectedTier);
       const tierForms = formsForTier(selectedTier);
       if (tierForms.length === 0) selectedMode = "new";
@@ -26490,7 +26546,7 @@ var CFormApp = (() => {
         <button type="submit" class="btn btn--primary">${selectedMode === "existing" ? "\u5408\u4F75\u9032\u7E3D\u8868" : "\u5EFA\u7ACB\u7E3D\u8868"}</button>
         <p class="field-error" data-error></p>
       </form>
-      ${failed ? resultSummaryHtml(failed, skippedDuplicates) : ""}
+      ${failed ? resultSummaryHtml(failed, skippedDuplicates, reroutedCount) : ""}
     `;
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
       container.querySelector('[data-field="tier"]').addEventListener("change", (event) => {
@@ -26532,17 +26588,18 @@ var CFormApp = (() => {
           const {
             form,
             failed: failedResult,
-            skippedDuplicates: skippedResult
+            skippedDuplicates: skippedResult,
+            reroutedCount: reroutedCount2
           } = await aggregateCoursePlanIntoForm({
             childId: child.id,
             tier: selectedTier,
             reportIds,
             targetFormId
           });
-          if (failedResult.length === 0 && skippedResult === 0) {
+          if (failedResult.length === 0 && skippedResult === 0 && reroutedCount2 === 0) {
             onCreated(form);
           } else {
-            render(failedResult, form, skippedResult);
+            render(failedResult, form, skippedResult, reroutedCount2);
           }
         } catch (err) {
           errorEl.textContent = "\u5EFA\u7ACB\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -27309,6 +27366,13 @@ var CFormApp = (() => {
 
   // src/storage/backup.js
   var BACKUP_VERSION = 3;
+  async function withContext(label, fn) {
+    try {
+      return await fn();
+    } catch (err) {
+      throw new Error(`${label}\uFF1A${err?.message || err}`, { cause: err });
+    }
+  }
   async function blobToBase64(blob) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let binary = "";
@@ -27334,48 +27398,74 @@ var CFormApp = (() => {
     const behaviorObservations = [];
     const highlightEntries = [];
     for (const child of children) {
-      const childForms = await listFormsForChild(child.id);
+      const childForms = await withContext(`\u8B80\u53D6\u300C${child.name}\u300D\u7684\u9069\u6027\u7E3D\u8868`, () => listFormsForChild(child.id));
       forms.push(...childForms);
       for (const form of childForms) {
-        entries.push(...await listEntriesForForm(form.id));
+        const formEntries = await withContext(`\u8B80\u53D6\u300C${child.name}\u300D${form.period}\u7E3D\u8868\u7684\u89C0\u5BDF\u7D00\u9304`, () => listEntriesForForm(form.id));
+        entries.push(...formEntries);
       }
-      const childReports = await listParentReportsForChild(child.id);
+      const childReports = await withContext(`\u8B80\u53D6\u300C${child.name}\u300D\u7684\u9069\u6027\u7D00\u9304`, () => listParentReportsForChild(child.id));
       parentReports.push(...childReports);
       for (const report of childReports) {
-        const reportEntries = await listCoursePlanEntriesForReport(report.id);
+        const reportEntries = await withContext(
+          `\u8B80\u53D6\u300C${child.name}\u300D${report.period}\u9069\u6027\u7D00\u9304\u7684\u8AB2\u7A0B\u8A08\u756B\u8868`,
+          () => listCoursePlanEntriesForReport(report.id)
+        );
         coursePlanEntries.push(...reportEntries);
         for (const entry of reportEntries) {
-          courseOccurrences.push(...await listCourseOccurrencesForEntry(entry.id));
+          const occurrences = await withContext(
+            `\u8B80\u53D6\u300C${child.name}\u300D${report.period}\u8AB2\u7A0B\u8A08\u756B\u8868\u300C${entry.indicatorCode}\u300D\u7684\u5BE6\u65BD\u7D00\u9304`,
+            () => listCourseOccurrencesForEntry(entry.id)
+          );
+          courseOccurrences.push(...occurrences);
         }
-        developmentRecordEntries.push(...await listDevelopmentRecordEntriesForReport(report.id));
-        behaviorObservations.push(...await listBehaviorObservationsForReport(report.id));
-        const reportHighlights = await listHighlightEntriesForReport(report.id);
+        developmentRecordEntries.push(
+          ...await withContext(
+            `\u8B80\u53D6\u300C${child.name}\u300D${report.period}\u9069\u6027\u7D00\u9304\u7684\u9069\u6027\u767C\u5C55\u7D00\u9304\u8868`,
+            () => listDevelopmentRecordEntriesForReport(report.id)
+          )
+        );
+        behaviorObservations.push(
+          ...await withContext(
+            `\u8B80\u53D6\u300C${child.name}\u300D${report.period}\u9069\u6027\u7D00\u9304\u7684\u884C\u70BA\u89C0\u5BDF`,
+            () => listBehaviorObservationsForReport(report.id)
+          )
+        );
+        const reportHighlights = await withContext(
+          `\u8B80\u53D6\u300C${child.name}\u300D${report.period}\u9069\u6027\u7D00\u9304\u7684\u9EDE\u6EF4\u5206\u4EAB`,
+          () => listHighlightEntriesForReport(report.id)
+        );
         for (const highlight of reportHighlights) {
-          const photos = await Promise.all(
-            highlight.photos.map(async (photo) => ({
-              base64: await blobToBase64(photo.blob),
-              type: photo.blob.type,
-              width: photo.width,
-              height: photo.height
-            }))
+          const photos = await withContext(
+            `\u8F49\u63DB\u300C${child.name}\u300D${report.period}\u9EDE\u6EF4\u5206\u4EAB\u300C${highlight.caption}\u300D\u7684\u7167\u7247`,
+            () => Promise.all(
+              highlight.photos.map(async (photo) => ({
+                base64: await blobToBase64(photo.blob),
+                type: photo.blob.type,
+                width: photo.width,
+                height: photo.height
+              }))
+            )
           );
           highlightEntries.push({ ...highlight, photos });
         }
       }
     }
-    const monthlyCoursePlans = await listMonthlyCoursePlans();
+    const monthlyCoursePlans = await withContext("\u8B80\u53D6\u8AB2\u7A0B\u6708\u8A08\u756B", () => listMonthlyCoursePlans());
     const planSlots = [];
     const planSlotItems = [];
     for (const plan of monthlyCoursePlans) {
-      const slots = await listPlanSlotsForPlan(plan.id);
+      const slots = await withContext(`\u8B80\u53D6\u8AB2\u7A0B\u6708\u8A08\u756B\u300C${plan.period}\u300D\u7684\u65E5\u66C6\u683C`, () => listPlanSlotsForPlan(plan.id));
       planSlots.push(...slots);
       for (const slot of slots) {
-        planSlotItems.push(...await listPlanSlotItems(slot.id));
+        planSlotItems.push(...await withContext(`\u8B80\u53D6\u8AB2\u7A0B\u6708\u8A08\u756B\u300C${plan.period}\u300D\u7684\u9805\u76EE`, () => listPlanSlotItems(slot.id)));
       }
     }
     const childItemOverrides = [];
     for (const plan of monthlyCoursePlans) {
-      childItemOverrides.push(...await listChildItemOverridesForPlan(plan.id));
+      childItemOverrides.push(
+        ...await withContext(`\u8B80\u53D6\u8AB2\u7A0B\u6708\u8A08\u756B\u300C${plan.period}\u300D\u7684\u500B\u5225\u8ABF\u6574`, () => listChildItemOverridesForPlan(plan.id))
+      );
     }
     return JSON.stringify(
       {
@@ -27748,6 +27838,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v50</footer>
+<footer class="app-version">v51</footer>
 </body>
 </html>

@@ -165,6 +165,26 @@ describe('renderFormEditorView', () => {
     vi.restoreAllMocks();
   });
 
+  it('shows a 備註 section on screen for the child\'s still-developing entries from their previous tier, but not when there are none', async () => {
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+    expect(container.querySelector('[data-remark-section]')).toBeNull();
+
+    const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
+    await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習扶物站立' });
+    await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-2', date: '2025-10-05', status: 'developed', note: '已完成' });
+
+    const container2 = document.createElement('div');
+    await renderFormEditorView(container2, { child, form, onBack: () => {} });
+
+    const remarkSection = container2.querySelector('[data-remark-section]');
+    expect(remarkSection).not.toBeNull();
+    expect(remarkSection.textContent).toContain('Ⅲ-1-1');
+    expect(remarkSection.textContent).toContain('仍在練習扶物站立');
+    expect(remarkSection.textContent).not.toContain('Ⅲ-1-2');
+    expect(remarkSection.textContent).not.toContain('已完成');
+  });
+
   it('passes the child\'s still-developing entries from their previous tier (Ⅲ) into the export, but not their already-developed ones', async () => {
     const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
     await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習扶物站立' });

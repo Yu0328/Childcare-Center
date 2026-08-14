@@ -3,7 +3,7 @@ import { listFormsForChild } from '../storage/db.js';
 import { aggregateCoursePlanIntoForm } from '../domain/aggregateCoursePlan.js';
 import { escapeHtml } from './escapeHtml.js';
 
-function resultSummaryHtml(failed, skippedDuplicates) {
+function resultSummaryHtml(failed, skippedDuplicates, reroutedCount) {
   const failedSection =
     failed.length > 0
       ? `<p>以下 ${failed.length} 筆因故無法帶入：</p>
@@ -16,12 +16,17 @@ function resultSummaryHtml(failed, skippedDuplicates) {
              .join('')}
          </ul>`
       : '';
+  const reroutedSection =
+    reroutedCount > 0
+      ? `<p>另有 ${reroutedCount} 筆指標不屬於此階段，已依其實際階段歸類到對應的適性總表（匯出總表 Word 時會顯示在備註欄位）</p>`
+      : '';
   const skippedSection = skippedDuplicates > 0 ? `<p>已跳過 ${skippedDuplicates} 筆重複資料</p>` : '';
 
   return `
     <div class="field-error" data-aggregate-result>
       <p>已完成彙整，但：</p>
       ${failedSection}
+      ${reroutedSection}
       ${skippedSection}
       <button type="button" class="btn btn--primary" data-action="go-to-form">前往查看總表</button>
     </div>
@@ -57,7 +62,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
     return forms.filter(f => f.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
   }
 
-  function render(failed = null, createdForm = null, skippedDuplicates = 0) {
+  function render(failed = null, createdForm = null, skippedDuplicates = 0, reroutedCount = 0) {
     const tierReports = reportsForTier(selectedTier);
     const tierForms = formsForTier(selectedTier);
     if (tierForms.length === 0) selectedMode = 'new';
@@ -112,7 +117,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
         <button type="submit" class="btn btn--primary">${selectedMode === 'existing' ? '合併進總表' : '建立總表'}</button>
         <p class="field-error" data-error></p>
       </form>
-      ${failed ? resultSummaryHtml(failed, skippedDuplicates) : ''}
+      ${failed ? resultSummaryHtml(failed, skippedDuplicates, reroutedCount) : ''}
     `;
 
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);
@@ -165,16 +170,17 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
           form,
           failed: failedResult,
           skippedDuplicates: skippedResult,
+          reroutedCount,
         } = await aggregateCoursePlanIntoForm({
           childId: child.id,
           tier: selectedTier,
           reportIds,
           targetFormId,
         });
-        if (failedResult.length === 0 && skippedResult === 0) {
+        if (failedResult.length === 0 && skippedResult === 0 && reroutedCount === 0) {
           onCreated(form);
         } else {
-          render(failedResult, form, skippedResult);
+          render(failedResult, form, skippedResult, reroutedCount);
         }
       } catch (err) {
         errorEl.textContent = '建立失敗，請再試一次';
