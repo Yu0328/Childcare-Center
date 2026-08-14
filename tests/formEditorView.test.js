@@ -165,6 +165,27 @@ describe('renderFormEditorView', () => {
     vi.restoreAllMocks();
   });
 
+  it('passes the child\'s still-developing entries from their previous tier (Ⅲ) into the export, but not their already-developed ones', async () => {
+    const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
+    await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習扶物站立' });
+    await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-2', date: '2025-10-05', status: 'developed', note: '已完成' });
+
+    const docxExportModule = await import('../src/export/docxExport.js');
+    const generateSpy = vi.spyOn(docxExportModule, 'generateDocxBlob');
+    vi.spyOn(docxExportModule, 'downloadDocx').mockImplementation(() => {});
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    container.querySelector('[data-action="export"]').click();
+    await waitFor(() => generateSpy.mock.calls.length > 0);
+
+    const previousTierEntries = generateSpy.mock.calls[0][0].previousTierEntries;
+    expect(previousTierEntries.map(e => e.indicatorCode)).toEqual(['Ⅲ-1-1']);
+
+    vi.restoreAllMocks();
+  });
+
   it('calls onBack when the back button is clicked', async () => {
     const container = document.createElement('div');
     const onBack = vi.fn();

@@ -323,6 +323,13 @@ export function tierFormLabel(tierCode) {
   return tier.formLetter ? `${tier.formLetter}表` : tier.label;
 }
 
+// The tier immediately before this one in TIERS, or null for Ⅰ (no earlier tier) or an
+// unrecognized code.
+export function previousTier(tierCode) {
+  const index = TIERS.findIndex(t => t.code === tierCode);
+  return index > 0 ? TIERS[index - 1].code : null;
+}
+
 export const DOMAINS = RAW_DOMAINS.map(({ domain, name, subdomain }) => ({
   id: domain,
   name,
