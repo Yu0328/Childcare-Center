@@ -15,13 +15,15 @@ import {
 
 const BACKUP_VERSION = 3;
 
-// Chunked to avoid call-stack overflows from spreading a huge byte array into String.fromCharCode.
+// Appends one character at a time rather than spreading bytes into String.fromCharCode: spreading
+// even a chunked subarray (this used to chunk at 0x8000) can exceed Safari's call-stack/argument-
+// spread limit, which is lower than Chrome's, for a real (non-trivial) photo. One argument per
+// call has no such limit on any engine.
 async function blobToBase64(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  const chunkSize = 0x8000;
   let binary = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
 }

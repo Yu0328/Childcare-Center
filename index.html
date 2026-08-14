@@ -27252,10 +27252,9 @@ var CFormApp = (() => {
   var BACKUP_VERSION = 3;
   async function blobToBase64(blob) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    const chunkSize = 32768;
     let binary = "";
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
   }
@@ -27688,6 +27687,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v45</footer>
+<footer class="app-version">v46</footer>
 </body>
 </html>
