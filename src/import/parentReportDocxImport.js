@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { DOMAINS, getIndicator } from '../data/indicators.js';
+import { DOMAINS, getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
 
 function cellsForRow(rowXml) {
   return [...rowXml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map(match => match[1]);
@@ -59,27 +59,6 @@ function normalizeMonthDay(raw) {
   const match = /^(\d{1,2})\/(\d{1,2})/.exec(raw);
   if (!match) return null;
   return `${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}`;
-}
-
-// Bug fix: src/data/indicators.js's reference codes always use the Unicode ROMAN NUMERAL
-// characters (Ⅰ Ⅱ Ⅲ Ⅳ Ⅴ, single codepoints) as the tier prefix, and getIndicator() does an exact
-// string match against them. A real legacy file's author sometimes typed that prefix using
-// ordinary ASCII Latin letters (the keyboard "V" key, etc.) instead — verified against a real
-// reference sample (gitignored, not committed here): 8 Latin-prefixed codes vs. only 3 proper
-// Unicode ones in that one file. A Latin-prefixed code still displays fine as text, but
-// getIndicator() silently fails to resolve it, which breaks every downstream domain-grouping
-// consumer (export sort, UI display, etc.) even though nothing looks wrong in the raw import.
-// Normalizing here, at the point indicatorCode is extracted, means the STORED code is always
-// canonical — no downstream consumer needs to know this ever happened.
-//
-// Longest-prefix-first ordering matters: "IV" and "III" must be checked before the single-letter
-// "I"/"V" fallbacks, or "IV-1-2" would match "I" and leave a bogus "V-1-2" remainder.
-const LATIN_TIER_PREFIX_TO_UNICODE = { III: 'Ⅲ', IV: 'Ⅳ', II: 'Ⅱ', I: 'Ⅰ', V: 'Ⅴ' };
-const LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
-export function normalizeIndicatorCode(code) {
-  const match = LATIN_TIER_PREFIX_PATTERN.exec(code);
-  if (!match) return code; // already Unicode, or unrecognized/garbled — leave untouched
-  return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);
 }
 
 export function parseCoursePlanTable(documentXml) {

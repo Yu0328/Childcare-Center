@@ -3950,12 +3950,23 @@ var CFormApp = (() => {
     return { id, reportId, photos, caption };
   }
   async function listHighlightEntriesForReport(reportId) {
-    const entries = await runRequest("highlightEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    let entries;
+    try {
+      entries = await runRequest("highlightEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    } catch (err) {
+      throw new Error(`IndexedDB \u67E5\u8A62\u5931\u6557\uFF1A${err?.message || err}`, { cause: err });
+    }
     return Promise.all(
       entries.map(async (entry) => ({
         ...entry,
         photos: await Promise.all(
-          entry.photos.map(async (photo) => ({ ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) }))
+          entry.photos.map(async (photo, index) => {
+            try {
+              return { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) };
+            } catch (err) {
+              throw new Error(`\u7B2C ${index + 1} \u5F35\u7167\u7247\u8B80\u53D6\u5931\u6557\uFF1A${err?.message || err}`, { cause: err });
+            }
+          })
         )
       }))
     );
@@ -4535,8 +4546,16 @@ var CFormApp = (() => {
     const dataKeys = TIER_DATA_KEYS[tierCode] || [tierCode];
     return INDICATORS.filter((indicator) => dataKeys.includes(indicator.tier));
   }
+  var LATIN_TIER_PREFIX_TO_UNICODE = { III: "\u2162", IV: "\u2163", II: "\u2161", I: "\u2160", V: "\u2164" };
+  var LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
+  function normalizeIndicatorCode(code) {
+    const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? "");
+    if (!match) return code;
+    return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);
+  }
   function getIndicator(code) {
-    return INDICATORS.find((indicator) => indicator.code === code);
+    const normalized = normalizeIndicatorCode(code);
+    return INDICATORS.find((indicator) => indicator.code === normalized);
   }
 
   // src/import/docxImport.js
@@ -4829,13 +4848,6 @@ var CFormApp = (() => {
     const match = /^(\d{1,2})\/(\d{1,2})/.exec(raw);
     if (!match) return null;
     return `${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
-  }
-  var LATIN_TIER_PREFIX_TO_UNICODE = { III: "\u2162", IV: "\u2163", II: "\u2161", I: "\u2160", V: "\u2164" };
-  var LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
-  function normalizeIndicatorCode(code) {
-    const match = LATIN_TIER_PREFIX_PATTERN.exec(code);
-    if (!match) return code;
-    return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);
   }
   function parseCoursePlanTable(documentXml) {
     const bodyRows = rowsOf2(documentXml).slice(1);
@@ -26372,11 +26384,12 @@ var CFormApp = (() => {
     for (const report of reports) {
       const entries = await listCoursePlanEntriesForReport(report.id);
       for (const entry of entries) {
-        const indicator = getIndicator(entry.indicatorCode);
+        const indicatorCode = normalizeIndicatorCode(entry.indicatorCode);
+        const indicator = getIndicator(indicatorCode);
         if (!indicator) {
           failed.push({
             reportPeriod: report.period,
-            indicatorCode: entry.indicatorCode,
+            indicatorCode,
             activityName: entry.activityName,
             reason: "\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19"
           });
@@ -26388,7 +26401,7 @@ var CFormApp = (() => {
           if (occurrence.absent) continue;
           target.push({
             tier: indicator.tier,
-            indicatorCode: entry.indicatorCode,
+            indicatorCode,
             date: occurrence.date,
             status: occurrence.status,
             note: occurrence.note
@@ -27838,6 +27851,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v51</footer>
+<footer class="app-version">v52</footer>
 </body>
 </html>
