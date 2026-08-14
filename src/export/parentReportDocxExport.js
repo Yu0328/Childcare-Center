@@ -4,6 +4,7 @@ import {
   TextWrappingType, VerticalAlign, VerticalMergeType, VerticalPositionRelativeFrom, WidthType,
 } from 'docx';
 import { TIERS, DOMAINS, getIndicator } from '../data/indicators.js';
+import { downloadBlob } from './downloadBlob.js';
 import {
   FONT, DEFAULT_TEXT_SIZE, PAGE_SIZE, HEADER_ICON_EMU, EMU_PER_PIXEL,
   textParagraph, emptyParagraph, headerIconRunInFrontOfText, toRocDate,
@@ -549,12 +550,5 @@ export async function generateParentReportDocxBlob({
 }
 
 export function downloadParentReportDocx(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, filename);
 }

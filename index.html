@@ -5418,6 +5418,20 @@ var CFormApp = (() => {
     });
   }
 
+  // src/export/downloadBlob.js
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 1e3);
+  }
+
   // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
@@ -24777,14 +24791,7 @@ var CFormApp = (() => {
     return Packer.toBlob(doc);
   }
   function downloadDocx(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, filename);
   }
 
   // src/ui/formEditorView.js
@@ -25436,14 +25443,7 @@ var CFormApp = (() => {
     return Packer.toBlob(doc);
   }
   function downloadParentReportDocx(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, filename);
   }
 
   // src/ui/courseplanTabView.js
@@ -27000,14 +27000,7 @@ var CFormApp = (() => {
           itemsBySlotId: data.itemsBySlotId,
           overrides: [...data.overrideByKey.values()]
         });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${plan.period}\u8AB2\u7A0B\u6708\u8A08\u756B.docx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${plan.period}\u8AB2\u7A0B\u6708\u8A08\u756B.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
         if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -27600,16 +27593,7 @@ var CFormApp = (() => {
       try {
         const json = await exportBackup();
         const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `c-form-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 1e3);
+        downloadBlob(blob, `c-form-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`);
         showMessage("");
       } catch (err) {
         showMessage(EXPORT_FAILED_MESSAGE);
