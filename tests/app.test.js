@@ -200,7 +200,7 @@ describe('wireBackupControls', () => {
     exportButton.click();
 
     await waitFor(() => header.textContent.includes('匯出失敗，請再試一次'));
-    expect(header.querySelector('[data-error="backup"]').textContent).toBe('匯出失敗，請再試一次');
+    expect(header.querySelector('[data-error="backup"]').textContent).toBe('匯出失敗，請再試一次（nope）');
   });
 
   it('does not import when the confirmation is declined', async () => {
@@ -229,7 +229,7 @@ describe('wireBackupControls', () => {
     importInput.dispatchEvent(new Event('change'));
 
     await waitFor(() => header.textContent.includes('匯入失敗，請再試一次'));
-    expect(header.querySelector('[data-error="backup"]').textContent).toBe('匯入失敗，請再試一次');
+    expect(header.querySelector('[data-error="backup"]').textContent).toBe('匯入失敗，請再試一次（corrupt backup）');
     expect(reload).not.toHaveBeenCalled();
   });
 

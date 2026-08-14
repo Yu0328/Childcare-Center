@@ -179,7 +179,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       downloadBlob(blob, `${plan.period}課程月計畫.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {
-      if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';
+      if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
   });
 

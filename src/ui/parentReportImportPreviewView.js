@@ -167,7 +167,7 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
 
       onImported();
     } catch (err) {
-      errorEl.textContent = '匯入失敗，請再試一次';
+      errorEl.textContent = `匯入失敗，請再試一次（${err?.message || err}）`;
     }
   });
 }
