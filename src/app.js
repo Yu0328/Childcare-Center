@@ -8,6 +8,7 @@ import { renderAggregateCoursePlanView } from './ui/aggregateCoursePlanView.js';
 import { renderMonthlyPlanListView } from './ui/monthlyPlanListView.js';
 import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
 import { exportBackup, importBackup } from './storage/backup.js';
+import { downloadBlob } from './export/downloadBlob.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 
 const RENDER_FAILED_MESSAGE = '載入失敗，請重新整理頁面';
@@ -119,21 +120,7 @@ export function wireBackupControls({
     try {
       const json = await exportBackup();
       const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `c-form-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      // Safari has been observed to drop the download entirely, with no error, when the object
-      // URL is revoked (and the element removed) synchronously right after click() — its download
-      // handling can still be starting asynchronously at that point, unlike Chrome/Edge, which
-      // capture the blob's data immediately. A short delay avoids that race; it's harmless
-      // everywhere else since nothing else depends on the URL being revoked immediately.
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 1000);
+      downloadBlob(blob, `c-form-backup-${new Date().toISOString().slice(0, 10)}.json`);
       showMessage('');
     } catch (err) {
       showMessage(EXPORT_FAILED_MESSAGE);

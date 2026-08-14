@@ -1,3 +1,4 @@
+import { downloadBlob } from './downloadBlob.js';
 import {
   AlignmentType,
   Document,
@@ -348,12 +349,5 @@ export async function generateDocxBlob({ child, form, indicators, entries }) {
 }
 
 export function downloadDocx(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, filename);
 }

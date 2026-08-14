@@ -11,6 +11,7 @@ import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../dat
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
+import { downloadBlob } from '../export/downloadBlob.js';
 
 // Loads everything the render pass needs in one pass: the plan's still-existing children (a
 // child deleted elsewhere after being added to this plan is silently skipped rather than
@@ -175,14 +176,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         plan, children: data.children, slots: data.slots, itemsBySlotId: data.itemsBySlotId,
         overrides: [...data.overrideByKey.values()],
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${plan.period}課程月計畫.docx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${plan.period}課程月計畫.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {
       if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';
