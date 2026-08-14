@@ -84,6 +84,9 @@ export function mountApp(container) {
     renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }).catch(showRenderError);
   }
 
+  const homeButton = document.getElementById('home-button');
+  if (homeButton) homeButton.addEventListener('click', showReportTypeSelect);
+
   if (isUnlocked()) {
     showReportTypeSelect();
   } else {

@@ -1,4 +1,4 @@
-import { addChild } from '../storage/db.js';
+import { addChild, listChildren } from '../storage/db.js';
 import {
   addParentReport, addCoursePlanEntry, addCourseOccurrence,
   addDevelopmentRecordEntry, addBehaviorObservation, addHighlightEntry,
@@ -130,7 +130,10 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
       .filter(i => container.querySelector(`[data-highlight-include="${i}"]`).checked);
 
     try {
-      const child = await addChild({ name, birthDate });
+      // Match on name+birthDate so re-importing a docx for a child already in the system adds
+      // this report to their existing record instead of creating a duplicate child.
+      const existingChild = (await listChildren()).find(c => c.name === name && c.birthDate === birthDate);
+      const child = existingChild ?? (await addChild({ name, birthDate }));
       const report = await addParentReport({ childId: child.id, tier, period });
 
       const entryIdByOriginalIndex = new Map();

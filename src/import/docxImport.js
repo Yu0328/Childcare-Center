@@ -130,6 +130,10 @@ function resolveEntryDates(rawEntries, periodYear) {
       achieved,
       note,
       description: indicator ? indicator.description : null,
+      // The entry's own tier, read off its indicator code — not necessarily the document's
+      // overall (majority-vote) tier: a child not yet developed into every current-tier
+      // indicator can have entries genuinely recorded against an earlier tier's codes.
+      tier: indicator ? indicator.tier : null,
     };
   });
 }
