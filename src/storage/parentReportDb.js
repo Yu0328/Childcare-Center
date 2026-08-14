@@ -139,12 +139,23 @@ export async function addHighlightEntry({ reportId, photos, caption }) {
 // the IndexedDB read, captures its bytes at the freshest possible moment — before that staleness
 // window opens — for every consumer (thumbnails, docx export, backup export) at once.
 export async function listHighlightEntriesForReport(reportId) {
-  const entries = await runRequest('highlightEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  let entries;
+  try {
+    entries = await runRequest('highlightEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  } catch (err) {
+    throw new Error(`IndexedDB 查詢失敗：${err?.message || err}`, { cause: err });
+  }
   return Promise.all(
     entries.map(async entry => ({
       ...entry,
       photos: await Promise.all(
-        entry.photos.map(async photo => ({ ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) }))
+        entry.photos.map(async (photo, index) => {
+          try {
+            return { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) };
+          } catch (err) {
+            throw new Error(`第 ${index + 1} 張照片讀取失敗：${err?.message || err}`, { cause: err });
+          }
+        })
       ),
     }))
   );

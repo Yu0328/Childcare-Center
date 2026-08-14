@@ -1,4 +1,4 @@
-import { getIndicator } from '../data/indicators.js';
+import { getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
 import { addForm, addEntry, getForm, updateForm, listEntriesForForm, listFormsForChild } from '../storage/db.js';
 import { getParentReport, listCoursePlanEntriesForReport, listCourseOccurrencesForEntry } from '../storage/parentReportDb.js';
 
@@ -53,11 +53,16 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
   for (const report of reports) {
     const entries = await listCoursePlanEntriesForReport(report.id);
     for (const entry of entries) {
-      const indicator = getIndicator(entry.indicatorCode);
+      // Normalized once here so a code stored with a Latin (ASCII) tier prefix from an older
+      // import — see normalizeIndicatorCode — gets written onward in its canonical form, not just
+      // resolved for this lookup: formEditorView's entriesByIndicatorCode does a plain object-key
+      // match against indicator.code, which wouldn't find an entry still stored under "IV-1-1".
+      const indicatorCode = normalizeIndicatorCode(entry.indicatorCode);
+      const indicator = getIndicator(indicatorCode);
       if (!indicator) {
         failed.push({
           reportPeriod: report.period,
-          indicatorCode: entry.indicatorCode,
+          indicatorCode,
           activityName: entry.activityName,
           reason: '找不到對應指標',
         });
@@ -70,7 +75,7 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
         if (occurrence.absent) continue;
         target.push({
           tier: indicator.tier,
-          indicatorCode: entry.indicatorCode,
+          indicatorCode,
           date: occurrence.date,
           status: occurrence.status,
           note: occurrence.note,

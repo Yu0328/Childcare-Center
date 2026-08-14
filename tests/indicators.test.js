@@ -64,6 +64,12 @@ describe('indicator reference data', () => {
     expect(getIndicator('Ⅵ-9-9')).toBeUndefined();
   });
 
+  it('getIndicator also resolves a code stored with a Latin (ASCII) tier prefix instead of the Unicode roman numeral', () => {
+    expect(getIndicator('IV-1-1')).toEqual(getIndicator('Ⅳ-1-1'));
+    expect(getIndicator('V-1-1')).toEqual(getIndicator('Ⅴ-1-1'));
+    expect(getIndicator('III-1-1')).toEqual(getIndicator('Ⅲ-1-1'));
+  });
+
   it('previousTier returns the tier immediately before, null for Ⅰ or an unknown code', () => {
     expect(previousTier('Ⅴ')).toBe('Ⅳ');
     expect(previousTier('Ⅱ')).toBe('Ⅰ');

@@ -121,6 +121,24 @@ describe('aggregateCoursePlanIntoForm', () => {
     expect(ivEntries).toMatchObject([{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' }]);
   });
 
+  it('reroutes (rather than failing) an entry whose code is stored with a Latin tier prefix from an older import', async () => {
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    // A legacy import stored this with an ASCII "IV" prefix instead of the Unicode Ⅳ.
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'IV-1-1', activityName: '走路練習' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+    const { failed, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+
+    expect(failed).toEqual([]);
+    expect(reroutedCount).toBe(1);
+
+    const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
+    const ivForm = forms.find(f => f.tier === 'Ⅳ');
+    expect(ivForm).toBeDefined();
+    // Written in its canonical (Unicode) form, not the legacy "IV-1-1" it was read as.
+    expect(await listEntriesForForm(ivForm.id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1' }]);
+  });
+
   it('reuses an existing form for the rerouted tier instead of creating a second one', async () => {
     const existingIvForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '114年10月' });
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
