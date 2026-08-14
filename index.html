@@ -106,6 +106,10 @@ button {
   font-size: 1.05rem;
   color: var(--text-primary);
   margin-right: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .app-version {
@@ -1331,7 +1335,7 @@ fieldset.panel-form__field legend {
 </head>
 <body>
 <header class="app-header">
-  <span class="app-header__brand">屏東縣內埔鄉育英公托填表系統</span>
+  <button type="button" class="app-header__brand" id="home-button">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
     <button type="button" class="btn btn--header" id="export-backup">匯出備份</button>
     <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
@@ -4622,7 +4626,11 @@ var CFormApp = (() => {
         date: `${currentYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
         achieved,
         note,
-        description: indicator ? indicator.description : null
+        description: indicator ? indicator.description : null,
+        // The entry's own tier, read off its indicator code — not necessarily the document's
+        // overall (majority-vote) tier: a child not yet developed into every current-tier
+        // indicator can have entries genuinely recorded against an earlier tier's codes.
+        tier: indicator ? indicator.tier : null
       };
     });
   }
@@ -4751,16 +4759,26 @@ var CFormApp = (() => {
       const period = `${year}\u5E74${month}\u6708`;
       const includedEntries = parsed.entries.filter((entry, index) => container.querySelector(`[data-entry-include="${index}"]`).checked);
       try {
-        const child = await addChild({ name, birthDate });
-        const form = await addForm({ childId: child.id, tier, period });
+        const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);
+        const child = existingChild ?? await addChild({ name, birthDate });
+        const entriesByTier = /* @__PURE__ */ new Map();
         for (const entry of includedEntries) {
-          await addEntry({
-            formId: form.id,
-            indicatorCode: entry.indicatorCode,
-            date: entry.date,
-            status: entry.achieved ? "developed" : "developing",
-            note: entry.note
-          });
+          const entryTier = entry.tier ?? tier;
+          if (!entriesByTier.has(entryTier)) entriesByTier.set(entryTier, []);
+          entriesByTier.get(entryTier).push(entry);
+        }
+        if (entriesByTier.size === 0) entriesByTier.set(tier, []);
+        for (const [entryTier, tierEntries] of entriesByTier) {
+          const form = await addForm({ childId: child.id, tier: entryTier, period });
+          for (const entry of tierEntries) {
+            await addEntry({
+              formId: form.id,
+              indicatorCode: entry.indicatorCode,
+              date: entry.date,
+              status: entry.achieved ? "developed" : "developing",
+              note: entry.note
+            });
+          }
         }
         onImported();
       } catch (err) {
@@ -5104,7 +5122,8 @@ var CFormApp = (() => {
       const includedObservationIndexes = parsed.behaviorObservations.map((_, i) => i).filter((i) => container.querySelector(`[data-observation-include="${i}"]`).checked);
       const includedHighlightIndexes = parsed.highlightEntries.map((_, i) => i).filter((i) => container.querySelector(`[data-highlight-include="${i}"]`).checked);
       try {
-        const child = await addChild({ name, birthDate });
+        const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);
+        const child = existingChild ?? await addChild({ name, birthDate });
         const report = await addParentReport({ childId: child.id, tier, period });
         const entryIdByOriginalIndex = /* @__PURE__ */ new Map();
         for (const index of includedEntryIndexes) {
@@ -27572,6 +27591,8 @@ var CFormApp = (() => {
     function showParentReportEditor(child, report) {
       renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }).catch(showRenderError);
     }
+    const homeButton = document.getElementById("home-button");
+    if (homeButton) homeButton.addEventListener("click", showReportTypeSelect);
     if (isUnlocked()) {
       showReportTypeSelect();
     } else {
@@ -27687,6 +27708,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v46</footer>
+<footer class="app-version">v47</footer>
 </body>
 </html>

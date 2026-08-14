@@ -95,6 +95,10 @@ button {
   font-size: 1.05rem;
   color: var(--text-primary);
   margin-right: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .app-version {

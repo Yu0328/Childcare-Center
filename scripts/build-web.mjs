@@ -46,7 +46,7 @@ ${css}
 </head>
 <body>
 <header class="app-header">
-  <span class="app-header__brand">屏東縣內埔鄉育英公托填表系統</span>
+  <button type="button" class="app-header__brand" id="home-button">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
     <button type="button" class="btn btn--header" id="export-backup">匯出備份</button>
     <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>

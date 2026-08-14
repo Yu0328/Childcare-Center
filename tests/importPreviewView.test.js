@@ -127,6 +127,49 @@ describe('renderImportPreviewView', () => {
     expect(children[0].name).toBe('正確姓名');
   });
 
+  it('reuses an existing child (matched by name+birthDate) instead of creating a duplicate', async () => {
+    const { addChild } = await import('../src/storage/db.js');
+    const existing = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    let imported = false;
+    renderImportPreviewView(container, { parsed: baseParsed(), onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const children = await listChildren();
+    expect(children).toHaveLength(1);
+    expect(children[0].id).toBe(existing.id);
+    expect(await listFormsForChild(existing.id)).toHaveLength(1);
+  });
+
+  it('splits entries into separate per-tier forms when an entry\'s own indicator tier differs from the document\'s overall tier', async () => {
+    const container = document.createElement('div');
+    let imported = false;
+    const parsed = baseParsed({
+      tier: 'Ⅴ',
+      entries: [
+        { indicatorCode: 'Ⅴ-1-1', date: '2026-01-07', achieved: true, note: 'V的', description: 'x', tier: 'Ⅴ' },
+        // Not yet developed into tier Ⅴ, so this observation is genuinely against a Ⅳ indicator.
+        { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', achieved: false, note: '尚未發展', description: 'y', tier: 'Ⅳ' },
+      ],
+    });
+    renderImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const children = await listChildren();
+    const forms = await listFormsForChild(children[0].id);
+    expect(forms.map(f => f.tier).sort()).toEqual(['Ⅳ', 'Ⅴ']);
+
+    const vForm = forms.find(f => f.tier === 'Ⅴ');
+    const ivForm = forms.find(f => f.tier === 'Ⅳ');
+    expect((await listEntriesForForm(vForm.id)).map(e => e.indicatorCode)).toEqual(['Ⅴ-1-1']);
+    expect((await listEntriesForForm(ivForm.id)).map(e => e.indicatorCode)).toEqual(['Ⅳ-1-2']);
+  });
+
   it('shows an error message and does not call onImported if saving fails', async () => {
     vi.spyOn(db, 'addChild').mockRejectedValueOnce(new Error('boom'));
     const container = document.createElement('div');
