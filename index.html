@@ -4782,7 +4782,7 @@ var CFormApp = (() => {
         }
         onImported();
       } catch (err) {
-        errorEl.textContent = "\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
   }
@@ -5150,7 +5150,7 @@ var CFormApp = (() => {
         }
         onImported();
       } catch (err) {
-        errorEl.textContent = "\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
   }
@@ -24916,7 +24916,7 @@ var CFormApp = (() => {
         downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
-        if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        if (errorEl) errorEl.textContent = `\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
     for (const indicator of indicators) {
@@ -26272,7 +26272,7 @@ var CFormApp = (() => {
         downloadParentReportDocx(blob, `${child.name}-\u9069\u6027\u7D00\u9304-${report.period}.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
-        if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        if (errorEl) errorEl.textContent = `\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
     for (const tab of TABS) {
@@ -27033,7 +27033,7 @@ var CFormApp = (() => {
         downloadBlob(blob, `${plan.period}\u8AB2\u7A0B\u6708\u8A08\u756B.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
-        if (errorEl) errorEl.textContent = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        if (errorEl) errorEl.textContent = `\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
     container.querySelector('[data-action="save-children"]').addEventListener("click", async () => {
@@ -27534,12 +27534,12 @@ var CFormApp = (() => {
   var IMPORT_FAILED_MESSAGE = "\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
   var IMPORT_CONFIRM_MESSAGE = "\u532F\u5165\u5099\u4EFD\u6703\u6E05\u9664\u76EE\u524D\u6240\u6709\u8CC7\u6599\uFF0C\u78BA\u5B9A\u8981\u7E7C\u7E8C\u55CE\uFF1F";
   function mountApp(container) {
-    function showRenderError() {
+    function showRenderError(err) {
       container.textContent = "";
       const message = document.createElement("p");
       message.dataset.error = "render";
       message.className = "field-error field-error--center";
-      message.textContent = RENDER_FAILED_MESSAGE;
+      message.textContent = `${RENDER_FAILED_MESSAGE}\uFF08${err?.message || err}\uFF09`;
       container.appendChild(message);
     }
     function showReportTypeSelect() {
@@ -27627,7 +27627,7 @@ var CFormApp = (() => {
         downloadBlob(blob, `c-form-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`);
         showMessage("");
       } catch (err) {
-        showMessage(EXPORT_FAILED_MESSAGE);
+        showMessage(`${EXPORT_FAILED_MESSAGE}\uFF08${err?.message || err}\uFF09`);
       }
     });
     importInput.addEventListener("change", async () => {
@@ -27643,7 +27643,7 @@ var CFormApp = (() => {
         showMessage("");
       } catch (err) {
         importInput.value = "";
-        showMessage(IMPORT_FAILED_MESSAGE);
+        showMessage(`${IMPORT_FAILED_MESSAGE}\uFF08${err?.message || err}\uFF09`);
         return;
       }
       reload();
@@ -27708,6 +27708,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v47</footer>
+<footer class="app-version">v48</footer>
 </body>
 </html>

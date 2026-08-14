@@ -113,7 +113,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
       }
       onImported();
     } catch (err) {
-      errorEl.textContent = '匯入失敗，請再試一次';
+      errorEl.textContent = `匯入失敗，請再試一次（${err?.message || err}）`;
     }
   });
 }

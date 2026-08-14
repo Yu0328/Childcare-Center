@@ -17,12 +17,14 @@ const IMPORT_FAILED_MESSAGE = '匯入失敗，請再試一次';
 const IMPORT_CONFIRM_MESSAGE = '匯入備份會清除目前所有資料，確定要繼續嗎？';
 
 export function mountApp(container) {
-  function showRenderError() {
+  function showRenderError(err) {
     container.textContent = '';
     const message = document.createElement('p');
     message.dataset.error = 'render';
     message.className = 'field-error field-error--center';
-    message.textContent = RENDER_FAILED_MESSAGE;
+    // See the export-failure handler below for why the raw error is appended rather than just
+    // showing the generic message.
+    message.textContent = `${RENDER_FAILED_MESSAGE}（${err?.message || err}）`;
     container.appendChild(message);
   }
 
@@ -126,7 +128,10 @@ export function wireBackupControls({
       downloadBlob(blob, `c-form-backup-${new Date().toISOString().slice(0, 10)}.json`);
       showMessage('');
     } catch (err) {
-      showMessage(EXPORT_FAILED_MESSAGE);
+      // The generic message alone gives no way to diagnose device-specific failures (e.g. Safari-only
+      // bugs already found this way) — showing the actual error inline means the person hitting it can
+      // just read/relay it instead of needing devtools access, which may not even be reachable on iOS.
+      showMessage(`${EXPORT_FAILED_MESSAGE}（${err?.message || err}）`);
     }
   });
 
@@ -148,7 +153,7 @@ export function wireBackupControls({
       // Do not reload after a failed import: the store may be half-written and a reload
       // would hide that behind a fresh render.
       importInput.value = '';
-      showMessage(IMPORT_FAILED_MESSAGE);
+      showMessage(`${IMPORT_FAILED_MESSAGE}（${err?.message || err}）`);
       return;
     }
 

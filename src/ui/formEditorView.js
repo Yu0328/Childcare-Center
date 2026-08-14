@@ -110,7 +110,7 @@ export async function renderFormEditorView(
       downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {
-      if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';
+      if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
   });
 

@@ -55,7 +55,7 @@ export async function renderParentReportEditorView(container, { child, report, o
       downloadParentReportDocx(blob, `${child.name}-適性紀錄-${report.period}.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {
-      if (errorEl) errorEl.textContent = '匯出失敗，請再試一次';
+      if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
   });
 
