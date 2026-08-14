@@ -138,6 +138,11 @@ export async function addHighlightEntry({ reportId, photos, caption }) {
 // reaching a photo blob is a textbook trigger). Rebuilding each blob immediately here, right after
 // the IndexedDB read, captures its bytes at the freshest possible moment — before that staleness
 // window opens — for every consumer (thumbnails, docx export, backup export) at once.
+//
+// A photo that still fails even at this earliest possible read is dropped (not re-thrown): at
+// that point its underlying data is presumed genuinely unreadable at the storage layer, not a
+// timing issue any retry or earlier read could have avoided — and letting one bad photo block a
+// whole child's backup export (or that report's rendering) is worse than losing just that photo.
 export async function listHighlightEntriesForReport(reportId) {
   let entries;
   try {
@@ -148,15 +153,18 @@ export async function listHighlightEntriesForReport(reportId) {
   return Promise.all(
     entries.map(async entry => ({
       ...entry,
-      photos: await Promise.all(
-        entry.photos.map(async (photo, index) => {
-          try {
-            return { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) };
-          } catch (err) {
-            throw new Error(`第 ${index + 1} 張照片讀取失敗：${err?.message || err}`, { cause: err });
-          }
-        })
-      ),
+      photos: (
+        await Promise.all(
+          entry.photos.map(async (photo, index) => {
+            try {
+              return { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) };
+            } catch (err) {
+              console.warn(`點滴分享 #${entry.id} 第 ${index + 1} 張照片讀取失敗，已略過：`, err);
+              return null;
+            }
+          })
+        )
+      ).filter(Boolean),
     }))
   );
 }

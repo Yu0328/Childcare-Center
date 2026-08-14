@@ -113,18 +113,19 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(paragraph).toContain('<w:sz w:val="22"/>');
   });
 
-  it('builds a 6-column grid with a two-row merged header', async () => {
+  it('builds a 7-column grid (6 data + 備註) with a two-row merged header', async () => {
     const { documentXml } = await exportParts();
 
     expect(documentXml).toContain(
       '<w:tblGrid><w:gridCol w:w="565"/><w:gridCol w:w="1557"/><w:gridCol w:w="992"/>' +
-        '<w:gridCol w:w="1984"/><w:gridCol w:w="1560"/><w:gridCol w:w="2443"/></w:tblGrid>'
+        '<w:gridCol w:w="1984"/><w:gridCol w:w="1560"/><w:gridCol w:w="1643"/><w:gridCol w:w="800"/></w:tblGrid>'
     );
 
     // Header row 1 spans 指標項次/發展活動 and 實施記錄 over two grid columns each.
     expect(documentXml).toContain('<w:gridSpan w:val="2"/>');
     expect(documentXml).toContain('指標項次/發展活動');
     expect(documentXml).toContain('實施記錄');
+    expect(documentXml).toContain('備註');
     // Header row 2.
     expect(documentXml).toContain('適性發展指標活動');
     expect(documentXml).toContain('課程實施日期【已發展○】');
@@ -255,28 +256,36 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(documentXml).toContain('1身體動作');
   });
 
-  describe('previous-tier carried-over 備註 rows', () => {
-    it('appends a row per previous-tier developing entry after the form\'s own rows, prefixed 備註：', async () => {
+  describe('備註 column', () => {
+    it('always exists as its own (7th) column, blank for the form\'s own rows', async () => {
+      const { documentXml } = await exportParts();
+
+      const bodyRows = parseTableRows(documentXml).slice(2);
+      expect(bodyRows.length).toBeGreaterThan(0);
+      for (const row of bodyRows) {
+        expect(row.texts[6]).toBe('');
+      }
+    });
+
+    it('appends a row per previous-tier developing entry after the form\'s own rows, with its note in the 備註 column (not 課程實施記錄)', async () => {
       const previousTierEntries = [
         { indicatorCode: 'Ⅲ-1-1', date: '2025-12-01', status: 'developing', note: '仍在練習扶物站立' },
       ];
       const { documentXml } = await exportParts({ previousTierEntries });
 
       expect(documentXml).toContain('Ⅲ-1-1');
-      expect(documentXml).toContain('備註：仍在練習扶物站立');
       expect(documentXml).toContain('12/01△');
 
       const bodyRows = parseTableRows(documentXml).slice(2);
-      const remarkRowIndex = bodyRows.findIndex(row => row.texts[2] === 'Ⅲ-1-1');
-      expect(remarkRowIndex).toBeGreaterThan(-1);
+      const remarkRow = bodyRows.find(row => row.texts[2] === 'Ⅲ-1-1');
+      expect(remarkRow).toBeDefined();
+      expect(remarkRow.texts[6]).toBe('仍在練習扶物站立');
+      expect(remarkRow.texts[5]).toBe(''); // not also duplicated into 課程實施記錄
+
+      const remarkRowIndex = bodyRows.indexOf(remarkRow);
       // It comes after every one of the form's own (Ⅳ-tier) rows.
       const ownRowIndexes = bodyRows.map((row, i) => (row.texts[2]?.startsWith('Ⅳ') ? i : -1)).filter(i => i >= 0);
       expect(remarkRowIndex).toBeGreaterThan(Math.max(...ownRowIndexes));
-    });
-
-    it('adds no extra rows or 備註 text when there are no previous-tier developing entries', async () => {
-      const { documentXml } = await exportParts();
-      expect(documentXml).not.toContain('備註：');
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
 import { clearAllData, addChild } from '../src/storage/db.js';
 
@@ -214,5 +214,25 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
 
     await deleteHighlightEntry(highlight.id);
     expect(await listHighlightEntriesForReport(report.id)).toEqual([]);
+  });
+
+  it('drops a photo whose blob fails to read instead of throwing and losing the rest', async () => {
+    const goodPhoto = { blob: new Blob(['a'], { type: 'image/jpeg' }), width: 10, height: 10 };
+    const badPhoto = { blob: new Blob(['b'], { type: 'image/jpeg' }), width: 20, height: 20 };
+    await addHighlightEntry({ reportId: report.id, photos: [goodPhoto, badPhoto], caption: '兩張照片' });
+
+    const originalArrayBuffer = Blob.prototype.arrayBuffer;
+    let callCount = 0;
+    vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function () {
+      callCount += 1;
+      if (callCount === 2) return Promise.reject(new Error('The object can not be found here.'));
+      return originalArrayBuffer.call(this);
+    });
+
+    const [entry] = await listHighlightEntriesForReport(report.id);
+    expect(entry.photos).toHaveLength(1);
+    expect(entry.caption).toBe('兩張照片');
+
+    vi.restoreAllMocks();
   });
 });

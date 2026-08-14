@@ -3959,15 +3959,16 @@ var CFormApp = (() => {
     return Promise.all(
       entries.map(async (entry) => ({
         ...entry,
-        photos: await Promise.all(
+        photos: (await Promise.all(
           entry.photos.map(async (photo, index) => {
             try {
               return { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) };
             } catch (err) {
-              throw new Error(`\u7B2C ${index + 1} \u5F35\u7167\u7247\u8B80\u53D6\u5931\u6557\uFF1A${err?.message || err}`, { cause: err });
+              console.warn(`\u9EDE\u6EF4\u5206\u4EAB #${entry.id} \u7B2C ${index + 1} \u5F35\u7167\u7247\u8B80\u53D6\u5931\u6557\uFF0C\u5DF2\u7565\u904E\uFF1A`, err);
+              return null;
             }
           })
-        )
+        )).filter(Boolean)
       }))
     );
   }
@@ -24615,7 +24616,7 @@ var CFormApp = (() => {
 
   // src/export/docxExport.js
   var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u793E\u5340\u516C\u5171\u6258\u80B2\u5BB6\u5712";
-  var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
+  var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 1643, 800];
   var TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
   var TABLE_CELL_MARGIN_DXA = 115;
   var SUBDOMAIN_SEPARATOR = "\u3001";
@@ -24695,6 +24696,12 @@ var CFormApp = (() => {
           verticalAlign: VerticalAlign.CENTER,
           shading: { type: ShadingType.CLEAR, color: "auto", fill: "D9D9D9" },
           children: [textParagraph("\u5BE6\u65BD\u8A18\u9304", { bold: true, ...CENTERED })]
+        }),
+        new TableCell({
+          width: cellWidth(6),
+          verticalMerge: VerticalMergeType.RESTART,
+          verticalAlign: VerticalAlign.CENTER,
+          children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
         })
       ]
     });
@@ -24729,6 +24736,11 @@ var CFormApp = (() => {
           width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph("\u8AB2\u7A0B\u5BE6\u65BD\u8A18\u9304", { bold: true, ...CENTERED })]
+        }),
+        new TableCell({
+          width: cellWidth(6),
+          verticalMerge: VerticalMergeType.CONTINUE,
+          children: [emptyParagraph()]
         })
       ]
     });
@@ -24762,7 +24774,12 @@ var CFormApp = (() => {
         new TableCell({
           width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph(isRemark ? `\u5099\u8A3B\uFF1A${row.note}` : row.note)]
+          children: [isRemark ? emptyParagraph() : textParagraph(row.note)]
+        }),
+        new TableCell({
+          width: cellWidth(6),
+          verticalAlign: VerticalAlign.CENTER,
+          children: [isRemark ? textParagraph(row.note) : emptyParagraph()]
         })
       ]
     });
@@ -27851,6 +27868,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v52</footer>
+<footer class="app-version">v53</footer>
 </body>
 </html>

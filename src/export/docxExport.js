@@ -34,9 +34,13 @@ import {
 // (陳小安C表-2.docx). Kept as a constant so another centre adopting this tool can change it in one place.
 const INSTITUTION_NAME = '屏東縣內埔鄉社區公共托育家園';
 
-// Column widths in DXA (twips), copied from the real form's <w:tblGrid> (verified against both
-// 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these widths).
-const COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
+// Column widths in DXA (twips). The first 6 are copied from the real form's <w:tblGrid> (verified
+// against both 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these
+// widths). The 7th (備註) is not from either sample — it's a later addition for carrying over a
+// previous tier's still-incomplete indicators — so its width is a reasonable guess (taken out of
+// 課程實施記錄's share, keeping the table's total/centered width unchanged) rather than a verified
+// value; revisit if a real sample with this column ever turns up.
+const COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 1643, 800];
 // The real form's table is narrower than the page's text area and centered in the remaining
 // space (<w:jc w:val="center"/> on the original's <w:tblPr>) rather than stretched edge to edge.
 const TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
@@ -168,6 +172,12 @@ function headerRows() {
         shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'D9D9D9' },
         children: [textParagraph('實施記錄', { bold: true, ...CENTERED })],
       }),
+      new TableCell({
+        width: cellWidth(6),
+        verticalMerge: VerticalMergeType.RESTART,
+        verticalAlign: VerticalAlign.CENTER,
+        children: [textParagraph('備註', { bold: true, ...CENTERED })],
+      }),
     ],
   });
 
@@ -203,6 +213,11 @@ function headerRows() {
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph('課程實施記錄', { bold: true, ...CENTERED })],
       }),
+      new TableCell({
+        width: cellWidth(6),
+        verticalMerge: VerticalMergeType.CONTINUE,
+        children: [emptyParagraph()],
+      }),
     ],
   });
 
@@ -235,8 +250,9 @@ function mergedCell(index, children, isFirstRowOfMerge) {
 // prose, matching the original.
 // isRemark: this row carries over a still-incomplete indicator from the child's previous tier
 // (they hadn't developed into it yet) rather than a record against this form's own tier — same
-// row layout as any other indicator, but the last column reads as a remark instead of this
-// tier's own 課程實施記錄, so it isn't mistaken for one.
+// row layout as any other indicator, but its note goes in the 備註 column instead of 課程實施記錄
+// (which the 備註 column always exists as, blank for every other row), so it isn't mistaken for
+// this tier's own record.
 function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, isRemark = false }) {
   return new TableRow({
     children: [
@@ -252,7 +268,12 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, is
       new TableCell({
         width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph(isRemark ? `備註：${row.note}` : row.note)],
+        children: [isRemark ? emptyParagraph() : textParagraph(row.note)],
+      }),
+      new TableCell({
+        width: cellWidth(6),
+        verticalAlign: VerticalAlign.CENTER,
+        children: [isRemark ? textParagraph(row.note) : emptyParagraph()],
       }),
     ],
   });
