@@ -27685,6 +27685,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (window.__cformReloaded) return;
+    window.__cformReloaded = true;
+    location.reload();
+  });
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
