@@ -34,13 +34,15 @@ import {
 // (陳小安C表-2.docx). Kept as a constant so another centre adopting this tool can change it in one place.
 const INSTITUTION_NAME = '屏東縣內埔鄉社區公共托育家園';
 
-// Column widths in DXA (twips). The first 6 are copied from the real form's <w:tblGrid> (verified
+// Column widths in DXA (twips): 發展領域, 領域範疇, 備註, 指標項次, 發展活動, 課程實施日期,
+// 課程實施記錄. The 5 non-備註 widths are copied from the real form's <w:tblGrid> (verified
 // against both 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these
-// widths). The 7th (備註) is not from either sample — it's a later addition for carrying over a
-// previous tier's still-incomplete indicators — so its width is a reasonable guess (taken out of
-// 課程實施記錄's share, keeping the table's total/centered width unchanged) rather than a verified
-// value; revisit if a real sample with this column ever turns up.
-const COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 1643, 800];
+// widths). 備註 is not from either sample — it's a later addition for carrying over a previous
+// tier's still-incomplete indicators, placed right after 領域範疇 (before the indicator's own
+// code/content) — so its width is a reasonable guess (taken out of 課程實施記錄's share, keeping
+// the table's total/centered width unchanged) rather than a verified value; revisit if a real
+// sample with this column ever turns up.
+const COLUMN_WIDTHS = [565, 1557, 800, 992, 1984, 1560, 1643];
 // The real form's table is narrower than the page's text area and centered in the remaining
 // space (<w:jc w:val="center"/> on the original's <w:tblPr>) rather than stretched edge to edge.
 const TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
@@ -159,24 +161,24 @@ function headerRows() {
         children: [textParagraph('領域範疇', { bold: true, ...CENTERED })],
       }),
       new TableCell({
-        width: spannedWidth(2, 3),
+        width: cellWidth(2),
+        verticalMerge: VerticalMergeType.RESTART,
+        verticalAlign: VerticalAlign.CENTER,
+        children: [textParagraph('備註', { bold: true, ...CENTERED })],
+      }),
+      new TableCell({
+        width: spannedWidth(3, 4),
         columnSpan: 2,
         verticalAlign: VerticalAlign.CENTER,
         shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'D9D9D9' },
         children: [textParagraph('指標項次/發展活動', { bold: true, ...CENTERED })],
       }),
       new TableCell({
-        width: spannedWidth(4, 5),
+        width: spannedWidth(5, 6),
         columnSpan: 2,
         verticalAlign: VerticalAlign.CENTER,
         shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'D9D9D9' },
         children: [textParagraph('實施記錄', { bold: true, ...CENTERED })],
-      }),
-      new TableCell({
-        width: cellWidth(6),
-        verticalMerge: VerticalMergeType.RESTART,
-        verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph('備註', { bold: true, ...CENTERED })],
       }),
     ],
   });
@@ -195,13 +197,18 @@ function headerRows() {
         children: [emptyParagraph()],
       }),
       new TableCell({
-        width: spannedWidth(2, 3),
+        width: cellWidth(2),
+        verticalMerge: VerticalMergeType.CONTINUE,
+        children: [emptyParagraph()],
+      }),
+      new TableCell({
+        width: spannedWidth(3, 4),
         columnSpan: 2,
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph('適性發展指標活動', { bold: true, ...CENTERED })],
       }),
       new TableCell({
-        width: cellWidth(4),
+        width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
         children: [
           textParagraph('課程實施日期【已發展○】', { bold: true, ...CENTERED }),
@@ -209,14 +216,9 @@ function headerRows() {
         ],
       }),
       new TableCell({
-        width: cellWidth(5),
+        width: cellWidth(6),
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph('課程實施記錄', { bold: true, ...CENTERED })],
-      }),
-      new TableCell({
-        width: cellWidth(6),
-        verticalMerge: VerticalMergeType.CONTINUE,
-        children: [emptyParagraph()],
       }),
     ],
   });
@@ -233,7 +235,8 @@ function subdomainParagraphs(subdomain) {
 }
 
 // A vertically merged cell: it either restarts the merge (and carries the content) or continues a
-// merge started further up (and must be empty). Columns 5-6 always carry their own per-row values.
+// merge started further up (and must be empty). Columns 2 (備註), 5-6 always carry their own
+// per-row values.
 function mergedCell(index, children, isFirstRowOfMerge) {
   return new TableCell({
     width: cellWidth(index),
@@ -245,9 +248,9 @@ function mergedCell(index, children, isFirstRowOfMerge) {
 
 // Two different merge scopes, matching the real form:
 //   columns 0-1 (發展領域 / 領域範疇) merge across every row of a domain, spanning many indicators;
-//   columns 2-3 (指標項次 / 發展活動) merge only across the rows of one indicator.
-// Columns 0-2 are short, tag-like values and are centered; 發展活動/課程實施記錄 stay left-aligned
-// prose, matching the original.
+//   columns 3-4 (指標項次 / 發展活動) merge only across the rows of one indicator.
+// Columns 0-1, 3 are short, tag-like values and are centered; 發展活動/課程實施記錄 stay
+// left-aligned prose, matching the original.
 // isRemark: this row carries over a still-incomplete indicator from the child's previous tier
 // (they hadn't developed into it yet) rather than a record against this form's own tier — same
 // row layout as any other indicator, but its note goes in the 備註 column instead of 課程實施記錄
@@ -258,22 +261,22 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, is
     children: [
       mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
       mergedCell(1, subdomainParagraphs(indicator.subdomain), isFirstRowOfDomain),
-      mergedCell(2, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
-      mergedCell(3, [textParagraph(row.description)], isFirstRowOfIndicator),
       new TableCell({
-        width: cellWidth(4),
+        width: cellWidth(2),
+        verticalAlign: VerticalAlign.CENTER,
+        children: [isRemark ? textParagraph(row.note) : emptyParagraph()],
+      }),
+      mergedCell(3, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
+      mergedCell(4, [textParagraph(row.description)], isFirstRowOfIndicator),
+      new TableCell({
+        width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph(formatDateCell(row), CENTERED)],
       }),
       new TableCell({
-        width: cellWidth(5),
-        verticalAlign: VerticalAlign.CENTER,
-        children: [isRemark ? emptyParagraph() : textParagraph(row.note)],
-      }),
-      new TableCell({
         width: cellWidth(6),
         verticalAlign: VerticalAlign.CENTER,
-        children: [isRemark ? textParagraph(row.note) : emptyParagraph()],
+        children: [isRemark ? emptyParagraph() : textParagraph(row.note)],
       }),
     ],
   });

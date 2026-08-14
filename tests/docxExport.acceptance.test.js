@@ -113,12 +113,12 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(paragraph).toContain('<w:sz w:val="22"/>');
   });
 
-  it('builds a 7-column grid (6 data + 備註) with a two-row merged header', async () => {
+  it('builds a 7-column grid (發展領域/領域範疇/備註/指標項次/發展活動/日期/記錄) with a two-row merged header', async () => {
     const { documentXml } = await exportParts();
 
     expect(documentXml).toContain(
-      '<w:tblGrid><w:gridCol w:w="565"/><w:gridCol w:w="1557"/><w:gridCol w:w="992"/>' +
-        '<w:gridCol w:w="1984"/><w:gridCol w:w="1560"/><w:gridCol w:w="1643"/><w:gridCol w:w="800"/></w:tblGrid>'
+      '<w:tblGrid><w:gridCol w:w="565"/><w:gridCol w:w="1557"/><w:gridCol w:w="800"/>' +
+        '<w:gridCol w:w="992"/><w:gridCol w:w="1984"/><w:gridCol w:w="1560"/><w:gridCol w:w="1643"/></w:tblGrid>'
     );
 
     // Header row 1 spans 指標項次/發展活動 and 實施記錄 over two grid columns each.
@@ -149,21 +149,22 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     const bodyRows = parseTableRows(documentXml).slice(2);
 
     // Ⅳ-1-1 has two entries: the first row restarts the code/description merge, the second continues it.
-    expect(bodyRows[0].texts[2]).toBe('Ⅳ-1-1');
-    expect(bodyRows[0].merges[2]).toBe('restart');
+    expect(bodyRows[0].texts[3]).toBe('Ⅳ-1-1');
     expect(bodyRows[0].merges[3]).toBe('restart');
-    expect(bodyRows[1].merges[2]).toBe('continue');
+    expect(bodyRows[0].merges[4]).toBe('restart');
     expect(bodyRows[1].merges[3]).toBe('continue');
+    expect(bodyRows[1].merges[4]).toBe('continue');
 
     // The next indicator restarts the code/description merge again.
-    expect(bodyRows[2].texts[2]).toBe('Ⅳ-1-2');
-    expect(bodyRows[2].merges[2]).toBe('restart');
+    expect(bodyRows[2].texts[3]).toBe('Ⅳ-1-2');
     expect(bodyRows[2].merges[3]).toBe('restart');
+    expect(bodyRows[2].merges[4]).toBe('restart');
 
-    // The 實施記錄 columns are never merged.
+    // The 備註/實施記錄 columns are never merged.
     for (const row of bodyRows) {
-      expect(row.merges[4]).toBeNull();
+      expect(row.merges[2]).toBeNull();
       expect(row.merges[5]).toBeNull();
+      expect(row.merges[6]).toBeNull();
     }
   });
 
@@ -193,14 +194,14 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
 
     // The regression this guards: Ⅳ-1-2 opens a new indicator inside 身體動作, so its code column
     // restarts while the domain columns must keep merging up into Ⅳ-1-1.
-    const indicatorStart = bodyRows.find(row => row.texts[2] === 'Ⅳ-1-2');
-    expect(indicatorStart.merges[2]).toBe('restart');
+    const indicatorStart = bodyRows.find(row => row.texts[3] === 'Ⅳ-1-2');
+    expect(indicatorStart.merges[3]).toBe('restart');
     expect(indicatorStart.merges[0]).toBe('continue');
     expect(indicatorStart.merges[1]).toBe('continue');
 
     // A domain's merge therefore covers more rows than any single indicator has.
     const firstDomainRows = bodyRows.slice(0, bodyRows.findIndex(row => row.texts[0] === '2社會情緒'));
-    const codesInFirstDomain = new Set(firstDomainRows.map(row => row.texts[2]).filter(Boolean));
+    const codesInFirstDomain = new Set(firstDomainRows.map(row => row.texts[3]).filter(Boolean));
     expect(codesInFirstDomain.size).toBeGreaterThan(1);
   });
 
@@ -257,13 +258,13 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
   });
 
   describe('備註 column', () => {
-    it('always exists as its own (7th) column, blank for the form\'s own rows', async () => {
+    it('always exists as its own column right after 領域範疇 (before 指標項次), blank for the form\'s own rows', async () => {
       const { documentXml } = await exportParts();
 
       const bodyRows = parseTableRows(documentXml).slice(2);
       expect(bodyRows.length).toBeGreaterThan(0);
       for (const row of bodyRows) {
-        expect(row.texts[6]).toBe('');
+        expect(row.texts[2]).toBe('');
       }
     });
 
@@ -277,14 +278,14 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
       expect(documentXml).toContain('12/01△');
 
       const bodyRows = parseTableRows(documentXml).slice(2);
-      const remarkRow = bodyRows.find(row => row.texts[2] === 'Ⅲ-1-1');
+      const remarkRow = bodyRows.find(row => row.texts[3] === 'Ⅲ-1-1');
       expect(remarkRow).toBeDefined();
-      expect(remarkRow.texts[6]).toBe('仍在練習扶物站立');
-      expect(remarkRow.texts[5]).toBe(''); // not also duplicated into 課程實施記錄
+      expect(remarkRow.texts[2]).toBe('仍在練習扶物站立');
+      expect(remarkRow.texts[6]).toBe(''); // not also duplicated into 課程實施記錄
 
       const remarkRowIndex = bodyRows.indexOf(remarkRow);
       // It comes after every one of the form's own (Ⅳ-tier) rows.
-      const ownRowIndexes = bodyRows.map((row, i) => (row.texts[2]?.startsWith('Ⅳ') ? i : -1)).filter(i => i >= 0);
+      const ownRowIndexes = bodyRows.map((row, i) => (row.texts[3]?.startsWith('Ⅳ') ? i : -1)).filter(i => i >= 0);
       expect(remarkRowIndex).toBeGreaterThan(Math.max(...ownRowIndexes));
     });
   });
