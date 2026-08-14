@@ -34,15 +34,9 @@ import {
 // (陳小安C表-2.docx). Kept as a constant so another centre adopting this tool can change it in one place.
 const INSTITUTION_NAME = '屏東縣內埔鄉社區公共托育家園';
 
-// Column widths in DXA (twips): 發展領域, 領域範疇, 備註, 指標項次, 發展活動, 課程實施日期,
-// 課程實施記錄. The 5 non-備註 widths are copied from the real form's <w:tblGrid> (verified
-// against both 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these
-// widths). 備註 is not from either sample — it's a later addition for carrying over a previous
-// tier's still-incomplete indicators, placed right after 領域範疇 (before the indicator's own
-// code/content) — so its width is a reasonable guess (taken out of 課程實施記錄's share, keeping
-// the table's total/centered width unchanged) rather than a verified value; revisit if a real
-// sample with this column ever turns up.
-const COLUMN_WIDTHS = [565, 1557, 800, 992, 1984, 1560, 1643];
+// Column widths in DXA (twips), copied from the real form's <w:tblGrid> (verified against both
+// 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these widths).
+const COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
 // The real form's table is narrower than the page's text area and centered in the remaining
 // space (<w:jc w:val="center"/> on the original's <w:tblPr>) rather than stretched edge to edge.
 const TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
@@ -161,20 +155,14 @@ function headerRows() {
         children: [textParagraph('領域範疇', { bold: true, ...CENTERED })],
       }),
       new TableCell({
-        width: cellWidth(2),
-        verticalMerge: VerticalMergeType.RESTART,
-        verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph('備註', { bold: true, ...CENTERED })],
-      }),
-      new TableCell({
-        width: spannedWidth(3, 4),
+        width: spannedWidth(2, 3),
         columnSpan: 2,
         verticalAlign: VerticalAlign.CENTER,
         shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'D9D9D9' },
         children: [textParagraph('指標項次/發展活動', { bold: true, ...CENTERED })],
       }),
       new TableCell({
-        width: spannedWidth(5, 6),
+        width: spannedWidth(4, 5),
         columnSpan: 2,
         verticalAlign: VerticalAlign.CENTER,
         shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'D9D9D9' },
@@ -197,18 +185,13 @@ function headerRows() {
         children: [emptyParagraph()],
       }),
       new TableCell({
-        width: cellWidth(2),
-        verticalMerge: VerticalMergeType.CONTINUE,
-        children: [emptyParagraph()],
-      }),
-      new TableCell({
-        width: spannedWidth(3, 4),
+        width: spannedWidth(2, 3),
         columnSpan: 2,
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph('適性發展指標活動', { bold: true, ...CENTERED })],
       }),
       new TableCell({
-        width: cellWidth(5),
+        width: cellWidth(4),
         verticalAlign: VerticalAlign.CENTER,
         children: [
           textParagraph('課程實施日期【已發展○】', { bold: true, ...CENTERED }),
@@ -216,7 +199,7 @@ function headerRows() {
         ],
       }),
       new TableCell({
-        width: cellWidth(6),
+        width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph('課程實施記錄', { bold: true, ...CENTERED })],
       }),
@@ -235,8 +218,7 @@ function subdomainParagraphs(subdomain) {
 }
 
 // A vertically merged cell: it either restarts the merge (and carries the content) or continues a
-// merge started further up (and must be empty). Columns 2 (備註), 5-6 always carry their own
-// per-row values.
+// merge started further up (and must be empty). Columns 4-5 always carry their own per-row values.
 function mergedCell(index, children, isFirstRowOfMerge) {
   return new TableCell({
     width: cellWidth(index),
@@ -248,36 +230,56 @@ function mergedCell(index, children, isFirstRowOfMerge) {
 
 // Two different merge scopes, matching the real form:
 //   columns 0-1 (發展領域 / 領域範疇) merge across every row of a domain, spanning many indicators;
-//   columns 3-4 (指標項次 / 發展活動) merge only across the rows of one indicator.
-// Columns 0-1, 3 are short, tag-like values and are centered; 發展活動/課程實施記錄 stay
-// left-aligned prose, matching the original.
-// isRemark: this row carries over a still-incomplete indicator from the child's previous tier
-// (they hadn't developed into it yet) rather than a record against this form's own tier — same
-// row layout as any other indicator, but its note goes in the 備註 column instead of 課程實施記錄
-// (which the 備註 column always exists as, blank for every other row), so it isn't mistaken for
-// this tier's own record.
-function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, isRemark = false }) {
+//   columns 2-3 (指標項次 / 發展活動) merge only across the rows of one indicator.
+// Columns 0-2 are short, tag-like values and are centered; 發展活動/課程實施記錄 stay left-aligned
+// prose, matching the original.
+function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) {
   return new TableRow({
     children: [
       mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
       mergedCell(1, subdomainParagraphs(indicator.subdomain), isFirstRowOfDomain),
+      mergedCell(2, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
+      mergedCell(3, [textParagraph(row.description)], isFirstRowOfIndicator),
       new TableCell({
-        width: cellWidth(2),
-        verticalAlign: VerticalAlign.CENTER,
-        children: [isRemark ? textParagraph(row.note) : emptyParagraph()],
-      }),
-      mergedCell(3, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
-      mergedCell(4, [textParagraph(row.description)], isFirstRowOfIndicator),
-      new TableCell({
-        width: cellWidth(5),
+        width: cellWidth(4),
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph(formatDateCell(row), CENTERED)],
       }),
       new TableCell({
-        width: cellWidth(6),
+        width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
-        children: [isRemark ? emptyParagraph() : textParagraph(row.note)],
+        children: [textParagraph(row.note)],
       }),
+    ],
+  });
+}
+
+// A single full-width divider row marking the start of the 備註 section: "備註" in the first cell,
+// the rest blank. Everything after it (see remarkRow below) is a previous-tier still-incomplete
+// item, or a course-plan entry whose indicator code couldn't be resolved at all during 彙整 —
+// either way, not this form's own tier's record, so it's kept visually separate rather than mixed
+// into the main table above.
+function remarkDividerRow() {
+  return new TableRow({
+    children: [
+      new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph('備註', { bold: true, ...CENTERED })] }),
+      ...[1, 2, 3, 4, 5].map(index => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] })),
+    ],
+  });
+}
+
+// row: { domainLabel, subdomainText, code, description, date, status, note }. Plain (unmerged)
+// cells — each remark is its own standalone row, not grouped with siblings the way the main
+// table's indicator rows are.
+function remarkRow(row) {
+  return new TableRow({
+    children: [
+      new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.domainLabel, CENTERED)] }),
+      new TableCell({ width: cellWidth(1), verticalAlign: VerticalAlign.CENTER, children: subdomainParagraphs(row.subdomainText) }),
+      new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
+      new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
+      new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
+      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] }),
     ],
   });
 }
@@ -334,9 +336,10 @@ function signatureParagraphs() {
   ];
 }
 
-// previousTierEntries: this child's still-developing (未完成) entries recorded against their
-// previous tier's indicators — appended as extra rows after the form's own tier so a still-open
-// item from before doesn't just fall out of sight once the child moves up a tier.
+// previousTierEntries: entries that don't belong in the main table above — this child's still-
+// developing (未完成) entries recorded against their previous tier's indicators, and/or entries
+// whose indicator code couldn't be resolved at all (see aggregateCoursePlan.js). Appended as a
+// 備註 section after the form's own tier so nothing recorded ever just falls out of sight.
 export async function generateDocxBlob({ child, form, indicators, entries, previousTierEntries = [] }) {
   const entriesByIndicatorCode = {};
   for (const entry of entries) {
@@ -357,23 +360,22 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
     )
   );
 
-  const remarkEntriesByCode = {};
-  for (const entry of previousTierEntries) {
-    (remarkEntriesByCode[entry.indicatorCode] ??= []).push(entry);
-  }
-  const remarkIndicators = [...new Set(previousTierEntries.map(e => e.indicatorCode))]
-    .map(getIndicator)
-    .filter(Boolean);
-  const remarkGroups = buildIndicatorRowGroups(remarkIndicators, remarkEntriesByCode);
-  const remarkRows = remarkGroups.flatMap(({ indicator, rows, isFirstGroupOfDomain }) =>
-    rows.map((row, index) =>
-      bodyRow(indicator, row, {
-        isFirstRowOfDomain: isFirstGroupOfDomain && index === 0,
-        isFirstRowOfIndicator: index === 0,
-        isRemark: true,
-      })
-    )
-  );
+  // A previousTierEntries item's own indicator is usually resolvable (just a different tier) —
+  // but one that came from 彙整's genuinely-unresolved-code path (see aggregateCoursePlan.js) has
+  // no indicator at all; domain/subdomain/description are left blank for those rather than
+  // dropping the row, so nothing recorded ever silently disappears.
+  const remarkRows = previousTierEntries.map(entry => {
+    const indicator = getIndicator(entry.indicatorCode);
+    return remarkRow({
+      domainLabel: indicator ? domainLabelFor(indicator) : '',
+      subdomainText: indicator ? indicator.subdomain : '',
+      code: entry.indicatorCode,
+      description: indicator ? indicator.description : '',
+      date: entry.date,
+      status: entry.status,
+      note: entry.note,
+    });
+  });
 
   const table = new Table({
     width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
@@ -381,7 +383,7 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
     margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-    rows: [...headerRows(), ...bodyRows, ...remarkRows],
+    rows: [...headerRows(), ...bodyRows, ...(remarkRows.length > 0 ? [remarkDividerRow(), ...remarkRows] : [])],
   });
 
   const doc = new Document({

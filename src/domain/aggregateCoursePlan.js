@@ -29,15 +29,17 @@ function entrySignature({ indicatorCode, date, status, note }) {
 // (AssessmentForm) — either a brand-new one, or an existing one when `targetFormId` is given.
 // Each ParentReport's CoursePlanEntry/CourseOccurrence pairs become ObservationEntry rows;
 // 請假／未執行 occurrences are dropped (the teacher did not actually run the activity, so the
-// total form has nothing to show for that date); an entry whose indicator code can't be resolved
-// at all is skipped and reported back in `failed` instead of aborting the whole merge. An entry
-// whose indicator belongs to a *different* tier than the target (the child recorded it before
-// developing into this tier's indicators) is filed into a form for its own tier instead — reusing
-// that child's existing form for that tier if there is one — so it isn't lost; formEditorView's
-// 備註 section picks these up automatically when exporting a later tier's form. When merging into
-// an existing form, a row that exactly duplicates one already there (same indicatorCode+date+
-// status+note) is skipped and counted in `skippedDuplicates` instead of being written twice — the
-// same dedup applies to rerouted rows against their own target tier's form.
+// total form has nothing to show for that date). An entry whose indicator belongs to a
+// *different* tier than the target (the child recorded it before developing into this tier's
+// indicators) is filed into a form for its own tier instead — reusing that child's existing form
+// for that tier if there is one — so it isn't lost; the target form's own 備註 section picks these
+// up automatically when exported. An entry whose indicator code can't be resolved at all (still
+// possible even after normalizeIndicatorCode) is written onto the *target* form as-is rather than
+// discarded — it won't match any of the target tier's own indicators, so generateDocxBlob's export
+// picks it up as a 備註 row there too, the same way. When merging into an existing form, a row
+// that exactly duplicates one already there (same indicatorCode+date+status+note) is skipped and
+// counted in `skippedDuplicates` instead of being written twice — the same dedup applies to
+// rerouted rows against their own target tier's form.
 export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, targetFormId = null }) {
   const reports = [];
   for (const reportId of reportIds) {
@@ -48,7 +50,6 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
 
   const toWrite = [];
   const rerouted = []; // { tier, indicatorCode, date, status, note } — a different tier's indicator
-  const failed = [];
 
   for (const report of reports) {
     const entries = await listCoursePlanEntriesForReport(report.id);
@@ -59,22 +60,15 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
       // match against indicator.code, which wouldn't find an entry still stored under "IV-1-1".
       const indicatorCode = normalizeIndicatorCode(entry.indicatorCode);
       const indicator = getIndicator(indicatorCode);
-      if (!indicator) {
-        failed.push({
-          reportPeriod: report.period,
-          indicatorCode,
-          activityName: entry.activityName,
-          reason: '找不到對應指標',
-        });
-        continue;
-      }
+      // No indicator to resolve a tier from at all — goes straight to the target form; it will
+      // land in 備註 there since its code matches none of that tier's own indicators.
+      const target = !indicator || indicator.tier === tier ? toWrite : rerouted;
 
       const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
-      const target = indicator.tier === tier ? toWrite : rerouted;
       for (const occurrence of occurrences) {
         if (occurrence.absent) continue;
         target.push({
-          tier: indicator.tier,
+          tier: indicator?.tier,
           indicatorCode,
           date: occurrence.date,
           status: occurrence.status,
@@ -148,5 +142,5 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
     }
   }
 
-  return { form, failed, skippedDuplicates, reroutedCount };
+  return { form, skippedDuplicates, reroutedCount };
 }

@@ -185,6 +185,20 @@ describe('renderFormEditorView', () => {
     expect(remarkSection.textContent).not.toContain('已完成');
   });
 
+  it('shows an unresolved-code entry left on this same form (e.g. by 彙整) in 備註 too, without crashing the delete/edit wiring for it', async () => {
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    const remarkSection = container.querySelector('[data-remark-section]');
+    expect(remarkSection).not.toBeNull();
+    expect(remarkSection.textContent).toContain('Ⅳ-9-9');
+    expect(remarkSection.textContent).toContain('無法對應到系統指標');
+    // Read-only: no delete/edit button rendered for it (and no crash wiring one that isn't there).
+    expect(remarkSection.querySelector('[data-delete-entry]')).toBeNull();
+  });
+
   it('passes the child\'s still-developing entries from their previous tier (Ⅲ) into the export, but not their already-developed ones', async () => {
     const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
     await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習扶物站立' });

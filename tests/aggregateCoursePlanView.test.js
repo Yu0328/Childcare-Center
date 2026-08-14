@@ -202,7 +202,7 @@ describe('renderAggregateCoursePlanView', () => {
     expect(created.tier).toBe('Ⅴ');
   });
 
-  it('shows the failed list and only calls onCreated after "前往查看總表" is clicked', async () => {
+  it('creates the form directly even when an entry\'s indicator code cannot be resolved — it is still written, not discarded', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     const badEntry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-9-9', activityName: '不存在的指標' });
     await addCourseOccurrence({ entryId: badEntry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
@@ -214,12 +214,8 @@ describe('renderAggregateCoursePlanView', () => {
     container.querySelector(`[data-report-checkbox="${report.id}"]`).checked = true;
     container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    await waitFor(() => container.querySelector('[data-action="go-to-form"]'));
-    expect(container.textContent).toContain('Ⅴ-9-9');
-    expect(created).toBeNull();
-
-    container.querySelector('[data-action="go-to-form"]').click();
-    expect(created).not.toBeNull();
+    await waitFor(() => created !== null);
+    expect(await listEntriesForForm(created.id)).toMatchObject([{ indicatorCode: 'Ⅴ-9-9' }]);
   });
 
   it('reports rerouted cross-tier entries instead of onCreated firing immediately, and files them into the right tier', async () => {
@@ -236,7 +232,7 @@ describe('renderAggregateCoursePlanView', () => {
     container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => container.querySelector('[data-action="go-to-form"]'));
-    expect(container.textContent).toContain('已依其實際階段歸類到對應的適性總表');
+    expect(container.textContent).toContain('已加進對應總表的備註');
     expect(created).toBeNull();
 
     const forms = await listFormsForChild(child.id);
