@@ -4626,10 +4626,14 @@ var CFormApp = (() => {
     for (const rowXml of bodyRows) {
       const cells = cellsForRow(rowXml);
       if (cells.length < 6) continue;
-      const code = cells[2] || lastCode;
+      const hasRemarkColumn = cells.length >= 7;
+      const codeIndex = hasRemarkColumn ? 3 : 2;
+      const dateIndex = hasRemarkColumn ? 5 : 4;
+      const noteIndex = hasRemarkColumn ? 6 : 5;
+      const code = cells[codeIndex] || lastCode;
       lastCode = code;
-      const dateCell = cells[4];
-      const note = cells[5];
+      const dateCell = cells[dateIndex];
+      const note = cells[noteIndex];
       if (!dateCell && !note) continue;
       const dateMatch = /^(\d{1,2})\/(\d{1,2})/.exec(dateCell);
       if (!dateMatch) continue;
@@ -24616,7 +24620,7 @@ var CFormApp = (() => {
 
   // src/export/docxExport.js
   var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u793E\u5340\u516C\u5171\u6258\u80B2\u5BB6\u5712";
-  var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 1643, 800];
+  var COLUMN_WIDTHS = [565, 1557, 800, 992, 1984, 1560, 1643];
   var TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
   var TABLE_CELL_MARGIN_DXA = 115;
   var SUBDOMAIN_SEPARATOR = "\u3001";
@@ -24684,24 +24688,24 @@ var CFormApp = (() => {
           children: [textParagraph("\u9818\u57DF\u7BC4\u7587", { bold: true, ...CENTERED })]
         }),
         new TableCell({
-          width: spannedWidth(2, 3),
+          width: cellWidth(2),
+          verticalMerge: VerticalMergeType.RESTART,
+          verticalAlign: VerticalAlign.CENTER,
+          children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
+        }),
+        new TableCell({
+          width: spannedWidth(3, 4),
           columnSpan: 2,
           verticalAlign: VerticalAlign.CENTER,
           shading: { type: ShadingType.CLEAR, color: "auto", fill: "D9D9D9" },
           children: [textParagraph("\u6307\u6A19\u9805\u6B21/\u767C\u5C55\u6D3B\u52D5", { bold: true, ...CENTERED })]
         }),
         new TableCell({
-          width: spannedWidth(4, 5),
+          width: spannedWidth(5, 6),
           columnSpan: 2,
           verticalAlign: VerticalAlign.CENTER,
           shading: { type: ShadingType.CLEAR, color: "auto", fill: "D9D9D9" },
           children: [textParagraph("\u5BE6\u65BD\u8A18\u9304", { bold: true, ...CENTERED })]
-        }),
-        new TableCell({
-          width: cellWidth(6),
-          verticalMerge: VerticalMergeType.RESTART,
-          verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
         })
       ]
     });
@@ -24719,13 +24723,18 @@ var CFormApp = (() => {
           children: [emptyParagraph()]
         }),
         new TableCell({
-          width: spannedWidth(2, 3),
+          width: cellWidth(2),
+          verticalMerge: VerticalMergeType.CONTINUE,
+          children: [emptyParagraph()]
+        }),
+        new TableCell({
+          width: spannedWidth(3, 4),
           columnSpan: 2,
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph("\u9069\u6027\u767C\u5C55\u6307\u6A19\u6D3B\u52D5", { bold: true, ...CENTERED })]
         }),
         new TableCell({
-          width: cellWidth(4),
+          width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
           children: [
             textParagraph("\u8AB2\u7A0B\u5BE6\u65BD\u65E5\u671F\u3010\u5DF2\u767C\u5C55\u25CB\u3011", { bold: true, ...CENTERED }),
@@ -24733,14 +24742,9 @@ var CFormApp = (() => {
           ]
         }),
         new TableCell({
-          width: cellWidth(5),
+          width: cellWidth(6),
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph("\u8AB2\u7A0B\u5BE6\u65BD\u8A18\u9304", { bold: true, ...CENTERED })]
-        }),
-        new TableCell({
-          width: cellWidth(6),
-          verticalMerge: VerticalMergeType.CONTINUE,
-          children: [emptyParagraph()]
         })
       ]
     });
@@ -24764,22 +24768,22 @@ var CFormApp = (() => {
       children: [
         mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
         mergedCell(1, subdomainParagraphs(indicator.subdomain), isFirstRowOfDomain),
-        mergedCell(2, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
-        mergedCell(3, [textParagraph(row.description)], isFirstRowOfIndicator),
         new TableCell({
-          width: cellWidth(4),
+          width: cellWidth(2),
+          verticalAlign: VerticalAlign.CENTER,
+          children: [isRemark ? textParagraph(row.note) : emptyParagraph()]
+        }),
+        mergedCell(3, [textParagraph(row.code, CENTERED)], isFirstRowOfIndicator),
+        mergedCell(4, [textParagraph(row.description)], isFirstRowOfIndicator),
+        new TableCell({
+          width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph(formatDateCell(row), CENTERED)]
         }),
         new TableCell({
-          width: cellWidth(5),
-          verticalAlign: VerticalAlign.CENTER,
-          children: [isRemark ? emptyParagraph() : textParagraph(row.note)]
-        }),
-        new TableCell({
           width: cellWidth(6),
           verticalAlign: VerticalAlign.CENTER,
-          children: [isRemark ? textParagraph(row.note) : emptyParagraph()]
+          children: [isRemark ? emptyParagraph() : textParagraph(row.note)]
         })
       ]
     });
@@ -27868,6 +27872,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v53</footer>
+<footer class="app-version">v54</footer>
 </body>
 </html>

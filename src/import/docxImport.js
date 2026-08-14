@@ -73,6 +73,12 @@ function inferTier(rawEntries) {
   return best;
 }
 
+// A real legacy sample (陳小安C表-2.docx, 林浩宇-C表-...彙整.docx) has 6 columns: 發展領域/領域範疇/
+// 指標項次/發展活動/課程實施日期/課程實施記錄, code at index 2. Our own exporter (see docxExport.js)
+// now also writes a 備註 column right after 領域範疇 (7 columns total), shifting code/date/note each
+// one index over — so a document re-imported after being exported by this app needs the later
+// indices, while a real legacy document (no 備註 column) still needs the original ones. The 備註
+// column's own content isn't reconstructed on import — it's not this row's own record.
 function parseBodyRows(documentXml) {
   const bodyRows = rowsOf(documentXml).slice(2); // the first two rows are the fixed table header
   const rawEntries = [];
@@ -82,11 +88,16 @@ function parseBodyRows(documentXml) {
     const cells = cellsForRow(rowXml);
     if (cells.length < 6) continue;
 
-    const code = cells[2] || lastCode;
+    const hasRemarkColumn = cells.length >= 7;
+    const codeIndex = hasRemarkColumn ? 3 : 2;
+    const dateIndex = hasRemarkColumn ? 5 : 4;
+    const noteIndex = hasRemarkColumn ? 6 : 5;
+
+    const code = cells[codeIndex] || lastCode;
     lastCode = code;
 
-    const dateCell = cells[4];
-    const note = cells[5];
+    const dateCell = cells[dateIndex];
+    const note = cells[noteIndex];
     if (!dateCell && !note) continue; // an unfilled placeholder row
 
     const dateMatch = /^(\d{1,2})\/(\d{1,2})/.exec(dateCell);

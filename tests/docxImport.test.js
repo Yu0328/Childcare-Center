@@ -109,6 +109,43 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
     expect(parsed.warnings).toContain('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
   });
 
+  it('reads a real legacy 6-column document (no 備註 column) using the original code/date/note positions', async () => {
+    // A real sample (陳小安C表-2.docx-shaped) never has our own exporter's 備註 column — code sits
+    // at index 2, not 3.
+    const zip = new JSZip();
+    zip.file(
+      'word/document.xml',
+      `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:body>
+          <w:tbl>
+            <w:tr><w:tc><w:p><w:r><w:t>header row 0</w:t></w:r></w:p></w:tc></w:tr>
+            <w:tr><w:tc><w:p><w:r><w:t>header row 1</w:t></w:r></w:p></w:tc></w:tr>
+            <w:tr>
+              <w:tc><w:p><w:r><w:t>1身體動作</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:t>粗動作</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:t>Ⅳ-1-1</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:t>能獨立穩定行走</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:t>01/07○</w:t></w:r></w:p></w:tc>
+              <w:tc><w:p><w:r><w:t>六欄舊格式備註</w:t></w:r></w:p></w:tc>
+            </w:tr>
+          </w:tbl>
+        </w:body>
+      </w:document>`
+    );
+    zip.file(
+      'word/header1.xml',
+      `<?xml version="1.0"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:p><w:r><w:t>幼兒姓名：測試寶寶 出生日期：113/11/01 實際月齡：14個月 實施時間：115年01月</w:t></w:r></w:p>
+      </w:hdr>`
+    );
+
+    const buffer = await zip.generateAsync({ type: 'arraybuffer' });
+    const parsed = await parseDocxImport(buffer);
+
+    expect(parsed.entries).toHaveLength(1);
+    expect(parsed.entries[0]).toMatchObject({ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '六欄舊格式備註' });
+  });
+
   it('flags missing header info instead of throwing', async () => {
     const zip = new JSZip();
     zip.file(
