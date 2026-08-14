@@ -1,5 +1,5 @@
-import { getIndicatorsForTier, tierFormLabel } from '../data/indicators.js';
-import { addEntry, deleteEntry, listEntriesForForm, updateEntry } from '../storage/db.js';
+import { getIndicatorsForTier, tierFormLabel, previousTier } from '../data/indicators.js';
+import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
 
@@ -61,6 +61,17 @@ function indicatorBlock(indicator, entries) {
   `;
 }
 
+// This child's still-developing (未完成) entries recorded against their previous tier's
+// indicators — a child moving up a tier can still have open items from before, and they'd
+// otherwise never show up on any form again once the new tier's form takes over.
+async function previousTierDevelopingEntries(childId, tier) {
+  const prevTier = previousTier(tier);
+  if (!prevTier) return [];
+  const forms = (await listFormsForChild(childId)).filter(f => f.tier === prevTier);
+  const entriesPerForm = await Promise.all(forms.map(f => listEntriesForForm(f.id)));
+  return entriesPerForm.flat().filter(entry => entry.status === 'developing');
+}
+
 export async function renderFormEditorView(
   container,
   { child, form, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
@@ -106,7 +117,11 @@ export async function renderFormEditorView(
   container.querySelector('[data-action="export"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
-      const blob = await generateDocxBlob({ child, form, indicators, entries: await listEntriesForForm(form.id) });
+      const blob = await generateDocxBlob({
+        child, form, indicators,
+        entries: await listEntriesForForm(form.id),
+        previousTierEntries: await previousTierDevelopingEntries(child.id, form.tier),
+      });
       downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {

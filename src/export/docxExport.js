@@ -16,7 +16,7 @@ import {
   VerticalMergeType,
   WidthType,
 } from 'docx';
-import { TIERS } from '../data/indicators.js';
+import { TIERS, getIndicator } from '../data/indicators.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 import {
   FONT,
@@ -233,7 +233,11 @@ function mergedCell(index, children, isFirstRowOfMerge) {
 //   columns 2-3 (指標項次 / 發展活動) merge only across the rows of one indicator.
 // Columns 0-2 are short, tag-like values and are centered; 發展活動/課程實施記錄 stay left-aligned
 // prose, matching the original.
-function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) {
+// isRemark: this row carries over a still-incomplete indicator from the child's previous tier
+// (they hadn't developed into it yet) rather than a record against this form's own tier — same
+// row layout as any other indicator, but the last column reads as a remark instead of this
+// tier's own 課程實施記錄, so it isn't mistaken for one.
+function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, isRemark = false }) {
   return new TableRow({
     children: [
       mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
@@ -248,7 +252,7 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
       new TableCell({
         width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph(row.note)],
+        children: [textParagraph(isRemark ? `備註：${row.note}` : row.note)],
       }),
     ],
   });
@@ -306,7 +310,10 @@ function signatureParagraphs() {
   ];
 }
 
-export async function generateDocxBlob({ child, form, indicators, entries }) {
+// previousTierEntries: this child's still-developing (未完成) entries recorded against their
+// previous tier's indicators — appended as extra rows after the form's own tier so a still-open
+// item from before doesn't just fall out of sight once the child moves up a tier.
+export async function generateDocxBlob({ child, form, indicators, entries, previousTierEntries = [] }) {
   const entriesByIndicatorCode = {};
   for (const entry of entries) {
     if (!entriesByIndicatorCode[entry.indicatorCode]) {
@@ -326,13 +333,31 @@ export async function generateDocxBlob({ child, form, indicators, entries }) {
     )
   );
 
+  const remarkEntriesByCode = {};
+  for (const entry of previousTierEntries) {
+    (remarkEntriesByCode[entry.indicatorCode] ??= []).push(entry);
+  }
+  const remarkIndicators = [...new Set(previousTierEntries.map(e => e.indicatorCode))]
+    .map(getIndicator)
+    .filter(Boolean);
+  const remarkGroups = buildIndicatorRowGroups(remarkIndicators, remarkEntriesByCode);
+  const remarkRows = remarkGroups.flatMap(({ indicator, rows, isFirstGroupOfDomain }) =>
+    rows.map((row, index) =>
+      bodyRow(indicator, row, {
+        isFirstRowOfDomain: isFirstGroupOfDomain && index === 0,
+        isFirstRowOfIndicator: index === 0,
+        isRemark: true,
+      })
+    )
+  );
+
   const table = new Table({
     width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
     columnWidths: COLUMN_WIDTHS,
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
     margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-    rows: [...headerRows(), ...bodyRows],
+    rows: [...headerRows(), ...bodyRows, ...remarkRows],
   });
 
   const doc = new Document({

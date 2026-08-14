@@ -13,9 +13,9 @@ const entries = [
   { indicatorCode: 'Ⅳ-1-2', date: '2026-02-26', status: 'developed', note: '可穩定蹲下拿起地上的小石頭' },
 ];
 
-async function exportParts() {
+async function exportParts({ previousTierEntries } = {}) {
   const indicators = getIndicatorsForTier('Ⅳ');
-  const blob = await generateDocxBlob({ child, form, indicators, entries });
+  const blob = await generateDocxBlob({ child, form, indicators, entries, previousTierEntries });
   const zip = await JSZip.loadAsync(blob);
 
   const documentXml = await zip.file('word/document.xml').async('text');
@@ -253,5 +253,30 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     const { documentXml } = await exportParts();
 
     expect(documentXml).toContain('1身體動作');
+  });
+
+  describe('previous-tier carried-over 備註 rows', () => {
+    it('appends a row per previous-tier developing entry after the form\'s own rows, prefixed 備註：', async () => {
+      const previousTierEntries = [
+        { indicatorCode: 'Ⅲ-1-1', date: '2025-12-01', status: 'developing', note: '仍在練習扶物站立' },
+      ];
+      const { documentXml } = await exportParts({ previousTierEntries });
+
+      expect(documentXml).toContain('Ⅲ-1-1');
+      expect(documentXml).toContain('備註：仍在練習扶物站立');
+      expect(documentXml).toContain('12/01△');
+
+      const bodyRows = parseTableRows(documentXml).slice(2);
+      const remarkRowIndex = bodyRows.findIndex(row => row.texts[2] === 'Ⅲ-1-1');
+      expect(remarkRowIndex).toBeGreaterThan(-1);
+      // It comes after every one of the form's own (Ⅳ-tier) rows.
+      const ownRowIndexes = bodyRows.map((row, i) => (row.texts[2]?.startsWith('Ⅳ') ? i : -1)).filter(i => i >= 0);
+      expect(remarkRowIndex).toBeGreaterThan(Math.max(...ownRowIndexes));
+    });
+
+    it('adds no extra rows or 備註 text when there are no previous-tier developing entries', async () => {
+      const { documentXml } = await exportParts();
+      expect(documentXml).not.toContain('備註：');
+    });
   });
 });

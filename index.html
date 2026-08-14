@@ -4505,6 +4505,10 @@ var CFormApp = (() => {
     if (!tier) return "";
     return tier.formLetter ? `${tier.formLetter}\u8868` : tier.label;
   }
+  function previousTier(tierCode) {
+    const index = TIERS.findIndex((t) => t.code === tierCode);
+    return index > 0 ? TIERS[index - 1].code : null;
+  }
   var DOMAINS = RAW_DOMAINS.map(({ domain, name, subdomain }) => ({
     id: domain,
     name,
@@ -24731,7 +24735,7 @@ var CFormApp = (() => {
       children: isFirstRowOfMerge ? children : [emptyParagraph()]
     });
   }
-  function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) {
+  function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator, isRemark = false }) {
     return new TableRow({
       children: [
         mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
@@ -24746,7 +24750,7 @@ var CFormApp = (() => {
         new TableCell({
           width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph(row.note)]
+          children: [textParagraph(isRemark ? `\u5099\u8A3B\uFF1A${row.note}` : row.note)]
         })
       ]
     });
@@ -24792,7 +24796,7 @@ var CFormApp = (() => {
       emptyParagraph()
     ];
   }
-  async function generateDocxBlob({ child, form, indicators, entries }) {
+  async function generateDocxBlob({ child, form, indicators, entries, previousTierEntries = [] }) {
     const entriesByIndicatorCode = {};
     for (const entry of entries) {
       if (!entriesByIndicatorCode[entry.indicatorCode]) {
@@ -24809,13 +24813,28 @@ var CFormApp = (() => {
         })
       )
     );
+    const remarkEntriesByCode = {};
+    for (const entry of previousTierEntries) {
+      (remarkEntriesByCode[entry.indicatorCode] ??= []).push(entry);
+    }
+    const remarkIndicators = [...new Set(previousTierEntries.map((e) => e.indicatorCode))].map(getIndicator).filter(Boolean);
+    const remarkGroups = buildIndicatorRowGroups(remarkIndicators, remarkEntriesByCode);
+    const remarkRows = remarkGroups.flatMap(
+      ({ indicator, rows, isFirstGroupOfDomain }) => rows.map(
+        (row, index) => bodyRow(indicator, row, {
+          isFirstRowOfDomain: isFirstGroupOfDomain && index === 0,
+          isFirstRowOfIndicator: index === 0,
+          isRemark: true
+        })
+      )
+    );
     const table = new Table({
       width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
       columnWidths: COLUMN_WIDTHS,
       layout: TableLayoutType.FIXED,
       alignment: AlignmentType.CENTER,
       margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-      rows: [...headerRows(), ...bodyRows]
+      rows: [...headerRows(), ...bodyRows, ...remarkRows]
     });
     const doc = new File({
       sections: [
@@ -24888,6 +24907,13 @@ var CFormApp = (() => {
     </div>
   `;
   }
+  async function previousTierDevelopingEntries(childId, tier) {
+    const prevTier = previousTier(tier);
+    if (!prevTier) return [];
+    const forms = (await listFormsForChild(childId)).filter((f) => f.tier === prevTier);
+    const entriesPerForm = await Promise.all(forms.map((f) => listEntriesForForm(f.id)));
+    return entriesPerForm.flat().filter((entry) => entry.status === "developing");
+  }
   async function renderFormEditorView(container, { child, form, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
     const indicators = getIndicatorsForTier(form.tier);
     const entries = await listEntriesForForm(form.id);
@@ -24920,7 +24946,13 @@ var CFormApp = (() => {
     container.querySelector('[data-action="export"]').addEventListener("click", async () => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
-        const blob = await generateDocxBlob({ child, form, indicators, entries: await listEntriesForForm(form.id) });
+        const blob = await generateDocxBlob({
+          child,
+          form,
+          indicators,
+          entries: await listEntriesForForm(form.id),
+          previousTierEntries: await previousTierDevelopingEntries(child.id, form.tier)
+        });
         downloadDocx(blob, `${child.name}-${tierFormLabel(form.tier)}-${form.period}.docx`);
         if (errorEl) errorEl.textContent = "";
       } catch (err) {
@@ -27716,6 +27748,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v49</footer>
+<footer class="app-version">v50</footer>
 </body>
 </html>

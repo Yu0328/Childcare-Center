@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator } from '../src/data/indicators.js';
+import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier } from '../src/data/indicators.js';
 
 describe('indicator reference data', () => {
   it('has 6 tiers in order Ⅰ through Ⅵ', () => {
@@ -62,5 +62,12 @@ describe('indicator reference data', () => {
 
   it('getIndicator returns undefined for an unknown code', () => {
     expect(getIndicator('Ⅵ-9-9')).toBeUndefined();
+  });
+
+  it('previousTier returns the tier immediately before, null for Ⅰ or an unknown code', () => {
+    expect(previousTier('Ⅴ')).toBe('Ⅳ');
+    expect(previousTier('Ⅱ')).toBe('Ⅰ');
+    expect(previousTier('Ⅰ')).toBeNull();
+    expect(previousTier('nope')).toBeNull();
   });
 });
