@@ -25,22 +25,38 @@ function entrySignature({ indicatorCode, date, status, note }) {
   return JSON.stringify([indicatorCode, date, status, note]);
 }
 
-// Merges the 課程計畫表 data of several same-tier 適性紀錄(家長版) into one 適性總表
-// (AssessmentForm) — either a brand-new one, or an existing one when `targetFormId` is given.
-// Each ParentReport's CoursePlanEntry/CourseOccurrence pairs become ObservationEntry rows;
-// 請假／未執行 occurrences are dropped (the teacher did not actually run the activity, so the
-// total form has nothing to show for that date). An entry whose indicator belongs to a
-// *different* tier than the target (the child recorded it before developing into this tier's
-// indicators) is filed into a form for its own tier instead — reusing that child's existing form
-// for that tier if there is one — so it isn't lost; the target form's own 備註 section picks these
-// up automatically when exported. An entry whose indicator code can't be resolved at all (still
-// possible even after normalizeIndicatorCode) is written onto the *target* form as-is rather than
-// discarded — it won't match any of the target tier's own indicators, so generateDocxBlob's export
-// picks it up as a 備註 row there too, the same way. When merging into an existing form, a row
-// that exactly duplicates one already there (same indicatorCode+date+status+note) is skipped and
-// counted in `skippedDuplicates` instead of being written twice — the same dedup applies to
-// rerouted rows against their own target tier's form.
-export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, targetFormId = null }) {
+// Deduplicates `rows` against a form's existing entries (or none, for a not-yet-created form),
+// returning only the rows that would actually get written plus how many were skipped as exact
+// duplicates. Read-only — makes no changes, so it's safe to call during preview.
+async function dedupeAgainstForm(existingForm, rows) {
+  const existingEntries = existingForm ? await listEntriesForForm(existingForm.id) : [];
+  const seen = new Set(existingEntries.map(entrySignature));
+  const rowsToWrite = [];
+  let skippedDuplicates = 0;
+  for (const row of rows) {
+    const signature = entrySignature(row);
+    if (seen.has(signature)) {
+      skippedDuplicates += 1;
+      continue;
+    }
+    seen.add(signature);
+    rowsToWrite.push(row);
+  }
+  return { rowsToWrite, skippedDuplicates };
+}
+
+// Computes everything a 彙整 (aggregate) run *would* do, without writing anything — so the UI can
+// show the user a preview (in particular, any entry whose indicator code couldn't be resolved at
+// all, like "我大大了", which lands in 備註 rather than the main table) before they confirm it.
+// Each ParentReport's CoursePlanEntry/CourseOccurrence pairs become planned ObservationEntry rows;
+// 請假／未執行 occurrences are dropped (the teacher did not actually run the activity, so the total
+// form has nothing to show for that date). An entry whose indicator belongs to a *different* tier
+// than the target is planned to be filed into a form for its own tier instead — reusing that
+// child's existing form for that tier if there is one. An entry whose indicator code can't be
+// resolved at all (still possible even after normalizeIndicatorCode) is planned onto the *target*
+// form as-is — it won't match any of the target tier's own indicators, so generateDocxBlob's export
+// picks it up as a 備註 row there, same as formEditorView's on-screen 備註 section.
+export async function planCoursePlanAggregation({ childId, tier, reportIds, targetFormId = null }) {
   const reports = [];
   for (const reportId of reportIds) {
     const report = await getParentReport(reportId);
@@ -49,7 +65,7 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
   reports.sort((a, b) => a.period.localeCompare(b.period));
 
   const toWrite = [];
-  const rerouted = []; // { tier, indicatorCode, date, status, note } — a different tier's indicator
+  const rerouted = []; // { tier, indicatorCode, date, status, note, activityName } — a different tier's indicator
 
   for (const report of reports) {
     const entries = await listCoursePlanEntriesForReport(report.id);
@@ -73,7 +89,7 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
           date: occurrence.date,
           status: occurrence.status,
           note: occurrence.note,
-          // Only needed as an export-time fallback for a code that never resolves to an
+          // Only needed as an export/preview-time fallback for a code that never resolves to an
           // indicator at all — a resolvable one (same-tier or rerouted) always has its official
           // description looked up fresh instead, so this would just go unused.
           activityName: indicator ? undefined : entry.activityName,
@@ -82,40 +98,16 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
     }
   }
 
-  let form;
-  let skippedDuplicates = 0;
   const period = combinedPeriodRange(reports.map(r => r.period));
+  const existingTargetForm = targetFormId ? await getForm(targetFormId) : null;
+  const targetPeriod = existingTargetForm
+    ? combinedPeriodRange([...periodRangeParts(existingTargetForm.period), ...reports.map(r => r.period)])
+    : period;
+  const { rowsToWrite: targetRowsToWrite, skippedDuplicates: targetSkipped } = await dedupeAgainstForm(
+    existingTargetForm,
+    toWrite
+  );
 
-  if (targetFormId) {
-    form = await getForm(targetFormId);
-    const existingEntries = await listEntriesForForm(targetFormId);
-    const seen = new Set(existingEntries.map(entrySignature));
-
-    const rowsToWrite = [];
-    for (const row of toWrite) {
-      const signature = entrySignature(row);
-      if (seen.has(signature)) {
-        skippedDuplicates += 1;
-        continue;
-      }
-      seen.add(signature);
-      rowsToWrite.push(row);
-    }
-
-    const mergedPeriod = combinedPeriodRange([...periodRangeParts(form.period), ...reports.map(r => r.period)]);
-    form = await updateForm(targetFormId, { period: mergedPeriod });
-
-    for (const row of rowsToWrite) {
-      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
-    }
-  } else {
-    form = await addForm({ childId, tier, period });
-    for (const row of toWrite) {
-      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
-    }
-  }
-
-  let reroutedCount = 0;
   const reroutedByTier = new Map();
   for (const row of rerouted) {
     if (!reroutedByTier.has(row.tier)) reroutedByTier.set(row.tier, []);
@@ -123,28 +115,58 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
   }
 
   const childForms = rerouted.length > 0 ? await listFormsForChild(childId) : [];
+  const reroutes = [];
   for (const [rowTier, rows] of reroutedByTier) {
-    let rerouteForm = childForms.find(f => f.tier === rowTier);
-    if (!rerouteForm) {
-      rerouteForm = await addForm({ childId, tier: rowTier, period });
-      childForms.push(rerouteForm);
-    }
+    const existingForm = childForms.find(f => f.tier === rowTier) ?? null;
+    const { rowsToWrite, skippedDuplicates } = await dedupeAgainstForm(existingForm, rows);
+    reroutes.push({ tier: rowTier, existingForm, period, rowsToWrite, skippedDuplicates });
+  }
 
-    const existingEntries = await listEntriesForForm(rerouteForm.id);
-    const seen = new Set(existingEntries.map(entrySignature));
+  const unresolved = targetRowsToWrite.filter(row => row.activityName !== undefined);
+  const totalSkippedDuplicates = targetSkipped + reroutes.reduce((sum, r) => sum + r.skippedDuplicates, 0);
+  const totalReroutedCount = reroutes.reduce((sum, r) => sum + r.rowsToWrite.length, 0);
 
-    for (const row of rows) {
-      const entryRow = { indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note };
-      const signature = entrySignature(entryRow);
-      if (seen.has(signature)) {
-        skippedDuplicates += 1;
-        continue;
-      }
-      seen.add(signature);
-      await addEntry({ formId: rerouteForm.id, ...entryRow, activityName: row.activityName });
+  return {
+    childId,
+    tier,
+    period: targetPeriod,
+    existingTargetForm,
+    targetRowsToWrite,
+    reroutes,
+    unresolved,
+    totalSkippedDuplicates,
+    totalReroutedCount,
+  };
+}
+
+// Writes a previously computed plan (see planCoursePlanAggregation) — the only function in this
+// module that actually touches storage.
+export async function applyCoursePlanAggregation(plan) {
+  let form;
+  if (plan.existingTargetForm) {
+    form = await updateForm(plan.existingTargetForm.id, { period: plan.period });
+  } else {
+    form = await addForm({ childId: plan.childId, tier: plan.tier, period: plan.period });
+  }
+  for (const row of plan.targetRowsToWrite) {
+    await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
+  }
+
+  let reroutedCount = 0;
+  for (const reroute of plan.reroutes) {
+    const rerouteForm = reroute.existingForm ?? (await addForm({ childId: plan.childId, tier: reroute.tier, period: reroute.period }));
+    for (const row of reroute.rowsToWrite) {
+      await addEntry({ formId: rerouteForm.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
       reroutedCount += 1;
     }
   }
 
-  return { form, skippedDuplicates, reroutedCount };
+  return { form, skippedDuplicates: plan.totalSkippedDuplicates, reroutedCount };
+}
+
+// Convenience wrapper for callers (and existing tests) that don't need the separate preview step —
+// plans, then immediately applies.
+export async function aggregateCoursePlanIntoForm(params) {
+  const plan = await planCoursePlanAggregation(params);
+  return applyCoursePlanAggregation(plan);
 }
