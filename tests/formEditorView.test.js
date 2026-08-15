@@ -225,6 +225,25 @@ describe('renderFormEditorView', () => {
     expect(updated).toMatchObject({ indicatorCode: '改過的標籤', note: '改過的內容' });
   });
 
+  it('edits a local remark\'s activityName fallback (e.g. "我大大了") via its inline edit form', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標', activityName: '我大大了' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    container.querySelector(`[data-edit-remark="${entry.id}"]`).click();
+    const activityNameField = container.querySelector(`[data-remark-edit-field="activityName"][data-remark-id="${entry.id}"]`);
+    expect(activityNameField.value).toBe('我大大了');
+
+    activityNameField.value = '我長高了';
+    container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).click();
+
+    await waitFor(() => container.textContent.includes('我長高了'));
+
+    const [updated] = await listEntriesForForm(form.id);
+    expect(updated.activityName).toBe('我長高了');
+  });
+
   it('deletes a local remark (unresolved-code entry on this form) after confirmation', async () => {
     const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: 'x' });
 

@@ -254,36 +254,26 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
   });
 }
 
-// row: { code, description, date, status, note }. The very first remark row's 發展領域/領域範疇
-// cells are merged into one "備註" label — marking the start of the section inline, without a
-// separate divider row of its own — so nothing appears at all when there's nothing to remark on
-// (see generateDocxBlob below). Every remark after the first uses the normal remarkRow (unmerged,
-// showing its own domain/subdomain) instead, so "備註" only ever appears once.
-function firstRemarkRow(row) {
-  return new TableRow({
-    children: [
-      new TableCell({
-        width: spannedWidth(0, 1),
-        columnSpan: 2,
-        verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph('備註', { bold: true, ...CENTERED })],
-      }),
-      new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
-      new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
-      new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
-      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] }),
-    ],
+// The 備註 section's 發展領域/領域範疇 cells merge into one "備註" label spanning every remark row —
+// a vertical merge (like the main table's domain-column merge), not a label repeated per row.
+function remarkLabelCell(isFirstRow) {
+  return new TableCell({
+    width: spannedWidth(0, 1),
+    columnSpan: 2,
+    verticalAlign: VerticalAlign.CENTER,
+    verticalMerge: isFirstRow ? VerticalMergeType.RESTART : VerticalMergeType.CONTINUE,
+    children: isFirstRow ? [textParagraph('備註', { bold: true, ...CENTERED })] : [emptyParagraph()],
   });
 }
 
-// row: { domainLabel, subdomainText, code, description, date, status, note }. Plain (unmerged)
-// cells — each remark is its own standalone row, not grouped with siblings the way the main
-// table's indicator rows are.
-function remarkRow(row) {
+// row: { code, description, date, status, note }. The section always has at least one row (with
+// blank code/description/date/note when there's nothing to remark on — see generateDocxBlob below),
+// so 備註 stays a discoverable, always-present part of the printed form rather than only appearing
+// when something happens to need it.
+function remarkRow(row, isFirstRow) {
   return new TableRow({
     children: [
-      new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.domainLabel, CENTERED)] }),
-      new TableCell({ width: cellWidth(1), verticalAlign: VerticalAlign.CENTER, children: subdomainParagraphs(row.subdomainText) }),
+      remarkLabelCell(isFirstRow),
       new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
       new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
       new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
@@ -370,13 +360,11 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
 
   // A previousTierEntries item's own indicator is usually resolvable (just a different tier) —
   // but one that came from 彙整's genuinely-unresolved-code path (see aggregateCoursePlan.js) has
-  // no indicator at all; domain/subdomain/description are left blank for those rather than
-  // dropping the row, so nothing recorded ever silently disappears.
+  // no indicator at all; description falls back to activityName rather than dropping the row, so
+  // nothing recorded ever silently disappears.
   const remarkData = previousTierEntries.map(entry => {
     const indicator = getIndicator(entry.indicatorCode);
     return {
-      domainLabel: indicator ? domainLabelFor(indicator) : '',
-      subdomainText: indicator ? indicator.subdomain : '',
       code: entry.indicatorCode,
       // A resolved indicator's own description always wins; entry.activityName is only ever set
       // (see aggregateCoursePlan.js) as a fallback for a code that never resolved to one at all,
@@ -387,11 +375,11 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
       note: entry.note,
     };
   });
-  // Only the first remark row carries the "備註" label (merged into 發展領域/領域範疇); every
-  // later one displays like a normal row. Nothing at all is appended when there's nothing to
-  // remark on — no separate divider row exists independent of actual content.
-  const remarkRows =
-    remarkData.length > 0 ? [firstRemarkRow(remarkData[0]), ...remarkData.slice(1).map(remarkRow)] : [];
+  // Always at least one row (blank when there's nothing to remark on), so the 備註 section stays a
+  // permanent, discoverable part of the printed form rather than appearing only when needed.
+  const remarkRows = (remarkData.length > 0 ? remarkData : [{ code: '', description: '', date: '', status: null, note: '' }]).map(
+    (row, index) => remarkRow(row, index === 0)
+  );
 
   const table = new Table({
     width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },

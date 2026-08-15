@@ -24772,27 +24772,19 @@ var CFormApp = (() => {
       ]
     });
   }
-  function firstRemarkRow(row) {
-    return new TableRow({
-      children: [
-        new TableCell({
-          width: spannedWidth(0, 1),
-          columnSpan: 2,
-          verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
-        }),
-        new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
-        new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
-        new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
-        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] })
-      ]
+  function remarkLabelCell(isFirstRow) {
+    return new TableCell({
+      width: spannedWidth(0, 1),
+      columnSpan: 2,
+      verticalAlign: VerticalAlign.CENTER,
+      verticalMerge: isFirstRow ? VerticalMergeType.RESTART : VerticalMergeType.CONTINUE,
+      children: isFirstRow ? [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })] : [emptyParagraph()]
     });
   }
-  function remarkRow(row) {
+  function remarkRow(row, isFirstRow) {
     return new TableRow({
       children: [
-        new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.domainLabel, CENTERED)] }),
-        new TableCell({ width: cellWidth(1), verticalAlign: VerticalAlign.CENTER, children: subdomainParagraphs(row.subdomainText) }),
+        remarkLabelCell(isFirstRow),
         new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
         new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
         new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
@@ -24861,8 +24853,6 @@ var CFormApp = (() => {
     const remarkData = previousTierEntries.map((entry) => {
       const indicator = getIndicator(entry.indicatorCode);
       return {
-        domainLabel: indicator ? domainLabelFor(indicator) : "",
-        subdomainText: indicator ? indicator.subdomain : "",
         code: entry.indicatorCode,
         // A resolved indicator's own description always wins; entry.activityName is only ever set
         // (see aggregateCoursePlan.js) as a fallback for a code that never resolved to one at all,
@@ -24873,7 +24863,9 @@ var CFormApp = (() => {
         note: entry.note
       };
     });
-    const remarkRows = remarkData.length > 0 ? [firstRemarkRow(remarkData[0]), ...remarkData.slice(1).map(remarkRow)] : [];
+    const remarkRows = (remarkData.length > 0 ? remarkData : [{ code: "", description: "", date: "", status: null, note: "" }]).map(
+      (row, index) => remarkRow(row, index === 0)
+    );
     const table = new Table({
       width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
       columnWidths: COLUMN_WIDTHS,
@@ -24969,6 +24961,7 @@ var CFormApp = (() => {
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
       ${entry.isLocal ? `<div class="entry-form" data-remark-edit-form-for="${escapeHtml(entry.id)}" hidden>
               <label class="entry-form__field">\u6A19\u7C64 <input type="text" data-remark-edit-field="code" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.indicatorCode)}"></label>
+              <label class="entry-form__field">\u6D3B\u52D5\u540D\u7A31\uFF08\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19\u6642\u986F\u793A\uFF09 <input type="text" data-remark-edit-field="activityName" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.activityName ?? "")}"></label>
               <label class="entry-form__field">\u65E5\u671F <input type="date" data-remark-edit-field="date" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
               ${statusRadios(`remark-edit-${entry.id}`, { fieldAttr: "remark-edit-field", idAttr: "remark-id", checkedStatus: entry.status })}
               <input type="text" class="entry-form__note" data-remark-edit-field="note" data-remark-id="${escapeHtml(entry.id)}" placeholder="\u5099\u8A3B\u5167\u5BB9" value="${escapeHtml(entry.note)}">
@@ -25029,6 +25022,7 @@ var CFormApp = (() => {
           <button type="button" class="btn btn--outline btn--small" data-action="add-remark">\uFF0B \u65B0\u589E\u5099\u8A3B</button>
           <div class="entry-form" data-remark-form hidden>
             <label class="entry-form__field">\u6A19\u7C64 <input type="text" data-remark-field="code" placeholder="\u4F8B\uFF1A\u2163-5-4 \u6216\u81EA\u8A02\u6587\u5B57"></label>
+            <label class="entry-form__field">\u6D3B\u52D5\u540D\u7A31\uFF08\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19\u6642\u986F\u793A\uFF09 <input type="text" data-remark-field="activityName" placeholder="\u4F8B\uFF1A\u6211\u5927\u5927\u4E86"></label>
             <label class="entry-form__field">\u65E5\u671F <input type="date" data-remark-field="date"></label>
             ${statusRadios("remark", { fieldAttr: "remark-field", idAttr: "remark-id", checkedStatus: "developed" })}
             <input type="text" class="entry-form__note" data-remark-field="note" placeholder="\u5099\u8A3B\u5167\u5BB9">
@@ -25066,13 +25060,14 @@ var CFormApp = (() => {
     container.querySelector('[data-action="save-remark"]').addEventListener("click", async () => {
       const errorEl = container.querySelector("[data-remark-form] [data-error]");
       const code = container.querySelector('[data-remark-field="code"]').value;
+      const activityName = container.querySelector('[data-remark-field="activityName"]').value;
       const date = container.querySelector('[data-remark-field="date"]').value;
       const radios = container.querySelectorAll('input[name="status-remark"]');
       const statusInput = Array.from(radios).find((r) => r.checked);
       const status = statusInput ? statusInput.value : "developed";
       const note = container.querySelector('[data-remark-field="note"]').value;
       try {
-        await addEntry({ formId: form.id, indicatorCode: code, date, status, note });
+        await addEntry({ formId: form.id, indicatorCode: code, date, status, note, activityName: activityName || void 0 });
         await renderFormEditorView(container, { child, form, onBack, confirmDelete });
       } catch (err) {
         if (errorEl) errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -25098,13 +25093,14 @@ var CFormApp = (() => {
       });
       container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).addEventListener("click", async () => {
         const code = container.querySelector(`[data-remark-edit-field="code"][data-remark-id="${entry.id}"]`).value;
+        const activityName = container.querySelector(`[data-remark-edit-field="activityName"][data-remark-id="${entry.id}"]`).value;
         const date = container.querySelector(`[data-remark-edit-field="date"][data-remark-id="${entry.id}"]`).value;
         const radios = container.querySelectorAll(`input[name="status-remark-edit-${escapeHtml(entry.id)}"]`);
         const statusInput = Array.from(radios).find((r) => r.checked);
         const status = statusInput ? statusInput.value : "developed";
         const note = container.querySelector(`[data-remark-edit-field="note"][data-remark-id="${entry.id}"]`).value;
         try {
-          await updateEntry(entry.id, { indicatorCode: code, date, status, note });
+          await updateEntry(entry.id, { indicatorCode: code, date, status, note, activityName: activityName || void 0 });
           await renderFormEditorView(container, { child, form, onBack, confirmDelete });
         } catch (err) {
           const errorEl = container.querySelector(`[data-remark-edit-form-for="${entry.id}"] [data-error]`);
@@ -27955,6 +27951,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v58</footer>
+<footer class="app-version">v23</footer>
 </body>
 </html>
