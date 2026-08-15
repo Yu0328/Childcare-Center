@@ -24955,11 +24955,25 @@ var CFormApp = (() => {
     return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
       <div class="entry-row__top">
-        <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? "")}</h4>
-        ${entry.isLocal ? `<button type="button" class="btn--delete-circle" data-delete-remark="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>` : ""}
+        <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? entry.activityName ?? "")}</h4>
+        ${entry.isLocal ? `<div class="entry-row__actions">
+                <button type="button" class="btn btn--edit btn--small" data-edit-remark="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
+                <button type="button" class="btn--delete-circle" data-delete-remark="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>
+              </div>` : ""}
       </div>
       <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+      ${entry.isLocal ? `<div class="entry-form" data-remark-edit-form-for="${escapeHtml(entry.id)}" hidden>
+              <label class="entry-form__field">\u6A19\u7C64 <input type="text" data-remark-edit-field="code" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.indicatorCode)}"></label>
+              <label class="entry-form__field">\u65E5\u671F <input type="date" data-remark-edit-field="date" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
+              ${statusRadios(`remark-edit-${entry.id}`, { fieldAttr: "remark-edit-field", idAttr: "remark-id", checkedStatus: entry.status })}
+              <input type="text" class="entry-form__note" data-remark-edit-field="note" data-remark-id="${escapeHtml(entry.id)}" placeholder="\u5099\u8A3B\u5167\u5BB9" value="${escapeHtml(entry.note)}">
+              <div class="entry-form__actions">
+                <button type="button" class="btn btn--primary btn--small" data-remark-edit-save-for="${escapeHtml(entry.id)}">\u5132\u5B58</button>
+                <button type="button" class="btn btn--outline btn--small" data-remark-edit-cancel-for="${escapeHtml(entry.id)}">\u53D6\u6D88</button>
+              </div>
+              <p class="field-error" data-error></p>
+            </div>` : ""}
     </div>
   `;
   }
@@ -25069,6 +25083,28 @@ var CFormApp = (() => {
         } catch (err) {
           const errorEl = container.querySelector("[data-remark-form] [data-error]");
           if (errorEl) errorEl.textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+      container.querySelector(`[data-edit-remark="${entry.id}"]`).addEventListener("click", () => {
+        const editForm = container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`);
+        editForm.hidden = !editForm.hidden;
+      });
+      container.querySelector(`[data-remark-edit-cancel-for="${entry.id}"]`).addEventListener("click", () => {
+        container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`).hidden = true;
+      });
+      container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).addEventListener("click", async () => {
+        const code = container.querySelector(`[data-remark-edit-field="code"][data-remark-id="${entry.id}"]`).value;
+        const date = container.querySelector(`[data-remark-edit-field="date"][data-remark-id="${entry.id}"]`).value;
+        const radios = container.querySelectorAll(`input[name="status-remark-edit-${escapeHtml(entry.id)}"]`);
+        const statusInput = Array.from(radios).find((r) => r.checked);
+        const status = statusInput ? statusInput.value : "developed";
+        const note = container.querySelector(`[data-remark-edit-field="note"][data-remark-id="${entry.id}"]`).value;
+        try {
+          await updateEntry(entry.id, { indicatorCode: code, date, status, note });
+          await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        } catch (err) {
+          const errorEl = container.querySelector(`[data-remark-edit-form-for="${entry.id}"] [data-error]`);
+          if (errorEl) errorEl.textContent = "\u66F4\u65B0\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
         }
       });
     }
@@ -27915,6 +27951,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v56</footer>
+<footer class="app-version">v57</footer>
 </body>
 </html>
