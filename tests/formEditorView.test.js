@@ -185,8 +185,8 @@ describe('renderFormEditorView', () => {
     expect(remarkSection.textContent).not.toContain('已完成');
   });
 
-  it('shows an unresolved-code entry left on this same form (e.g. by 彙整) in 備註 too, deletable from here (but not editable), without crashing the delete/edit wiring for it', async () => {
-    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標' });
+  it('shows an unresolved-code entry left on this same form (e.g. by 彙整) in 備註 too, editable/deletable from here, without crashing the main table\'s own delete/edit wiring for it', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標', activityName: '我大大了' });
 
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} });
@@ -195,11 +195,34 @@ describe('renderFormEditorView', () => {
     expect(remarkSection).not.toBeNull();
     expect(remarkSection.textContent).toContain('Ⅳ-9-9');
     expect(remarkSection.textContent).toContain('無法對應到系統指標');
-    // Not editable, and not wired via the main table's own delete mechanism (no crash from that).
+    // Falls back to the stored activityName since the code doesn't resolve to a real indicator.
+    expect(remarkSection.textContent).toContain('我大大了');
+    // Not wired via the main table's own delete/edit mechanism (no crash from that).
     expect(remarkSection.querySelector('[data-delete-entry]')).toBeNull();
     expect(remarkSection.querySelector('[data-edit-entry]')).toBeNull();
-    // But deletable, since it lives on this same form.
+    // Has its own remark-specific edit/delete buttons instead, since it lives on this same form.
     expect(remarkSection.querySelector(`[data-delete-remark="${entry.id}"]`)).not.toBeNull();
+    expect(remarkSection.querySelector(`[data-edit-remark="${entry.id}"]`)).not.toBeNull();
+  });
+
+  it('edits a local remark\'s label/date/status/note via its inline edit form', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: '自訂', date: '2026-01-05', status: 'developed', note: '原始內容' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    container.querySelector(`[data-edit-remark="${entry.id}"]`).click();
+    const editForm = container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`);
+    expect(editForm.hidden).toBe(false);
+
+    container.querySelector(`[data-remark-edit-field="code"][data-remark-id="${entry.id}"]`).value = '改過的標籤';
+    container.querySelector(`[data-remark-edit-field="note"][data-remark-id="${entry.id}"]`).value = '改過的內容';
+    container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).click();
+
+    await waitFor(() => container.textContent.includes('改過的內容'));
+
+    const [updated] = await listEntriesForForm(form.id);
+    expect(updated).toMatchObject({ indicatorCode: '改過的標籤', note: '改過的內容' });
   });
 
   it('deletes a local remark (unresolved-code entry on this form) after confirmation', async () => {
