@@ -73,6 +73,10 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
           date: occurrence.date,
           status: occurrence.status,
           note: occurrence.note,
+          // Only needed as an export-time fallback for a code that never resolves to an
+          // indicator at all — a resolvable one (same-tier or rerouted) always has its official
+          // description looked up fresh instead, so this would just go unused.
+          activityName: indicator ? undefined : entry.activityName,
         });
       }
     }
@@ -102,12 +106,12 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
     form = await updateForm(targetFormId, { period: mergedPeriod });
 
     for (const row of rowsToWrite) {
-      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note });
+      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
     }
   } else {
     form = await addForm({ childId, tier, period });
     for (const row of toWrite) {
-      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note });
+      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
     }
   }
 
@@ -137,7 +141,7 @@ export async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, ta
         continue;
       }
       seen.add(signature);
-      await addEntry({ formId: rerouteForm.id, ...entryRow });
+      await addEntry({ formId: rerouteForm.id, ...entryRow, activityName: row.activityName });
       reroutedCount += 1;
     }
   }

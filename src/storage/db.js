@@ -85,11 +85,16 @@ export async function deleteForm(id) {
   await runRequest('forms', 'readwrite', store => store.delete(id));
 }
 
-export async function addEntry({ formId, indicatorCode, date, status, note }) {
+// activityName is optional — normal entries (against one of this form's own tier's indicators)
+// never need it, since their description is always looked up fresh from the indicator. It exists
+// for a remark entry whose code doesn't resolve to any indicator at all (see
+// aggregateCoursePlan.js), so the original activity label the child's record was under isn't lost
+// just because the code couldn't be matched — 發展活動 falls back to it on export.
+export async function addEntry({ formId, indicatorCode, date, status, note, activityName }) {
   const id = await runRequest('entries', 'readwrite', store =>
-    store.add({ formId, indicatorCode, date, status, note })
+    store.add({ formId, indicatorCode, date, status, note, activityName })
   );
-  return { id, formId, indicatorCode, date, status, note };
+  return { id, formId, indicatorCode, date, status, note, activityName };
 }
 
 export async function updateEntry(id, changes) {

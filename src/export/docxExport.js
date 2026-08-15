@@ -254,16 +254,23 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
   });
 }
 
-// A single full-width divider row marking the start of the 備註 section: "備註" in the first cell,
-// the rest blank. Everything after it (see remarkRow below) is a previous-tier still-incomplete
-// item, or a course-plan entry whose indicator code couldn't be resolved at all during 彙整 —
-// either way, not this form's own tier's record, so it's kept visually separate rather than mixed
-// into the main table above.
+// A single full-width divider row marking the 備註 section, always present at the end of the
+// table (even with nothing to remark on, so the section reads as a permanent part of the form,
+// not something that only sometimes exists) — "備註" spanning the same two columns 發展領域/
+// 領域範疇 normally occupy, the rest blank. Everything after it (see remarkRow below) is a
+// previous-tier still-incomplete item, a course-plan entry whose indicator code couldn't be
+// resolved at all during 彙整, or one the teacher added directly — either way, not this form's
+// own tier's record, so it's kept visually separate rather than mixed into the main table above.
 function remarkDividerRow() {
   return new TableRow({
     children: [
-      new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph('備註', { bold: true, ...CENTERED })] }),
-      ...[1, 2, 3, 4, 5].map(index => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] })),
+      new TableCell({
+        width: spannedWidth(0, 1),
+        columnSpan: 2,
+        verticalAlign: VerticalAlign.CENTER,
+        children: [textParagraph('備註', { bold: true, ...CENTERED })],
+      }),
+      ...[2, 3, 4, 5].map(index => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] })),
     ],
   });
 }
@@ -370,7 +377,10 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
       domainLabel: indicator ? domainLabelFor(indicator) : '',
       subdomainText: indicator ? indicator.subdomain : '',
       code: entry.indicatorCode,
-      description: indicator ? indicator.description : '',
+      // A resolved indicator's own description always wins; entry.activityName is only ever set
+      // (see aggregateCoursePlan.js) as a fallback for a code that never resolved to one at all,
+      // so the original activity label isn't just silently dropped.
+      description: indicator ? indicator.description : entry.activityName || '',
       date: entry.date,
       status: entry.status,
       note: entry.note,
@@ -383,7 +393,7 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
     margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-    rows: [...headerRows(), ...bodyRows, ...(remarkRows.length > 0 ? [remarkDividerRow(), ...remarkRows] : [])],
+    rows: [...headerRows(), ...bodyRows, remarkDividerRow(), ...remarkRows],
   });
 
   const doc = new Document({

@@ -4171,13 +4171,13 @@ var CFormApp = (() => {
     }
     await runRequest("forms", "readwrite", (store) => store.delete(id));
   }
-  async function addEntry({ formId, indicatorCode, date, status, note }) {
+  async function addEntry({ formId, indicatorCode, date, status, note, activityName }) {
     const id = await runRequest(
       "entries",
       "readwrite",
-      (store) => store.add({ formId, indicatorCode, date, status, note })
+      (store) => store.add({ formId, indicatorCode, date, status, note, activityName })
     );
-    return { id, formId, indicatorCode, date, status, note };
+    return { id, formId, indicatorCode, date, status, note, activityName };
   }
   async function updateEntry(id, changes) {
     const existing = await runRequest("entries", "readonly", (store) => store.get(id));
@@ -24775,8 +24775,13 @@ var CFormApp = (() => {
   function remarkDividerRow() {
     return new TableRow({
       children: [
-        new TableCell({ width: cellWidth(0), verticalAlign: VerticalAlign.CENTER, children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })] }),
-        ...[1, 2, 3, 4, 5].map((index) => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] }))
+        new TableCell({
+          width: spannedWidth(0, 1),
+          columnSpan: 2,
+          verticalAlign: VerticalAlign.CENTER,
+          children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
+        }),
+        ...[2, 3, 4, 5].map((index) => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] }))
       ]
     });
   }
@@ -24856,7 +24861,10 @@ var CFormApp = (() => {
         domainLabel: indicator ? domainLabelFor(indicator) : "",
         subdomainText: indicator ? indicator.subdomain : "",
         code: entry.indicatorCode,
-        description: indicator ? indicator.description : "",
+        // A resolved indicator's own description always wins; entry.activityName is only ever set
+        // (see aggregateCoursePlan.js) as a fallback for a code that never resolved to one at all,
+        // so the original activity label isn't just silently dropped.
+        description: indicator ? indicator.description : entry.activityName || "",
         date: entry.date,
         status: entry.status,
         note: entry.note
@@ -24868,7 +24876,7 @@ var CFormApp = (() => {
       layout: TableLayoutType.FIXED,
       alignment: AlignmentType.CENTER,
       margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-      rows: [...headerRows(), ...bodyRows, ...remarkRows.length > 0 ? [remarkDividerRow(), ...remarkRows] : []]
+      rows: [...headerRows(), ...bodyRows, remarkDividerRow(), ...remarkRows]
     });
     const doc = new File({
       sections: [
@@ -24946,7 +24954,10 @@ var CFormApp = (() => {
     const mark = entry.status === "developed" ? "\u25CB" : "\u25B3";
     return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
-      <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? "")}</h4>
+      <div class="entry-row__top">
+        <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? "")}</h4>
+        ${entry.isLocal ? `<button type="button" class="btn--delete-circle" data-delete-remark="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>` : ""}
+      </div>
       <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
     </div>
@@ -24960,8 +24971,8 @@ var CFormApp = (() => {
     return entriesPerForm.flat().filter((entry) => entry.status === "developing");
   }
   async function remarkEntries(childId, tier, ownEntries, ownIndicatorCodes) {
-    const previousTierEntries = await previousTierDevelopingEntries(childId, tier);
-    const ownOrphaned = ownEntries.filter((entry) => !ownIndicatorCodes.has(entry.indicatorCode));
+    const previousTierEntries = (await previousTierDevelopingEntries(childId, tier)).map((entry) => ({ ...entry, isLocal: false }));
+    const ownOrphaned = ownEntries.filter((entry) => !ownIndicatorCodes.has(entry.indicatorCode)).map((entry) => ({ ...entry, isLocal: true }));
     return [...previousTierEntries, ...ownOrphaned];
   }
   async function renderFormEditorView(container, { child, form, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
@@ -24993,14 +25004,23 @@ var CFormApp = (() => {
             </section>
           `
     ).join("")}
-      ${remarks.length > 0 ? `
-            <section class="domain-card" data-remark-section>
-              <h3 class="domain-card__title">\u5099\u8A3B</h3>
-              <div class="domain-card__body">
-                ${remarks.map(remarkBlock).join("")}
-              </div>
-            </section>
-          ` : ""}
+      <section class="domain-card" data-remark-section>
+        <h3 class="domain-card__title">\u5099\u8A3B</h3>
+        <div class="domain-card__body">
+          ${remarks.map(remarkBlock).join("")}
+          <button type="button" class="btn btn--outline btn--small" data-action="add-remark">\uFF0B \u65B0\u589E\u5099\u8A3B</button>
+          <div class="entry-form" data-remark-form hidden>
+            <label class="entry-form__field">\u6A19\u7C64 <input type="text" data-remark-field="code" placeholder="\u4F8B\uFF1A\u2163-5-4 \u6216\u81EA\u8A02\u6587\u5B57"></label>
+            <label class="entry-form__field">\u65E5\u671F <input type="date" data-remark-field="date"></label>
+            ${statusRadios("remark", { fieldAttr: "remark-field", idAttr: "remark-id", checkedStatus: "developed" })}
+            <input type="text" class="entry-form__note" data-remark-field="note" placeholder="\u5099\u8A3B\u5167\u5BB9">
+            <div class="entry-form__actions">
+              <button type="button" class="btn btn--primary btn--small" data-action="save-remark">\u5132\u5B58</button>
+            </div>
+            <p class="field-error" data-error></p>
+          </div>
+        </div>
+      </section>
     </div>
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
@@ -25021,6 +25041,37 @@ var CFormApp = (() => {
         if (errorEl) errorEl.textContent = `\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
+    container.querySelector('[data-action="add-remark"]').addEventListener("click", () => {
+      const remarkForm = container.querySelector("[data-remark-form]");
+      remarkForm.hidden = !remarkForm.hidden;
+    });
+    container.querySelector('[data-action="save-remark"]').addEventListener("click", async () => {
+      const errorEl = container.querySelector("[data-remark-form] [data-error]");
+      const code = container.querySelector('[data-remark-field="code"]').value;
+      const date = container.querySelector('[data-remark-field="date"]').value;
+      const radios = container.querySelectorAll('input[name="status-remark"]');
+      const statusInput = Array.from(radios).find((r) => r.checked);
+      const status = statusInput ? statusInput.value : "developed";
+      const note = container.querySelector('[data-remark-field="note"]').value;
+      try {
+        await addEntry({ formId: form.id, indicatorCode: code, date, status, note });
+        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+      } catch (err) {
+        if (errorEl) errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      }
+    });
+    for (const entry of remarks.filter((r) => r.isLocal)) {
+      container.querySelector(`[data-delete-remark="${entry.id}"]`).addEventListener("click", async () => {
+        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u9019\u7B46\u5099\u8A3B\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
+        try {
+          await deleteEntry(entry.id);
+          await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        } catch (err) {
+          const errorEl = container.querySelector("[data-remark-form] [data-error]");
+          if (errorEl) errorEl.textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+    }
     for (const indicator of indicators) {
       container.querySelector(`[data-add-entry-for="${indicator.code}"]`).addEventListener("click", () => {
         const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
@@ -26425,7 +26476,11 @@ var CFormApp = (() => {
             indicatorCode,
             date: occurrence.date,
             status: occurrence.status,
-            note: occurrence.note
+            note: occurrence.note,
+            // Only needed as an export-time fallback for a code that never resolves to an
+            // indicator at all — a resolvable one (same-tier or rerouted) always has its official
+            // description looked up fresh instead, so this would just go unused.
+            activityName: indicator ? void 0 : entry.activityName
           });
         }
       }
@@ -26450,12 +26505,12 @@ var CFormApp = (() => {
       const mergedPeriod = combinedPeriodRange([...periodRangeParts(form.period), ...reports.map((r) => r.period)]);
       form = await updateForm(targetFormId, { period: mergedPeriod });
       for (const row of rowsToWrite) {
-        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note });
+        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
       }
     } else {
       form = await addForm({ childId, tier, period });
       for (const row of toWrite) {
-        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note });
+        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
       }
     }
     let reroutedCount = 0;
@@ -26481,7 +26536,7 @@ var CFormApp = (() => {
           continue;
         }
         seen.add(signature);
-        await addEntry({ formId: rerouteForm.id, ...entryRow3 });
+        await addEntry({ formId: rerouteForm.id, ...entryRow3, activityName: row.activityName });
         reroutedCount += 1;
       }
     }
@@ -27860,6 +27915,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v55</footer>
+<footer class="app-version">v56</footer>
 </body>
 </html>
