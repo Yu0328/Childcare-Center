@@ -88,6 +88,7 @@ function remarkBlock(entry) {
         entry.isLocal
           ? `<div class="entry-form" data-remark-edit-form-for="${escapeHtml(entry.id)}" hidden>
               <label class="entry-form__field">標籤 <input type="text" data-remark-edit-field="code" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.indicatorCode)}"></label>
+              <label class="entry-form__field">活動名稱（找不到對應指標時顯示） <input type="text" data-remark-edit-field="activityName" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.activityName ?? '')}"></label>
               <label class="entry-form__field">日期 <input type="date" data-remark-edit-field="date" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
               ${statusRadios(`remark-edit-${entry.id}`, { fieldAttr: 'remark-edit-field', idAttr: 'remark-id', checkedStatus: entry.status })}
               <input type="text" class="entry-form__note" data-remark-edit-field="note" data-remark-id="${escapeHtml(entry.id)}" placeholder="備註內容" value="${escapeHtml(entry.note)}">
@@ -174,6 +175,7 @@ export async function renderFormEditorView(
           <button type="button" class="btn btn--outline btn--small" data-action="add-remark">＋ 新增備註</button>
           <div class="entry-form" data-remark-form hidden>
             <label class="entry-form__field">標籤 <input type="text" data-remark-field="code" placeholder="例：Ⅳ-5-4 或自訂文字"></label>
+            <label class="entry-form__field">活動名稱（找不到對應指標時顯示） <input type="text" data-remark-field="activityName" placeholder="例：我大大了"></label>
             <label class="entry-form__field">日期 <input type="date" data-remark-field="date"></label>
             ${statusRadios('remark', { fieldAttr: 'remark-field', idAttr: 'remark-id', checkedStatus: 'developed' })}
             <input type="text" class="entry-form__note" data-remark-field="note" placeholder="備註內容">
@@ -213,13 +215,14 @@ export async function renderFormEditorView(
   container.querySelector('[data-action="save-remark"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-remark-form] [data-error]');
     const code = container.querySelector('[data-remark-field="code"]').value;
+    const activityName = container.querySelector('[data-remark-field="activityName"]').value;
     const date = container.querySelector('[data-remark-field="date"]').value;
     const radios = container.querySelectorAll('input[name="status-remark"]');
     const statusInput = Array.from(radios).find(r => r.checked);
     const status = statusInput ? statusInput.value : 'developed';
     const note = container.querySelector('[data-remark-field="note"]').value;
     try {
-      await addEntry({ formId: form.id, indicatorCode: code, date, status, note });
+      await addEntry({ formId: form.id, indicatorCode: code, date, status, note, activityName: activityName || undefined });
       await renderFormEditorView(container, { child, form, onBack, confirmDelete });
     } catch (err) {
       if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
@@ -249,13 +252,14 @@ export async function renderFormEditorView(
 
     container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).addEventListener('click', async () => {
       const code = container.querySelector(`[data-remark-edit-field="code"][data-remark-id="${entry.id}"]`).value;
+      const activityName = container.querySelector(`[data-remark-edit-field="activityName"][data-remark-id="${entry.id}"]`).value;
       const date = container.querySelector(`[data-remark-edit-field="date"][data-remark-id="${entry.id}"]`).value;
       const radios = container.querySelectorAll(`input[name="status-remark-edit-${escapeHtml(entry.id)}"]`);
       const statusInput = Array.from(radios).find(r => r.checked);
       const status = statusInput ? statusInput.value : 'developed';
       const note = container.querySelector(`[data-remark-edit-field="note"][data-remark-id="${entry.id}"]`).value;
       try {
-        await updateEntry(entry.id, { indicatorCode: code, date, status, note });
+        await updateEntry(entry.id, { indicatorCode: code, date, status, note, activityName: activityName || undefined });
         await renderFormEditorView(container, { child, form, onBack, confirmDelete });
       } catch (err) {
         const errorEl = container.querySelector(`[data-remark-edit-form-for="${entry.id}"] [data-error]`);
