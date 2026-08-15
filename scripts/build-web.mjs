@@ -1,6 +1,5 @@
 import esbuild from 'esbuild';
 import { createHash } from 'node:crypto';
-import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 
 // This builds the hosted (GitHub Pages) version — a small set of files instead of the desktop
@@ -21,11 +20,10 @@ const result = await esbuild.build({
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles.css', 'utf-8');
 
-// Version = total commit count across every change since the project began. Counts the union of
-// `public` (deploy snapshots) and the dev branch explicitly, rather than plain HEAD — otherwise the
-// number depends on which branch happens to be checked out at build time (public's own history is
-// much shorter than the dev branch's, since it only holds one squashed-ish commit per deploy).
-const version = execSync('git rev-list --count public worktree-monthly-course-plan-design').toString().trim();
+// Semantic Versioning (MAJOR.MINOR.PATCH) — bump package.json's "version" by hand per release,
+// same as any npm package. A commit-count-derived number (the previous approach) isn't meaningful
+// on its own and swung wildly depending which branch happened to be checked out at build time.
+const { version } = JSON.parse(readFileSync('package.json', 'utf-8'));
 
 // Every rebuild gets a fresh cache name derived from the bundle's own content, so a redeploy
 // reliably invalidates old clients' cached copy instead of a cache-first Service Worker serving

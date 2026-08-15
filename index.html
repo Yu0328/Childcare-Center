@@ -26489,7 +26489,23 @@ var CFormApp = (() => {
   function entrySignature({ indicatorCode, date, status, note }) {
     return JSON.stringify([indicatorCode, date, status, note]);
   }
-  async function aggregateCoursePlanIntoForm({ childId, tier, reportIds, targetFormId = null }) {
+  async function dedupeAgainstForm(existingForm, rows) {
+    const existingEntries = existingForm ? await listEntriesForForm(existingForm.id) : [];
+    const seen = new Set(existingEntries.map(entrySignature));
+    const rowsToWrite = [];
+    let skippedDuplicates = 0;
+    for (const row of rows) {
+      const signature = entrySignature(row);
+      if (seen.has(signature)) {
+        skippedDuplicates += 1;
+        continue;
+      }
+      seen.add(signature);
+      rowsToWrite.push(row);
+    }
+    return { rowsToWrite, skippedDuplicates };
+  }
+  async function planCoursePlanAggregation({ childId, tier, reportIds, targetFormId = null }) {
     const reports = [];
     for (const reportId of reportIds) {
       const report = await getParentReport(reportId);
@@ -26513,7 +26529,7 @@ var CFormApp = (() => {
             date: occurrence.date,
             status: occurrence.status,
             note: occurrence.note,
-            // Only needed as an export-time fallback for a code that never resolves to an
+            // Only needed as an export/preview-time fallback for a code that never resolves to an
             // indicator at all — a resolvable one (same-tier or rerouted) always has its official
             // description looked up fresh instead, so this would just go unused.
             activityName: indicator ? void 0 : entry.activityName
@@ -26521,74 +26537,86 @@ var CFormApp = (() => {
         }
       }
     }
-    let form;
-    let skippedDuplicates = 0;
     const period = combinedPeriodRange(reports.map((r) => r.period));
-    if (targetFormId) {
-      form = await getForm(targetFormId);
-      const existingEntries = await listEntriesForForm(targetFormId);
-      const seen = new Set(existingEntries.map(entrySignature));
-      const rowsToWrite = [];
-      for (const row of toWrite) {
-        const signature = entrySignature(row);
-        if (seen.has(signature)) {
-          skippedDuplicates += 1;
-          continue;
-        }
-        seen.add(signature);
-        rowsToWrite.push(row);
-      }
-      const mergedPeriod = combinedPeriodRange([...periodRangeParts(form.period), ...reports.map((r) => r.period)]);
-      form = await updateForm(targetFormId, { period: mergedPeriod });
-      for (const row of rowsToWrite) {
-        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
-      }
-    } else {
-      form = await addForm({ childId, tier, period });
-      for (const row of toWrite) {
-        await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
-      }
-    }
-    let reroutedCount = 0;
+    const existingTargetForm = targetFormId ? await getForm(targetFormId) : null;
+    const targetPeriod = existingTargetForm ? combinedPeriodRange([...periodRangeParts(existingTargetForm.period), ...reports.map((r) => r.period)]) : period;
+    const { rowsToWrite: targetRowsToWrite, skippedDuplicates: targetSkipped } = await dedupeAgainstForm(
+      existingTargetForm,
+      toWrite
+    );
     const reroutedByTier = /* @__PURE__ */ new Map();
     for (const row of rerouted) {
       if (!reroutedByTier.has(row.tier)) reroutedByTier.set(row.tier, []);
       reroutedByTier.get(row.tier).push(row);
     }
     const childForms = rerouted.length > 0 ? await listFormsForChild(childId) : [];
+    const reroutes = [];
     for (const [rowTier, rows] of reroutedByTier) {
-      let rerouteForm = childForms.find((f) => f.tier === rowTier);
-      if (!rerouteForm) {
-        rerouteForm = await addForm({ childId, tier: rowTier, period });
-        childForms.push(rerouteForm);
-      }
-      const existingEntries = await listEntriesForForm(rerouteForm.id);
-      const seen = new Set(existingEntries.map(entrySignature));
-      for (const row of rows) {
-        const entryRow3 = { indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note };
-        const signature = entrySignature(entryRow3);
-        if (seen.has(signature)) {
-          skippedDuplicates += 1;
-          continue;
-        }
-        seen.add(signature);
-        await addEntry({ formId: rerouteForm.id, ...entryRow3, activityName: row.activityName });
+      const existingForm = childForms.find((f) => f.tier === rowTier) ?? null;
+      const { rowsToWrite, skippedDuplicates } = await dedupeAgainstForm(existingForm, rows);
+      reroutes.push({ tier: rowTier, existingForm, period, rowsToWrite, skippedDuplicates });
+    }
+    const unresolved = targetRowsToWrite.filter((row) => row.activityName !== void 0);
+    const totalSkippedDuplicates = targetSkipped + reroutes.reduce((sum, r) => sum + r.skippedDuplicates, 0);
+    const totalReroutedCount = reroutes.reduce((sum, r) => sum + r.rowsToWrite.length, 0);
+    return {
+      childId,
+      tier,
+      period: targetPeriod,
+      existingTargetForm,
+      targetRowsToWrite,
+      reroutes,
+      unresolved,
+      totalSkippedDuplicates,
+      totalReroutedCount
+    };
+  }
+  async function applyCoursePlanAggregation(plan) {
+    let form;
+    if (plan.existingTargetForm) {
+      form = await updateForm(plan.existingTargetForm.id, { period: plan.period });
+    } else {
+      form = await addForm({ childId: plan.childId, tier: plan.tier, period: plan.period });
+    }
+    for (const row of plan.targetRowsToWrite) {
+      await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
+    }
+    let reroutedCount = 0;
+    for (const reroute of plan.reroutes) {
+      const rerouteForm = reroute.existingForm ?? await addForm({ childId: plan.childId, tier: reroute.tier, period: reroute.period });
+      for (const row of reroute.rowsToWrite) {
+        await addEntry({ formId: rerouteForm.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
         reroutedCount += 1;
       }
     }
-    return { form, skippedDuplicates, reroutedCount };
+    return { form, skippedDuplicates: plan.totalSkippedDuplicates, reroutedCount };
   }
 
   // src/ui/aggregateCoursePlanView.js
-  function resultSummaryHtml(skippedDuplicates, reroutedCount) {
-    const reroutedSection = reroutedCount > 0 ? `<p>\u53E6\u6709 ${reroutedCount} \u7B46\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\uFF08\u6216\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF09\uFF0C\u5DF2\u52A0\u9032\u5C0D\u61C9\u7E3D\u8868\u7684\u5099\u8A3B\uFF08\u532F\u51FA\u7E3D\u8868 Word \u6642\u6703\u986F\u793A\u5728\u6700\u5F8C\u7684\u5099\u8A3B\u5340\u584A\uFF09</p>` : "";
-    const skippedSection = skippedDuplicates > 0 ? `<p>\u5DF2\u8DF3\u904E ${skippedDuplicates} \u7B46\u91CD\u8907\u8CC7\u6599</p>` : "";
+  function unresolvedListHtml(unresolved) {
+    if (unresolved.length === 0) return "";
     return `
-    <div class="field-error" data-aggregate-result>
-      <p>\u5DF2\u5B8C\u6210\u5F59\u6574\uFF0C\u4F46\uFF1A</p>
+    <p>\u4EE5\u4E0B ${unresolved.length} \u7B46\u627E\u4E0D\u5230\u5C0D\u61C9\u7684\u7CFB\u7D71\u6307\u6A19\uFF0C\u5C07\u4EE5\u300C\u6D3B\u52D5\u540D\u7A31\u300D\u5099\u63F4\u65B9\u5F0F\u52A0\u5165\u7E3D\u8868\u7684\u5099\u8A3B\u5340\u584A\uFF0C\u8ACB\u78BA\u8A8D\u5167\u5BB9\u7121\u8AA4\uFF1A</p>
+    <ul>
+      ${unresolved.map(
+      (row) => `<li>${escapeHtml(row.indicatorCode)}\u3000${escapeHtml(row.activityName ?? "")}\u3000${escapeHtml(row.date)}\u3000${escapeHtml(row.note)}</li>`
+    ).join("")}
+    </ul>
+  `;
+  }
+  function previewHtml(plan) {
+    const reroutedSection = plan.totalReroutedCount > 0 ? `<p>\u53E6\u6709 ${plan.totalReroutedCount} \u7B46\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\uFF08\u6216\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF09\uFF0C\u78BA\u8A8D\u5F8C\u5C07\u52A0\u9032\u5C0D\u61C9\u7E3D\u8868\u7684\u5099\u8A3B\uFF08\u532F\u51FA\u7E3D\u8868 Word \u6642\u6703\u986F\u793A\u5728\u6700\u5F8C\u7684\u5099\u8A3B\u5340\u584A\uFF09</p>` : "";
+    const skippedSection = plan.totalSkippedDuplicates > 0 ? `<p>\u5C07\u8DF3\u904E ${plan.totalSkippedDuplicates} \u7B46\u91CD\u8907\u8CC7\u6599</p>` : "";
+    return `
+    <div class="field-error" data-aggregate-preview>
+      <p>\u5F59\u6574\u524D\u8ACB\u5148\u78BA\u8A8D\u4EE5\u4E0B\u5167\u5BB9\uFF1A</p>
+      ${unresolvedListHtml(plan.unresolved)}
       ${reroutedSection}
       ${skippedSection}
-      <button type="button" class="btn btn--primary" data-action="go-to-form">\u524D\u5F80\u67E5\u770B\u7E3D\u8868</button>
+      <div class="entry-form__actions">
+        <button type="button" class="btn btn--primary" data-action="confirm-aggregate">\u78BA\u8A8D\u5F59\u6574</button>
+        <button type="button" class="btn btn--outline" data-action="cancel-preview">\u8FD4\u56DE\u4FEE\u6539</button>
+      </div>
     </div>
   `;
   }
@@ -26610,13 +26638,14 @@ var CFormApp = (() => {
     let selectedTier = tiers[0];
     let selectedMode = "new";
     let checkedReportIds = /* @__PURE__ */ new Set();
+    let previewPlan = null;
     function reportsForTier(tier) {
       return reports.filter((r) => r.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
     }
     function formsForTier(tier) {
       return forms.filter((f) => f.tier === tier).sort((a, b) => a.period.localeCompare(b.period));
     }
-    function render(showResult = false, createdForm = null, skippedDuplicates = 0, reroutedCount = 0) {
+    function render() {
       const tierReports = reportsForTier(selectedTier);
       const tierForms = formsForTier(selectedTier);
       if (tierForms.length === 0) selectedMode = "new";
@@ -26625,48 +26654,58 @@ var CFormApp = (() => {
         <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
         <h2 class="page-header__title">${escapeHtml(child.name)}\u3000\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</h2>
       </div>
-      <form class="panel-form" data-action="aggregate">
-        <label class="panel-form__field">
-          \u6708\u9F61\u968E\u6BB5
-          <select data-field="tier">
-            ${tiers.map((t) => `<option value="${escapeHtml(t)}" ${t === selectedTier ? "selected" : ""}>${escapeHtml(t)} \u968E\u6BB5</option>`).join("")}
-          </select>
-        </label>
-        <fieldset class="panel-form__field">
-          <legend>\u9078\u64C7\u8981\u5F59\u6574\u7684\u9069\u6027\u7D00\u9304</legend>
-          ${tierReports.map(
+      ${previewPlan ? previewHtml(previewPlan) : `<form class="panel-form" data-action="aggregate">
+              <label class="panel-form__field">
+                \u6708\u9F61\u968E\u6BB5
+                <select data-field="tier">
+                  ${tiers.map((t) => `<option value="${escapeHtml(t)}" ${t === selectedTier ? "selected" : ""}>${escapeHtml(t)} \u968E\u6BB5</option>`).join("")}
+                </select>
+              </label>
+              <fieldset class="panel-form__field">
+                <legend>\u9078\u64C7\u8981\u5F59\u6574\u7684\u9069\u6027\u7D00\u9304</legend>
+                ${tierReports.map(
         (r) => `
-                <label class="panel-form__checkbox-row">
-                  <input type="checkbox" data-report-checkbox="${escapeHtml(r.id)}" ${checkedReportIds.has(String(r.id)) ? "checked" : ""}>
-                  ${escapeHtml(r.period)}
-                </label>
-              `
+                      <label class="panel-form__checkbox-row">
+                        <input type="checkbox" data-report-checkbox="${escapeHtml(r.id)}" ${checkedReportIds.has(String(r.id)) ? "checked" : ""}>
+                        ${escapeHtml(r.period)}
+                      </label>
+                    `
       ).join("")}
-        </fieldset>
-        <fieldset class="panel-form__field">
-          <legend>\u5F59\u6574\u65B9\u5F0F</legend>
-          <label class="panel-form__checkbox-row">
-            <input type="radio" name="target-mode" data-field="target-mode" value="new" ${selectedMode === "new" ? "checked" : ""}>
-            \u5EFA\u7ACB\u65B0\u7E3D\u8868
-          </label>
-          <label class="panel-form__checkbox-row">
-            <input type="radio" name="target-mode" data-field="target-mode" value="existing" ${selectedMode === "existing" ? "checked" : ""} ${tierForms.length === 0 ? "disabled" : ""}>
-            \u5408\u4F75\u9032\u73FE\u6709\u7E3D\u8868
-          </label>
-          ${selectedMode === "existing" ? `<label class="panel-form__field">
-                   \u9078\u64C7\u8981\u5408\u4F75\u9032\u53BB\u7684\u7E3D\u8868
-                   <select data-field="target-form">
-                     <option value="">\u8ACB\u9078\u64C7</option>
-                     ${tierForms.map((f) => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.period)}</option>`).join("")}
-                   </select>
-                 </label>` : ""}
-        </fieldset>
-        <button type="submit" class="btn btn--primary">${selectedMode === "existing" ? "\u5408\u4F75\u9032\u7E3D\u8868" : "\u5EFA\u7ACB\u7E3D\u8868"}</button>
-        <p class="field-error" data-error></p>
-      </form>
-      ${showResult ? resultSummaryHtml(skippedDuplicates, reroutedCount) : ""}
+              </fieldset>
+              <fieldset class="panel-form__field">
+                <legend>\u5F59\u6574\u65B9\u5F0F</legend>
+                <label class="panel-form__checkbox-row">
+                  <input type="radio" name="target-mode" data-field="target-mode" value="new" ${selectedMode === "new" ? "checked" : ""}>
+                  \u5EFA\u7ACB\u65B0\u7E3D\u8868
+                </label>
+                <label class="panel-form__checkbox-row">
+                  <input type="radio" name="target-mode" data-field="target-mode" value="existing" ${selectedMode === "existing" ? "checked" : ""} ${tierForms.length === 0 ? "disabled" : ""}>
+                  \u5408\u4F75\u9032\u73FE\u6709\u7E3D\u8868
+                </label>
+                ${selectedMode === "existing" ? `<label class="panel-form__field">
+                         \u9078\u64C7\u8981\u5408\u4F75\u9032\u53BB\u7684\u7E3D\u8868
+                         <select data-field="target-form">
+                           <option value="">\u8ACB\u9078\u64C7</option>
+                           ${tierForms.map((f) => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.period)}</option>`).join("")}
+                         </select>
+                       </label>` : ""}
+              </fieldset>
+              <button type="submit" class="btn btn--primary">${selectedMode === "existing" ? "\u5408\u4F75\u9032\u7E3D\u8868" : "\u5EFA\u7ACB\u7E3D\u8868"}</button>
+              <p class="field-error" data-error></p>
+            </form>`}
     `;
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+      if (previewPlan) {
+        container.querySelector('[data-action="confirm-aggregate"]').addEventListener("click", async () => {
+          const { form } = await applyCoursePlanAggregation(previewPlan);
+          onCreated(form);
+        });
+        container.querySelector('[data-action="cancel-preview"]').addEventListener("click", () => {
+          previewPlan = null;
+          render();
+        });
+        return;
+      }
       container.querySelector('[data-field="tier"]').addEventListener("change", (event) => {
         selectedTier = event.target.value;
         checkedReportIds = /* @__PURE__ */ new Set();
@@ -26703,24 +26742,19 @@ var CFormApp = (() => {
           targetFormId = Number(targetFormValue);
         }
         try {
-          const { form, skippedDuplicates: skippedResult, reroutedCount: reroutedCount2 } = await aggregateCoursePlanIntoForm({
-            childId: child.id,
-            tier: selectedTier,
-            reportIds,
-            targetFormId
-          });
-          if (skippedResult === 0 && reroutedCount2 === 0) {
+          const plan = await planCoursePlanAggregation({ childId: child.id, tier: selectedTier, reportIds, targetFormId });
+          const isClean = plan.unresolved.length === 0 && plan.totalReroutedCount === 0 && plan.totalSkippedDuplicates === 0;
+          if (isClean) {
+            const { form } = await applyCoursePlanAggregation(plan);
             onCreated(form);
           } else {
-            render(true, form, skippedResult, reroutedCount2);
+            previewPlan = plan;
+            render();
           }
         } catch (err) {
           errorEl.textContent = "\u5EFA\u7ACB\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
         }
       });
-      if (showResult && createdForm) {
-        container.querySelector('[data-action="go-to-form"]').addEventListener("click", () => onCreated(createdForm));
-      }
     }
     render();
   }
@@ -27951,6 +27985,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v79</footer>
+<footer class="app-version">v1.1.0</footer>
 </body>
 </html>

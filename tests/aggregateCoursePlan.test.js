@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearAllData, addChild, listEntriesForForm, addForm, addEntry } from '../src/storage/db.js';
 import { addParentReport, addCoursePlanEntry, addCourseOccurrence } from '../src/storage/parentReportDb.js';
-import { aggregateCoursePlanIntoForm } from '../src/domain/aggregateCoursePlan.js';
+import { aggregateCoursePlanIntoForm, planCoursePlanAggregation, applyCoursePlanAggregation } from '../src/domain/aggregateCoursePlan.js';
 
 describe('aggregateCoursePlanIntoForm', () => {
   let child;
@@ -163,6 +163,47 @@ describe('aggregateCoursePlanIntoForm', () => {
     expect(skippedDuplicates).toBe(1);
     expect(reroutedCount).toBe(0);
     expect(await listEntriesForForm(existingIvForm.id)).toHaveLength(1);
+  });
+
+  describe('planCoursePlanAggregation (preview, no writes)', () => {
+    it('lists an unresolved-code entry in `unresolved` for preview, and writes nothing until applied', async () => {
+      const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+      const badEntry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-9-9', activityName: '我大大了' });
+      await addCourseOccurrence({ entryId: badEntry.id, date: '2026-01-10', status: 'developed', absent: false, note: '無法對應到系統指標的紀錄' });
+
+      const plan = await planCoursePlanAggregation({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+
+      expect(plan.unresolved).toMatchObject([
+        { indicatorCode: 'Ⅴ-9-9', date: '2026-01-10', status: 'developed', note: '無法對應到系統指標的紀錄', activityName: '我大大了' },
+      ]);
+      // Nothing written yet — no form exists for this child at all.
+      const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
+      expect(forms).toEqual([]);
+    });
+
+    it('does not list a resolvable (same-tier) entry in `unresolved`', async () => {
+      const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+      const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+      await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+      const plan = await planCoursePlanAggregation({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+
+      expect(plan.unresolved).toEqual([]);
+    });
+
+    it('applying a previously computed plan produces the exact same result as aggregateCoursePlanIntoForm', async () => {
+      const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+      const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+      await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
+
+      const plan = await planCoursePlanAggregation({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+      const { form, skippedDuplicates, reroutedCount } = await applyCoursePlanAggregation(plan);
+
+      expect(form.tier).toBe('Ⅴ');
+      expect(skippedDuplicates).toBe(0);
+      expect(reroutedCount).toBe(0);
+      expect(await listEntriesForForm(form.id)).toMatchObject([{ indicatorCode: 'Ⅴ-1-6', date: '2026-01-10' }]);
+    });
   });
 
   describe('merging into an existing target form', () => {
