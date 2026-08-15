@@ -24772,7 +24772,7 @@ var CFormApp = (() => {
       ]
     });
   }
-  function remarkDividerRow() {
+  function firstRemarkRow(row) {
     return new TableRow({
       children: [
         new TableCell({
@@ -24781,7 +24781,10 @@ var CFormApp = (() => {
           verticalAlign: VerticalAlign.CENTER,
           children: [textParagraph("\u5099\u8A3B", { bold: true, ...CENTERED })]
         }),
-        ...[2, 3, 4, 5].map((index) => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] }))
+        new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
+        new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
+        new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
+        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] })
       ]
     });
   }
@@ -24855,9 +24858,9 @@ var CFormApp = (() => {
         })
       )
     );
-    const remarkRows = previousTierEntries.map((entry) => {
+    const remarkData = previousTierEntries.map((entry) => {
       const indicator = getIndicator(entry.indicatorCode);
-      return remarkRow({
+      return {
         domainLabel: indicator ? domainLabelFor(indicator) : "",
         subdomainText: indicator ? indicator.subdomain : "",
         code: entry.indicatorCode,
@@ -24868,15 +24871,16 @@ var CFormApp = (() => {
         date: entry.date,
         status: entry.status,
         note: entry.note
-      });
+      };
     });
+    const remarkRows = remarkData.length > 0 ? [firstRemarkRow(remarkData[0]), ...remarkData.slice(1).map(remarkRow)] : [];
     const table = new Table({
       width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
       columnWidths: COLUMN_WIDTHS,
       layout: TableLayoutType.FIXED,
       alignment: AlignmentType.CENTER,
       margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-      rows: [...headerRows(), ...bodyRows, remarkDividerRow(), ...remarkRows]
+      rows: [...headerRows(), ...bodyRows, ...remarkRows]
     });
     const doc = new File({
       sections: [
@@ -27951,6 +27955,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v57</footer>
+<footer class="app-version">v58</footer>
 </body>
 </html>
