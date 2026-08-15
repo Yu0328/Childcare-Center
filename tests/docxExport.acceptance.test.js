@@ -260,21 +260,13 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(documentXml).toContain('1身體動作');
   });
 
-  describe('備註 section (divider row + one full-width row per remark)', () => {
-    it('always includes the 備註 divider row, spanning 發展領域/領域範疇, even with nothing to remark on', async () => {
+  describe('備註 section (no separate divider row — "備註" is the first remark row\'s own label)', () => {
+    it('adds nothing at all when there is nothing to remark on', async () => {
       const { documentXml } = await exportParts();
-
-      const bodyRows = parseTableRows(documentXml).slice(2);
-      const dividerIndex = bodyRows.findIndex(row => row.texts[0] === '備註');
-      expect(dividerIndex).toBeGreaterThan(-1);
-      expect(dividerIndex).toBe(bodyRows.length - 1); // nothing to remark on — it's the last row
-      // Spans 發展領域+領域範疇 in one cell (4 more blank cells for 指標項次/發展活動/日期/記錄).
-      expect(bodyRows[dividerIndex].texts).toHaveLength(5);
-      expect(bodyRows[dividerIndex].texts.slice(1)).toEqual(['', '', '', '']);
-      expect(documentXml).toContain('<w:gridSpan w:val="2"/>');
+      expect(documentXml).not.toContain('備註');
     });
 
-    it('appends a 備註 divider row after the form\'s own rows, then one row per previous-tier developing entry, in the same 6-column shape', async () => {
+    it('merges the first remark row\'s 發展領域/領域範疇 cells into a single "備註" label, directly followed by its own code/content/date/note', async () => {
       const previousTierEntries = [
         { indicatorCode: 'Ⅲ-1-1', date: '2025-12-01', status: 'developing', note: '仍在練習扶物站立' },
       ];
@@ -282,38 +274,45 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
 
       expect(documentXml).toContain('Ⅲ-1-1');
       expect(documentXml).toContain('12/01△');
+      expect(documentXml).toContain('<w:gridSpan w:val="2"/>');
 
       const bodyRows = parseTableRows(documentXml).slice(2);
-
-      const dividerIndex = bodyRows.findIndex(row => row.texts[0] === '備註');
-      expect(dividerIndex).toBeGreaterThan(-1);
-      // The divider row's other cells are blank.
-      expect(bodyRows[dividerIndex].texts.slice(1)).toEqual(['', '', '', '']);
+      const remarkRowIndex = bodyRows.findIndex(row => row.texts[0] === '備註');
+      expect(remarkRowIndex).toBeGreaterThan(-1);
 
       // It comes after every one of the form's own (Ⅳ-tier) rows.
-      const ownRowIndexes = bodyRows.map((row, i) => (row.texts[2]?.startsWith('Ⅳ') ? i : -1)).filter(i => i >= 0);
-      expect(dividerIndex).toBeGreaterThan(Math.max(...ownRowIndexes));
+      const ownRowIndexes = bodyRows
+        .map((row, i) => (row.texts[2]?.startsWith('Ⅳ') ? i : -1))
+        .filter(i => i >= 0);
+      expect(remarkRowIndex).toBeGreaterThan(Math.max(...ownRowIndexes));
 
-      // The remark row itself follows the divider, in the normal 6-column shape.
-      const remarkRow = bodyRows[dividerIndex + 1];
-      expect(remarkRow.texts[2]).toBe('Ⅲ-1-1');
-      expect(remarkRow.texts[3]).toBe('能自己坐穩'); // Ⅲ-1-1's own description, resolved
-      expect(remarkRow.texts[4]).toBe('12/01△');
-      expect(remarkRow.texts[5]).toBe('仍在練習扶物站立');
-      // None of the remark row's cells are merged with a neighbor.
-      expect(remarkRow.merges).toEqual([null, null, null, null, null, null]);
+      // The merged "備註" cell shares a row with the remark's own code/description/date/note —
+      // 5 cells total (發展領域+領域範疇 merged into one), no separate row for the label alone.
+      const remarkRow = bodyRows[remarkRowIndex];
+      expect(remarkRow.texts).toEqual(['備註', 'Ⅲ-1-1', '能自己坐穩', '12/01△', '仍在練習扶物站立']);
+      expect(remarkRow.merges).toEqual([null, null, null, null, null]);
     });
 
-    it('leaves domain/subdomain blank but falls back to the indicator\'s official description for a resolvable remark', async () => {
+    it('shows a second remark on the very next row, normally (its own domain/subdomain, no repeated "備註")', async () => {
       const previousTierEntries = [
-        { indicatorCode: 'Ⅳ-5-4', date: '2026-01-05', status: 'developed', note: '尿濕了會表示' },
+        { indicatorCode: 'Ⅲ-1-1', date: '2025-12-01', status: 'developing', note: '第一筆' },
+        { indicatorCode: 'Ⅳ-5-4', date: '2026-01-05', status: 'developed', note: '第二筆' },
       ];
       const { documentXml } = await exportParts({ previousTierEntries });
 
       const bodyRows = parseTableRows(documentXml).slice(2);
-      const remarkRow = bodyRows.find(row => row.texts[2] === 'Ⅳ-5-4');
-      expect(remarkRow).toBeDefined();
-      expect(remarkRow.texts[3]).toBe('會表示尿濕了或已排便');
+      const firstIndex = bodyRows.findIndex(row => row.texts[0] === '備註');
+      const secondRow = bodyRows[firstIndex + 1];
+
+      // Normal (unmerged) 6-cell shape, showing Ⅳ-5-4's own resolved domain/subdomain — not "備註".
+      expect(secondRow.texts[0]).toBe('5生活自理');
+      expect(secondRow.texts[2]).toBe('Ⅳ-5-4');
+      expect(secondRow.texts[3]).toBe('會表示尿濕了或已排便');
+      expect(secondRow.texts[4]).toBe('01/05○');
+      expect(secondRow.texts[5]).toBe('第二筆');
+      expect(secondRow.merges).toEqual([null, null, null, null, null, null]);
+      // Only ever appears once.
+      expect(bodyRows.filter(row => row.texts[0] === '備註')).toHaveLength(1);
     });
 
     it('falls back to the original entry\'s activityName in 發展活動 for a remark whose indicator code cannot be resolved at all, rather than leaving it blank or dropping it', async () => {
@@ -323,13 +322,10 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
       const { documentXml } = await exportParts({ previousTierEntries });
 
       const bodyRows = parseTableRows(documentXml).slice(2);
-      const remarkRow = bodyRows.find(row => row.texts[2] === 'Ⅴ-9-9');
+      const remarkRow = bodyRows.find(row => row.texts[0] === '備註');
       expect(remarkRow).toBeDefined();
-      expect(remarkRow.texts[0]).toBe('');
-      expect(remarkRow.texts[1]).toBe('');
-      expect(remarkRow.texts[3]).toBe('我大大了');
-      expect(remarkRow.texts[4]).toBe('01/05○');
-      expect(remarkRow.texts[5]).toBe('無法對應到系統指標的紀錄');
+      // First-row shape: ['備註', code, description, date, note].
+      expect(remarkRow.texts).toEqual(['備註', 'Ⅴ-9-9', '我大大了', '01/05○', '無法對應到系統指標的紀錄']);
     });
   });
 });

@@ -254,14 +254,12 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
   });
 }
 
-// A single full-width divider row marking the 備註 section, always present at the end of the
-// table (even with nothing to remark on, so the section reads as a permanent part of the form,
-// not something that only sometimes exists) — "備註" spanning the same two columns 發展領域/
-// 領域範疇 normally occupy, the rest blank. Everything after it (see remarkRow below) is a
-// previous-tier still-incomplete item, a course-plan entry whose indicator code couldn't be
-// resolved at all during 彙整, or one the teacher added directly — either way, not this form's
-// own tier's record, so it's kept visually separate rather than mixed into the main table above.
-function remarkDividerRow() {
+// row: { code, description, date, status, note }. The very first remark row's 發展領域/領域範疇
+// cells are merged into one "備註" label — marking the start of the section inline, without a
+// separate divider row of its own — so nothing appears at all when there's nothing to remark on
+// (see generateDocxBlob below). Every remark after the first uses the normal remarkRow (unmerged,
+// showing its own domain/subdomain) instead, so "備註" only ever appears once.
+function firstRemarkRow(row) {
   return new TableRow({
     children: [
       new TableCell({
@@ -270,7 +268,10 @@ function remarkDividerRow() {
         verticalAlign: VerticalAlign.CENTER,
         children: [textParagraph('備註', { bold: true, ...CENTERED })],
       }),
-      ...[2, 3, 4, 5].map(index => new TableCell({ width: cellWidth(index), children: [emptyParagraph()] })),
+      new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
+      new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
+      new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
+      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] }),
     ],
   });
 }
@@ -371,9 +372,9 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
   // but one that came from 彙整's genuinely-unresolved-code path (see aggregateCoursePlan.js) has
   // no indicator at all; domain/subdomain/description are left blank for those rather than
   // dropping the row, so nothing recorded ever silently disappears.
-  const remarkRows = previousTierEntries.map(entry => {
+  const remarkData = previousTierEntries.map(entry => {
     const indicator = getIndicator(entry.indicatorCode);
-    return remarkRow({
+    return {
       domainLabel: indicator ? domainLabelFor(indicator) : '',
       subdomainText: indicator ? indicator.subdomain : '',
       code: entry.indicatorCode,
@@ -384,8 +385,13 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
       date: entry.date,
       status: entry.status,
       note: entry.note,
-    });
+    };
   });
+  // Only the first remark row carries the "備註" label (merged into 發展領域/領域範疇); every
+  // later one displays like a normal row. Nothing at all is appended when there's nothing to
+  // remark on — no separate divider row exists independent of actual content.
+  const remarkRows =
+    remarkData.length > 0 ? [firstRemarkRow(remarkData[0]), ...remarkData.slice(1).map(remarkRow)] : [];
 
   const table = new Table({
     width: { size: TABLE_WIDTH_DXA, type: WidthType.DXA },
@@ -393,7 +399,7 @@ export async function generateDocxBlob({ child, form, indicators, entries, previ
     layout: TableLayoutType.FIXED,
     alignment: AlignmentType.CENTER,
     margins: { left: TABLE_CELL_MARGIN_DXA, right: TABLE_CELL_MARGIN_DXA, marginUnitType: WidthType.DXA },
-    rows: [...headerRows(), ...bodyRows, remarkDividerRow(), ...remarkRows],
+    rows: [...headerRows(), ...bodyRows, ...remarkRows],
   });
 
   const doc = new Document({
