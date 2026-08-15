@@ -165,10 +165,10 @@ describe('renderFormEditorView', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows a 備註 section on screen for the child\'s still-developing entries from their previous tier, but not when there are none', async () => {
+  it('always shows the 備註 section on screen, even with nothing to remark on, and lists the child\'s still-developing entries from their previous tier when there are some', async () => {
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} });
-    expect(container.querySelector('[data-remark-section]')).toBeNull();
+    expect(container.querySelector('[data-remark-section]')).not.toBeNull();
 
     const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
     await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習扶物站立' });
@@ -185,8 +185,8 @@ describe('renderFormEditorView', () => {
     expect(remarkSection.textContent).not.toContain('已完成');
   });
 
-  it('shows an unresolved-code entry left on this same form (e.g. by 彙整) in 備註 too, without crashing the delete/edit wiring for it', async () => {
-    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標' });
+  it('shows an unresolved-code entry left on this same form (e.g. by 彙整) in 備註 too, deletable from here (but not editable), without crashing the delete/edit wiring for it', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標' });
 
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} });
@@ -195,8 +195,52 @@ describe('renderFormEditorView', () => {
     expect(remarkSection).not.toBeNull();
     expect(remarkSection.textContent).toContain('Ⅳ-9-9');
     expect(remarkSection.textContent).toContain('無法對應到系統指標');
-    // Read-only: no delete/edit button rendered for it (and no crash wiring one that isn't there).
+    // Not editable, and not wired via the main table's own delete mechanism (no crash from that).
     expect(remarkSection.querySelector('[data-delete-entry]')).toBeNull();
+    expect(remarkSection.querySelector('[data-edit-entry]')).toBeNull();
+    // But deletable, since it lives on this same form.
+    expect(remarkSection.querySelector(`[data-delete-remark="${entry.id}"]`)).not.toBeNull();
+  });
+
+  it('deletes a local remark (unresolved-code entry on this form) after confirmation', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: 'x' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {}, confirmDelete: () => true });
+
+    container.querySelector(`[data-delete-remark="${entry.id}"]`).click();
+    await waitFor(() => !container.querySelector(`[data-delete-remark="${entry.id}"]`));
+
+    expect(await listEntriesForForm(form.id)).toEqual([]);
+  });
+
+  it('does not offer a delete button for a remark sourced from a different (previous-tier) form', async () => {
+    const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
+    const entry = await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習扶物站立' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    expect(container.querySelector(`[data-delete-remark="${entry.id}"]`)).toBeNull();
+  });
+
+  it('lets the teacher add a manual remark, which lands on this form and is shown/deletable like other local remarks', async () => {
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    container.querySelector('[data-action="add-remark"]').click();
+    container.querySelector('[data-remark-field="code"]').value = '自訂備註';
+    container.querySelector('[data-remark-field="date"]').value = '2026-01-05';
+    container.querySelector('[data-remark-field="note"]').value = '老師手動加的備註';
+    container.querySelector('[data-action="save-remark"]').click();
+
+    await waitFor(() => container.textContent.includes('老師手動加的備註'));
+
+    const entries = await listEntriesForForm(form.id);
+    expect(entries).toMatchObject([{ indicatorCode: '自訂備註', date: '2026-01-05', note: '老師手動加的備註' }]);
+
+    const remarkSection = container.querySelector('[data-remark-section]');
+    expect(remarkSection.querySelector(`[data-delete-remark="${entries[0].id}"]`)).not.toBeNull();
   });
 
   it('passes the child\'s still-developing entries from their previous tier (Ⅲ) into the export, but not their already-developed ones', async () => {

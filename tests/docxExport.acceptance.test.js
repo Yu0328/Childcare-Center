@@ -144,8 +144,11 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     expect(documentXml).toContain('<w:vMerge w:val="restart"/>');
     expect(documentXml).toContain('<w:vMerge w:val="continue"/>');
 
-    // Skip the two header rows.
-    const bodyRows = parseTableRows(documentXml).slice(2);
+    // Skip the two header rows and the always-present trailing 備註 divider row (a merged cell,
+    // not a normal indicator row — see its own describe block below).
+    const bodyRows = parseTableRows(documentXml)
+      .slice(2)
+      .filter(row => row.texts[0] !== '備註');
 
     // Ⅳ-1-1 has two entries: the first row restarts the code/description merge, the second continues it.
     expect(bodyRows[0].texts[2]).toBe('Ⅳ-1-1');
@@ -169,7 +172,9 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
   it('merges 發展領域/領域範疇 across every row of a domain, spanning multiple indicators', async () => {
     const { documentXml } = await exportParts();
 
-    const bodyRows = parseTableRows(documentXml).slice(2);
+    const bodyRows = parseTableRows(documentXml)
+      .slice(2)
+      .filter(row => row.texts[0] !== '備註');
 
     // Only the first row of each domain restarts the 發展領域/領域範疇 merge.
     const domainRestartRows = bodyRows.filter(row => row.merges[0] === 'restart');
@@ -256,9 +261,17 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
   });
 
   describe('備註 section (divider row + one full-width row per remark)', () => {
-    it('adds no divider or extra rows when there is nothing to remark on', async () => {
+    it('always includes the 備註 divider row, spanning 發展領域/領域範疇, even with nothing to remark on', async () => {
       const { documentXml } = await exportParts();
-      expect(documentXml).not.toContain('備註');
+
+      const bodyRows = parseTableRows(documentXml).slice(2);
+      const dividerIndex = bodyRows.findIndex(row => row.texts[0] === '備註');
+      expect(dividerIndex).toBeGreaterThan(-1);
+      expect(dividerIndex).toBe(bodyRows.length - 1); // nothing to remark on — it's the last row
+      // Spans 發展領域+領域範疇 in one cell (4 more blank cells for 指標項次/發展活動/日期/記錄).
+      expect(bodyRows[dividerIndex].texts).toHaveLength(5);
+      expect(bodyRows[dividerIndex].texts.slice(1)).toEqual(['', '', '', '']);
+      expect(documentXml).toContain('<w:gridSpan w:val="2"/>');
     });
 
     it('appends a 備註 divider row after the form\'s own rows, then one row per previous-tier developing entry, in the same 6-column shape', async () => {
@@ -275,7 +288,7 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
       const dividerIndex = bodyRows.findIndex(row => row.texts[0] === '備註');
       expect(dividerIndex).toBeGreaterThan(-1);
       // The divider row's other cells are blank.
-      expect(bodyRows[dividerIndex].texts.slice(1)).toEqual(['', '', '', '', '']);
+      expect(bodyRows[dividerIndex].texts.slice(1)).toEqual(['', '', '', '']);
 
       // It comes after every one of the form's own (Ⅳ-tier) rows.
       const ownRowIndexes = bodyRows.map((row, i) => (row.texts[2]?.startsWith('Ⅳ') ? i : -1)).filter(i => i >= 0);
@@ -291,9 +304,21 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
       expect(remarkRow.merges).toEqual([null, null, null, null, null, null]);
     });
 
-    it('leaves domain/subdomain/description blank for a remark entry whose indicator code cannot be resolved at all, rather than dropping it', async () => {
+    it('leaves domain/subdomain blank but falls back to the indicator\'s official description for a resolvable remark', async () => {
       const previousTierEntries = [
-        { indicatorCode: 'Ⅴ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標的紀錄' },
+        { indicatorCode: 'Ⅳ-5-4', date: '2026-01-05', status: 'developed', note: '尿濕了會表示' },
+      ];
+      const { documentXml } = await exportParts({ previousTierEntries });
+
+      const bodyRows = parseTableRows(documentXml).slice(2);
+      const remarkRow = bodyRows.find(row => row.texts[2] === 'Ⅳ-5-4');
+      expect(remarkRow).toBeDefined();
+      expect(remarkRow.texts[3]).toBe('會表示尿濕了或已排便');
+    });
+
+    it('falls back to the original entry\'s activityName in 發展活動 for a remark whose indicator code cannot be resolved at all, rather than leaving it blank or dropping it', async () => {
+      const previousTierEntries = [
+        { indicatorCode: 'Ⅴ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標的紀錄', activityName: '我大大了' },
       ];
       const { documentXml } = await exportParts({ previousTierEntries });
 
@@ -302,7 +327,7 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
       expect(remarkRow).toBeDefined();
       expect(remarkRow.texts[0]).toBe('');
       expect(remarkRow.texts[1]).toBe('');
-      expect(remarkRow.texts[3]).toBe('');
+      expect(remarkRow.texts[3]).toBe('我大大了');
       expect(remarkRow.texts[4]).toBe('01/05○');
       expect(remarkRow.texts[5]).toBe('無法對應到系統指標的紀錄');
     });

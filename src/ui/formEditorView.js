@@ -61,14 +61,24 @@ function indicatorBlock(indicator, entries) {
   `;
 }
 
-// Read-only: a previous-tier entry lives on a different form (edit it there); an unresolved-code
-// entry has no indicator to look up at all (getIndicator returns undefined, left blank below).
+// isLocal: this entry lives on THIS form (an unresolved-code entry left here by 彙整, or one the
+// teacher added directly below) — deletable from here. A previous-tier entry lives on a different
+// form instead; edit/delete it there, not here. getIndicator returns undefined for an unresolved
+// code, leaving the description blank below (activityName isn't shown here — the code/date/note
+// are what matter on screen; the Word export's own fallback is what actually needed it).
 function remarkBlock(entry) {
   const indicator = getIndicator(entry.indicatorCode);
   const mark = entry.status === 'developed' ? '○' : '△';
   return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
-      <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? '')}</h4>
+      <div class="entry-row__top">
+        <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? '')}</h4>
+        ${
+          entry.isLocal
+            ? `<button type="button" class="btn--delete-circle" data-delete-remark="${escapeHtml(entry.id)}" aria-label="刪除備註：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">×</button>`
+            : ''
+        }
+      </div>
       <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
       <p class="entry-row__note">${escapeHtml(entry.note)}</p>
     </div>
@@ -87,12 +97,15 @@ async function previousTierDevelopingEntries(childId, tier) {
 }
 
 // Every remark source combined: this child's still-developing entries from their previous tier's
-// form, plus (see aggregateCoursePlan.js) any of THIS form's own entries whose indicator code
-// doesn't match one of this tier's own indicators at all — 彙整 files those onto the target form
-// as-is when it can't resolve them, rather than discarding them.
+// form (isLocal: false — edit/delete those at the source), plus any of THIS form's own entries
+// whose indicator code doesn't match one of this tier's own indicators at all (isLocal: true) —
+// either because 彙整 filed an unresolvable one here as-is (see aggregateCoursePlan.js), or
+// because the teacher added it directly via the 備註 section's own "＋ 新增備註" form.
 async function remarkEntries(childId, tier, ownEntries, ownIndicatorCodes) {
-  const previousTierEntries = await previousTierDevelopingEntries(childId, tier);
-  const ownOrphaned = ownEntries.filter(entry => !ownIndicatorCodes.has(entry.indicatorCode));
+  const previousTierEntries = (await previousTierDevelopingEntries(childId, tier)).map(entry => ({ ...entry, isLocal: false }));
+  const ownOrphaned = ownEntries
+    .filter(entry => !ownIndicatorCodes.has(entry.indicatorCode))
+    .map(entry => ({ ...entry, isLocal: true }));
   return [...previousTierEntries, ...ownOrphaned];
 }
 
@@ -136,18 +149,23 @@ export async function renderFormEditorView(
           `
         )
         .join('')}
-      ${
-        remarks.length > 0
-          ? `
-            <section class="domain-card" data-remark-section>
-              <h3 class="domain-card__title">備註</h3>
-              <div class="domain-card__body">
-                ${remarks.map(remarkBlock).join('')}
-              </div>
-            </section>
-          `
-          : ''
-      }
+      <section class="domain-card" data-remark-section>
+        <h3 class="domain-card__title">備註</h3>
+        <div class="domain-card__body">
+          ${remarks.map(remarkBlock).join('')}
+          <button type="button" class="btn btn--outline btn--small" data-action="add-remark">＋ 新增備註</button>
+          <div class="entry-form" data-remark-form hidden>
+            <label class="entry-form__field">標籤 <input type="text" data-remark-field="code" placeholder="例：Ⅳ-5-4 或自訂文字"></label>
+            <label class="entry-form__field">日期 <input type="date" data-remark-field="date"></label>
+            ${statusRadios('remark', { fieldAttr: 'remark-field', idAttr: 'remark-id', checkedStatus: 'developed' })}
+            <input type="text" class="entry-form__note" data-remark-field="note" placeholder="備註內容">
+            <div class="entry-form__actions">
+              <button type="button" class="btn btn--primary btn--small" data-action="save-remark">儲存</button>
+            </div>
+            <p class="field-error" data-error></p>
+          </div>
+        </div>
+      </section>
     </div>
   `;
 
@@ -168,6 +186,40 @@ export async function renderFormEditorView(
       if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
   });
+
+  container.querySelector('[data-action="add-remark"]').addEventListener('click', () => {
+    const remarkForm = container.querySelector('[data-remark-form]');
+    remarkForm.hidden = !remarkForm.hidden;
+  });
+
+  container.querySelector('[data-action="save-remark"]').addEventListener('click', async () => {
+    const errorEl = container.querySelector('[data-remark-form] [data-error]');
+    const code = container.querySelector('[data-remark-field="code"]').value;
+    const date = container.querySelector('[data-remark-field="date"]').value;
+    const radios = container.querySelectorAll('input[name="status-remark"]');
+    const statusInput = Array.from(radios).find(r => r.checked);
+    const status = statusInput ? statusInput.value : 'developed';
+    const note = container.querySelector('[data-remark-field="note"]').value;
+    try {
+      await addEntry({ formId: form.id, indicatorCode: code, date, status, note });
+      await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+    } catch (err) {
+      if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
+    }
+  });
+
+  for (const entry of remarks.filter(r => r.isLocal)) {
+    container.querySelector(`[data-delete-remark="${entry.id}"]`).addEventListener('click', async () => {
+      if (!confirmDelete(`確定要刪除這筆備註嗎？此操作無法復原。`)) return;
+      try {
+        await deleteEntry(entry.id);
+        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+      } catch (err) {
+        const errorEl = container.querySelector('[data-remark-form] [data-error]');
+        if (errorEl) errorEl.textContent = '刪除失敗，請再試一次';
+      }
+    });
+  }
 
   for (const indicator of indicators) {
     container.querySelector(`[data-add-entry-for="${indicator.code}"]`).addEventListener('click', () => {
