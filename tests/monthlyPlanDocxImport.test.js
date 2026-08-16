@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems, parseLegacyDayCellItems } from '../src/import/monthlyPlanDocxImport.js';
+import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems, parseLegacyDayCellItems, parseDayCellItems, buildSlotsAndOverrides } from '../src/import/monthlyPlanDocxImport.js';
 
 function zipWith({ headerXml, documentXml }) {
   const zip = new JSZip();
@@ -230,5 +230,72 @@ describe('parseLegacyDayCellItems', () => {
 
   it('returns an empty array for an empty cell', () => {
     expect(parseLegacyDayCellItems('<w:p></w:p>', '<w:p></w:p>')).toEqual([]);
+  });
+});
+
+describe('parseDayCellItems', () => {
+  it('uses the precise parser when the cell matches our own export format', () => {
+    const contentCellXml = `<w:p>${plainRun('大團體活動')}</w:p>`;
+    expect(parseDayCellItems('<w:p></w:p>', contentCellXml)).toEqual([
+      { indicatorCode: null, activityName: '大團體活動', indicatorText: '', notAchieved: false, replaced: false, replacementText: '' },
+    ]);
+  });
+
+  it('falls back to the legacy parser when the precise parser finds nothing', () => {
+    const contentCellXml = legacyParagraph('Ⅲ-1-2【換一隻手】文字OK');
+    const items = parseDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(items[0]).toMatchObject({ indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手' });
+  });
+
+  it('returns an empty array for a genuinely empty cell (no fallback false-positive)', () => {
+    expect(parseDayCellItems('<w:p></w:p>', '<w:p></w:p>')).toEqual([]);
+  });
+});
+
+describe('buildSlotsAndOverrides', () => {
+  const item = (over = {}) => ({ indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手', indicatorText: '文字', notAchieved: false, replaced: false, replacementText: '', ...over });
+
+  it('uses the first same-tier child\'s cell as the canonical slot content', () => {
+    const children = [
+      { name: '甲', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item()] }] },
+      { name: '乙', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item()] }] },
+    ];
+    const { slotsByTier } = buildSlotsAndOverrides(children);
+    expect(slotsByTier.get('Ⅲ')).toEqual([
+      { weekIndex: 1, weekday: 1, items: [{ indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手', indicatorText: '文字' }] },
+    ]);
+  });
+
+  it('records a per-child override by item index without touching canonical content', () => {
+    const children = [
+      { name: '甲', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item()] }] },
+      { name: '乙', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item({ notAchieved: true })] }] },
+    ];
+    const { children: withOverrides } = buildSlotsAndOverrides(children);
+    expect(withOverrides[0].overrides).toEqual([]);
+    expect(withOverrides[1].overrides).toEqual([
+      { weekIndex: 1, weekday: 1, itemIndex: 0, notAchieved: true, replaced: false, replacementText: '' },
+    ]);
+  });
+
+  it('ignores a same-tier child\'s extra items beyond the canonical count, no warning/crash', () => {
+    const children = [
+      { name: '甲', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item()] }] },
+      { name: '乙', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item(), item({ replaced: true })] }] },
+    ];
+    const { children: withOverrides } = buildSlotsAndOverrides(children);
+    expect(withOverrides[1].overrides).toEqual([
+      { weekIndex: 1, weekday: 1, itemIndex: 1, notAchieved: false, replaced: true, replacementText: '' },
+    ]);
+  });
+
+  it('keeps different tiers independent', () => {
+    const children = [
+      { name: '甲', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item()] }] },
+      { name: '乙', tier: 'Ⅴ', days: [{ weekIndex: 1, weekday: 1, items: [item({ activityName: '不同內容' })] }] },
+    ];
+    const { slotsByTier } = buildSlotsAndOverrides(children);
+    expect(slotsByTier.get('Ⅲ')[0].items[0].activityName).toBe('換一隻手');
+    expect(slotsByTier.get('Ⅴ')[0].items[0].activityName).toBe('不同內容');
   });
 });

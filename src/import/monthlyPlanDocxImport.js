@@ -214,3 +214,59 @@ export function parseLegacyDayCellItems(dateCellXml, contentCellXml) {
 
   return items;
 }
+
+// A single-run legacy paragraph (e.g. "Ⅲ-1-2【換一隻手】文字") that isn't an
+// exact code-only line falls into parseExportedDayCellItems's free-text
+// fallback just like a real no-code activity (e.g. "大團體活動") would — both
+// come back as a non-empty array, so a bare length check can't tell them
+// apart. ponytail: narrow heuristic (code-shaped substring in a "free text"
+// item), not a real format detector; revisit if Task 12's real-file pass
+// finds it still swallows genuine legacy content.
+const INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/;
+
+export function parseDayCellItems(dateCellXml, contentCellXml) {
+  const precise = parseExportedDayCellItems(contentCellXml);
+  const looksMisparsed = precise.some(item => item.indicatorCode === null && INDICATOR_CODE_SUBSTRING.test(item.activityName));
+  if (precise.length > 0 && !looksMisparsed) return precise;
+  return parseLegacyDayCellItems(dateCellXml, contentCellXml);
+}
+
+export function buildSlotsAndOverrides(children) {
+  const canonicalByTier = new Map();
+  for (const child of children) {
+    if (child.tier && !canonicalByTier.has(child.tier)) canonicalByTier.set(child.tier, child);
+  }
+
+  const slotsByTier = new Map();
+  for (const [tier, canonical] of canonicalByTier) {
+    slotsByTier.set(
+      tier,
+      canonical.days.map(day => ({
+        weekIndex: day.weekIndex,
+        weekday: day.weekday,
+        items: day.items.map(({ indicatorCode, activityName, indicatorText }) => ({ indicatorCode, activityName, indicatorText })),
+      }))
+    );
+  }
+
+  const childrenWithOverrides = children.map(child => {
+    const overrides = [];
+    for (const day of child.days) {
+      day.items.forEach((item, itemIndex) => {
+        if (item.notAchieved || item.replaced) {
+          overrides.push({
+            weekIndex: day.weekIndex,
+            weekday: day.weekday,
+            itemIndex,
+            notAchieved: item.notAchieved,
+            replaced: item.replaced,
+            replacementText: item.replacementText || '',
+          });
+        }
+      });
+    }
+    return { name: child.name, tier: child.tier, overrides };
+  });
+
+  return { slotsByTier, children: childrenWithOverrides };
+}
