@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parsePeriodFromTitleText, extractTitleText } from '../src/import/monthlyPlanDocxImport.js';
+import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell } from '../src/import/monthlyPlanDocxImport.js';
 
 function zipWith({ headerXml, documentXml }) {
   const zip = new JSZip();
@@ -47,5 +47,30 @@ describe('extractTitleText', () => {
     const documentXml = await zip.file('word/document.xml').async('text');
     const text = await extractTitleText(zip, documentXml);
     expect(text).toContain('115年03月課程計畫');
+  });
+});
+
+describe('parseChildNameCell', () => {
+  it('parses this app\'s own export format: name / age / "X表" as three paragraphs', () => {
+    const cellXml = `<w:p><w:r><w:t>趙萬竑</w:t></w:r></w:p><w:p><w:r><w:t>24M</w:t></w:r></w:p><w:p><w:r><w:t>D表</w:t></w:r></w:p>`;
+    expect(parseChildNameCell(cellXml)).toEqual({ name: '趙萬竑', tier: 'Ⅴ' });
+  });
+
+  it('parses tier Ⅰ\'s own export, which has no letter (plain age-range label instead)', () => {
+    const cellXml = `<w:p><w:r><w:t>陳小安</w:t></w:r></w:p><w:p><w:r><w:t>2M</w:t></w:r></w:p><w:p><w:r><w:t>0-3個月</w:t></w:r></w:p>`;
+    expect(parseChildNameCell(cellXml)).toEqual({ name: '陳小安', tier: 'Ⅰ' });
+  });
+
+  it('parses a legacy file\'s "name / age＋slash＋trailing letter" layout, letter possibly in its own colored run', () => {
+    const cellXml = `<w:p><w:r><w:t>測試寶寶</w:t></w:r></w:p><w:p><w:r><w:t>1y6m/</w:t></w:r><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>C</w:t></w:r></w:p>`;
+    expect(parseChildNameCell(cellXml)).toEqual({ name: '測試寶寶', tier: 'Ⅳ' });
+  });
+
+  it('returns null tier when no recognizable tier marker is present', () => {
+    expect(parseChildNameCell('<w:p><w:r><w:t>某某某</w:t></w:r></w:p>')).toEqual({ name: '某某某', tier: null });
+  });
+
+  it('returns a null name for a completely empty cell', () => {
+    expect(parseChildNameCell('')).toEqual({ name: null, tier: null });
   });
 });
