@@ -378,24 +378,36 @@ button {
   color: var(--text-secondary);
 }
 
-.type-select__option--brand .type-select__icon {
+.type-select__option--brand {
   background: var(--brand-tint);
+  border-color: var(--brand-tint);
+}
+.type-select__option--brand .type-select__icon {
+  background: var(--surface);
   color: var(--brand-dark);
 }
 .type-select__option--brand:hover {
   border-color: var(--brand);
 }
 
-.type-select__option--edit .type-select__icon {
+.type-select__option--edit {
   background: var(--edit-tint);
+  border-color: var(--edit-tint);
+}
+.type-select__option--edit .type-select__icon {
+  background: var(--surface);
   color: var(--edit-accent);
 }
 .type-select__option--edit:hover {
   border-color: var(--edit-accent);
 }
 
-.type-select__option--filled .type-select__icon {
+.type-select__option--filled {
   background: var(--filled-tint);
+  border-color: var(--filled-tint);
+}
+.type-select__option--filled .type-select__icon {
+  background: var(--surface);
   color: var(--filled-accent);
 }
 .type-select__option--filled:hover {

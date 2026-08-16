@@ -389,24 +389,36 @@ button {
   color: var(--text-secondary);
 }
 
-.type-select__option--brand .type-select__icon {
+.type-select__option--brand {
   background: var(--brand-tint);
+  border-color: var(--brand-tint);
+}
+.type-select__option--brand .type-select__icon {
+  background: var(--surface);
   color: var(--brand-dark);
 }
 .type-select__option--brand:hover {
   border-color: var(--brand);
 }
 
-.type-select__option--edit .type-select__icon {
+.type-select__option--edit {
   background: var(--edit-tint);
+  border-color: var(--edit-tint);
+}
+.type-select__option--edit .type-select__icon {
+  background: var(--surface);
   color: var(--edit-accent);
 }
 .type-select__option--edit:hover {
   border-color: var(--edit-accent);
 }
 
-.type-select__option--filled .type-select__icon {
+.type-select__option--filled {
   background: var(--filled-tint);
+  border-color: var(--filled-tint);
+}
+.type-select__option--filled .type-select__icon {
+  background: var(--surface);
   color: var(--filled-accent);
 }
 .type-select__option--filled:hover {
@@ -4813,6 +4825,10 @@ var CFormApp = (() => {
     if (!match) return { year: null, month: null };
     return { year: Number(match[1]), month: Number(match[2]) };
   }
+  function combinedPeriod(periodA, periodB) {
+    const [first, last] = [periodA, periodB].sort();
+    return first === last ? first : `${first}-${last}`;
+  }
 
   // src/ui/importPreviewView.js
   function entryRow(entry, index) {
@@ -5534,12 +5550,27 @@ var CFormApp = (() => {
       selectedMonth: defaultMonth
     })}
         </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
+        </label>
+        <label class="panel-form__field" data-field-group="period-end" hidden>
+          \u81F3
+          ${periodSelectsHtml({
+      yearFieldName: "period-end-year",
+      monthFieldName: "period-end-month",
+      selectedYear: defaultYear,
+      selectedMonth: defaultMonth
+    })}
+        </label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
       </form>
     </div>
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     container.querySelector('[data-action="aggregate"]').addEventListener("click", onAggregate);
+    container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
+      container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
+    });
     for (const form of forms) {
       container.querySelector(`[data-form-id="${form.id}"]`).addEventListener("click", () => onSelectForm(form));
     }
@@ -5559,7 +5590,14 @@ var CFormApp = (() => {
       const tier = container.querySelector('[data-field="tier"]').value;
       const year = container.querySelector('[data-field="period-year"]').value;
       const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
-      const period = `${year}\u5E74${month}\u6708`;
+      const startPeriod = `${year}\u5E74${month}\u6708`;
+      const isRange = container.querySelector('[data-field="period-is-range"]').checked;
+      let period = startPeriod;
+      if (isRange) {
+        const endYear = container.querySelector('[data-field="period-end-year"]').value;
+        const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, "0");
+        period = combinedPeriod(startPeriod, `${endYear}\u5E74${endMonth}\u6708`);
+      }
       try {
         await addForm({ childId: child.id, tier, period });
         await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
