@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { TIERS } from '../data/indicators.js';
+import { TIERS, normalizeIndicatorCode, getIndicator } from '../data/indicators.js';
 
 function flatJoinedText(xml) {
   return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
@@ -85,4 +85,62 @@ export function splitChildTables(documentXml) {
     }
     return { nameCellXml, days };
   });
+}
+
+const INDICATOR_CODE_EXACT = /^(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+$/;
+
+function extractRuns(xml) {
+  return [...xml.matchAll(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/g)].map(m => {
+    const runXml = m[1];
+    const rPr = /<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(runXml)?.[1] || '';
+    return {
+      text: [...runXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(t => t[1]).join(''),
+      hasStrike: /<w:strike\s*\/>/.test(rPr),
+      hasRedColor: /<w:color\b[^>]*w:val="FF0000"/i.test(rPr),
+    };
+  });
+}
+
+function linesToItem(lines, flags) {
+  const [first, ...rest] = lines;
+  if (!INDICATOR_CODE_EXACT.test(first || '')) {
+    return { indicatorCode: null, activityName: first || '', indicatorText: '', ...flags };
+  }
+  const indicatorCode = normalizeIndicatorCode(first);
+  let activityName = '';
+  let indicatorText = '';
+  if (rest[0] && rest[0].startsWith('【') && rest[0].endsWith('】')) {
+    activityName = rest[0].slice(1, -1);
+    indicatorText = rest[1] || '';
+  } else {
+    indicatorText = rest[0] || '';
+  }
+  return { indicatorCode, activityName, indicatorText, ...flags };
+}
+
+function parseExportedItemParagraph(paragraphXml) {
+  const runs = extractRuns(paragraphXml);
+  if (runs.length === 0) return null;
+
+  const hasAnyStrike = runs.some(r => r.hasStrike);
+  let itemRuns = runs;
+  let replacementText = '';
+  if (hasAnyStrike) {
+    const last = runs[runs.length - 1];
+    if (!last.hasStrike) {
+      replacementText = last.text;
+      itemRuns = runs.slice(0, -1);
+    }
+  }
+
+  const lines = itemRuns.map(r => r.text);
+  const notAchieved = itemRuns.some(r => r.hasRedColor);
+  const replaced = itemRuns.some(r => r.hasStrike);
+
+  return linesToItem(lines, { notAchieved, replaced, replacementText });
+}
+
+export function parseExportedDayCellItems(contentCellXml) {
+  const paragraphs = [...contentCellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(m => m[0]);
+  return paragraphs.map(parseExportedItemParagraph).filter(Boolean);
 }

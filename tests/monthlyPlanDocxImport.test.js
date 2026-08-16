@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables } from '../src/import/monthlyPlanDocxImport.js';
+import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems } from '../src/import/monthlyPlanDocxImport.js';
 
 function zipWith({ headerXml, documentXml }) {
   const zip = new JSZip();
@@ -120,5 +120,59 @@ describe('splitChildTables', () => {
     expect(tables).toHaveLength(2);
     expect(tables[0].nameCellXml).toContain('甲');
     expect(tables[1].nameCellXml).toContain('乙');
+  });
+});
+
+function plainRun(text) {
+  return `<w:r><w:t>${text}</w:t></w:r>`;
+}
+function styledRun(text, { color, strike } = {}) {
+  const rPr = `<w:rPr>${color ? '<w:color w:val="FF0000"/>' : ''}${strike ? '<w:strike/>' : ''}</w:rPr>`;
+  return `<w:r>${rPr}<w:t>${text}</w:t></w:r>`;
+}
+
+describe('parseExportedDayCellItems', () => {
+  it('parses an indicator item as code/name/text with no override', () => {
+    const cellXml = `<w:p>${plainRun('Ⅴ-4-3')}${plainRun('【分類遊戲】')}${plainRun('能依形狀或顏色分類')}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml)).toEqual([
+      { indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類', notAchieved: false, replaced: false, replacementText: '' },
+    ]);
+  });
+
+  it('parses a free (no-indicator) single-line item', () => {
+    const cellXml = `<w:p>${plainRun('大團體活動')}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml)).toEqual([
+      { indicatorCode: null, activityName: '大團體活動', indicatorText: '', notAchieved: false, replaced: false, replacementText: '' },
+    ]);
+  });
+
+  it('parses a tier-Ⅵ item with no activity name (code + text only, two lines)', () => {
+    const cellXml = `<w:p>${plainRun('Ⅵ-1-1')}${plainRun('會手心朝下丟球或東西')}</w:p>`;
+    const [item] = parseExportedDayCellItems(cellXml);
+    expect(item).toMatchObject({ indicatorCode: 'Ⅵ-1-1', activityName: '', indicatorText: '會手心朝下丟球或東西' });
+  });
+
+  it('detects notAchieved from a colored run', () => {
+    const cellXml = `<w:p>${styledRun('拼拼圖', { color: true })}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml)[0]).toMatchObject({ notAchieved: true, replaced: false });
+  });
+
+  it('detects replaced + replacementText from struck runs plus a trailing plain run', () => {
+    const cellXml = `<w:p>${styledRun('拼拼圖', { strike: true })}${plainRun('請假')}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml)[0]).toMatchObject({ activityName: '拼拼圖', replaced: true, replacementText: '請假' });
+  });
+
+  it('handles replaced with no replacementText (no trailing run at all)', () => {
+    const cellXml = `<w:p>${styledRun('拼拼圖', { strike: true })}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml)[0]).toMatchObject({ replaced: true, replacementText: '' });
+  });
+
+  it('preserves item order across multiple items in one cell', () => {
+    const cellXml = `<w:p>${plainRun('a')}</w:p><w:p>${plainRun('b')}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml).map(i => i.activityName)).toEqual(['a', 'b']);
+  });
+
+  it('returns an empty array for an empty/placeholder cell', () => {
+    expect(parseExportedDayCellItems('<w:p></w:p>')).toEqual([]);
   });
 });
