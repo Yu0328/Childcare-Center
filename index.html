@@ -50,19 +50,23 @@
   /* Domain identity colors — one per 發展領域, ordered for adjacent-pair
      colorblind-safe contrast (see dataviz palette reference). Tints are deliberately a shade
      deeper than a barely-there pastel so each card reads as colored against the page, not white. */
-  --domain-1-accent: #2a78d6; /* 身體動作 · blue */
+  /* Accents are darkened from the "true" hue-matched brand color specifically so
+     .domain-card__title (accent-on-tint) clears WCAG AA's 4.5:1 text-contrast minimum — verified
+     by computed relative-luminance contrast ratio, not by eye. Tints/borders are unchanged (they
+     never carry text, so AA doesn't apply to them). */
+  --domain-1-accent: #2467b9; /* 身體動作 · blue — 4.59:1 on --domain-1-tint */
   --domain-1-tint: #dbe9fa;
   --domain-1-border: #b9d4f3;
-  --domain-2-accent: #d9611f; /* 社會情緒 · orange */
+  --domain-2-accent: #a84b18; /* 社會情緒 · orange — 4.51:1 on --domain-2-tint */
   --domain-2-tint: #fbe0c9;
   --domain-2-border: #f0c39c;
-  --domain-3-accent: #189b6c; /* 語言溝通 · aqua */
+  --domain-3-accent: #127350; /* 語言溝通 · aqua — 4.77:1 on --domain-3-tint */
   --domain-3-tint: #cdf0e1;
   --domain-3-border: #9fdcc0;
-  --domain-4-accent: #b9790a; /* 認知探索 · yellow (darkened for text-contrast use) */
+  --domain-4-accent: #8d5d08; /* 認知探索 · yellow — 4.73:1 on --domain-4-tint */
   --domain-4-tint: #faeab8;
   --domain-4-border: #edd287;
-  --domain-5-accent: #c85d84; /* 生活自理 · magenta */
+  --domain-5-accent: #a93962; /* 生活自理 · magenta — 4.66:1 on --domain-5-tint */
   --domain-5-tint: #f8d9e6;
   --domain-5-border: #eeb3cc;
 }
@@ -389,6 +393,13 @@ button {
   width: 100%;
 }
 
+.card-list__empty {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
 .card-list__delete {
   position: absolute;
   top: -8px;
@@ -456,6 +467,12 @@ fieldset.panel-form__field legend {
   padding: 0;
   font: inherit;
   color: inherit;
+}
+
+.password-gate__notice {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.5em;
 }
 
 .panel-form input,
@@ -676,14 +693,17 @@ fieldset.panel-form__field legend {
 }
 
 .entry-row--absent .entry-row__date,
-.entry-row--absent .entry-row__note {
+.entry-row--absent .entry-row__note,
+.entry-row--course-changed .entry-row__date,
+.entry-row--course-changed .entry-row__note {
   text-decoration: line-through;
 }
 
-/* 未發展(發展中△) or 請假 occurrences read as red text so they stand out from a plain 已發展○
-   row at a glance — added to .entry-row__date instead of relying on .entry-row--absent's color
-   alone so 發展中△ (not absent) gets the same red treatment. */
-.entry-row__date--flag {
+/* 未發展(發展中△)、請假、or 更換課程 occurrences read as red text so they stand out from a plain
+   已發展○ row at a glance — added to .entry-row__date instead of relying on .entry-row--absent's
+   color alone so 發展中△ (not absent) gets the same red treatment. */
+.entry-row__date--flag,
+.entry-row--flagged .entry-row__date {
   color: var(--danger);
 }
 
@@ -1337,7 +1357,7 @@ fieldset.panel-form__field legend {
 <header class="app-header">
   <button type="button" class="app-header__brand" id="home-button">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
-    <button type="button" class="btn btn--header" id="export-backup">匯出備份</button>
+    <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
     <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
   </div>
 </header>
@@ -1381,9 +1401,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // ../../../node_modules/jszip/dist/jszip.min.js
+  // node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -3890,9 +3910,13 @@ var CFormApp = (() => {
     }
     await runRequest("coursePlanEntries", "readwrite", (store) => store.delete(id));
   }
-  async function addCourseOccurrence({ entryId, date, status, absent, note }) {
-    const id = await runRequest("courseOccurrences", "readwrite", (store) => store.add({ entryId, date, status, absent, note }));
-    return { id, entryId, date, status, absent, note };
+  async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note }) {
+    const id = await runRequest(
+      "courseOccurrences",
+      "readwrite",
+      (store) => store.add({ entryId, date, status, absent, courseChanged, note })
+    );
+    return { id, entryId, date, status, absent, courseChanged, note };
   }
   async function listCourseOccurrencesForEntry(entryId) {
     return runRequest("courseOccurrences", "readonly", (store) => store.index("by_entryId").getAll(entryId));
@@ -4549,7 +4573,9 @@ var CFormApp = (() => {
   }
   var LATIN_TIER_PREFIX_TO_UNICODE = { III: "\u2162", IV: "\u2163", II: "\u2161", I: "\u2160", V: "\u2164" };
   var LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
+  var MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
   function normalizeIndicatorCode(code) {
+    if (MIXED_IV_PREFIX_PATTERN.test(code ?? "")) return "\u2163" + code.slice(2);
     const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? "");
     if (!match) return code;
     return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);
@@ -4630,7 +4656,7 @@ var CFormApp = (() => {
       const codeIndex = hasRemarkColumn ? 3 : 2;
       const dateIndex = hasRemarkColumn ? 5 : 4;
       const noteIndex = hasRemarkColumn ? 6 : 5;
-      const code = cells[codeIndex] || lastCode;
+      const code = cells[codeIndex] ? normalizeIndicatorCode(cells[codeIndex]) : lastCode;
       lastCode = code;
       const dateCell = cells[dateIndex];
       const note = cells[noteIndex];
@@ -4844,10 +4870,10 @@ var CFormApp = (() => {
     return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(" ");
   }
   function isVMergeContinue(cellXml) {
-    return /<w:vMerge\s*\/>/.test(cellXml) || /<w:vMerge(?!\s+w:val)/.test(cellXml);
+    return /<w:vMerge\s*\/>/.test(cellXml) || /<w:vMerge(?!\s+w:val)/.test(cellXml) || /<w:vMerge\s+w:val="continue"\s*\/>/.test(cellXml);
   }
   function isStruck(cellXml) {
-    return /<w:strike\s*\/>/.test(cellXml);
+    return /<w:strike\s*\/>/.test(cellXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, ""));
   }
   function normalizeMonthDay(raw) {
     const match = /^(\d{1,2})\/(\d{1,2})/.exec(raw);
@@ -4884,14 +4910,14 @@ var CFormApp = (() => {
     return { entries, occurrencesByEntryIndex };
   }
   function rocDotDateToIso(rocDate) {
-    const match = /^(\d{1,3})\.(\d{1,2})\.(\d{1,2})$/.exec(rocDate.trim());
+    const match = /^(\d{1,3})[./](\d{1,2})[./](\d{1,2})$/.exec(rocDate.trim());
     if (!match) return null;
     const [, rocYear, month, day] = match;
     return `${Number(rocYear) + 1911}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
   function parseHeaderInfo2(headerText) {
     const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
-    const birthMatch = /出生年月日[：:]\s*(\d{1,3}\.\d{1,2}\.\d{1,2})/.exec(headerText);
+    const birthMatch = /出生年月日[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
     const periodMatch = /紀錄時間[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
     return {
       name: nameMatch ? nameMatch[1] : null,
@@ -4953,7 +4979,19 @@ var CFormApp = (() => {
     return Promise.all(bodyMediaNames.map(async (name) => zip.file(name).async("blob")));
   }
   var BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]/;
-  var INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤ]|III|IV|II|I|V)-\d-\d/g;
+  var INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+  function stripReferencedIndicatorLines(rawText) {
+    const lines = rawText.split("\n");
+    let i = 0;
+    while (i < lines.length) {
+      const match = /^([^　]+)　(.*)$/.exec(lines[i]);
+      if (!match) break;
+      const indicator = getIndicator(match[1]);
+      if (!indicator || indicator.description !== match[2]) break;
+      i += 1;
+    }
+    return lines.slice(i).join("\n").trim();
+  }
   function classifyRecordBlocks(blocks, coursePlanEntries, warnings) {
     const domainByName = new Map(DOMAINS.map((d) => [d.name, d.id]));
     const developmentRecordBlocks = [];
@@ -4962,7 +5000,7 @@ var CFormApp = (() => {
       if (domainByName.has(block.label)) {
         const codeMatches = [...block.rawText.matchAll(INDICATOR_CODE_IN_TEXT_PATTERN)].map((m) => normalizeIndicatorCode(m[0]));
         const courseEntryIndexes = coursePlanEntries.map((entry, index) => codeMatches.includes(entry.indicatorCode) ? index : -1).filter((index) => index !== -1);
-        developmentRecordBlocks.push({ domain: domainByName.get(block.label), courseEntryIndexes, narrative: block.rawText });
+        developmentRecordBlocks.push({ domain: domainByName.get(block.label), courseEntryIndexes, narrative: stripReferencedIndicatorLines(block.rawText) });
       } else if (BEHAVIOR_OBSERVATION_LABEL.test(block.label)) {
         const separatorMatch = BEHAVIOR_OBSERVATION_LABEL.exec(block.label);
         behaviorObservations.push({ title: block.label.slice(separatorMatch[0].length), narrative: block.rawText });
@@ -5267,7 +5305,7 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="\u522A\u9664${escapeHtml(child.name)}">\xD7</button>
                 </li>`
-    ).join("")}
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u5E7C\u5152\u8CC7\u6599\uFF0C\u8ACB\u5728\u53F3\u5074\u300C\u65B0\u589E\u5E7C\u5152\u300D\u65B0\u589E</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
@@ -5413,7 +5451,7 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="\u522A\u9664${escapeHtml(form.tier)} ${escapeHtml(form.period)}">\xD7</button>
                 </li>`
-    ).join("")}
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7E3D\u8868\uFF0C\u8ACB\u5728\u53F3\u5074\u65B0\u589E\uFF0C\u6216\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
@@ -5491,7 +5529,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // ../../../node_modules/docx/dist/index.mjs
+  // node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -24559,7 +24597,7 @@ var CFormApp = (() => {
   function runFont() {
     return { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT };
   }
-  function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, alignment } = {}) {
+  function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, alignment, color } = {}) {
     return new Paragraph({
       ...alignment ? { alignment } : {},
       children: [
@@ -24567,7 +24605,8 @@ var CFormApp = (() => {
           text: String(text ?? ""),
           font: runFont(),
           size,
-          ...bold ? { bold: true } : {}
+          ...bold ? { bold: true } : {},
+          ...color ? { color } : {}
         })
       ]
     });
@@ -24660,12 +24699,19 @@ var CFormApp = (() => {
       return { indicator, rows, isFirstGroupOfDomain };
     });
   }
+  var FLAGGED_STATUS_LABELS = { absent: "\u8ACB\u5047", courseChanged: "\u66F4\u63DB\u8AB2\u7A0B" };
+  var FLAGGED_TEXT_COLOR = "C00000";
   function formatDateCell(row) {
     if (!row.date) return "";
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
     const formatted = match ? `${match[2]}/${match[3]}` : row.date;
+    const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
+    if (flaggedLabel) return `${formatted}\u3000${flaggedLabel}`;
     const glyph = row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
     return `${formatted}${glyph}`;
+  }
+  function rowTextColor(row) {
+    return FLAGGED_STATUS_LABELS[row.status] ? FLAGGED_TEXT_COLOR : void 0;
   }
   function tierLabelFor(tierCode) {
     const tier = TIERS.find((t) => t.code === tierCode);
@@ -24762,12 +24808,12 @@ var CFormApp = (() => {
         new TableCell({
           width: cellWidth(4),
           verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph(formatDateCell(row), CENTERED)]
+          children: [textParagraph(formatDateCell(row), { ...CENTERED, color: rowTextColor(row) })]
         }),
         new TableCell({
           width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph(row.note)]
+          children: [textParagraph(row.note, { color: rowTextColor(row) })]
         })
       ]
     });
@@ -24787,8 +24833,8 @@ var CFormApp = (() => {
         remarkLabelCell(isFirstRow),
         new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
         new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
-        new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), CENTERED)] }),
-        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note)] })
+        new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), { ...CENTERED, color: rowTextColor(row) })] }),
+        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note, { color: rowTextColor(row) })] })
       ]
     });
   }
@@ -24899,15 +24945,24 @@ var CFormApp = (() => {
       <label class="entry-form__radio">
         <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === "developing" ? "checked" : ""}> \u767C\u5C55\u4E2D\u25B3
       </label>
+      <label class="entry-form__radio">
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="absent" ${checkedStatus === "absent" ? "checked" : ""}> \u8ACB\u5047
+      </label>
+      <label class="entry-form__radio">
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="courseChanged" ${checkedStatus === "courseChanged" ? "checked" : ""}> \u66F4\u63DB\u8AB2\u7A0B
+      </label>
     </div>
   `;
   }
+  var FLAGGED_STATUS_LABELS2 = { absent: "\u8ACB\u5047", courseChanged: "\u66F4\u63DB\u8AB2\u7A0B" };
   function entryRow2(entry) {
-    const mark = entry.status === "developed" ? "\u25CB" : "\u25B3";
+    const flaggedLabel = FLAGGED_STATUS_LABELS2[entry.status];
+    const mark = flaggedLabel ? "" : entry.status === "developed" ? "\u25CB" : "\u25B3";
+    const rowClass = entry.status === "developed" ? " entry-row--achieved" : flaggedLabel ? " entry-row--flagged" : "";
     return `
-    <li class="entry-row${entry.status === "developed" ? " entry-row--achieved" : ""}" data-entry="${escapeHtml(entry.id)}">
+    <li class="entry-row${rowClass}" data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</span>
+        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}${flaggedLabel ? `\u3000${flaggedLabel}` : ""}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>
@@ -25213,7 +25268,7 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="\u522A\u9664${escapeHtml(report.tier)} ${escapeHtml(report.period)}">\xD7</button>
                 </li>`
-    ).join("")}
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7D00\u9304\uFF0C\u8ACB\u5728\u53F3\u5074\u65B0\u589E</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
@@ -25310,7 +25365,7 @@ var CFormApp = (() => {
       const isFirstEntryOfDomain = domain !== previousDomain;
       previousDomain = domain;
       const occurrences = occurrencesByEntryId[entry.id] || [];
-      const rows = occurrences.length === 0 ? [{ date: "", status: null, absent: false, note: "" }] : occurrences.map((o) => ({ date: o.date, status: o.status, absent: o.absent, note: o.note }));
+      const rows = occurrences.length === 0 ? [{ date: "", status: null, absent: false, courseChanged: false, note: "" }] : occurrences.map((o) => ({ date: o.date, status: o.status, absent: o.absent, courseChanged: o.courseChanged, note: o.note }));
       return { entry, indicator, domain, rows, isFirstEntryOfDomain };
     });
   }
@@ -25339,28 +25394,32 @@ var CFormApp = (() => {
       ...extra
     });
   }
+  function isStruckRow(row) {
+    return Boolean(row.absent || row.courseChanged);
+  }
+  function isFlaggedRow(row) {
+    return Boolean(row.absent || row.courseChanged || row.status === "developing");
+  }
   function occurrenceDateRun(row) {
     if (!row.date) return new TextRun({ text: "", font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT }, size: DEFAULT_TEXT_SIZE });
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
     const formatted = match ? `${match[2]}/${match[3]}` : row.date;
-    const glyph = row.absent ? "" : row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
-    const isFlagged = row.absent || row.status === "developing";
+    const glyph = isStruckRow(row) ? "" : row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
     return new TextRun({
       text: `${formatted}${glyph}`,
       font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
       size: DEFAULT_TEXT_SIZE,
-      ...row.absent ? { strike: true } : {},
-      ...isFlagged ? { color: "FF0000" } : {}
+      ...isStruckRow(row) ? { strike: true } : {},
+      ...isFlaggedRow(row) ? { color: "FF0000" } : {}
     });
   }
   function occurrenceNoteRun(row) {
-    const isFlagged = row.absent || row.status === "developing";
     return new TextRun({
       text: String(row.note ?? ""),
       font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
       size: DEFAULT_TEXT_SIZE,
-      ...row.absent ? { strike: true } : {},
-      ...isFlagged ? { color: "FF0000" } : {}
+      ...isStruckRow(row) ? { strike: true } : {},
+      ...isFlaggedRow(row) ? { color: "FF0000" } : {}
     });
   }
   function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }) {
@@ -25678,11 +25737,25 @@ var CFormApp = (() => {
     </div>
   `;
   }
+  function wireAbsentCourseChangedExclusion(absentEl, courseChangedEl, statusRadios3) {
+    const update = () => {
+      const disabled = absentEl.checked || courseChangedEl.checked;
+      statusRadios3.forEach((radio) => {
+        radio.disabled = disabled;
+      });
+      absentEl.disabled = courseChangedEl.checked;
+      courseChangedEl.disabled = absentEl.checked;
+    };
+    absentEl.addEventListener("change", update);
+    courseChangedEl.addEventListener("change", update);
+    update();
+  }
   function occurrenceRow(occurrence) {
-    const statusLabel = occurrence.absent ? "\u8ACB\u5047" : occurrence.status === "developed" ? "\u5DF2\u767C\u5C55\u25CB" : "\u767C\u5C55\u4E2D\u25B3";
-    const isFlagged = occurrence.absent || occurrence.status === "developing";
+    const statusLabel = occurrence.courseChanged ? "\u66F4\u63DB\u8AB2\u7A0B" : occurrence.absent ? "\u8ACB\u5047" : occurrence.status === "developed" ? "\u5DF2\u767C\u5C55\u25CB" : "\u767C\u5C55\u4E2D\u25B3";
+    const isFlagged = occurrence.absent || occurrence.courseChanged || occurrence.status === "developing";
+    const rowClass = occurrence.courseChanged ? " entry-row--course-changed" : occurrence.absent ? " entry-row--absent" : "";
     return `
-    <li class="entry-row${occurrence.absent ? " entry-row--absent" : ""}" data-course-occurrence="${escapeHtml(occurrence.id)}">
+    <li class="entry-row${rowClass}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
         <span class="entry-row__date${isFlagged ? " entry-row__date--flag" : ""}">${escapeHtml(occurrence.date)}\u3000${statusLabel}</span>
         <div class="entry-row__actions">
@@ -25696,6 +25769,9 @@ var CFormApp = (() => {
         ${statusRadios2(occurrence.id, { namePrefix: "status-edit", fieldAttr: "occurrence-edit-field", idAttr: "occurrence-id", checkedStatus: occurrence.status })}
         <label class="entry-form__checkbox">
           <input type="checkbox" data-occurrence-edit-field="absent" data-occurrence-id="${escapeHtml(occurrence.id)}" ${occurrence.absent ? "checked" : ""}> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
+        </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-occurrence-edit-field="courseChanged" data-occurrence-id="${escapeHtml(occurrence.id)}" ${occurrence.courseChanged ? "checked" : ""}> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
         </label>
         <input type="text" class="entry-form__note" data-occurrence-edit-field="note" data-occurrence-id="${escapeHtml(occurrence.id)}" placeholder="\u8AAA\u660E" value="${escapeHtml(occurrence.note)}">
         <div class="entry-form__actions">
@@ -25745,6 +25821,9 @@ var CFormApp = (() => {
         </div>
         <label class="entry-form__checkbox">
           <input type="checkbox" data-occurrence-field="absent" data-entry-id="${escapeHtml(entry.id)}"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
+        </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
         </label>
         <input type="text" class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="\u8AAA\u660E">
         <div class="entry-form__actions">
@@ -25806,6 +25885,9 @@ var CFormApp = (() => {
         <label class="entry-form__checkbox">
           <input type="checkbox" data-field="occurrenceAbsent"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
         </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="occurrenceCourseChanged"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
+        </label>
         <label class="panel-form__field">\u8AAA\u660E\u5167\u5BB9 <input type="text" data-field="occurrenceNote"></label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
         <p class="field-error" data-error></p>
@@ -25833,23 +25915,23 @@ var CFormApp = (() => {
       const occurrenceDate = container.querySelector('[data-field="occurrenceDate"]').value;
       const occurrenceStatus = container.querySelector('[data-field="occurrenceStatus"]:checked').value;
       const occurrenceAbsent = container.querySelector('[data-field="occurrenceAbsent"]').checked;
+      const occurrenceCourseChanged = container.querySelector('[data-field="occurrenceCourseChanged"]').checked;
       const occurrenceNote = container.querySelector('[data-field="occurrenceNote"]').value;
       try {
         const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode, activityName, indicatorText });
         if (occurrenceDate) {
-          await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, note: occurrenceNote });
+          await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, courseChanged: occurrenceCourseChanged, note: occurrenceNote });
         }
         onChange();
       } catch (err) {
         container.querySelector('[data-action="add-entry"] [data-error]').textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
       }
     });
-    container.querySelector('[data-field="occurrenceAbsent"]').addEventListener("change", (event) => {
-      const disabled = event.target.checked;
-      container.querySelectorAll('[data-field="occurrenceStatus"]').forEach((radio) => {
-        radio.disabled = disabled;
-      });
-    });
+    wireAbsentCourseChangedExclusion(
+      container.querySelector('[data-field="occurrenceAbsent"]'),
+      container.querySelector('[data-field="occurrenceCourseChanged"]'),
+      container.querySelectorAll('[data-field="occurrenceStatus"]')
+    );
     for (const entry of entries) {
       container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener("click", async () => {
         if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${entry.indicatorCode} \u3010${entry.activityName}\u3011\u300D\u9019\u500B\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
@@ -25884,20 +25966,20 @@ var CFormApp = (() => {
         const form = container.querySelector(`[data-occurrence-form-for="${entry.id}"]`);
         form.hidden = !form.hidden;
       });
-      container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`).addEventListener("change", (event) => {
-        const disabled = event.target.checked;
-        container.querySelectorAll(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]`).forEach((radio) => {
-          radio.disabled = disabled;
-        });
-      });
+      wireAbsentCourseChangedExclusion(
+        container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`),
+        container.querySelector(`[data-occurrence-field="courseChanged"][data-entry-id="${entry.id}"]`),
+        container.querySelectorAll(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]`)
+      );
       container.querySelector(`[data-occurrence-save-for="${entry.id}"]`).addEventListener("click", async () => {
         const date = container.querySelector(`[data-occurrence-field="date"][data-entry-id="${entry.id}"]`).value;
         const absent = container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`).checked;
+        const courseChanged = container.querySelector(`[data-occurrence-field="courseChanged"][data-entry-id="${entry.id}"]`).checked;
         const statusInput = container.querySelector(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]:checked`);
         const status = statusInput ? statusInput.value : "developed";
         const note = container.querySelector(`[data-occurrence-field="note"][data-entry-id="${entry.id}"]`).value;
         try {
-          await addCourseOccurrence({ entryId: entry.id, date, status, absent, note });
+          await addCourseOccurrence({ entryId: entry.id, date, status, absent, courseChanged, note });
           onChange();
         } catch (err) {
           container.querySelector(`[data-occurrence-form-for="${entry.id}"] [data-error]`).textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -25910,6 +25992,9 @@ var CFormApp = (() => {
             await deleteCourseOccurrence(occurrence.id);
             onChange();
           } catch (err) {
+            container.querySelector(`[data-course-occurrence="${occurrence.id}"]`).appendChild(
+              Object.assign(document.createElement("p"), { className: "field-error", textContent: "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21" })
+            );
           }
         });
         container.querySelector(`[data-edit-occurrence="${occurrence.id}"]`).addEventListener("click", () => {
@@ -25919,20 +26004,20 @@ var CFormApp = (() => {
         container.querySelector(`[data-occurrence-edit-cancel-for="${occurrence.id}"]`).addEventListener("click", () => {
           container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"]`).hidden = true;
         });
-        container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`).addEventListener("change", (event) => {
-          const disabled = event.target.checked;
-          container.querySelectorAll(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]`).forEach((radio) => {
-            radio.disabled = disabled;
-          });
-        });
+        wireAbsentCourseChangedExclusion(
+          container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`),
+          container.querySelector(`[data-occurrence-edit-field="courseChanged"][data-occurrence-id="${occurrence.id}"]`),
+          container.querySelectorAll(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]`)
+        );
         container.querySelector(`[data-occurrence-edit-save-for="${occurrence.id}"]`).addEventListener("click", async () => {
           const date = container.querySelector(`[data-occurrence-edit-field="date"][data-occurrence-id="${occurrence.id}"]`).value;
           const absent = container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`).checked;
+          const courseChanged = container.querySelector(`[data-occurrence-edit-field="courseChanged"][data-occurrence-id="${occurrence.id}"]`).checked;
           const statusInput = container.querySelector(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]:checked`);
           const status = statusInput ? statusInput.value : "developed";
           const note = container.querySelector(`[data-occurrence-edit-field="note"][data-occurrence-id="${occurrence.id}"]`).value;
           try {
-            await updateCourseOccurrence(occurrence.id, { date, status, absent, note });
+            await updateCourseOccurrence(occurrence.id, { date, status, absent, courseChanged, note });
             onChange();
           } catch (err) {
             container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"] [data-error]`).textContent = "\u66F4\u65B0\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -26522,12 +26607,12 @@ var CFormApp = (() => {
         const target = !indicator || indicator.tier === tier ? toWrite : rerouted;
         const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
         for (const occurrence of occurrences) {
-          if (occurrence.absent) continue;
+          const status = occurrence.absent ? "absent" : occurrence.courseChanged ? "courseChanged" : occurrence.status;
           target.push({
             tier: indicator?.tier,
             indicatorCode,
             date: occurrence.date,
-            status: occurrence.status,
+            status,
             note: occurrence.note,
             // Only needed as an export/preview-time fallback for a code that never resolves to an
             // indicator at all — a resolvable one (same-tier or rerouted) always has its official
@@ -27679,6 +27764,7 @@ var CFormApp = (() => {
         date: occurrence.date,
         status: occurrence.status,
         absent: occurrence.absent,
+        courseChanged: occurrence.courseChanged,
         note: occurrence.note
       });
     }
@@ -27786,6 +27872,7 @@ var CFormApp = (() => {
         <label class="panel-form__field">\u5BC6\u78BC <input type="password" data-field="password" autocomplete="current-password" required></label>
         <button type="submit" class="btn btn--primary">\u9032\u5165</button>
         <p class="field-error" data-error></p>
+        <p class="password-gate__notice">\u6B64\u5BC6\u78BC\u50C5\u9632\u6B62\u4ED6\u4EBA\u8AA4\u5165\uFF0C\u7121\u6CD5\u4FDD\u8B77\u88DD\u7F6E\u4E0A\u5DF2\u5132\u5B58\u7684\u8CC7\u6599\uFF0C\u8ACB\u540C\u6642\u9396\u5B9A\u96FB\u8166\u6216\u5E73\u677F\u3002</p>
       </form>
     </div>
   `;
@@ -27810,7 +27897,7 @@ var CFormApp = (() => {
   var EXPORT_FAILED_MESSAGE = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
   var IMPORT_FAILED_MESSAGE = "\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
   var IMPORT_CONFIRM_MESSAGE = "\u532F\u5165\u5099\u4EFD\u6703\u6E05\u9664\u76EE\u524D\u6240\u6709\u8CC7\u6599\uFF0C\u78BA\u5B9A\u8981\u7E7C\u7E8C\u55CE\uFF1F";
-  function mountApp(container) {
+  function mountApp(container, { onUnlock } = {}) {
     function showRenderError(err) {
       container.textContent = "";
       const message = document.createElement("p");
@@ -27870,10 +27957,14 @@ var CFormApp = (() => {
     }
     const homeButton = document.getElementById("home-button");
     if (homeButton) homeButton.addEventListener("click", showReportTypeSelect);
+    function handleUnlock() {
+      showReportTypeSelect();
+      if (onUnlock) onUnlock();
+    }
     if (isUnlocked()) {
       showReportTypeSelect();
     } else {
-      renderPasswordGate(container, { onUnlock: showReportTypeSelect });
+      renderPasswordGate(container, { onUnlock: handleUnlock });
     }
   }
   function wireBackupControls({
@@ -27883,6 +27974,12 @@ var CFormApp = (() => {
     confirmImport = (message) => typeof confirm === "function" ? confirm(message) : false,
     reload = () => window.location.reload()
   }) {
+    function updateLockState() {
+      const locked = !isUnlocked();
+      exportButton.disabled = locked;
+      importInput.disabled = locked;
+    }
+    updateLockState();
     function showMessage(text) {
       let errorEl = messageContainer.querySelector('[data-error="backup"]');
       if (!text) {
@@ -27898,6 +27995,7 @@ var CFormApp = (() => {
       errorEl.textContent = text;
     }
     exportButton.addEventListener("click", async () => {
+      if (!isUnlocked()) return;
       try {
         const json = await exportBackup();
         const blob = new Blob([json], { type: "application/json" });
@@ -27910,6 +28008,10 @@ var CFormApp = (() => {
     importInput.addEventListener("change", async () => {
       const file = importInput.files[0];
       if (!file) return;
+      if (!isUnlocked()) {
+        importInput.value = "";
+        return;
+      }
       if (!confirmImport(IMPORT_CONFIRM_MESSAGE)) {
         importInput.value = "";
         return;
@@ -27925,9 +28027,7 @@ var CFormApp = (() => {
       }
       reload();
     });
-  }
-  if (typeof document !== "undefined" && document.getElementById("app")) {
-    mountApp(document.getElementById("app"));
+    return { updateLockState };
   }
   return __toCommonJS(app_exports);
 })();
@@ -27971,10 +28071,11 @@ docx/dist/index.mjs:
 */
 
 document.addEventListener('DOMContentLoaded', () => {
-  CFormApp.wireBackupControls({
+  const backupControls = CFormApp.wireBackupControls({
     exportButton: document.getElementById('export-backup'),
     importInput: document.getElementById('import-backup'),
   });
+  CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
 });
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -27985,6 +28086,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v1.1.0</footer>
+<footer class="app-version">v1.2.0</footer>
 </body>
 </html>
