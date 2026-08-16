@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { getIndicator } from '../data/indicators.js';
+import { getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
 
 function cellText(cellXml) {
   return [...cellXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
@@ -93,7 +93,7 @@ function parseBodyRows(documentXml) {
     const dateIndex = hasRemarkColumn ? 5 : 4;
     const noteIndex = hasRemarkColumn ? 6 : 5;
 
-    const code = cells[codeIndex] || lastCode;
+    const code = cells[codeIndex] ? normalizeIndicatorCode(cells[codeIndex]) : lastCode;
     lastCode = code;
 
     const dateCell = cells[dateIndex];

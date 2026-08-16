@@ -369,7 +369,15 @@ export function getIndicatorsForTier(tierCode) {
 // single-letter "I"/"V" fallbacks, or "IV-1-2" would match "I" and leave a bogus "V-1-2" remainder.
 const LATIN_TIER_PREFIX_TO_UNICODE = { III: 'Ⅲ', IV: 'Ⅳ', II: 'Ⅱ', I: 'Ⅰ', V: 'Ⅴ' };
 const LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
+
+// A second, distinct garbling: Latin "I" (U+0049) directly followed by the Unicode Roman numeral
+// "Ⅴ" (U+2164) — visually resembling "IV" but mixing an ASCII and a Unicode character — found
+// recurring across several real 適性紀錄 files (always the same activity, "我大大了"). Confirmed
+// against real data to represent tier Ⅳ, same as the pure-ASCII "IV" case above.
+const MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
+
 export function normalizeIndicatorCode(code) {
+  if (MIXED_IV_PREFIX_PATTERN.test(code ?? '')) return 'Ⅳ' + code.slice(2);
   const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? '');
   if (!match) return code; // already Unicode, or unrecognized/garbled — leave untouched
   return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);

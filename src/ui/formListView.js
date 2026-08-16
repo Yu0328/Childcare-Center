@@ -34,7 +34,7 @@ export async function renderFormListView(
                   <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="刪除${escapeHtml(form.tier)} ${escapeHtml(form.period)}">×</button>
                 </li>`
             )
-            .join('')}
+            .join('') || '<li class="card-list__empty">目前還沒有適性總表，請在右側新增，或從適性紀錄彙整</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>

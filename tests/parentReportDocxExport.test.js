@@ -64,7 +64,7 @@ describe('buildCoursePlanRowGroups', () => {
 
   it('emits one blank row for an entry with no occurrences', () => {
     const groups = buildCoursePlanRowGroups([entries[0]], {});
-    expect(groups[0].rows).toEqual([{ date: '', status: null, absent: false, note: '' }]);
+    expect(groups[0].rows).toEqual([{ date: '', status: null, absent: false, courseChanged: false, note: '' }]);
   });
 
   it('emits one row per occurrence, preserving insertion order', () => {

@@ -18,11 +18,29 @@ function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
   `;
 }
 
+// Wires the 請假 and 更換課程 checkboxes of one occurrence form to be mutually exclusive with each
+// other and with the status radios: checking either one disables the status radios AND the other
+// checkbox (so a teacher can't mark an occurrence both absent and course-changed at once).
+function wireAbsentCourseChangedExclusion(absentEl, courseChangedEl, statusRadios) {
+  const update = () => {
+    const disabled = absentEl.checked || courseChangedEl.checked;
+    statusRadios.forEach(radio => { radio.disabled = disabled; });
+    absentEl.disabled = courseChangedEl.checked;
+    courseChangedEl.disabled = absentEl.checked;
+  };
+  absentEl.addEventListener('change', update);
+  courseChangedEl.addEventListener('change', update);
+  update();
+}
+
 function occurrenceRow(occurrence) {
-  const statusLabel = occurrence.absent ? '請假' : occurrence.status === 'developed' ? '已發展○' : '發展中△';
-  const isFlagged = occurrence.absent || occurrence.status === 'developing';
+  const statusLabel = occurrence.courseChanged ? '更換課程'
+    : occurrence.absent ? '請假'
+    : occurrence.status === 'developed' ? '已發展○' : '發展中△';
+  const isFlagged = occurrence.absent || occurrence.courseChanged || occurrence.status === 'developing';
+  const rowClass = occurrence.courseChanged ? ' entry-row--course-changed' : occurrence.absent ? ' entry-row--absent' : '';
   return `
-    <li class="entry-row${occurrence.absent ? ' entry-row--absent' : ''}" data-course-occurrence="${escapeHtml(occurrence.id)}">
+    <li class="entry-row${rowClass}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
         <span class="entry-row__date${isFlagged ? ' entry-row__date--flag' : ''}">${escapeHtml(occurrence.date)}　${statusLabel}</span>
         <div class="entry-row__actions">
@@ -36,6 +54,9 @@ function occurrenceRow(occurrence) {
         ${statusRadios(occurrence.id, { namePrefix: 'status-edit', fieldAttr: 'occurrence-edit-field', idAttr: 'occurrence-id', checkedStatus: occurrence.status })}
         <label class="entry-form__checkbox">
           <input type="checkbox" data-occurrence-edit-field="absent" data-occurrence-id="${escapeHtml(occurrence.id)}" ${occurrence.absent ? 'checked' : ''}> 請假／未執行（劃掉日期與說明）
+        </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-occurrence-edit-field="courseChanged" data-occurrence-id="${escapeHtml(occurrence.id)}" ${occurrence.courseChanged ? 'checked' : ''}> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
         </label>
         <input type="text" class="entry-form__note" data-occurrence-edit-field="note" data-occurrence-id="${escapeHtml(occurrence.id)}" placeholder="說明" value="${escapeHtml(occurrence.note)}">
         <div class="entry-form__actions">
@@ -86,6 +107,9 @@ function entryCard(entry, indicator, occurrences, tier) {
         </div>
         <label class="entry-form__checkbox">
           <input type="checkbox" data-occurrence-field="absent" data-entry-id="${escapeHtml(entry.id)}"> 請假／未執行（劃掉日期與說明）
+        </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
         </label>
         <input type="text" class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="說明">
         <div class="entry-form__actions">
@@ -164,6 +188,9 @@ export async function renderCoursePlanTab(
         <label class="entry-form__checkbox">
           <input type="checkbox" data-field="occurrenceAbsent"> 請假／未執行（劃掉日期與說明）
         </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="occurrenceCourseChanged"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
+        </label>
         <label class="panel-form__field">說明內容 <input type="text" data-field="occurrenceNote"></label>
         <button type="submit" class="btn btn--primary">新增</button>
         <p class="field-error" data-error></p>
@@ -194,11 +221,12 @@ export async function renderCoursePlanTab(
     const occurrenceDate = container.querySelector('[data-field="occurrenceDate"]').value;
     const occurrenceStatus = container.querySelector('[data-field="occurrenceStatus"]:checked').value;
     const occurrenceAbsent = container.querySelector('[data-field="occurrenceAbsent"]').checked;
+    const occurrenceCourseChanged = container.querySelector('[data-field="occurrenceCourseChanged"]').checked;
     const occurrenceNote = container.querySelector('[data-field="occurrenceNote"]').value;
     try {
       const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode, activityName, indicatorText });
       if (occurrenceDate) {
-        await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, note: occurrenceNote });
+        await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, courseChanged: occurrenceCourseChanged, note: occurrenceNote });
       }
       onChange();
     } catch (err) {
@@ -206,10 +234,11 @@ export async function renderCoursePlanTab(
     }
   });
 
-  container.querySelector('[data-field="occurrenceAbsent"]').addEventListener('change', event => {
-    const disabled = event.target.checked;
-    container.querySelectorAll('[data-field="occurrenceStatus"]').forEach(radio => { radio.disabled = disabled; });
-  });
+  wireAbsentCourseChangedExclusion(
+    container.querySelector('[data-field="occurrenceAbsent"]'),
+    container.querySelector('[data-field="occurrenceCourseChanged"]'),
+    container.querySelectorAll('[data-field="occurrenceStatus"]')
+  );
 
   for (const entry of entries) {
     container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', async () => {
@@ -250,21 +279,21 @@ export async function renderCoursePlanTab(
       form.hidden = !form.hidden;
     });
 
-    container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`).addEventListener('change', event => {
-      const disabled = event.target.checked;
-      container.querySelectorAll(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]`).forEach(radio => {
-        radio.disabled = disabled;
-      });
-    });
+    wireAbsentCourseChangedExclusion(
+      container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`),
+      container.querySelector(`[data-occurrence-field="courseChanged"][data-entry-id="${entry.id}"]`),
+      container.querySelectorAll(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]`)
+    );
 
     container.querySelector(`[data-occurrence-save-for="${entry.id}"]`).addEventListener('click', async () => {
       const date = container.querySelector(`[data-occurrence-field="date"][data-entry-id="${entry.id}"]`).value;
       const absent = container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`).checked;
+      const courseChanged = container.querySelector(`[data-occurrence-field="courseChanged"][data-entry-id="${entry.id}"]`).checked;
       const statusInput = container.querySelector(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]:checked`);
       const status = statusInput ? statusInput.value : 'developed';
       const note = container.querySelector(`[data-occurrence-field="note"][data-entry-id="${entry.id}"]`).value;
       try {
-        await addCourseOccurrence({ entryId: entry.id, date, status, absent, note });
+        await addCourseOccurrence({ entryId: entry.id, date, status, absent, courseChanged, note });
         onChange();
       } catch (err) {
         container.querySelector(`[data-occurrence-form-for="${entry.id}"] [data-error]`).textContent = '新增失敗，請再試一次';
@@ -278,7 +307,9 @@ export async function renderCoursePlanTab(
           await deleteCourseOccurrence(occurrence.id);
           onChange();
         } catch (err) {
-          // Non-fatal: entry stays visible; the teacher can retry the delete.
+          container.querySelector(`[data-course-occurrence="${occurrence.id}"]`).appendChild(
+            Object.assign(document.createElement('p'), { className: 'field-error', textContent: '刪除失敗，請再試一次' })
+          );
         }
       });
 
@@ -291,23 +322,21 @@ export async function renderCoursePlanTab(
         container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"]`).hidden = true;
       });
 
-      container
-        .querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`)
-        .addEventListener('change', event => {
-          const disabled = event.target.checked;
-          container.querySelectorAll(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]`).forEach(radio => {
-            radio.disabled = disabled;
-          });
-        });
+      wireAbsentCourseChangedExclusion(
+        container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`),
+        container.querySelector(`[data-occurrence-edit-field="courseChanged"][data-occurrence-id="${occurrence.id}"]`),
+        container.querySelectorAll(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]`)
+      );
 
       container.querySelector(`[data-occurrence-edit-save-for="${occurrence.id}"]`).addEventListener('click', async () => {
         const date = container.querySelector(`[data-occurrence-edit-field="date"][data-occurrence-id="${occurrence.id}"]`).value;
         const absent = container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`).checked;
+        const courseChanged = container.querySelector(`[data-occurrence-edit-field="courseChanged"][data-occurrence-id="${occurrence.id}"]`).checked;
         const statusInput = container.querySelector(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]:checked`);
         const status = statusInput ? statusInput.value : 'developed';
         const note = container.querySelector(`[data-occurrence-edit-field="note"][data-occurrence-id="${occurrence.id}"]`).value;
         try {
-          await updateCourseOccurrence(occurrence.id, { date, status, absent, note });
+          await updateCourseOccurrence(occurrence.id, { date, status, absent, courseChanged, note });
           onChange();
         } catch (err) {
           container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"] [data-error]`).textContent = '更新失敗，請再試一次';

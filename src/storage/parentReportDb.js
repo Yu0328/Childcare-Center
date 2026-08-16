@@ -62,9 +62,11 @@ export async function deleteCoursePlanEntry(id) {
   await runRequest('coursePlanEntries', 'readwrite', store => store.delete(id));
 }
 
-export async function addCourseOccurrence({ entryId, date, status, absent, note }) {
-  const id = await runRequest('courseOccurrences', 'readwrite', store => store.add({ entryId, date, status, absent, note }));
-  return { id, entryId, date, status, absent, note };
+export async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note }) {
+  const id = await runRequest('courseOccurrences', 'readwrite', store =>
+    store.add({ entryId, date, status, absent, courseChanged, note })
+  );
+  return { id, entryId, date, status, absent, courseChanged, note };
 }
 
 export async function listCourseOccurrencesForEntry(entryId) {

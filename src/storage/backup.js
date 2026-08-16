@@ -196,6 +196,7 @@ async function importParentReports(data, childIdMap) {
       date: occurrence.date,
       status: occurrence.status,
       absent: occurrence.absent,
+      courseChanged: occurrence.courseChanged,
       note: occurrence.note,
     });
   }

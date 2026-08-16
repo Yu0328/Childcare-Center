@@ -43,14 +43,28 @@ function flatJoinedText(xml) {
   return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join(' ');
 }
 
+// A cell continues a vertical merge if it carries a bare <w:vMerge/> (the shorthand real Word
+// sometimes uses, where a missing w:val defaults to "continue" per the OOXML spec) OR an explicit
+// <w:vMerge w:val="continue"/> — the form this app's own docx export (via the `docx` npm library)
+// always writes, and the only form it ever writes for a continuation cell. Recognizing only the
+// bare shorthand meant re-importing a file this app itself had exported turned every occurrence
+// after an entry's first into a phantom new entry with a blank indicator code (verified: any
+// course-plan entry with 2+ occurrences was silently corrupted on export→re-import).
 function isVMergeContinue(cellXml) {
-  return /<w:vMerge\s*\/>/.test(cellXml) || /<w:vMerge(?!\s+w:val)/.test(cellXml);
+  return /<w:vMerge\s*\/>/.test(cellXml) || /<w:vMerge(?!\s+w:val)/.test(cellXml) || /<w:vMerge\s+w:val="continue"\s*\/>/.test(cellXml);
 }
 
 // A cell counts as struck-through if ANY of its runs carries <w:strike/> — the export always
 // strikes the whole cell's text as one run, but this stays lenient about run-splitting.
+//
+// Bug fix: <w:pPr><w:rPr>...</w:pPr> (the paragraph MARK's own run properties, controlling only
+// the invisible pilcrow at the paragraph's end) is stripped out before testing. Word can leave a
+// <w:strike/> there as a leftover from earlier edits without it being present on any actual
+// visible-text run — that residue does not make the cell look struck through in Word, so it must
+// not be read as absent here either (verified against a real sample file where this happened on
+// 5 of 26 rows).
 function isStruck(cellXml) {
-  return /<w:strike\s*\/>/.test(cellXml);
+  return /<w:strike\s*\/>/.test(cellXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, ''));
 }
 
 // "06/11" -> "06-11" (kept without a year — see Task 20's note on why year inference is deferred
@@ -100,11 +114,12 @@ export function parseCoursePlanTable(documentXml) {
   return { entries, occurrencesByEntryIndex };
 }
 
-// ROC "113.06.20" -> "2024-06-20" (note the dot separators here, unlike 適性總表's slash-separated
-// 出生日期 — copied from the real reference sample's own header phrasing, do not "fix" to match
-// docxImport.js's slash format).
+// ROC "113.06.20" or "113/06/20" -> "2024-06-20". The real reference sample's own header
+// phrasing uses dots (unlike 適性總表's slash-separated 出生日期), but a real legacy file can use
+// slashes instead — both separators are accepted here (verified: a slash-separated file otherwise
+// fails to parse and silently drops the birth date).
 function rocDotDateToIso(rocDate) {
-  const match = /^(\d{1,3})\.(\d{1,2})\.(\d{1,2})$/.exec(rocDate.trim());
+  const match = /^(\d{1,3})[./](\d{1,2})[./](\d{1,2})$/.exec(rocDate.trim());
   if (!match) return null;
   const [, rocYear, month, day] = match;
   return `${Number(rocYear) + 1911}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -112,7 +127,7 @@ function rocDotDateToIso(rocDate) {
 
 export function parseHeaderInfo(headerText) {
   const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
-  const birthMatch = /出生年月日[：:]\s*(\d{1,3}\.\d{1,2}\.\d{1,2})/.exec(headerText);
+  const birthMatch = /出生年月日[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
   const periodMatch = /紀錄時間[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
 
   return {
@@ -230,13 +245,37 @@ async function extractSortedMediaImages(zip, documentXml) {
 // legacy file (verified once during Task 21, not committed to this repo) used the ordinary ASCII
 // "-" (U+002D) instead — so both are accepted here.
 const BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]/;
-// Mirrors normalizeIndicatorCode's own longest-prefix-first alternation ordering (III/IV before
-// II/I/V) — a narrative paragraph's rawText can reference an indicator by either the canonical
-// Unicode Roman numeral OR the same Latin-letter typo parseCoursePlanTable normalizes away, since
-// this free-text narrative is typed independently of the code cell. Each match is normalized
-// below before comparing against coursePlanEntries' already-normalized indicatorCode, or a
-// Latin-typed reference here would never match its (now-Unicode) course-plan entry.
-const INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤ]|III|IV|II|I|V)-\d-\d/g;
+// Mirrors normalizeIndicatorCode's own set of recognized prefixes (its Latin-letter typos, plus
+// the distinct mixed "IⅤ" garble) — a narrative paragraph's rawText can reference an indicator by
+// any of the forms normalizeIndicatorCode knows how to fix, since this free-text narrative is
+// typed independently of the code cell. Each match is normalized below before comparing against
+// coursePlanEntries' already-normalized indicatorCode, or a non-canonical reference here would
+// never match its (now-Unicode) course-plan entry. The item-index group is \d+, not \d, because
+// tier Ⅵ (src/data/indicators.js) is the only tier with domains that run past 9 items.
+const INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+
+// parentReportDocxExport.js's referencedIndicatorLines() prepends one line per linked
+// course-plan entry — formatted exactly "code　description" — before a developmentRecordEntry's
+// own narrative, when exporting (see that file). Strip that leading run of lines back off here on
+// import, so re-importing a file this app exported doesn't bake them into the narrative — they'd
+// otherwise duplicate on every further export→re-import cycle. A line only counts if it exactly
+// reproduces a real indicator's own code AND description; anything else (a legacy file with no
+// such lines, or a narrative that happens to start by mentioning an indicator in different
+// wording) is left untouched, matching classifyRecordBlocks' existing conservative approach of
+// keeping the full text rather than guessing at a prefix that might not be there.
+function stripReferencedIndicatorLines(rawText) {
+  const lines = rawText.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const match = /^([^　]+)　(.*)$/.exec(lines[i]);
+    if (!match) break;
+    const indicator = getIndicator(match[1]);
+    if (!indicator || indicator.description !== match[2]) break;
+    i += 1;
+  }
+  return lines.slice(i).join('\n').trim();
+}
+
 function classifyRecordBlocks(blocks, coursePlanEntries, warnings) {
   const domainByName = new Map(DOMAINS.map(d => [d.name, d.id]));
   const developmentRecordBlocks = [];
@@ -248,12 +287,7 @@ function classifyRecordBlocks(blocks, coursePlanEntries, warnings) {
       const courseEntryIndexes = coursePlanEntries
         .map((entry, index) => (codeMatches.includes(entry.indicatorCode) ? index : -1))
         .filter(index => index !== -1);
-      // The narrative itself is everything after the leading "code　description" lines this
-      // project's own export writes (see parentReportDocxExport.js's referencedIndicatorLines) —
-      // a legacy file may not follow that exact shape, so this keeps the FULL rawText as the
-      // narrative rather than trying to strip a prefix that might not be there; the teacher can
-      // trim it in the preview step if it duplicates the indicator list visually.
-      developmentRecordBlocks.push({ domain: domainByName.get(block.label), courseEntryIndexes, narrative: block.rawText });
+      developmentRecordBlocks.push({ domain: domainByName.get(block.label), courseEntryIndexes, narrative: stripReferencedIndicatorLines(block.rawText) });
     } else if (BEHAVIOR_OBSERVATION_LABEL.test(block.label)) {
       const separatorMatch = BEHAVIOR_OBSERVATION_LABEL.exec(block.label);
       behaviorObservations.push({ title: block.label.slice(separatorMatch[0].length), narrative: block.rawText });

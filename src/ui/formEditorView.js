@@ -12,16 +12,26 @@ function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
       <label class="entry-form__radio">
         <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === 'developing' ? 'checked' : ''}> 發展中△
       </label>
+      <label class="entry-form__radio">
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="absent" ${checkedStatus === 'absent' ? 'checked' : ''}> 請假
+      </label>
+      <label class="entry-form__radio">
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="courseChanged" ${checkedStatus === 'courseChanged' ? 'checked' : ''}> 更換課程
+      </label>
     </div>
   `;
 }
 
+const FLAGGED_STATUS_LABELS = { absent: '請假', courseChanged: '更換課程' };
+
 function entryRow(entry) {
-  const mark = entry.status === 'developed' ? '○' : '△';
+  const flaggedLabel = FLAGGED_STATUS_LABELS[entry.status];
+  const mark = flaggedLabel ? '' : entry.status === 'developed' ? '○' : '△';
+  const rowClass = entry.status === 'developed' ? ' entry-row--achieved' : flaggedLabel ? ' entry-row--flagged' : '';
   return `
-    <li class="entry-row${entry.status === 'developed' ? ' entry-row--achieved' : ''}" data-entry="${escapeHtml(entry.id)}">
+    <li class="entry-row${rowClass}" data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</span>
+        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}${flaggedLabel ? `　${flaggedLabel}` : ''}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">×</button>

@@ -16,7 +16,7 @@ const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
 const IMPORT_FAILED_MESSAGE = '匯入失敗，請再試一次';
 const IMPORT_CONFIRM_MESSAGE = '匯入備份會清除目前所有資料，確定要繼續嗎？';
 
-export function mountApp(container) {
+export function mountApp(container, { onUnlock } = {}) {
   function showRenderError(err) {
     container.textContent = '';
     const message = document.createElement('p');
@@ -89,10 +89,15 @@ export function mountApp(container) {
   const homeButton = document.getElementById('home-button');
   if (homeButton) homeButton.addEventListener('click', showReportTypeSelect);
 
+  function handleUnlock() {
+    showReportTypeSelect();
+    if (onUnlock) onUnlock();
+  }
+
   if (isUnlocked()) {
     showReportTypeSelect();
   } else {
-    renderPasswordGate(container, { onUnlock: showReportTypeSelect });
+    renderPasswordGate(container, { onUnlock: handleUnlock });
   }
 }
 
@@ -103,6 +108,20 @@ export function wireBackupControls({
   confirmImport = message => (typeof confirm === 'function' ? confirm(message) : false),
   reload = () => window.location.reload(),
 }) {
+  // Bug fix (Critical): these controls live in the page header, outside mountApp's
+  // password-gated container, and used to be wired unconditionally on page load — anyone who
+  // opened the page, locked or not, could export every child's data or wipe it via import with
+  // no password. Gated two ways: disabled by default and re-checked on every click/change (so a
+  // host page that forgets to call updateLockState() after unlock still can't be tricked by
+  // re-enabling the button via devtools — the handler itself refuses), AND kept disabled until
+  // updateLockState() is called (wire this to mountApp's onUnlock hook).
+  function updateLockState() {
+    const locked = !isUnlocked();
+    exportButton.disabled = locked;
+    importInput.disabled = locked;
+  }
+  updateLockState();
+
   // Export and import controls can live in different DOM branches (e.g. the import input is
   // wrapped in its own <label>), so feedback always targets one shared container rather than
   // each control's own parent — otherwise a success on one control can clear the other's message.
@@ -122,6 +141,7 @@ export function wireBackupControls({
   }
 
   exportButton.addEventListener('click', async () => {
+    if (!isUnlocked()) return; // belt-and-suspenders: the button should already be disabled
     try {
       const json = await exportBackup();
       const blob = new Blob([json], { type: 'application/json' });
@@ -138,6 +158,7 @@ export function wireBackupControls({
   importInput.addEventListener('change', async () => {
     const file = importInput.files[0];
     if (!file) return;
+    if (!isUnlocked()) { importInput.value = ''; return; } // belt-and-suspenders: see updateLockState above
 
     // Importing wipes every existing record, so always ask first.
     if (!confirmImport(IMPORT_CONFIRM_MESSAGE)) {
@@ -159,8 +180,6 @@ export function wireBackupControls({
 
     reload();
   });
-}
 
-if (typeof document !== 'undefined' && document.getElementById('app')) {
-  mountApp(document.getElementById('app'));
+  return { updateLockState };
 }

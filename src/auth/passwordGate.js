@@ -29,6 +29,7 @@ export function renderPasswordGate(container, { onUnlock }) {
         <label class="panel-form__field">密碼 <input type="password" data-field="password" autocomplete="current-password" required></label>
         <button type="submit" class="btn btn--primary">進入</button>
         <p class="field-error" data-error></p>
+        <p class="password-gate__notice">此密碼僅防止他人誤入，無法保護裝置上已儲存的資料，請同時鎖定電腦或平板。</p>
       </form>
     </div>
   `;
