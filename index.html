@@ -5125,7 +5125,7 @@ var CFormApp = (() => {
     const bodyMediaNames = mediaNames.slice(skipCount);
     return Promise.all(bodyMediaNames.map(async (name) => zip.file(name).async("blob")));
   }
-  var BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]/;
+  var BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]?/;
   var INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
   function stripReferencedIndicatorLines(rawText) {
     const lines = rawText.split("\n");
@@ -5210,7 +5210,9 @@ var CFormApp = (() => {
       return best;
     })();
     if (!tier) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u6708\u9F61\u968E\u6BB5\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
-    const blocks = secondTableXml ? parseRecordBlocks(secondTableXml) : [];
+    const highlightsIndex = secondTableXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
+    const beforeHighlightsXml = highlightsIndex === -1 ? secondTableXml : secondTableXml.slice(0, highlightsIndex);
+    const blocks = beforeHighlightsXml ? parseRecordBlocks(beforeHighlightsXml) : [];
     const { developmentRecordBlocks, behaviorObservations } = classifyRecordBlocks(blocks, coursePlanEntries, warnings);
     const photoGroups = secondTableXml ? extractHighlightPhotoGroups(secondTableXml) : [];
     const mediaImages = await extractSortedMediaImages(zip, documentXml);
@@ -24881,7 +24883,9 @@ var CFormApp = (() => {
   function formatNoteCell(row) {
     const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
     if (!flaggedLabel) return row.note;
-    return row.note ? `${flaggedLabel}\u3000${row.note}` : flaggedLabel;
+    const note = (row.note ?? "").trim();
+    if (!note || note === flaggedLabel) return flaggedLabel;
+    return `${flaggedLabel}\u3000${row.note}`;
   }
   function rowTextColor(row) {
     return FLAGGED_STATUS_LABELS[row.status] ? FLAGGED_TEXT_COLOR : void 0;
@@ -25131,7 +25135,9 @@ var CFormApp = (() => {
   function noteLineHtml(entry) {
     const flaggedLabel = FLAGGED_STATUS_LABELS2[entry.status];
     if (!flaggedLabel) return escapeHtml(entry.note);
-    return entry.note ? `${escapeHtml(flaggedLabel)}\u3000${escapeHtml(entry.note)}` : escapeHtml(flaggedLabel);
+    const note = (entry.note ?? "").trim();
+    if (!note || note === flaggedLabel) return escapeHtml(flaggedLabel);
+    return `${escapeHtml(flaggedLabel)}\u3000${escapeHtml(entry.note)}`;
   }
   function entryRow2(entry) {
     const flaggedLabel = FLAGGED_STATUS_LABELS2[entry.status];

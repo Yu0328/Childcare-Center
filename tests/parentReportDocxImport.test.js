@@ -186,6 +186,52 @@ describe('parseParentReportDocxImport', () => {
     expect(result.behaviorObservations).toEqual([{ title: '我會好好說！', narrative: '本月觀察發現...' }]);
   });
 
+  // Regression (real sample: 趙萬竑-115年04月適性紀錄(家長版).docx and others): a bare "行為觀察"
+  // label with no separator or title at all — the teacher left the title blank — must still
+  // resolve to a behavior observation with an empty title, not an unrecognized-paragraph warning.
+  it('classifies a bare "行為觀察" label with no separator or title as a behavior observation with an empty title', async () => {
+    const secondTableXml = `
+      <w:tbl>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="6"/></w:tcPr><w:p><w:r><w:t>行為觀察</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="6"/></w:tcPr><w:p><w:r><w:t>本月觀察發現...</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>
+    `;
+    const result = await importWithSecondTable(secondTableXml);
+    expect(result.behaviorObservations).toEqual([{ title: '', narrative: '本月觀察發現...' }]);
+    expect(result.warnings).not.toContain(expect.stringContaining('無法辨識的段落標題'));
+  });
+
+  // Regression (real sample: 張珏銨-115年04月適性紀錄(家長版).docx): parseRecordBlocks' fixed
+  // header/content row pairing used to run all the way to the end of the merged non-course-plan
+  // tables — including the 點滴分享 photo-caption rows and the trailing 家長回饋 signature area,
+  // which it was never meant to see (extractHighlightPhotoGroups handles 點滴分享 separately). When
+  // the LAST 點滴分享 caption row happened to sit immediately before "家長回饋", that caption text
+  // was misread as an unrecognized paragraph title, with "家長回饋" as its equally bogus "content".
+  it('does not treat the last 點滴分享 caption (immediately followed by 家長回饋) as an unrecognized paragraph title', async () => {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const secondTableXml = `
+      <w:tbl>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>點滴分享</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:p><w:r><w:drawing/></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>最後一組照片說明</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>家長回饋</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>家長簽名：</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>
+    `;
+    const documentXml = `<w:document><w:body>${COURSE_PLAN_TABLE_XML}${secondTableXml}</w:body></w:document>`;
+    zip.file('word/document.xml', documentXml);
+    zip.file('word/media/image1.png', 'photo-A');
+    const blob = await zip.generateAsync({ type: 'blob' });
+
+    const result = await parseParentReportDocxImport(blob);
+
+    expect(result.warnings).not.toContain(expect.stringContaining('無法辨識的段落標題'));
+    expect(result.highlightEntries).toHaveLength(1);
+    expect(result.highlightEntries[0].caption).toBe('最後一組照片說明');
+    expect(result.highlightEntries[0].photos).toHaveLength(1);
+  });
+
   // Regression (real sample: 張珏銨-115年04月適性紀錄(家長版).docx): a real 課程計畫表 can be split
   // across TWO physical <w:tbl> elements (each repeating the header row), e.g. from a page break.
   // Treating only the first as the course-plan table used to silently drop every entry in the
