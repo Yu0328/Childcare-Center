@@ -270,3 +270,46 @@ export function buildSlotsAndOverrides(children) {
 
   return { slotsByTier, children: childrenWithOverrides };
 }
+
+export async function parseMonthlyPlanDocxImport(data) {
+  const zip = await JSZip.loadAsync(data);
+  const documentXml = await zip.file('word/document.xml').async('text');
+  const warnings = [];
+
+  const titleText = await extractTitleText(zip, documentXml);
+  const period = parsePeriodFromTitleText(titleText);
+  if (!period) warnings.push('無法從檔案中判斷課程計畫的年月，請手動選擇');
+
+  const tables = splitChildTables(documentXml);
+  const parsedChildren = tables.map(table => {
+    const { name, tier } = parseChildNameCell(table.nameCellXml);
+    const days = table.days.map(day => ({
+      weekIndex: day.weekIndex,
+      weekday: day.weekday,
+      items: parseDayCellItems(day.dateCellXml, day.contentCellXml),
+    }));
+    return { name, tier, days };
+  });
+
+  for (const child of parsedChildren) {
+    if (!child.name) warnings.push('偵測到一位無法判斷姓名的小朋友，請於預覽畫面手動確認');
+    if (!child.tier) warnings.push(`無法判斷「${child.name || '（未知姓名）'}」的月齡階段，請手動選擇`);
+  }
+
+  const { slotsByTier, children: childrenWithOverrides } = buildSlotsAndOverrides(parsedChildren);
+
+  const hasUnresolvedIndicator = [...slotsByTier.values()]
+    .flat()
+    .flatMap(slot => slot.items)
+    .some(item => item.indicatorCode && !getIndicator(item.indicatorCode));
+  if (hasUnresolvedIndicator) {
+    warnings.push('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
+  }
+
+  return {
+    period,
+    children: childrenWithOverrides,
+    slotsByTier: Object.fromEntries(slotsByTier),
+    warnings,
+  };
+}

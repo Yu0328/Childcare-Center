@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems, parseLegacyDayCellItems, parseDayCellItems, buildSlotsAndOverrides } from '../src/import/monthlyPlanDocxImport.js';
+import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems, parseLegacyDayCellItems, parseDayCellItems, buildSlotsAndOverrides, parseMonthlyPlanDocxImport } from '../src/import/monthlyPlanDocxImport.js';
 
 function zipWith({ headerXml, documentXml }) {
   const zip = new JSZip();
@@ -297,5 +297,66 @@ describe('buildSlotsAndOverrides', () => {
     const { slotsByTier } = buildSlotsAndOverrides(children);
     expect(slotsByTier.get('Ⅲ')[0].items[0].activityName).toBe('換一隻手');
     expect(slotsByTier.get('Ⅴ')[0].items[0].activityName).toBe('不同內容');
+  });
+});
+
+describe('parseMonthlyPlanDocxImport', () => {
+  it('assembles period, children, slotsByTier, and warns on missing/unrecognized data', async () => {
+    const zip = new JSZip();
+    zip.file(
+      'word/header1.xml',
+      `<?xml version="1.0"?><w:hdr ${NS}><w:p><w:r><w:t>115年06月課程計畫</w:t></w:r></w:p></w:hdr>`
+    );
+    const nameCellXml = '<w:p><w:r><w:t>趙萬竑</w:t></w:r></w:p><w:p><w:r><w:t>24M</w:t></w:r></w:p><w:p><w:r><w:t>D表</w:t></w:r></w:p>';
+    const tableXml = buildTableXml({
+      nameCellXml,
+      weeksCount: 1,
+      cellForDay: (weekday, weekIndex) =>
+        weekday === 1 && weekIndex === 1 ? `<w:p>${plainRun('Ⅴ-4-3')}${plainRun('【分類遊戲】')}${plainRun('能依形狀或顏色分類')}</w:p>` : '<w:p></w:p>',
+    });
+    zip.file('word/document.xml', `<?xml version="1.0"?><w:document ${NS}><w:body>${tableXml}</w:body></w:document>`);
+
+    const buffer = await zip.generateAsync({ type: 'arraybuffer' });
+    const parsed = await parseMonthlyPlanDocxImport(buffer);
+
+    expect(parsed.period).toBe('115年06月');
+    expect(parsed.children).toHaveLength(1);
+    expect(parsed.children[0]).toMatchObject({ name: '趙萬竑', tier: 'Ⅴ' });
+    expect(parsed.slotsByTier['Ⅴ'][0]).toMatchObject({ weekIndex: 1, weekday: 1, items: [{ indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲' }] });
+    expect(parsed.warnings).toEqual([]);
+  });
+
+  it('warns when the period cannot be found', async () => {
+    const zip = new JSZip();
+    const nameCellXml = '<w:p><w:r><w:t>某某某</w:t></w:r></w:p><w:p><w:r><w:t>D表</w:t></w:r></w:p>';
+    zip.file('word/document.xml', `<?xml version="1.0"?><w:document ${NS}><w:body>${buildTableXml({ nameCellXml, weeksCount: 1 })}</w:body></w:document>`);
+
+    const parsed = await parseMonthlyPlanDocxImport(await zip.generateAsync({ type: 'arraybuffer' }));
+    expect(parsed.period).toBeNull();
+    expect(parsed.warnings).toContain('無法從檔案中判斷課程計畫的年月，請手動選擇');
+  });
+
+  it('warns per child when name or tier cannot be determined', async () => {
+    const zip = new JSZip();
+    zip.file('word/document.xml', `<?xml version="1.0"?><w:document ${NS}><w:body>${buildTableXml({ nameCellXml: '', weeksCount: 1 })}</w:body></w:document>`);
+
+    const parsed = await parseMonthlyPlanDocxImport(await zip.generateAsync({ type: 'arraybuffer' }));
+    expect(parsed.warnings.some(w => w.includes('姓名'))).toBe(true);
+    expect(parsed.warnings.some(w => w.includes('月齡階段'))).toBe(true);
+  });
+
+  it('warns when an item\'s indicator code cannot be resolved to a known indicator', async () => {
+    const zip = new JSZip();
+    const nameCellXml = '<w:p><w:r><w:t>某某某</w:t></w:r></w:p><w:p><w:r><w:t>D表</w:t></w:r></w:p>';
+    const tableXml = buildTableXml({
+      nameCellXml,
+      weeksCount: 1,
+      cellForDay: (weekday, weekIndex) =>
+        weekday === 1 && weekIndex === 1 ? `<w:p>${plainRun('Ⅴ-9-9')}${plainRun('【未知】')}${plainRun('未知指標')}</w:p>` : '<w:p></w:p>',
+    });
+    zip.file('word/document.xml', `<?xml version="1.0"?><w:document ${NS}><w:body>${tableXml}</w:body></w:document>`);
+
+    const parsed = await parseMonthlyPlanDocxImport(await zip.generateAsync({ type: 'arraybuffer' }));
+    expect(parsed.warnings).toContain('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
   });
 });
