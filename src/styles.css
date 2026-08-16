@@ -458,12 +458,6 @@ fieldset.panel-form__field legend {
   color: inherit;
 }
 
-.password-gate__notice {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-top: 0.5em;
-}
-
 .panel-form input,
 .panel-form select,
 .panel-form textarea {
