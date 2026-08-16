@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell } from '../src/import/monthlyPlanDocxImport.js';
+import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables } from '../src/import/monthlyPlanDocxImport.js';
 
 function zipWith({ headerXml, documentXml }) {
   const zip = new JSZip();
@@ -72,5 +72,53 @@ describe('parseChildNameCell', () => {
 
   it('returns a null name for a completely empty cell', () => {
     expect(parseChildNameCell('')).toEqual({ name: null, tier: null });
+  });
+});
+
+function row(cells) {
+  return `<w:tr>${cells.map(c => `<w:tc>${c}</w:tc>`).join('')}</w:tr>`;
+}
+
+// 2-week, 1-child table: header row + 5 weekday (date,content) row pairs + trailing note row.
+function buildTableXml({ nameCellXml = '<w:p><w:r><w:t>小明</w:t></w:r></w:p>', weeksCount = 2, cellForDay } = {}) {
+  const headerRow = row(['日期/姓名', ...Array.from({ length: weeksCount }, () => '第N週')]);
+  const bodyRows = [];
+  for (let weekday = 1; weekday <= 5; weekday += 1) {
+    const dateCells = Array.from({ length: weeksCount }, (_, i) => `<w:p><w:r><w:t>0${weekday}/0${i + 1}</w:t></w:r></w:p>`);
+    const contentCells = Array.from({ length: weeksCount }, (_, i) =>
+      cellForDay ? cellForDay(weekday, i + 1) : `<w:p><w:r><w:t>content-w${i + 1}-d${weekday}</w:t></w:r></w:p>`
+    );
+    bodyRows.push(row([weekday === 1 ? nameCellXml : '', ...dateCells]));
+    bodyRows.push(row(['', ...contentCells]));
+  }
+  const trailingRow = row(['節氣', ...Array.from({ length: weeksCount }, () => '')]);
+  return `<w:tbl>${headerRow}${bodyRows.join('')}${trailingRow}</w:tbl>`;
+}
+
+describe('splitChildTables', () => {
+  it('splits one <w:tbl> per child, each into positional day cells', () => {
+    const documentXml = `<w:body>${buildTableXml()}</w:body>`;
+    const tables = splitChildTables(documentXml);
+
+    expect(tables).toHaveLength(1);
+    expect(tables[0].nameCellXml).toContain('小明');
+    expect(tables[0].days).toHaveLength(10); // 5 weekdays x 2 weeks
+  });
+
+  it('recovers weekIndex/weekday purely from column/row-pair position', () => {
+    const documentXml = `<w:body>${buildTableXml({ weeksCount: 2 })}</w:body>`;
+    const [{ days }] = splitChildTables(documentXml);
+
+    const wed2 = days.find(d => d.weekIndex === 2 && d.weekday === 3);
+    expect(wed2.contentCellXml).toContain('content-w2-d3');
+  });
+
+  it('handles two children (two <w:tbl> elements) independently', () => {
+    const documentXml = `<w:body>${buildTableXml({ nameCellXml: '<w:p><w:r><w:t>甲</w:t></w:r></w:p>' })}${buildTableXml({ nameCellXml: '<w:p><w:r><w:t>乙</w:t></w:r></w:p>' })}</w:body>`;
+    const tables = splitChildTables(documentXml);
+
+    expect(tables).toHaveLength(2);
+    expect(tables[0].nameCellXml).toContain('甲');
+    expect(tables[1].nameCellXml).toContain('乙');
   });
 });

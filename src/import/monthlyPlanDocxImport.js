@@ -56,3 +56,33 @@ export function parseChildNameCell(cellXml) {
 
   return { name, tier };
 }
+
+function rowCells(rowXml) {
+  return [...rowXml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map(m => m[1]);
+}
+
+export function splitChildTables(documentXml) {
+  const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map(m => m[0]);
+
+  return tables.map(tableXml => {
+    const rows = [...tableXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map(m => m[0]);
+    const bodyRows = rows.slice(1, 11); // skip the week-header row; up to 5 (date,content) pairs
+
+    const nameCellXml = bodyRows[0] ? rowCells(bodyRows[0])[0] || '' : '';
+    const days = [];
+    for (let pairIndex = 0; pairIndex * 2 + 1 < bodyRows.length; pairIndex += 1) {
+      const weekday = pairIndex + 1;
+      const dateRowCells = rowCells(bodyRows[pairIndex * 2]);
+      const contentRowCells = rowCells(bodyRows[pairIndex * 2 + 1]);
+      for (let col = 1; col < contentRowCells.length; col += 1) {
+        days.push({
+          weekIndex: col,
+          weekday,
+          dateCellXml: dateRowCells[col] || '',
+          contentCellXml: contentRowCells[col] || '',
+        });
+      }
+    }
+    return { nameCellXml, days };
+  });
+}
