@@ -104,7 +104,7 @@ export async function renderDevelopmentRecordTab(
 
   container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form" data-action="add-record">
+      <form class="panel-form panel-form--wide" data-action="add-record">
         <h3 class="panel-form__title">新增段落</h3>
         <label class="panel-form__field">
           領域
@@ -114,7 +114,7 @@ export async function renderDevelopmentRecordTab(
         </label>
         <fieldset class="panel-form__field">
           <legend>已在課程計畫表填寫的項目（勾選要引用的項目）</legend>
-          ${checkboxListHtml(domainEntries, { checkboxAttr: 'course-entry-checkbox' })}
+          <div class="panel-form__checkbox-grid">${checkboxListHtml(domainEntries, { checkboxAttr: 'course-entry-checkbox' })}</div>
         </fieldset>
         <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">新增</button>
