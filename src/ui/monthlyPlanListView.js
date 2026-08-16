@@ -5,6 +5,9 @@ import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
 import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
 import { periodSelectsHtml, parsePeriod, currentRocYear } from './periodFields.js';
 import { escapeHtml } from './escapeHtml.js';
+import { processImportQueue } from './importQueue.js';
+import { parseMonthlyPlanDocxImport } from '../import/monthlyPlanDocxImport.js';
+import { renderMonthlyPlanImportPreviewView } from './monthlyPlanImportPreviewView.js';
 
 export async function renderMonthlyPlanListView(
   container,
@@ -19,7 +22,10 @@ export async function renderMonthlyPlanListView(
     <div class="page-header page-header--editor">
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
       <h2 class="page-header__title">課程月計畫</h2>
+      <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">課程月計畫匯入</button>
+      <input type="file" accept=".docx" data-field="import-monthly-plan-file" multiple hidden>
     </div>
+    <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
         <ul class="card-list">
@@ -122,5 +128,18 @@ export async function renderMonthlyPlanListView(
     } catch (err) {
       errorEl.textContent = '新增失敗，請再試一次';
     }
+  });
+
+  const importFileInput = container.querySelector('[data-field="import-monthly-plan-file"]');
+  container.querySelector('[data-action="import-monthly-plan-docx"]').addEventListener('click', () => importFileInput.click());
+
+  importFileInput.addEventListener('change', async () => {
+    if (importFileInput.files.length === 0) return;
+    await processImportQueue(importFileInput.files, {
+      parseFn: parseMonthlyPlanDocxImport,
+      renderPreview: renderMonthlyPlanImportPreviewView,
+      container,
+      backToList: () => renderMonthlyPlanListView(container, { onSelectPlan, onBack, confirmDelete }),
+    });
   });
 }

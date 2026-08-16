@@ -4,6 +4,7 @@ import { listMonthlyCoursePlans, listPlanSlotItems, getOrCreatePlanSlot } from '
 import { renderMonthlyPlanListView } from '../src/ui/monthlyPlanListView.js';
 import { currentRocYear } from '../src/ui/periodFields.js';
 import { waitFor } from './helpers.js';
+import { parseMonthlyPlanDocxImport } from '../src/import/monthlyPlanDocxImport.js';
 
 describe('monthlyPlanListView', () => {
   let container, childA, childB;
@@ -70,5 +71,22 @@ describe('monthlyPlanListView', () => {
     await waitFor(async () => (await listMonthlyCoursePlans()).length === 0);
 
     expect(await listMonthlyCoursePlans()).toEqual([]);
+  });
+
+  it('imports a docx file via the import button and file input', async () => {
+    await renderMonthlyPlanListView(container, { onSelectPlan: vi.fn(), onBack: vi.fn() });
+
+    const button = container.querySelector('[data-action="import-monthly-plan-docx"]');
+    const fileInput = container.querySelector('[data-field="import-monthly-plan-file"]');
+    expect(button).toBeTruthy();
+    expect(fileInput).toBeTruthy();
+    expect(fileInput.multiple).toBe(true);
+
+    // A real file-picker interaction can't be simulated in jsdom; this test only asserts the
+    // control exists and click() delegates to the hidden file input, matching childListView's
+    // existing import-button test convention.
+    const clickSpy = vi.spyOn(fileInput, 'click');
+    button.click();
+    expect(clickSpy).toHaveBeenCalled();
   });
 });
