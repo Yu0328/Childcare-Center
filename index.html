@@ -5432,6 +5432,35 @@ var CFormApp = (() => {
   }
 
   // src/ui/childListView.js
+  async function processImportQueue(files, { parseFn, renderPreview, container, backToList }) {
+    const queue2 = Array.from(files);
+    const skipped = [];
+    async function next(index) {
+      if (index >= queue2.length) {
+        await backToList();
+        if (skipped.length > 0) {
+          const importErrorEl = container.querySelector('[data-error="import"]');
+          if (importErrorEl) importErrorEl.textContent = `\u4EE5\u4E0B\u6A94\u6848\u7121\u6CD5\u8B80\u53D6\uFF0C\u5DF2\u7565\u904E\uFF1A${skipped.join("\u3001")}`;
+        }
+        return;
+      }
+      const file = queue2[index];
+      let parsed;
+      try {
+        parsed = await parseFn(file);
+      } catch (err) {
+        skipped.push(file.name);
+        await next(index + 1);
+        return;
+      }
+      renderPreview(container, {
+        parsed,
+        onCancel: () => next(index + 1),
+        onImported: () => next(index + 1)
+      });
+    }
+    await next(0);
+  }
   async function renderChildListView(container, { onSelectChild, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false, onBack, reportType }) {
     const children = await listChildren();
     const isParentReport = reportType === "parent-report";
@@ -5440,8 +5469,8 @@ var CFormApp = (() => {
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
       <h2 class="page-header__title">\u5E7C\u5152\u5217\u8868</h2>
       ${isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">\u9069\u6027\u7D00\u9304\u532F\u5165</button>
-             <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
-             <input type="file" accept=".docx" data-field="import-file" hidden>`}
+             <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
+             <input type="file" accept=".docx" data-field="import-file" multiple hidden>`}
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
@@ -5523,39 +5552,25 @@ var CFormApp = (() => {
       const fileInput = container.querySelector('[data-field="import-parent-report-file"]');
       container.querySelector('[data-action="import-parent-report-docx"]').addEventListener("click", () => fileInput.click());
       fileInput.addEventListener("change", async () => {
-        const file = fileInput.files[0];
-        if (!file) return;
-        const importErrorEl = container.querySelector('[data-error="import"]');
-        try {
-          const parsed = await parseParentReportDocxImport(file);
-          renderParentReportImportPreviewView(container, {
-            parsed,
-            onCancel: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
-            onImported: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
-          });
-        } catch (err) {
-          importErrorEl.textContent = "\u7121\u6CD5\u8B80\u53D6\u9019\u500B\u6A94\u6848\uFF0C\u8ACB\u78BA\u8A8D\u662F\u6709\u6548\u7684 Word \u6A94\u6848";
-          fileInput.value = "";
-        }
+        if (fileInput.files.length === 0) return;
+        await processImportQueue(fileInput.files, {
+          parseFn: parseParentReportDocxImport,
+          renderPreview: renderParentReportImportPreviewView,
+          container,
+          backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
+        });
       });
     } else {
       const fileInput = container.querySelector('[data-field="import-file"]');
       container.querySelector('[data-action="import-docx"]').addEventListener("click", () => fileInput.click());
       fileInput.addEventListener("change", async () => {
-        const file = fileInput.files[0];
-        if (!file) return;
-        const importErrorEl = container.querySelector('[data-error="import"]');
-        try {
-          const parsed = await parseDocxImport(file);
-          renderImportPreviewView(container, {
-            parsed,
-            onCancel: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
-            onImported: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
-          });
-        } catch (err) {
-          importErrorEl.textContent = "\u7121\u6CD5\u8B80\u53D6\u9019\u500B\u6A94\u6848\uFF0C\u8ACB\u78BA\u8A8D\u662F\u6709\u6548\u7684 Word \u6A94\u6848";
-          fileInput.value = "";
-        }
+        if (fileInput.files.length === 0) return;
+        await processImportQueue(fileInput.files, {
+          parseFn: parseDocxImport,
+          renderPreview: renderImportPreviewView,
+          container,
+          backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
+        });
       });
     }
   }
@@ -25927,6 +25942,11 @@ var CFormApp = (() => {
   }
 
   // src/ui/courseplanTabView.js
+  var openDomainsByReportId = /* @__PURE__ */ new Map();
+  function indicatorItemNumber(code) {
+    const match = /-(\d+)$/.exec(String(code ?? ""));
+    return match ? Number(match[1]) : Infinity;
+  }
   function statusRadios2(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
     return `
     <div class="entry-form__radio-group">
@@ -26062,13 +26082,17 @@ var CFormApp = (() => {
       if (!byDomain.has(domainId)) byDomain.set(domainId, []);
       byDomain.get(domainId).push({ entry, indicator });
     }
+    for (const group of byDomain.values()) {
+      group.sort((a, b) => indicatorItemNumber(a.entry.indicatorCode) - indicatorItemNumber(b.entry.indicatorCode));
+    }
     const domainGroups = [
       ...DOMAINS.filter((d) => byDomain.has(d.id)).map((d) => [d.id, d.name, byDomain.get(d.id)]),
       ...byDomain.has("unknown") ? [["unknown", "\u672A\u77E5\u9818\u57DF", byDomain.get("unknown")]] : []
     ];
-    const previousDomainCards = [...container.querySelectorAll(".domain-card")];
-    const previousOpenDomains = new Set(previousDomainCards.filter((el) => el.open).map((el) => el.dataset.domain));
-    const hadPreviousRender = previousDomainCards.length > 0;
+    const isFirstRenderForReport = !openDomainsByReportId.has(report.id);
+    if (isFirstRenderForReport) openDomainsByReportId.set(report.id, /* @__PURE__ */ new Set());
+    const openDomains = openDomainsByReportId.get(report.id);
+    if (isFirstRenderForReport && domainGroups.length > 0) openDomains.add(String(domainGroups[0][0]));
     container.innerHTML = `
     <div class="tab-layout">
       <form class="panel-form" data-action="add-entry">
@@ -26096,7 +26120,7 @@ var CFormApp = (() => {
       </form>
       <div class="domain-grid">
         ${domainGroups.map(([domainId, domainName, group], index) => {
-      const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domainId)) : index === 0;
+      const isOpen = isFirstRenderForReport ? index === 0 : openDomains.has(String(domainId));
       return `
               <details class="domain-card" data-domain="${escapeHtml(domainId)}" ${isOpen ? "open" : ""}>
                 <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
@@ -26124,6 +26148,8 @@ var CFormApp = (() => {
         if (occurrenceDate) {
           await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, courseChanged: occurrenceCourseChanged, note: occurrenceNote });
         }
+        const addedIndicator = getIndicator(indicatorCode);
+        openDomains.add(String(addedIndicator ? addedIndicator.domain : "unknown"));
         onChange();
       } catch (err) {
         container.querySelector('[data-action="add-entry"] [data-error]').textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
@@ -26134,6 +26160,12 @@ var CFormApp = (() => {
       container.querySelector('[data-field="occurrenceCourseChanged"]'),
       container.querySelectorAll('[data-field="occurrenceStatus"]')
     );
+    container.querySelectorAll(".domain-card").forEach((details) => {
+      details.addEventListener("toggle", () => {
+        if (details.open) openDomains.add(details.dataset.domain);
+        else openDomains.delete(details.dataset.domain);
+      });
+    });
     for (const entry of entries) {
       container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener("click", async () => {
         if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${entry.indicatorCode} \u3010${entry.activityName}\u3011\u300D\u9019\u500B\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;

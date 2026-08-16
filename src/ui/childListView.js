@@ -6,6 +6,47 @@ import { parseParentReportDocxImport } from '../import/parentReportDocxImport.js
 import { renderParentReportImportPreviewView } from './parentReportImportPreviewView.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 
+// Processes a multi-file selection one at a time: parses the next file, shows its existing
+// single-file preview/confirm screen, and — whether the user confirms or cancels that one — moves
+// on to the next file in the queue, rather than dropping back to the child list until every
+// selected file has had its own turn. A file that fails to parse is skipped (not aborting the rest
+// of the batch); every skipped filename is reported together in one summary once the whole queue
+// finishes, since the preview screens that follow would otherwise overwrite a per-file error
+// before the person ever saw it.
+async function processImportQueue(files, { parseFn, renderPreview, container, backToList }) {
+  const queue = Array.from(files);
+  const skipped = [];
+
+  async function next(index) {
+    if (index >= queue.length) {
+      await backToList();
+      if (skipped.length > 0) {
+        const importErrorEl = container.querySelector('[data-error="import"]');
+        if (importErrorEl) importErrorEl.textContent = `以下檔案無法讀取，已略過：${skipped.join('、')}`;
+      }
+      return;
+    }
+
+    const file = queue[index];
+    let parsed;
+    try {
+      parsed = await parseFn(file);
+    } catch (err) {
+      skipped.push(file.name);
+      await next(index + 1);
+      return;
+    }
+
+    renderPreview(container, {
+      parsed,
+      onCancel: () => next(index + 1),
+      onImported: () => next(index + 1),
+    });
+  }
+
+  await next(0);
+}
+
 export async function renderChildListView(
   container,
   { onSelectChild, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false), onBack, reportType }
@@ -20,9 +61,9 @@ export async function renderChildListView(
       ${
         isParentReport
           ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">適性紀錄匯入</button>
-             <input type="file" accept=".docx" data-field="import-parent-report-file" hidden>`
+             <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>`
           : `<button type="button" class="btn btn--purple" data-action="import-docx">適性總表匯入</button>
-             <input type="file" accept=".docx" data-field="import-file" hidden>`
+             <input type="file" accept=".docx" data-field="import-file" multiple hidden>`
       }
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
@@ -115,42 +156,28 @@ export async function renderChildListView(
     container.querySelector('[data-action="import-parent-report-docx"]').addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', async () => {
-      const file = fileInput.files[0];
-      if (!file) return;
-      const importErrorEl = container.querySelector('[data-error="import"]');
-
-      try {
-        const parsed = await parseParentReportDocxImport(file);
-        renderParentReportImportPreviewView(container, {
-          parsed,
-          onCancel: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
-          onImported: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
-        });
-      } catch (err) {
-        importErrorEl.textContent = '無法讀取這個檔案，請確認是有效的 Word 檔案';
-        fileInput.value = '';
-      }
+      if (fileInput.files.length === 0) return;
+      // backToList's re-render replaces this whole container's markup — including this very
+      // fileInput element — with a fresh one, so there's no stale selection left to clear here.
+      await processImportQueue(fileInput.files, {
+        parseFn: parseParentReportDocxImport,
+        renderPreview: renderParentReportImportPreviewView,
+        container,
+        backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
+      });
     });
   } else {
     const fileInput = container.querySelector('[data-field="import-file"]');
     container.querySelector('[data-action="import-docx"]').addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', async () => {
-      const file = fileInput.files[0];
-      if (!file) return;
-      const importErrorEl = container.querySelector('[data-error="import"]');
-
-      try {
-        const parsed = await parseDocxImport(file);
-        renderImportPreviewView(container, {
-          parsed,
-          onCancel: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
-          onImported: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
-        });
-      } catch (err) {
-        importErrorEl.textContent = '無法讀取這個檔案，請確認是有效的 Word 檔案';
-        fileInput.value = '';
-      }
+      if (fileInput.files.length === 0) return;
+      await processImportQueue(fileInput.files, {
+        parseFn: parseDocxImport,
+        renderPreview: renderImportPreviewView,
+        container,
+        backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
+      });
     });
   }
 }

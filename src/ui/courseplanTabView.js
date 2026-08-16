@@ -5,6 +5,22 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 
+// Which domain <details> cards are open persists across renders keyed by report.id, since
+// renderCoursePlanTab's own `container` is a brand-new, empty element on every call — its parent
+// (parentReportEditorView.js's onChange) rebuilds the entire tab shell from scratch, so there is no
+// previous DOM state left to read the way a same-node re-render could. A new report id starts with
+// only its first domain open (the general default); an id already in the map keeps whatever set of
+// domains the user has toggled since.
+const openDomainsByReportId = new Map();
+
+// "Ⅳ-2-4" -> 4 (the item number within its domain) — used to sort entries within a domain card in
+// the same order the indicator picker itself lists them, regardless of the order they were added
+// in (insertion/id order otherwise, which has no relation to the indicator's own numbering).
+function indicatorItemNumber(code) {
+  const match = /-(\d+)$/.exec(String(code ?? ''));
+  return match ? Number(match[1]) : Infinity; // unparsable codes sort last rather than first
+}
+
 function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
   return `
     <div class="entry-form__radio-group">
@@ -157,18 +173,24 @@ export async function renderCoursePlanTab(
     if (!byDomain.has(domainId)) byDomain.set(domainId, []);
     byDomain.get(domainId).push({ entry, indicator });
   }
+  // Sorted by the indicator's own item number within the domain (same order the 指標 picker itself
+  // lists them), not by insertion/id order — so a newly added entry lands where its indicator
+  // belongs rather than always at the end of the card.
+  for (const group of byDomain.values()) {
+    group.sort((a, b) => indicatorItemNumber(a.entry.indicatorCode) - indicatorItemNumber(b.entry.indicatorCode));
+  }
   const domainGroups = [
     ...DOMAINS.filter(d => byDomain.has(d.id)).map(d => [d.id, d.name, byDomain.get(d.id)]),
     ...(byDomain.has('unknown') ? [['unknown', '未知領域', byDomain.get('unknown')]] : []),
   ];
 
-  // Preserve which domains the user has expanded/collapsed across re-renders (the container is
-  // reused, so its previous <details> state is still readable right before we overwrite it). An
-  // empty previous render (nothing to read yet) is what triggers the "expand the first domain"
-  // default, distinct from the user having collapsed everything themselves.
-  const previousDomainCards = [...container.querySelectorAll('.domain-card')];
-  const previousOpenDomains = new Set(previousDomainCards.filter(el => el.open).map(el => el.dataset.domain));
-  const hadPreviousRender = previousDomainCards.length > 0;
+  // See openDomainsByReportId above — a report id seen for the first time defaults to only its
+  // first domain open; one already tracked keeps whatever the user (or a just-added entry, see the
+  // add-entry submit handler below) has opened since.
+  const isFirstRenderForReport = !openDomainsByReportId.has(report.id);
+  if (isFirstRenderForReport) openDomainsByReportId.set(report.id, new Set());
+  const openDomains = openDomainsByReportId.get(report.id);
+  if (isFirstRenderForReport && domainGroups.length > 0) openDomains.add(String(domainGroups[0][0]));
 
   container.innerHTML = `
     <div class="tab-layout">
@@ -198,7 +220,7 @@ export async function renderCoursePlanTab(
       <div class="domain-grid">
         ${domainGroups
           .map(([domainId, domainName, group], index) => {
-            const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domainId)) : index === 0;
+            const isOpen = isFirstRenderForReport ? index === 0 : openDomains.has(String(domainId));
             return `
               <details class="domain-card" data-domain="${escapeHtml(domainId)}" ${isOpen ? 'open' : ''}>
                 <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
@@ -228,6 +250,11 @@ export async function renderCoursePlanTab(
       if (occurrenceDate) {
         await addCourseOccurrence({ entryId: entry.id, date: occurrenceDate, status: occurrenceStatus, absent: occurrenceAbsent, courseChanged: occurrenceCourseChanged, note: occurrenceNote });
       }
+      // Open the domain the new entry landed in — without touching any other domain the user
+      // already had open — so the newly added item is visible right away rather than requiring an
+      // extra click to expand its card.
+      const addedIndicator = getIndicator(indicatorCode);
+      openDomains.add(String(addedIndicator ? addedIndicator.domain : 'unknown'));
       onChange();
     } catch (err) {
       container.querySelector('[data-action="add-entry"] [data-error]').textContent = '新增失敗，請再試一次';
@@ -239,6 +266,15 @@ export async function renderCoursePlanTab(
     container.querySelector('[data-field="occurrenceCourseChanged"]'),
     container.querySelectorAll('[data-field="occurrenceStatus"]')
   );
+
+  // Keeps openDomainsByReportId in sync with the user manually expanding/collapsing a card, so a
+  // later re-render (e.g. after adding an entry to a *different* domain) doesn't reset it.
+  container.querySelectorAll('.domain-card').forEach(details => {
+    details.addEventListener('toggle', () => {
+      if (details.open) openDomains.add(details.dataset.domain);
+      else openDomains.delete(details.dataset.domain);
+    });
+  });
 
   for (const entry of entries) {
     container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', async () => {
