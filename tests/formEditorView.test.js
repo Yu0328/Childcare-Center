@@ -22,6 +22,21 @@ describe('renderFormEditorView', () => {
     expect(container.textContent).toContain('身體動作');
   });
 
+  // The 請假/更換課程 label prints in the 說明 line only, not next to the date — a flagged entry's
+  // date must stay a plain date, or the label would show twice whenever the teacher also
+  // separately typed "請假" as their own note text.
+  it('shows the flagged status label ("請假") in the 說明 line, not next to the date', async () => {
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'absent', note: '生病請假' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    const dateEl = container.querySelector('.entry-row__date');
+    const noteEl = container.querySelector('.entry-row__note');
+    expect(dateEl.textContent).not.toContain('請假');
+    expect(noteEl.textContent).toBe('請假　生病請假');
+  });
+
   it('renders existing entries under their indicator', async () => {
     await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
 

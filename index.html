@@ -775,9 +775,12 @@ fieldset.panel-form__field legend {
 
 /* 未發展(發展中△)、請假、or 更換課程 occurrences read as red text so they stand out from a plain
    已發展○ row at a glance — added to .entry-row__date instead of relying on .entry-row--absent's
-   color alone so 發展中△ (not absent) gets the same red treatment. */
+   color alone so 發展中△ (not absent) gets the same red treatment. 適性總表's own flagged rows
+   (.entry-row--flagged) also color .entry-row__note red, since the 請假/更換課程 label itself now
+   prints there instead of next to the date. */
 .entry-row__date--flag,
-.entry-row--flagged .entry-row__date {
+.entry-row--flagged .entry-row__date,
+.entry-row--flagged .entry-row__note {
   color: var(--danger);
 }
 
@@ -5185,7 +5188,7 @@ var CFormApp = (() => {
     if (!headerInfo.period) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u7D00\u9304\u5E74\u6708\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
     const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((m) => m[0]);
     const coursePlanTableXmls = tables.filter(isCoursePlanShapedTable);
-    const secondTableXml = tables.find((t) => !isCoursePlanShapedTable(t));
+    const secondTableXml = tables.filter((t) => !isCoursePlanShapedTable(t)).join("");
     const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXmls.length ? parseCoursePlanTables(coursePlanTableXmls) : { entries: [], occurrencesByEntryIndex: {} };
     const inferredYear = headerInfo.period ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911 : (/* @__PURE__ */ new Date()).getFullYear();
     const coursePlanEntries = coursePlanEntriesRaw.map((entry, index) => ({
@@ -24872,10 +24875,13 @@ var CFormApp = (() => {
     if (!row.date) return "";
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
     const formatted = match ? `${match[2]}/${match[3]}` : row.date;
-    const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
-    if (flaggedLabel) return `${formatted}\u3000${flaggedLabel}`;
     const glyph = row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
     return `${formatted}${glyph}`;
+  }
+  function formatNoteCell(row) {
+    const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
+    if (!flaggedLabel) return row.note;
+    return row.note ? `${flaggedLabel}\u3000${row.note}` : flaggedLabel;
   }
   function rowTextColor(row) {
     return FLAGGED_STATUS_LABELS[row.status] ? FLAGGED_TEXT_COLOR : void 0;
@@ -24980,7 +24986,7 @@ var CFormApp = (() => {
         new TableCell({
           width: cellWidth(5),
           verticalAlign: VerticalAlign.CENTER,
-          children: [textParagraph(row.note, { color: rowTextColor(row) })]
+          children: [textParagraph(formatNoteCell(row), { color: rowTextColor(row) })]
         })
       ]
     });
@@ -25001,7 +25007,7 @@ var CFormApp = (() => {
         new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
         new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
         new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), { ...CENTERED, color: rowTextColor(row) })] }),
-        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note, { color: rowTextColor(row) })] })
+        new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatNoteCell(row), { color: rowTextColor(row) })] })
       ]
     });
   }
@@ -25122,6 +25128,11 @@ var CFormApp = (() => {
   `;
   }
   var FLAGGED_STATUS_LABELS2 = { absent: "\u8ACB\u5047", courseChanged: "\u66F4\u63DB\u8AB2\u7A0B" };
+  function noteLineHtml(entry) {
+    const flaggedLabel = FLAGGED_STATUS_LABELS2[entry.status];
+    if (!flaggedLabel) return escapeHtml(entry.note);
+    return entry.note ? `${escapeHtml(flaggedLabel)}\u3000${escapeHtml(entry.note)}` : escapeHtml(flaggedLabel);
+  }
   function entryRow2(entry) {
     const flaggedLabel = FLAGGED_STATUS_LABELS2[entry.status];
     const mark = flaggedLabel ? "" : entry.status === "developed" ? "\u25CB" : "\u25B3";
@@ -25129,13 +25140,13 @@ var CFormApp = (() => {
     return `
     <li class="entry-row${rowClass}" data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}${flaggedLabel ? `\u3000${flaggedLabel}` : ""}</span>
+        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>
         </div>
       </div>
-      <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+      <p class="entry-row__note">${noteLineHtml(entry)}</p>
       <div class="entry-form" data-entry-edit-form-for="${escapeHtml(entry.id)}" hidden>
         <label class="entry-form__field">\u65E5\u671F <input type="date" data-entry-edit-field="date" data-entry-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
         ${statusRadios(entry.id, { fieldAttr: "entry-edit-field", idAttr: "entry-id", checkedStatus: entry.status })}
@@ -26783,25 +26794,25 @@ var CFormApp = (() => {
     }
     reports.sort((a, b) => a.period.localeCompare(b.period));
     const toWrite = [];
-    const rerouted = [];
     for (const report of reports) {
       const entries = await listCoursePlanEntriesForReport(report.id);
       for (const entry of entries) {
         const indicatorCode = normalizeIndicatorCode(entry.indicatorCode);
         const indicator = getIndicator(indicatorCode);
-        const target = !indicator || indicator.tier === tier ? toWrite : rerouted;
+        const offTier = !indicator || indicator.tier !== tier;
         const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
         for (const occurrence of occurrences) {
           const status = occurrence.absent ? "absent" : occurrence.courseChanged ? "courseChanged" : occurrence.status;
-          target.push({
-            tier: indicator?.tier,
+          toWrite.push({
             indicatorCode,
             date: occurrence.date,
             status,
             note: occurrence.note,
-            // Only needed as an export/preview-time fallback for a code that never resolves to an
-            // indicator at all — a resolvable one (same-tier or rerouted) always has its official
-            // description looked up fresh instead, so this would just go unused.
+            offTier,
+            // A resolvable-but-off-tier code gets its own official description; a code that never
+            // resolves to any indicator at all falls back to whatever activity name the teacher
+            // originally entered, so the preview list still shows something meaningful.
+            description: indicator ? indicator.description : void 0,
             activityName: indicator ? void 0 : entry.activityName
           });
         }
@@ -26810,35 +26821,19 @@ var CFormApp = (() => {
     const period = combinedPeriodRange(reports.map((r) => r.period));
     const existingTargetForm = targetFormId ? await getForm(targetFormId) : null;
     const targetPeriod = existingTargetForm ? combinedPeriodRange([...periodRangeParts(existingTargetForm.period), ...reports.map((r) => r.period)]) : period;
-    const { rowsToWrite: targetRowsToWrite, skippedDuplicates: targetSkipped } = await dedupeAgainstForm(
+    const { rowsToWrite: targetRowsToWrite, skippedDuplicates: totalSkippedDuplicates } = await dedupeAgainstForm(
       existingTargetForm,
       toWrite
     );
-    const reroutedByTier = /* @__PURE__ */ new Map();
-    for (const row of rerouted) {
-      if (!reroutedByTier.has(row.tier)) reroutedByTier.set(row.tier, []);
-      reroutedByTier.get(row.tier).push(row);
-    }
-    const childForms = rerouted.length > 0 ? await listFormsForChild(childId) : [];
-    const reroutes = [];
-    for (const [rowTier, rows] of reroutedByTier) {
-      const existingForm = childForms.find((f) => f.tier === rowTier) ?? null;
-      const { rowsToWrite, skippedDuplicates } = await dedupeAgainstForm(existingForm, rows);
-      reroutes.push({ tier: rowTier, existingForm, period, rowsToWrite, skippedDuplicates });
-    }
-    const unresolved = targetRowsToWrite.filter((row) => row.activityName !== void 0);
-    const totalSkippedDuplicates = targetSkipped + reroutes.reduce((sum, r) => sum + r.skippedDuplicates, 0);
-    const totalReroutedCount = reroutes.reduce((sum, r) => sum + r.rowsToWrite.length, 0);
+    const unresolved = targetRowsToWrite.filter((row) => row.offTier);
     return {
       childId,
       tier,
       period: targetPeriod,
       existingTargetForm,
       targetRowsToWrite,
-      reroutes,
       unresolved,
-      totalSkippedDuplicates,
-      totalReroutedCount
+      totalSkippedDuplicates
     };
   }
   async function applyCoursePlanAggregation(plan) {
@@ -26851,37 +26846,27 @@ var CFormApp = (() => {
     for (const row of plan.targetRowsToWrite) {
       await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
     }
-    let reroutedCount = 0;
-    for (const reroute of plan.reroutes) {
-      const rerouteForm = reroute.existingForm ?? await addForm({ childId: plan.childId, tier: reroute.tier, period: reroute.period });
-      for (const row of reroute.rowsToWrite) {
-        await addEntry({ formId: rerouteForm.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
-        reroutedCount += 1;
-      }
-    }
-    return { form, skippedDuplicates: plan.totalSkippedDuplicates, reroutedCount };
+    return { form, skippedDuplicates: plan.totalSkippedDuplicates };
   }
 
   // src/ui/aggregateCoursePlanView.js
   function unresolvedListHtml(unresolved) {
     if (unresolved.length === 0) return "";
     return `
-    <p>\u4EE5\u4E0B ${unresolved.length} \u7B46\u627E\u4E0D\u5230\u5C0D\u61C9\u7684\u7CFB\u7D71\u6307\u6A19\uFF0C\u5C07\u4EE5\u300C\u6D3B\u52D5\u540D\u7A31\u300D\u5099\u63F4\u65B9\u5F0F\u52A0\u5165\u7E3D\u8868\u7684\u5099\u8A3B\u5340\u584A\uFF0C\u8ACB\u78BA\u8A8D\u5167\u5BB9\u7121\u8AA4\uFF1A</p>
+    <p>\u4EE5\u4E0B ${unresolved.length} \u7B46\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\u7684\u6307\u6A19\uFF08\u6216\u627E\u4E0D\u5230\u5C0D\u61C9\u7684\u7CFB\u7D71\u6307\u6A19\uFF09\uFF0C\u5C07\u52A0\u5165\u7E3D\u8868\u7684\u5099\u8A3B\u5340\u584A\uFF0C\u4E0D\u6703\u53E6\u5916\u5EFA\u7ACB\u6216\u52A0\u9032\u5176\u4ED6\u968E\u6BB5\u7684\u7E3D\u8868\uFF0C\u8ACB\u78BA\u8A8D\u5167\u5BB9\u7121\u8AA4\uFF1A</p>
     <ul>
       ${unresolved.map(
-      (row) => `<li>${escapeHtml(row.indicatorCode)}\u3000${escapeHtml(row.activityName ?? "")}\u3000${escapeHtml(row.date)}\u3000${escapeHtml(row.note)}</li>`
+      (row) => `<li>${escapeHtml(row.indicatorCode)}\u3000${escapeHtml(row.description ?? row.activityName ?? "")}\u3000${escapeHtml(row.date)}\u3000${escapeHtml(row.note)}</li>`
     ).join("")}
     </ul>
   `;
   }
   function previewHtml(plan) {
-    const reroutedSection = plan.totalReroutedCount > 0 ? `<p>\u53E6\u6709 ${plan.totalReroutedCount} \u7B46\u6307\u6A19\u4E0D\u5C6C\u65BC\u6B64\u968E\u6BB5\uFF08\u6216\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF09\uFF0C\u78BA\u8A8D\u5F8C\u5C07\u52A0\u9032\u5C0D\u61C9\u7E3D\u8868\u7684\u5099\u8A3B\uFF08\u532F\u51FA\u7E3D\u8868 Word \u6642\u6703\u986F\u793A\u5728\u6700\u5F8C\u7684\u5099\u8A3B\u5340\u584A\uFF09</p>` : "";
     const skippedSection = plan.totalSkippedDuplicates > 0 ? `<p>\u5C07\u8DF3\u904E ${plan.totalSkippedDuplicates} \u7B46\u91CD\u8907\u8CC7\u6599</p>` : "";
     return `
     <div class="field-error" data-aggregate-preview>
       <p>\u5F59\u6574\u524D\u8ACB\u5148\u78BA\u8A8D\u4EE5\u4E0B\u5167\u5BB9\uFF1A</p>
       ${unresolvedListHtml(plan.unresolved)}
-      ${reroutedSection}
       ${skippedSection}
       <div class="entry-form__actions">
         <button type="button" class="btn btn--primary" data-action="confirm-aggregate">\u78BA\u8A8D\u5F59\u6574</button>
@@ -27013,7 +26998,7 @@ var CFormApp = (() => {
         }
         try {
           const plan = await planCoursePlanAggregation({ childId: child.id, tier: selectedTier, reportIds, targetFormId });
-          const isClean = plan.unresolved.length === 0 && plan.totalReroutedCount === 0 && plan.totalSkippedDuplicates === 0;
+          const isClean = plan.unresolved.length === 0 && plan.totalSkippedDuplicates === 0;
           if (isClean) {
             const { form } = await applyCoursePlanAggregation(plan);
             onCreated(form);

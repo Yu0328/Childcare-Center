@@ -124,9 +124,9 @@ export function buildIndicatorRows(indicators, entriesByIndicatorCode) {
   return buildIndicatorRowGroups(indicators, entriesByIndicatorCode).flatMap(group => group.rows);
 }
 
-// A status label that replaces the ○/△ glyph entirely for a flagged row, printed in red with no
-// checkmark (there is nothing to "check" — it's a record of an exception, not a completed
-// observation).
+// A status label for a flagged row, printed in red — in the 說明 column only, not next to the
+// date (a flagged date still prints as a plain date, just colored, so the label isn't duplicated
+// between the date and whatever the teacher separately typed as the note).
 const FLAGGED_STATUS_LABELS = { absent: '請假', courseChanged: '更換課程' };
 const FLAGGED_TEXT_COLOR = 'C00000';
 
@@ -135,10 +135,16 @@ function formatDateCell(row) {
   if (!row.date) return '';
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
   const formatted = match ? `${match[2]}/${match[3]}` : row.date;
-  const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
-  if (flaggedLabel) return `${formatted}　${flaggedLabel}`;
   const glyph = row.status === 'developed' ? '○' : row.status === 'developing' ? '△' : '';
   return `${formatted}${glyph}`;
+}
+
+// The flagged status label ("請假"/"更換課程") prefixes the 說明 text instead of the date — see
+// FLAGGED_STATUS_LABELS above.
+function formatNoteCell(row) {
+  const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
+  if (!flaggedLabel) return row.note;
+  return row.note ? `${flaggedLabel}　${row.note}` : flaggedLabel;
 }
 
 // undefined (not a flagged status) is intentionally passed straight to textParagraph's `color`
@@ -262,7 +268,7 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
       new TableCell({
         width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph(row.note, { color: rowTextColor(row) })],
+        children: [textParagraph(formatNoteCell(row), { color: rowTextColor(row) })],
       }),
     ],
   });
@@ -291,7 +297,7 @@ function remarkRow(row, isFirstRow) {
       new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
       new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
       new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), { ...CENTERED, color: rowTextColor(row) })] }),
-      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.note, { color: rowTextColor(row) })] }),
+      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatNoteCell(row), { color: rowTextColor(row) })] }),
     ],
   });
 }

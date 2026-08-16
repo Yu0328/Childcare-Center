@@ -278,7 +278,7 @@ describe('renderAggregateCoursePlanView', () => {
     expect(await listEntriesForForm(created.id)).toMatchObject([{ indicatorCode: 'Ⅴ-9-9' }]);
   });
 
-  it('previews rerouted cross-tier entries instead of onCreated firing immediately, and files them into the right tier once confirmed', async () => {
+  it('previews a cross-tier entry and files it into the target form\'s own 備註 once confirmed, without creating any other tier\'s form', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     // Ⅳ-1-1 is a real indicator, but for the Ⅳ tier, not Ⅴ.
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
@@ -292,7 +292,8 @@ describe('renderAggregateCoursePlanView', () => {
     container.querySelector('[data-action="aggregate"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => container.querySelector('[data-action="confirm-aggregate"]'));
-    expect(container.textContent).toContain('將加進對應總表的備註');
+    expect(container.textContent).toContain('不屬於此階段的指標');
+    expect(container.textContent).toContain('不會另外建立或加進其他階段的總表');
     expect(created).toBeNull();
     expect(await listFormsForChild(child.id)).toEqual([]);
 
@@ -300,9 +301,9 @@ describe('renderAggregateCoursePlanView', () => {
     await waitFor(() => created !== null);
 
     const forms = await listFormsForChild(child.id);
-    const ivForm = forms.find(f => f.tier === 'Ⅳ');
-    expect(ivForm).toBeDefined();
-    expect(await listEntriesForForm(ivForm.id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1' }]);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].tier).toBe('Ⅴ'); // the target tier — no separate Ⅳ form was created
+    expect(await listEntriesForForm(forms[0].id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1' }]);
   });
 
   it('calls onBack when the back button is clicked', async () => {

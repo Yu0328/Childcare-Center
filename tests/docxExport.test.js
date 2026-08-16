@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import JSZip from 'jszip';
 import { buildIndicatorRowGroups, buildIndicatorRows, generateDocxBlob } from '../src/export/docxExport.js';
 
 const indicators = [
@@ -100,5 +101,27 @@ describe('generateDocxBlob', () => {
 
     expect(blob.size).toBeGreaterThan(0);
     expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  });
+
+  // The 請假/更換課程 label prints in the 說明 column only, not next to the date — a flagged date
+  // cell must stay a plain date (just red), or the label would print twice whenever the teacher
+  // also separately typed "請假" as their own note text.
+  it('prints the flagged status label ("請假") in the 說明 column, not the date column', async () => {
+    const indicators = [
+      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', domainName: '身體動作', subdomain: '粗動作、精細動作' },
+    ];
+    const entries = [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'absent', note: '生病請假' }];
+
+    const blob = await generateDocxBlob({
+      child: { name: '陳小安', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators,
+      entries,
+    });
+    const zip = await JSZip.loadAsync(blob);
+    const xml = await zip.file('word/document.xml').async('text');
+
+    expect(xml).not.toMatch(/<w:t[^>]*>01\/07[^<]*請假/);
+    expect(xml).toContain('請假　生病請假');
   });
 });

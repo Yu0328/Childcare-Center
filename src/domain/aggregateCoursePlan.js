@@ -1,5 +1,5 @@
 import { getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
-import { addForm, addEntry, getForm, updateForm, listEntriesForForm, listFormsForChild } from '../storage/db.js';
+import { addForm, addEntry, getForm, updateForm, listEntriesForForm } from '../storage/db.js';
 import { getParentReport, listCoursePlanEntriesForReport, listCourseOccurrencesForEntry } from '../storage/parentReportDb.js';
 
 // "115年05月-115年08月" (min-max range) from a flat list of period strings, collapsing to a
@@ -51,12 +51,11 @@ async function dedupeAgainstForm(existingForm, rows) {
 // Each ParentReport's CoursePlanEntry/CourseOccurrence pairs become planned ObservationEntry rows.
 // 請假／未執行 and 更換課程 occurrences are NOT dropped: they carry over with status 'absent' or
 // 'courseChanged' respectively, instead of the occurrence's own developed/developing status. An
-// entry whose indicator belongs to a *different* tier
-// than the target is planned to be filed into a form for its own tier instead — reusing that
-// child's existing form for that tier if there is one. An entry whose indicator code can't be
-// resolved at all (still possible even after normalizeIndicatorCode) is planned onto the *target*
-// form as-is — it won't match any of the target tier's own indicators, so generateDocxBlob's export
-// picks it up as a 備註 row there, same as formEditorView's on-screen 備註 section.
+// entry whose indicator belongs to a *different* tier than the target, or can't be resolved at
+// all (still possible even after normalizeIndicatorCode), is planned onto the *target* form as-is
+// rather than being filed into a separate form for its own tier — it won't match any of the
+// target tier's own indicators, so generateDocxBlob's export picks it up as a 備註 row there, same
+// as formEditorView's on-screen 備註 section. No other total form is ever auto-created or added to.
 export async function planCoursePlanAggregation({ childId, tier, reportIds, targetFormId = null }) {
   const reports = [];
   for (const reportId of reportIds) {
@@ -66,7 +65,6 @@ export async function planCoursePlanAggregation({ childId, tier, reportIds, targ
   reports.sort((a, b) => a.period.localeCompare(b.period));
 
   const toWrite = [];
-  const rerouted = []; // { tier, indicatorCode, date, status, note, activityName } — a different tier's indicator
 
   for (const report of reports) {
     const entries = await listCoursePlanEntriesForReport(report.id);
@@ -77,9 +75,7 @@ export async function planCoursePlanAggregation({ childId, tier, reportIds, targ
       // match against indicator.code, which wouldn't find an entry still stored under "IV-1-1".
       const indicatorCode = normalizeIndicatorCode(entry.indicatorCode);
       const indicator = getIndicator(indicatorCode);
-      // No indicator to resolve a tier from at all — goes straight to the target form; it will
-      // land in 備註 there since its code matches none of that tier's own indicators.
-      const target = !indicator || indicator.tier === tier ? toWrite : rerouted;
+      const offTier = !indicator || indicator.tier !== tier;
 
       const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
       for (const occurrence of occurrences) {
@@ -88,15 +84,16 @@ export async function planCoursePlanAggregation({ childId, tier, reportIds, targ
         // an occurrence should never have both flags set, but absent wins if it somehow does),
         // instead of the occurrence's own developed/developing status.
         const status = occurrence.absent ? 'absent' : occurrence.courseChanged ? 'courseChanged' : occurrence.status;
-        target.push({
-          tier: indicator?.tier,
+        toWrite.push({
           indicatorCode,
           date: occurrence.date,
           status,
           note: occurrence.note,
-          // Only needed as an export/preview-time fallback for a code that never resolves to an
-          // indicator at all — a resolvable one (same-tier or rerouted) always has its official
-          // description looked up fresh instead, so this would just go unused.
+          offTier,
+          // A resolvable-but-off-tier code gets its own official description; a code that never
+          // resolves to any indicator at all falls back to whatever activity name the teacher
+          // originally entered, so the preview list still shows something meaningful.
+          description: indicator ? indicator.description : undefined,
           activityName: indicator ? undefined : entry.activityName,
         });
       }
@@ -108,28 +105,12 @@ export async function planCoursePlanAggregation({ childId, tier, reportIds, targ
   const targetPeriod = existingTargetForm
     ? combinedPeriodRange([...periodRangeParts(existingTargetForm.period), ...reports.map(r => r.period)])
     : period;
-  const { rowsToWrite: targetRowsToWrite, skippedDuplicates: targetSkipped } = await dedupeAgainstForm(
+  const { rowsToWrite: targetRowsToWrite, skippedDuplicates: totalSkippedDuplicates } = await dedupeAgainstForm(
     existingTargetForm,
     toWrite
   );
 
-  const reroutedByTier = new Map();
-  for (const row of rerouted) {
-    if (!reroutedByTier.has(row.tier)) reroutedByTier.set(row.tier, []);
-    reroutedByTier.get(row.tier).push(row);
-  }
-
-  const childForms = rerouted.length > 0 ? await listFormsForChild(childId) : [];
-  const reroutes = [];
-  for (const [rowTier, rows] of reroutedByTier) {
-    const existingForm = childForms.find(f => f.tier === rowTier) ?? null;
-    const { rowsToWrite, skippedDuplicates } = await dedupeAgainstForm(existingForm, rows);
-    reroutes.push({ tier: rowTier, existingForm, period, rowsToWrite, skippedDuplicates });
-  }
-
-  const unresolved = targetRowsToWrite.filter(row => row.activityName !== undefined);
-  const totalSkippedDuplicates = targetSkipped + reroutes.reduce((sum, r) => sum + r.skippedDuplicates, 0);
-  const totalReroutedCount = reroutes.reduce((sum, r) => sum + r.rowsToWrite.length, 0);
+  const unresolved = targetRowsToWrite.filter(row => row.offTier);
 
   return {
     childId,
@@ -137,10 +118,8 @@ export async function planCoursePlanAggregation({ childId, tier, reportIds, targ
     period: targetPeriod,
     existingTargetForm,
     targetRowsToWrite,
-    reroutes,
     unresolved,
     totalSkippedDuplicates,
-    totalReroutedCount,
   };
 }
 
@@ -157,16 +136,7 @@ export async function applyCoursePlanAggregation(plan) {
     await addEntry({ formId: form.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
   }
 
-  let reroutedCount = 0;
-  for (const reroute of plan.reroutes) {
-    const rerouteForm = reroute.existingForm ?? (await addForm({ childId: plan.childId, tier: reroute.tier, period: reroute.period }));
-    for (const row of reroute.rowsToWrite) {
-      await addEntry({ formId: rerouteForm.id, indicatorCode: row.indicatorCode, date: row.date, status: row.status, note: row.note, activityName: row.activityName });
-      reroutedCount += 1;
-    }
-  }
-
-  return { form, skippedDuplicates: plan.totalSkippedDuplicates, reroutedCount };
+  return { form, skippedDuplicates: plan.totalSkippedDuplicates };
 }
 
 // Convenience wrapper for callers (and existing tests) that don't need the separate preview step —
