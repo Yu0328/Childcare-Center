@@ -26165,19 +26165,20 @@ var CFormApp = (() => {
         <label class="panel-form__field">\u80FD\u529B\u6307\u6A19\u5167\u5BB9 <textarea data-field="indicatorText" rows="3"></textarea></label>
         <div class="panel-form__row">
           <label class="panel-form__field">\u65E5\u671F <input type="date" data-field="occurrenceDate"></label>
-          <div class="entry-form__radio-group">
-            <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> \u5DF2\u767C\u5C55\u25CB</label>
-            <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> \u767C\u5C55\u4E2D\u25B3</label>
+          <div class="panel-form__field">
+            \u72C0\u614B
+            <div class="entry-form__radio-group">
+              <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> \u5DF2\u767C\u5C55\u25CB</label>
+              <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> \u767C\u5C55\u4E2D\u25B3</label>
+            </div>
           </div>
         </div>
-        <div class="panel-form__row">
-          <label class="entry-form__checkbox">
-            <input type="checkbox" data-field="occurrenceAbsent"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
-          </label>
-          <label class="entry-form__checkbox">
-            <input type="checkbox" data-field="occurrenceCourseChanged"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
-          </label>
-        </div>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="occurrenceAbsent"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
+        </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="occurrenceCourseChanged"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
+        </label>
         <label class="panel-form__field">\u8AAA\u660E\u5167\u5BB9 <input type="text" data-field="occurrenceNote"></label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
         <p class="field-error" data-error></p>
