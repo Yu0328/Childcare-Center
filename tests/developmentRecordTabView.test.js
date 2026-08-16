@@ -16,6 +16,13 @@ describe('renderDevelopmentRecordTab', () => {
     entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' }); // domain 1
   });
 
+  it('gives the "新增段落" panel the wide/sticky variant class', async () => {
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {} });
+
+    expect(container.querySelector('[data-action="add-record"]').classList.contains('panel-form--wide')).toBe(true);
+  });
+
   it('only lists course plan entries belonging to the currently selected domain as checkboxes', async () => {
     await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-2', activityName: '香蕉鬆餅' }); // domain 2
 

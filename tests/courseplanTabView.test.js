@@ -16,6 +16,13 @@ describe('renderCoursePlanTab', () => {
     report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
   });
 
+  it('gives the "新增課程計畫項目" panel the wide/sticky variant class', async () => {
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+
+    expect(container.querySelector('[data-action="add-entry"]').classList.contains('panel-form--wide')).toBe(true);
+  });
+
   it('adds a new course plan entry via the form', async () => {
     const container = document.createElement('div');
     let changed = false;

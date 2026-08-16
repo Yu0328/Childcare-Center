@@ -573,6 +573,66 @@ fieldset.panel-form__field legend {
   padding: 0.3rem 0;
 }
 
+/* Wider variant for the 適性紀錄 課程計畫表/適性發展紀錄表 "新增..." panels specifically (not
+   every .panel-form — the short "新增幼兒"/"新增適性總表" forms elsewhere stay at the normal
+   420px cap). Widens both this panel's own column and #app itself (native :has(), no markup
+   changes needed elsewhere), so the domain-grid/entry-list beside it isn't squeezed by the wider
+   column — same pattern .domain-grid--row already uses for formEditorView. */
+.panel-form--wide {
+  max-width: 520px;
+}
+
+/* Guarded to min-width so it never fights the mobile single-column collapse below, which has
+   lower specificity and would otherwise lose to this unconditional :has() rule regardless of
+   viewport — same gotcha #app:has(.monthly-calendar-list) further down is guarded against. Also
+   keeps the panel in view while scrolling past a long domain list, instead of the "新增..."
+   controls scrolling out of reach — the same sticky technique .monthly-plan-side uses further
+   down, but directly on the panel-form itself since it's the only element in its grid column here
+   (unlike .monthly-plan-side, which wraps a second card below it — a sticky element's "stuck"
+   screen position doesn't push normal-flow siblings down, so a direct sibling could overlap a
+   stuck panel; there's no such sibling in this column). */
+@media (min-width: 641px) {
+  .tab-layout:has(.panel-form--wide) {
+    grid-template-columns: 1fr minmax(340px, 520px);
+  }
+
+  #app:has(.panel-form--wide) {
+    max-width: 1240px;
+  }
+
+  .panel-form--wide {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+  }
+}
+
+/* Pairs two short fields (e.g. 日期 + 狀態, or two checkboxes) side by side instead of each
+   taking a full stacked row, so a form with many fields fits more of them above the fold. */
+.panel-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+  align-items: start;
+}
+
+/* The course-plan-entry checkbox list (developmentRecordTabView's "已在課程計畫表填寫的項目") can
+   run to a dozen+ items — a 2-column grid roughly halves how far the panel scrolls compared to
+   one item per row. */
+.panel-form__checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.75rem;
+}
+.panel-form__checkbox-grid .panel-form__checkbox-row {
+  min-width: 0;
+}
+.panel-form__checkbox-grid .panel-form__checkbox-row span,
+.panel-form__checkbox-grid .panel-form__checkbox-row {
+  overflow-wrap: anywhere;
+}
+
 .panel-form .btn {
   align-self: center;
   margin-top: 0.3rem;
