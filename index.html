@@ -4877,6 +4877,18 @@ var CFormApp = (() => {
       selectedMonth: parsedMonth ?? defaultMonth
     })}
       </label>
+      <label class="entry-form__checkbox">
+        <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
+      </label>
+      <label class="panel-form__field" data-field-group="period-end" hidden>
+        \u81F3
+        ${periodSelectsHtml({
+      yearFieldName: "period-end-year",
+      monthFieldName: "period-end-month",
+      selectedYear: parsedYear ?? defaultRocYear,
+      selectedMonth: parsedMonth ?? defaultMonth
+    })}
+      </label>
 
       <h3 class="panel-form__title">\u89C0\u5BDF\u7D00\u9304\uFF08\u5171 ${parsed.entries.length} \u7B46\uFF0C\u53D6\u6D88\u52FE\u9078\u53EF\u6392\u9664\u4E0D\u532F\u5165\uFF09</h3>
       <ul class="import-preview__entry-list">
@@ -4888,6 +4900,9 @@ var CFormApp = (() => {
     </form>
   `;
     container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
+    container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
+      container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
+    });
     container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const errorEl = container.querySelector("[data-error]");
@@ -4896,7 +4911,14 @@ var CFormApp = (() => {
       const tier = container.querySelector('[data-field="tier"]').value;
       const year = container.querySelector('[data-field="period-year"]').value;
       const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
-      const period = `${year}\u5E74${month}\u6708`;
+      const startPeriod = `${year}\u5E74${month}\u6708`;
+      const isRange = container.querySelector('[data-field="period-is-range"]').checked;
+      let period = startPeriod;
+      if (isRange) {
+        const endYear = container.querySelector('[data-field="period-end-year"]').value;
+        const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, "0");
+        period = combinedPeriod(startPeriod, `${endYear}\u5E74${endMonth}\u6708`);
+      }
       const includedEntries = parsed.entries.filter((entry, index) => container.querySelector(`[data-entry-include="${index}"]`).checked);
       try {
         const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);

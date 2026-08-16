@@ -77,6 +77,24 @@ describe('renderImportPreviewView', () => {
     expect(entries).toHaveLength(2);
   });
 
+  it('creates the form with a range period when "涵蓋一段期間" is checked', async () => {
+    const container = document.createElement('div');
+    let imported = false;
+    renderImportPreviewView(container, { parsed: baseParsed(), onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-field="period-year"]').value = '114';
+    container.querySelector('[data-field="period-month"]').value = '9';
+    container.querySelector('[data-field="period-is-range"]').checked = true;
+    container.querySelector('[data-field="period-end-year"]').value = '115';
+    container.querySelector('[data-field="period-end-month"]').value = '2';
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const children = await listChildren();
+    const forms = await listFormsForChild(children[0].id);
+    expect(forms[0].period).toBe('114年09月-115年02月');
+  });
+
   it('excludes unchecked entries from the import', async () => {
     const container = document.createElement('div');
     let imported = false;
