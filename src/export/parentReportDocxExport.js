@@ -86,8 +86,8 @@ export function buildCoursePlanRowGroups(entries, occurrencesByEntryId) {
     const occurrences = occurrencesByEntryId[entry.id] || [];
     const rows =
       occurrences.length === 0
-        ? [{ date: '', status: null, absent: false, note: '' }]
-        : occurrences.map(o => ({ date: o.date, status: o.status, absent: o.absent, note: o.note }));
+        ? [{ date: '', status: null, absent: false, courseChanged: false, note: '' }]
+        : occurrences.map(o => ({ date: o.date, status: o.status, absent: o.absent, courseChanged: o.courseChanged, note: o.note }));
 
     return { entry, indicator, domain, rows, isFirstEntryOfDomain };
   });
@@ -125,33 +125,40 @@ function mergedCell(index, children, isFirstRowOfMerge, extra = {}) {
   });
 }
 
-// achieved/"developing" occurrences print a plain "MM/DD" + status glyph; an absent occurrence
-// instead prints the same "MM/DD" (no glyph) with a strikethrough run, per the real sample.
-// 發展中△ or 請假 occurrences also print in red, matching the browser UI's .entry-row__date--flag
-// treatment, so they stand out from a plain 已發展○ row in the printed document too.
+// achieved/"developing" occurrences print a plain "MM/DD" + status glyph; an absent or
+// course-changed occurrence instead prints the same "MM/DD" (no glyph) with a strikethrough run,
+// per the real sample. 發展中△、請假、or 更換課程 occurrences also print in red, matching the
+// browser UI's .entry-row__date--flag treatment, so they stand out from a plain 已發展○ row in the
+// printed document too.
+function isStruckRow(row) {
+  return Boolean(row.absent || row.courseChanged);
+}
+
+function isFlaggedRow(row) {
+  return Boolean(row.absent || row.courseChanged || row.status === 'developing');
+}
+
 function occurrenceDateRun(row) {
   if (!row.date) return new TextRun({ text: '', font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT }, size: DEFAULT_TEXT_SIZE });
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
   const formatted = match ? `${match[2]}/${match[3]}` : row.date;
-  const glyph = row.absent ? '' : row.status === 'developed' ? '○' : row.status === 'developing' ? '△' : '';
-  const isFlagged = row.absent || row.status === 'developing';
+  const glyph = isStruckRow(row) ? '' : row.status === 'developed' ? '○' : row.status === 'developing' ? '△' : '';
   return new TextRun({
     text: `${formatted}${glyph}`,
     font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
     size: DEFAULT_TEXT_SIZE,
-    ...(row.absent ? { strike: true } : {}),
-    ...(isFlagged ? { color: 'FF0000' } : {}),
+    ...(isStruckRow(row) ? { strike: true } : {}),
+    ...(isFlaggedRow(row) ? { color: 'FF0000' } : {}),
   });
 }
 
 function occurrenceNoteRun(row) {
-  const isFlagged = row.absent || row.status === 'developing';
   return new TextRun({
     text: String(row.note ?? ''),
     font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
     size: DEFAULT_TEXT_SIZE,
-    ...(row.absent ? { strike: true } : {}),
-    ...(isFlagged ? { color: 'FF0000' } : {}),
+    ...(isStruckRow(row) ? { strike: true } : {}),
+    ...(isFlaggedRow(row) ? { color: 'FF0000' } : {}),
   });
 }
 

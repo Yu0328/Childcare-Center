@@ -58,7 +58,7 @@ describe('aggregateCoursePlanIntoForm', () => {
     expect(form.period).toBe('115年03月');
   });
 
-  it('excludes occurrences marked absent (請假／未執行)', async () => {
+  it('carries occurrences marked absent (請假／未執行) into the total form with an "absent" status', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: true, note: '請假' });
@@ -67,8 +67,20 @@ describe('aggregateCoursePlanIntoForm', () => {
     const { form } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
     const entries = await listEntriesForForm(form.id);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].note).toBe('正常上課');
+    expect(entries).toHaveLength(2);
+    expect(entries.find(e => e.date === '2026-01-10')).toMatchObject({ status: 'absent', note: '請假' });
+    expect(entries.find(e => e.date === '2026-01-17')).toMatchObject({ status: 'developed', note: '正常上課' });
+  });
+
+  it('carries occurrences marked 更換課程 into the total form with a "courseChanged" status', async () => {
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, courseChanged: true, note: '改玩黏土' });
+
+    const { form } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+
+    const entries = await listEntriesForForm(form.id);
+    expect(entries[0]).toMatchObject({ status: 'courseChanged', note: '改玩黏土' });
   });
 
   it('writes an entry whose indicator code cannot be resolved at all onto the target form as-is, without blocking the rest', async () => {

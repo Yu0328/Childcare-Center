@@ -3,6 +3,9 @@
 *.docx
 *.pdf
 
+# App-exported data backups (full plaintext PII: names, birthdates, notes, photos).
+c-form-backup-*.json
+
 node_modules/
 dist/
 site/

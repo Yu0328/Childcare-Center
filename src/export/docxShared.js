@@ -35,7 +35,7 @@ function runFont() {
   return { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT };
 }
 
-export function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, alignment } = {}) {
+export function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, alignment, color } = {}) {
   return new Paragraph({
     ...(alignment ? { alignment } : {}),
     children: [
@@ -44,6 +44,7 @@ export function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, al
         font: runFont(),
         size,
         ...(bold ? { bold: true } : {}),
+        ...(color ? { color } : {}),
       }),
     ],
   });

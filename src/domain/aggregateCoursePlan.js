@@ -48,9 +48,10 @@ async function dedupeAgainstForm(existingForm, rows) {
 // Computes everything a 彙整 (aggregate) run *would* do, without writing anything — so the UI can
 // show the user a preview (in particular, any entry whose indicator code couldn't be resolved at
 // all, like "我大大了", which lands in 備註 rather than the main table) before they confirm it.
-// Each ParentReport's CoursePlanEntry/CourseOccurrence pairs become planned ObservationEntry rows;
-// 請假／未執行 occurrences are dropped (the teacher did not actually run the activity, so the total
-// form has nothing to show for that date). An entry whose indicator belongs to a *different* tier
+// Each ParentReport's CoursePlanEntry/CourseOccurrence pairs become planned ObservationEntry rows.
+// 請假／未執行 and 更換課程 occurrences are NOT dropped: they carry over with status 'absent' or
+// 'courseChanged' respectively, instead of the occurrence's own developed/developing status. An
+// entry whose indicator belongs to a *different* tier
 // than the target is planned to be filed into a form for its own tier instead — reusing that
 // child's existing form for that tier if there is one. An entry whose indicator code can't be
 // resolved at all (still possible even after normalizeIndicatorCode) is planned onto the *target*
@@ -82,12 +83,16 @@ export async function planCoursePlanAggregation({ childId, tier, reportIds, targ
 
       const occurrences = (await listCourseOccurrencesForEntry(entry.id)).sort((a, b) => a.date.localeCompare(b.date));
       for (const occurrence of occurrences) {
-        if (occurrence.absent) continue;
+        // 請假／未執行 and 更換課程 occurrences are NOT dropped: they carry into the total form as
+        // an entry with status 'absent' or 'courseChanged' respectively (in that priority order —
+        // an occurrence should never have both flags set, but absent wins if it somehow does),
+        // instead of the occurrence's own developed/developing status.
+        const status = occurrence.absent ? 'absent' : occurrence.courseChanged ? 'courseChanged' : occurrence.status;
         target.push({
           tier: indicator?.tier,
           indicatorCode,
           date: occurrence.date,
-          status: occurrence.status,
+          status,
           note: occurrence.note,
           // Only needed as an export/preview-time fallback for a code that never resolves to an
           // indicator at all — a resolvable one (same-tier or rerouted) always has its official
