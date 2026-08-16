@@ -75,8 +75,7 @@ function normalizeMonthDay(raw) {
   return `${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}`;
 }
 
-export function parseCoursePlanTable(documentXml) {
-  const bodyRows = rowsOf(documentXml).slice(1); // row 0 is the fixed header
+function processCoursePlanBodyRows(bodyRows) {
   const entries = [];
   const occurrencesByEntryIndex = {};
 
@@ -114,6 +113,32 @@ export function parseCoursePlanTable(documentXml) {
   return { entries, occurrencesByEntryIndex };
 }
 
+export function parseCoursePlanTable(documentXml) {
+  return processCoursePlanBodyRows(rowsOf(documentXml).slice(1)); // row 0 is the fixed header
+}
+
+// A real 課程計畫表 can appear as MORE THAN ONE physical <w:tbl> element — verified against a real
+// sample (張珏銨-115年04月適性紀錄(家長版).docx) where the table was split across two <w:tbl>
+// blocks (each repeating the header row), most likely from a page-break split. Treating only the
+// first as the course-plan table silently dropped every entry in the second, AND misclassified it
+// as the 適性發展紀錄表/行為觀察/點滴分享 table instead (see parseParentReportDocxImport's table
+// classification) — producing garbled "無法辨識的段落標題" warnings built from squished course-plan
+// row text. Concatenating each matched table's own body rows (skipping each one's own header row)
+// keeps processCoursePlanBodyRows itself unaware of the original table boundaries.
+export function parseCoursePlanTables(tableXmls) {
+  return processCoursePlanBodyRows(tableXmls.flatMap(xml => rowsOf(xml).slice(1)));
+}
+
+// A table counts as 課程計畫表-shaped by its fixed header row's text, not by position — real files
+// can have more than the expected two top-level tables (see parseCoursePlanTables), so position
+// alone ("tables[0]") is not reliable.
+export function isCoursePlanShapedTable(tableXml) {
+  const firstRow = rowsOf(tableXml)[0];
+  if (!firstRow) return false;
+  const headerText = textOf(firstRow);
+  return headerText.includes('發展領域') && headerText.includes('課程實施日期');
+}
+
 // ROC "113.06.20" or "113/06/20" -> "2024-06-20". The real reference sample's own header
 // phrasing uses dots (unlike 適性總表's slash-separated 出生日期), but a real legacy file can use
 // slashes instead — both separators are accepted here (verified: a slash-separated file otherwise
@@ -125,10 +150,15 @@ function rocDotDateToIso(rocDate) {
   return `${Number(rocYear) + 1911}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
+// "出生年月日"/"紀錄時間" are the usual 適性紀錄 template's own labels, but a real file can instead
+// use the 適性總表 template's labels ("出生日期"/"實施時間") — verified against a real sample
+// (06陳禹彤-115年4月適性紀錄-家長 115.5.15.docx) whose header otherwise has all the same info, just
+// under those alternate labels. Both are accepted here so neither template silently drops the
+// birth date or record period.
 export function parseHeaderInfo(headerText) {
   const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
-  const birthMatch = /出生年月日[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
-  const periodMatch = /紀錄時間[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
+  const birthMatch = /出生(?:年月日|日期)[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
+  const periodMatch = /(?:紀錄時間|實施時間)[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
 
   return {
     name: nameMatch ? nameMatch[1] : null,
@@ -339,10 +369,11 @@ export async function parseParentReportDocxImport(data) {
   if (!headerInfo.period) warnings.push('無法從檔案中判斷紀錄年月，請手動選擇');
 
   const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map(m => m[0]);
-  const [coursePlanTableXml, secondTableXml] = tables;
+  const coursePlanTableXmls = tables.filter(isCoursePlanShapedTable);
+  const secondTableXml = tables.find(t => !isCoursePlanShapedTable(t));
 
-  const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXml
-    ? parseCoursePlanTable(coursePlanTableXml)
+  const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXmls.length
+    ? parseCoursePlanTables(coursePlanTableXmls)
     : { entries: [], occurrencesByEntryIndex: {} };
 
   const inferredYear = headerInfo.period ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911 : new Date().getFullYear();

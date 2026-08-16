@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
 import { generateDocxBlob } from '../src/export/docxExport.js';
 import { getIndicatorsForTier } from '../src/data/indicators.js';
-import { parseDocxImport } from '../src/import/docxImport.js';
+import { parseDocxImport, parsePeriodFromHeaderText } from '../src/import/docxImport.js';
 
 describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => {
   it('recovers child, tier, period and entries from a generated .docx', async () => {
@@ -174,5 +174,37 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
         '無法從檔案中判斷紀錄年月，日期年份可能不準確，請確認每一筆日期',
       ])
     );
+  });
+});
+
+describe('parsePeriodFromHeaderText', () => {
+  it('parses the canonical full-width single period', () => {
+    expect(parsePeriodFromHeaderText('實施時間：114年09月')).toBe('114年09月');
+  });
+
+  it('parses a dot-separated single period', () => {
+    expect(parsePeriodFromHeaderText('實施時間：115.1')).toBe('115年01月');
+  });
+
+  it('parses a dot-separated range, padding single-digit months on either side', () => {
+    expect(parsePeriodFromHeaderText('實施時間：114.8-115.04')).toBe('114年08月-115年04月');
+    expect(parsePeriodFromHeaderText('實施時間：114.08-115.4')).toBe('114年08月-115年04月');
+  });
+
+  it('parses a dot-separated range with a fullwidth or tilde separator', () => {
+    expect(parsePeriodFromHeaderText('實施時間：114.8－115.4')).toBe('114年08月-115年04月');
+    expect(parsePeriodFromHeaderText('實施時間：114.8~115.4')).toBe('114年08月-115年04月');
+  });
+
+  it('parses a same-year shorthand range ("115.3 月-7 月") with no repeated year on the end month', () => {
+    expect(parsePeriodFromHeaderText('實施時間：115.3 月-7 月')).toBe('115年03月-115年07月');
+  });
+
+  it('collapses a range to a single period when both ends are the same month', () => {
+    expect(parsePeriodFromHeaderText('實施時間：114.8-114.08')).toBe('114年08月');
+  });
+
+  it('returns null when there is no 實施時間 text at all', () => {
+    expect(parsePeriodFromHeaderText('幼兒姓名：陳小安')).toBeNull();
   });
 });

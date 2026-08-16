@@ -75,6 +75,14 @@ describe('parseHeaderInfo', () => {
     const headerText = '屏東縣內埔鄉育英公設民營托嬰中心每月課程計畫表(19~24 個月) 幼兒姓名：陳小安 出生年月日：113.06.20 實際月齡：22 個月 紀錄時間：115 年 06 月';
     expect(parseHeaderInfo(headerText)).toEqual({ name: '陳小安', birthDate: '2024-06-20', period: '115年06月' });
   });
+
+  // A real sample (06陳禹彤-115年4月適性紀錄-家長 115.5.15.docx) uses the 適性總表 template's own
+  // labels ("出生日期"/"實施時間") instead of this template's usual ones, with everything else the
+  // same shape — verified this silently dropped both the birth date and record period before.
+  it('also accepts the 適性總表 template\'s alternate labels ("出生日期"/"實施時間")', () => {
+    const headerText = '屏東縣內埔鄉育英公設民營托嬰中心每月課程實施計畫表(19-24 個月) 幼兒姓名：陳禹彤 出生日期：113/09/16 實際月齡： 19個月 實施時間：115 年 4 月';
+    expect(parseHeaderInfo(headerText)).toEqual({ name: '陳禹彤', birthDate: '2024-09-16', period: '115年04月' });
+  });
 });
 
 describe('parseRecordBlocks', () => {
@@ -176,6 +184,55 @@ describe('parseParentReportDocxImport', () => {
     `;
     const result = await importWithSecondTable(secondTableXml);
     expect(result.behaviorObservations).toEqual([{ title: '我會好好說！', narrative: '本月觀察發現...' }]);
+  });
+
+  // Regression (real sample: 張珏銨-115年04月適性紀錄(家長版).docx): a real 課程計畫表 can be split
+  // across TWO physical <w:tbl> elements (each repeating the header row), e.g. from a page break.
+  // Treating only the first as the course-plan table used to silently drop every entry in the
+  // second one, AND misclassify it as the 適性發展紀錄表 table instead — producing a garbled
+  // "無法辨識的段落標題" warning built from squished course-plan row text, and losing the real
+  // 適性發展紀錄表 content entirely.
+  it('merges a 課程計畫表 split across two <w:tbl> elements, and still finds the real record table after it', async () => {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const secondCoursePlanTableXml = `
+      <w:tbl>
+      <w:tr><w:tc><w:p><w:r><w:t>發展領域</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>指標</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>活動名稱/能力指標</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>課程實施日期</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>說明</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>語言溝通</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Ⅴ-3-4</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>【故事魔毯】</w:t></w:r></w:p><w:p><w:r><w:t>能自己閱讀圖畫書</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>04/09○</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>會主動拿繪本閱讀</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      </w:tbl>
+    `;
+    const recordTableXml = `
+      <w:tbl>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="6"/></w:tcPr><w:p><w:r><w:t>語言溝通</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="6"/></w:tcPr><w:p><w:r><w:t>本月觀察發現...</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>
+    `;
+    const documentXml = `<w:document><w:body>${COURSE_PLAN_TABLE_XML.replace(
+      '</w:tr>',
+      `</w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>身體動作</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Ⅴ-1-6</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>【我愛畫畫】</w:t></w:r></w:p><w:p><w:r><w:t>能拿筆塗鴉</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>04/08○</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>能拿起畫筆沾取顏料</w:t></w:r></w:p></w:tc>
+      </w:tr>`
+    )}${secondCoursePlanTableXml}${recordTableXml}</w:body></w:document>`;
+    zip.file('word/document.xml', documentXml);
+    const blob = await zip.generateAsync({ type: 'blob' });
+
+    const result = await parseParentReportDocxImport(blob);
+
+    expect(result.coursePlanEntries.map(e => e.indicatorCode)).toEqual(['Ⅴ-1-6', 'Ⅴ-3-4']);
+    expect(result.warnings).not.toContain(expect.stringContaining('無法辨識的段落標題'));
+    expect(result.developmentRecordBlocks).toHaveLength(1);
+    expect(result.developmentRecordBlocks[0].narrative).toBe('本月觀察發現...');
   });
 
   // Regression: classifyRecordBlocks (internal, not exported) extracts indicator codes referenced

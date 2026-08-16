@@ -31,15 +31,61 @@ function rocDateToIso(rocDate) {
   return `${Number(rocYear) + 1911}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
+// "實施時間" appears in real legacy files in several shapes: the canonical full-width "114年08月",
+// a dot-separated single value "114.8", a dot-separated RANGE "114.8-115.04" (a record spanning
+// several months, common in real total-form headers), or a same-year shorthand RANGE
+// "115.3 月-7 月" where only the start repeats the "月" character and the end is just a bare month
+// number with no year of its own (implicitly the same year as the start). The separator between
+// the two dates tolerates the fullwidth "－" and "~"/"～" as well as the ASCII hyphen, since real
+// files use all of them. A matched range is returned in the app's own "起年月-迄年月" range shape
+// (see aggregateCoursePlan.js's combinedPeriodRange), keeping the file's own start-before-end
+// order rather than re-sorting, since the source document already states it correctly either way.
+export function parsePeriodFromHeaderText(headerText) {
+  // A canonical-format RANGE ("114年08月-115年04月") — what this app's own exporter writes when
+  // form.period is itself already a range (see aggregateCoursePlan.js / formListView.js) — must be
+  // checked before the single canonicalMatch below, or that pattern greedily matches just the
+  // first "年...月" pair and silently drops everything after the dash on re-import.
+  const canonicalRangeMatch = /實施時間[：:]\s*(\d{1,3})年\s*(\d{1,2})月\s*[-－~～]\s*(\d{1,3})年\s*(\d{1,2})月/.exec(headerText);
+  if (canonicalRangeMatch) {
+    const [, y1, m1, y2, m2] = canonicalRangeMatch;
+    const start = `${y1}年${m1.padStart(2, '0')}月`;
+    const end = `${y2}年${m2.padStart(2, '0')}月`;
+    return start === end ? start : `${start}-${end}`;
+  }
+
+  const rangeMatch = /實施時間[：:]\s*(\d{1,3})\.(\d{1,2})\s*[-－~～]\s*(\d{1,3})\.(\d{1,2})/.exec(headerText);
+  if (rangeMatch) {
+    const [, y1, m1, y2, m2] = rangeMatch;
+    const start = `${y1}年${m1.padStart(2, '0')}月`;
+    const end = `${y2}年${m2.padStart(2, '0')}月`;
+    return start === end ? start : `${start}-${end}`;
+  }
+
+  const sameYearShorthandMatch = /實施時間[：:]\s*(\d{1,3})\.(\d{1,2})\s*月\s*[-－~～]\s*(\d{1,2})\s*月/.exec(headerText);
+  if (sameYearShorthandMatch) {
+    const [, year, m1, m2] = sameYearShorthandMatch;
+    const start = `${year}年${m1.padStart(2, '0')}月`;
+    const end = `${year}年${m2.padStart(2, '0')}月`;
+    return start === end ? start : `${start}-${end}`;
+  }
+
+  const dotMatch = /實施時間[：:]\s*(\d{1,3})\.(\d{1,2})/.exec(headerText);
+  if (dotMatch) return `${dotMatch[1]}年${dotMatch[2].padStart(2, '0')}月`;
+
+  const canonicalMatch = /實施時間[：:]\s*(\d{1,3})年\s*(\d{1,2})月/.exec(headerText);
+  if (canonicalMatch) return `${canonicalMatch[1]}年${canonicalMatch[2].padStart(2, '0')}月`;
+
+  return null;
+}
+
 function parseHeaderInfo(headerText) {
   const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
   const birthMatch = /出生日期[：:]\s*(\d{1,3}\/\d{1,2}\/\d{1,2})/.exec(headerText);
-  const periodMatch = /實施時間[：:]\s*(\d{1,3})年\s*(\d{1,2})月/.exec(headerText);
 
   return {
     name: nameMatch ? nameMatch[1] : null,
     birthDate: birthMatch ? rocDateToIso(birthMatch[1]) : null,
-    period: periodMatch ? `${periodMatch[1]}年${periodMatch[2].padStart(2, '0')}月` : null,
+    period: parsePeriodFromHeaderText(headerText),
   };
 }
 

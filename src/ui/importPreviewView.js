@@ -1,7 +1,7 @@
 import { addChild, listChildren, addForm, addEntry } from '../storage/db.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
-import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
+import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPeriodRange } from './periodFields.js';
 
 function entryRow(entry, index) {
   const unresolved = !entry.description;
@@ -22,7 +22,10 @@ function entryRow(entry, index) {
 export function renderImportPreviewView(container, { parsed, onCancel, onImported }) {
   const defaultRocYear = currentRocYear();
   const defaultMonth = new Date().getMonth() + 1;
-  const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
+  const { start: parsedStart, end: parsedEnd } = splitPeriodRange(parsed.period);
+  const { year: parsedYear, month: parsedMonth } = parsePeriod(parsedStart);
+  const { year: parsedEndYear, month: parsedEndMonth } = parsePeriod(parsedEnd);
+  const parsedIsRange = parsedStart !== parsedEnd;
 
   container.innerHTML = `
     <div class="page-header">
@@ -55,6 +58,18 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
           selectedMonth: parsedMonth ?? defaultMonth,
         })}
       </label>
+      <label class="entry-form__checkbox">
+        <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? 'checked' : ''}> 涵蓋一段期間（跨多個月份）
+      </label>
+      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? '' : 'hidden'}>
+        至
+        ${periodSelectsHtml({
+          yearFieldName: 'period-end-year',
+          monthFieldName: 'period-end-month',
+          selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
+          selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth,
+        })}
+      </label>
 
       <h3 class="panel-form__title">觀察紀錄（共 ${parsed.entries.length} 筆，取消勾選可排除不匯入）</h3>
       <ul class="import-preview__entry-list">
@@ -68,6 +83,10 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
 
   container.querySelector('[data-action="cancel"]').addEventListener('click', onCancel);
 
+  container.querySelector('[data-field="period-is-range"]').addEventListener('change', event => {
+    container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
+  });
+
   container.querySelector('[data-action="confirm-import"]').addEventListener('submit', async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-error]');
@@ -77,7 +96,14 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
     const tier = container.querySelector('[data-field="tier"]').value;
     const year = container.querySelector('[data-field="period-year"]').value;
     const month = container.querySelector('[data-field="period-month"]').value.padStart(2, '0');
-    const period = `${year}年${month}月`;
+    const startPeriod = `${year}年${month}月`;
+    const isRange = container.querySelector('[data-field="period-is-range"]').checked;
+    let period = startPeriod;
+    if (isRange) {
+      const endYear = container.querySelector('[data-field="period-end-year"]').value;
+      const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, '0');
+      period = combinedPeriod(startPeriod, `${endYear}年${endMonth}月`);
+    }
 
     const includedEntries = parsed.entries.filter((entry, index) => container.querySelector(`[data-entry-include="${index}"]`).checked);
 
