@@ -219,16 +219,53 @@ export function parseLegacyDayCellItems(dateCellXml, contentCellXml) {
 // exact code-only line falls into parseExportedDayCellItems's free-text
 // fallback just like a real no-code activity (e.g. "大團體活動") would — both
 // come back as a non-empty array, so a bare length check can't tell them
-// apart. ponytail: narrow heuristic (code-shaped substring in a "free text"
-// item), not a real format detector; revisit if Task 12's real-file pass
-// finds it still swallows genuine legacy content.
+// apart.
 const INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/;
+
+// Task 12 real-file finding: some legacy documents write each entry as three
+// separate paragraphs (bare code / name / description) instead of combining
+// them with 【】 brackets in one paragraph — both the precise parser (clean
+// single-run code paragraph, so it finds the code fine and never trips the
+// "missed codes" check) and the legacy parser (per-paragraph code splitting)
+// produce one item per paragraph in this shape, not one item per entry. A
+// code-only item (nothing else on its own paragraph) immediately followed by
+// up to two code-less items absorbs them as its name/text, mirroring the
+// single-paragraph shape. Applied once here, after either parser is chosen,
+// rather than inside each one, since both need it.
+function mergeCodeOnlySequentialItems(items) {
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    if (!item.indicatorCode || item.activityName || item.indicatorText) continue;
+    const nameItem = items[i + 1];
+    if (!nameItem || nameItem.indicatorCode) continue;
+    item.activityName = nameItem.activityName;
+    items.splice(i + 1, 1);
+    const textItem = items[i + 1];
+    if (textItem && !textItem.indicatorCode) {
+      item.indicatorText = textItem.activityName;
+      items.splice(i + 1, 1);
+    }
+  }
+  return items;
+}
 
 export function parseDayCellItems(dateCellXml, contentCellXml) {
   const precise = parseExportedDayCellItems(contentCellXml);
   const looksMisparsed = precise.some(item => item.indicatorCode === null && INDICATOR_CODE_SUBSTRING.test(item.activityName));
-  if (precise.length > 0 && !looksMisparsed) return precise;
-  return parseLegacyDayCellItems(dateCellXml, contentCellXml);
+  // Task 12 real-file finding: a hand-edited legacy cell can have Word run
+  // fragmentation that scatters a code across multiple runs (e.g. spell-check
+  // history splits it mid-string), so no single "line" (== one run, the
+  // precise parser's own-export assumption) ever contains the full code and
+  // the leftover-substring check above never fires. Catching that requires
+  // comparing against code matches found on the cell's whole flattened text
+  // (ignoring run boundaries) rather than per-run.
+  const preciseCodeCount = precise.filter(item => item.indicatorCode).length;
+  const rawCodeCount = [...flatJoinedText(contentCellXml).matchAll(INDICATOR_CODE_ANCHOR)].length;
+  const missedCodes = rawCodeCount > preciseCodeCount;
+  const chosen = precise.length > 0 && !looksMisparsed && !missedCodes
+    ? precise
+    : parseLegacyDayCellItems(dateCellXml, contentCellXml);
+  return mergeCodeOnlySequentialItems(chosen);
 }
 
 export function buildSlotsAndOverrides(children) {
