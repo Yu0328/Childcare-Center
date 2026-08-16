@@ -26,11 +26,16 @@ const FLAGGED_STATUS_LABELS = { absent: '請假', courseChanged: '更換課程' 
 
 // The flagged status label ("請假"/"更換課程") shows in the 說明 line only, not next to the date —
 // a flagged date still renders as a plain (red-colored) date, so the label isn't duplicated
-// between the date and whatever the teacher separately typed as the note.
+// between the date and whatever the teacher separately typed as the note. When the note is empty,
+// or already IS exactly the label (a very common habit in 適性紀錄 — checking 請假 AND typing
+// "請假" as the note, carried over verbatim by 彙整), the label alone is shown once rather than
+// printing it twice.
 function noteLineHtml(entry) {
   const flaggedLabel = FLAGGED_STATUS_LABELS[entry.status];
   if (!flaggedLabel) return escapeHtml(entry.note);
-  return entry.note ? `${escapeHtml(flaggedLabel)}　${escapeHtml(entry.note)}` : escapeHtml(flaggedLabel);
+  const note = (entry.note ?? '').trim();
+  if (!note || note === flaggedLabel) return escapeHtml(flaggedLabel);
+  return `${escapeHtml(flaggedLabel)}　${escapeHtml(entry.note)}`;
 }
 
 function entryRow(entry) {

@@ -269,12 +269,14 @@ async function extractSortedMediaImages(zip, documentXml) {
 
 // The domain-block classifier: a block's label is either one of the 5 known domain names (→ a
 // 適性發展紀錄表 段落, referencing whichever already-parsed 課程計畫表 entries its rawText
-// mentions by indicator code), or starts with "行為觀察" followed by a separator (→ a behavior
-// observation), or neither (→ surfaced as a warning and dropped, rather than guessed at).
-// The separator this app's own docx export writes is the fullwidth "－" (U+FF0D), but a real
-// legacy file (verified once during Task 21, not committed to this repo) used the ordinary ASCII
-// "-" (U+002D) instead — so both are accepted here.
-const BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]/;
+// mentions by indicator code), or starts with "行為觀察" — usually followed by a separator and a
+// title, but the separator (and title) are optional: a real file (verified against
+// 趙萬竑-115年04月適性紀錄(家長版).docx and others) can have a bare "行為觀察" label with no title
+// at all, which must still resolve to a behavior observation (with an empty title), not an
+// unrecognized-paragraph warning. The separator this app's own docx export writes is the fullwidth
+// "－" (U+FF0D), but a real legacy file (verified once during Task 21, not committed to this repo)
+// used the ordinary ASCII "-" (U+002D) instead — so both are accepted here.
+const BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]?/;
 // Mirrors normalizeIndicatorCode's own set of recognized prefixes (its Latin-letter typos, plus
 // the distinct mixed "IⅤ" garble) — a narrative paragraph's rawText can reference an indicator by
 // any of the forms normalizeIndicatorCode knows how to fix, since this free-text narrative is
@@ -407,7 +409,18 @@ export async function parseParentReportDocxImport(data) {
   })();
   if (!tier) warnings.push('無法從檔案中判斷月齡階段，請手動選擇');
 
-  const blocks = secondTableXml ? parseRecordBlocks(secondTableXml) : [];
+  // Scoped to end BEFORE 點滴分享 (mirroring extractHighlightPhotoGroups' own start-from-點滴分享
+  // scoping below) so parseRecordBlocks' fixed header/content row pairing never crosses into the
+  // 點滴分享 photo-caption rows or the trailing 家長回饋 signature area. Without this, a real file
+  // (verified: 張珏銨-115年04月適性紀錄(家長版).docx) whose LAST 點滴分享 caption row happened to
+  // sit immediately before 家長回饋 had that caption text misread as an unrecognized paragraph
+  // title, with "家長回饋" as its equally bogus "content" — an entirely spurious warning. Slicing
+  // mid-row here is safe: the cut lands inside the 點滴分享 marker row's own <w:tr>, so that row's
+  // now-incomplete tag simply fails parseRecordBlocks' <w:tr>...</w:tr> regex match rather than
+  // producing a garbled partial row.
+  const highlightsIndex = secondTableXml.indexOf('點滴分享');
+  const beforeHighlightsXml = highlightsIndex === -1 ? secondTableXml : secondTableXml.slice(0, highlightsIndex);
+  const blocks = beforeHighlightsXml ? parseRecordBlocks(beforeHighlightsXml) : [];
   const { developmentRecordBlocks, behaviorObservations } = classifyRecordBlocks(blocks, coursePlanEntries, warnings);
 
   const photoGroups = secondTableXml ? extractHighlightPhotoGroups(secondTableXml) : [];

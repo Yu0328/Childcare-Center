@@ -124,4 +124,26 @@ describe('generateDocxBlob', () => {
     expect(xml).not.toMatch(/<w:t[^>]*>01\/07[^<]*請假/);
     expect(xml).toContain('請假　生病請假');
   });
+
+  // A common habit in 適性紀錄: checking 請假 AND separately typing "請假" as the note, carried
+  // over verbatim by 彙整 — the label must not print twice ("請假　請假") when the note is already
+  // exactly the label.
+  it('prints the flagged status label once, not twice, when the note is already exactly that label', async () => {
+    const indicators = [
+      { code: 'Ⅳ-1-1', description: '能獨立穩定行走', domainName: '身體動作', subdomain: '粗動作、精細動作' },
+    ];
+    const entries = [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'absent', note: '請假' }];
+
+    const blob = await generateDocxBlob({
+      child: { name: '陳小安', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators,
+      entries,
+    });
+    const zip = await JSZip.loadAsync(blob);
+    const xml = await zip.file('word/document.xml').async('text');
+
+    expect(xml).not.toContain('請假　請假');
+    expect(xml).toContain('請假');
+  });
 });

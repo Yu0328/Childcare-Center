@@ -141,10 +141,15 @@ function formatDateCell(row) {
 
 // The flagged status label ("請假"/"更換課程") prefixes the 說明 text instead of the date — see
 // FLAGGED_STATUS_LABELS above.
+// When the note is empty, or already IS exactly the label (a very common habit in 適性紀錄 —
+// checking 請假 AND typing "請假" as the note, carried over verbatim by 彙整), the label alone
+// prints once rather than printing it twice.
 function formatNoteCell(row) {
   const flaggedLabel = FLAGGED_STATUS_LABELS[row.status];
   if (!flaggedLabel) return row.note;
-  return row.note ? `${flaggedLabel}　${row.note}` : flaggedLabel;
+  const note = (row.note ?? '').trim();
+  if (!note || note === flaggedLabel) return flaggedLabel;
+  return `${flaggedLabel}　${row.note}`;
 }
 
 // undefined (not a flagged status) is intentionally passed straight to textParagraph's `color`
