@@ -11,6 +11,11 @@ function selectFile(input, file) {
   input.dispatchEvent(new Event('change'));
 }
 
+function selectFiles(input, files) {
+  Object.defineProperty(input, 'files', { configurable: true, value: files });
+  input.dispatchEvent(new Event('change'));
+}
+
 function setBirthDate(container, iso) {
   const [year, month, day] = iso.split('-').map(Number);
   container.querySelector('[data-field="birthDate-year"]').value = String(year);
@@ -25,14 +30,15 @@ function getBirthDate(container) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-async function buildSampleDocxFile() {
+async function buildSampleDocxFile({ name = '陳小安', birthDate = '2024-11-01' } = {}) {
   const indicators = getIndicatorsForTier('Ⅳ');
-  return generateDocxBlob({
-    child: { name: '陳小安', birthDate: '2024-11-01' },
+  const blob = await generateDocxBlob({
+    child: { name, birthDate },
     form: { tier: 'Ⅳ', period: '115年01月' },
     indicators,
     entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' }],
   });
+  return new File([blob], `${name}.docx`, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
 
 async function buildSampleParentReportDocxFile() {
@@ -127,14 +133,37 @@ describe('renderChildListView', () => {
     expect(container.querySelector('[data-field="name"]').value).toBe('陳小安');
   });
 
+  it('imports multiple selected files one after another, showing each one\'s own preview in turn', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    const fileA = await buildSampleDocxFile({ name: '陳小安', birthDate: '2024-11-01' });
+    const fileB = await buildSampleDocxFile({ name: '林小美', birthDate: '2024-06-01' });
+    selectFiles(container.querySelector('[data-field="import-file"]'), [fileA, fileB]);
+
+    await waitFor(() => container.textContent.includes('確認匯入內容'));
+    expect(container.querySelector('[data-field="name"]').value).toBe('陳小安');
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    // The second file's own preview comes up automatically, without returning to the child list first.
+    await waitFor(() => container.querySelector('[data-field="name"]')?.value === '林小美');
+    expect(container.textContent).toContain('確認匯入內容');
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.textContent.includes('幼兒列表'));
+    expect(container.textContent).toContain('陳小安');
+    expect(container.textContent).toContain('林小美');
+  });
+
   it('shows an error and stays on the child list when the selected file cannot be read', async () => {
     const container = document.createElement('div');
     await renderChildListView(container, { onSelectChild: () => {} });
 
-    const badFile = new Blob(['not a docx file'], { type: 'text/plain' });
+    const badFile = new File(['not a docx file'], '壞檔案.docx', { type: 'text/plain' });
     selectFile(container.querySelector('[data-field="import-file"]'), badFile);
 
-    await waitFor(() => container.textContent.includes('無法讀取這個檔案'));
+    await waitFor(() => container.textContent.includes('無法讀取'));
+    expect(container.textContent).toContain('壞檔案.docx');
     expect(container.textContent).toContain('幼兒列表');
   });
 

@@ -256,4 +256,39 @@ describe('renderCoursePlanTab', () => {
     expect(statusRadios.length).toBe(2);
     for (const radio of statusRadios) expect(radio.disabled).toBe(true);
   });
+
+  it('sorts entries within a domain by their indicator item number, not insertion order', async () => {
+    // Ⅴ-1-6 added before Ⅴ-1-1 (both domain 1) — the card should still list Ⅴ-1-1 first.
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '晚新增但編號較小的後補' });
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-1', activityName: '早新增但編號較大' });
+
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+
+    const codes = [...container.querySelectorAll('.indicator-block__code')].map(el => el.textContent);
+    expect(codes.indexOf('Ⅴ-1-1')).toBeLessThan(codes.indexOf('Ⅴ-1-6'));
+  });
+
+  it('opens the domain a new entry was added to, without collapsing a domain the user already had open', async () => {
+    // Ⅴ-1-6 (domain 1, 身體動作) already exists — the user manually opens its card.
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' });
+
+    const container = document.createElement('div');
+    const rerender = () => renderCoursePlanTab(container, { report, onChange: rerender });
+    await rerender();
+
+    const domain1Card = container.querySelector('.domain-card[data-domain="1"]');
+    domain1Card.open = true;
+    domain1Card.dispatchEvent(new Event('toggle'));
+
+    // Add a new entry into domain 2 (社會情緒) via the form.
+    container.querySelector('[data-field="indicatorCode"]').value = 'Ⅴ-2-2';
+    container.querySelector('[data-field="activityName"]').value = '香蕉鬆餅';
+    container.querySelector('[data-action="add-entry"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.querySelector('.domain-card[data-domain="2"]'));
+
+    expect(container.querySelector('.domain-card[data-domain="1"]').open).toBe(true);
+    expect(container.querySelector('.domain-card[data-domain="2"]').open).toBe(true);
+  });
 });
