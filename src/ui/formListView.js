@@ -2,7 +2,7 @@ import { addForm, listFormsForChild, deleteForm } from '../storage/db.js';
 import { suggestTier } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
-import { currentRocYear, periodSelectsHtml } from './periodFields.js';
+import { currentRocYear, periodSelectsHtml, combinedPeriod } from './periodFields.js';
 
 export async function renderFormListView(
   container,
@@ -55,6 +55,18 @@ export async function renderFormListView(
             selectedMonth: defaultMonth,
           })}
         </label>
+        <label class="entry-form__checkbox">
+          <input type="checkbox" data-field="period-is-range"> 涵蓋一段期間（跨多個月份）
+        </label>
+        <label class="panel-form__field" data-field-group="period-end" hidden>
+          至
+          ${periodSelectsHtml({
+            yearFieldName: 'period-end-year',
+            monthFieldName: 'period-end-month',
+            selectedYear: defaultYear,
+            selectedMonth: defaultMonth,
+          })}
+        </label>
         <button type="submit" class="btn btn--primary">新增</button>
       </form>
     </div>
@@ -62,6 +74,10 @@ export async function renderFormListView(
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
   container.querySelector('[data-action="aggregate"]').addEventListener('click', onAggregate);
+
+  container.querySelector('[data-field="period-is-range"]').addEventListener('change', event => {
+    container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
+  });
 
   for (const form of forms) {
     container.querySelector(`[data-form-id="${form.id}"]`).addEventListener('click', () => onSelectForm(form));
@@ -84,7 +100,14 @@ export async function renderFormListView(
     const tier = container.querySelector('[data-field="tier"]').value;
     const year = container.querySelector('[data-field="period-year"]').value;
     const month = container.querySelector('[data-field="period-month"]').value.padStart(2, '0');
-    const period = `${year}年${month}月`;
+    const startPeriod = `${year}年${month}月`;
+    const isRange = container.querySelector('[data-field="period-is-range"]').checked;
+    let period = startPeriod;
+    if (isRange) {
+      const endYear = container.querySelector('[data-field="period-end-year"]').value;
+      const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, '0');
+      period = combinedPeriod(startPeriod, `${endYear}年${endMonth}月`);
+    }
     try {
       await addForm({ childId: child.id, tier, period });
       await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });

@@ -49,6 +49,22 @@ describe('renderFormListView', () => {
     expect(container.textContent).toContain('115年02月');
   });
 
+  it('creates a form with a range period when "涵蓋一段期間" is checked', async () => {
+    const container = document.createElement('div');
+    await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {} });
+
+    container.querySelector('[data-field="tier"]').value = 'Ⅳ';
+    container.querySelector('[data-field="period-year"]').value = '114';
+    container.querySelector('[data-field="period-month"]').value = '9';
+    container.querySelector('[data-field="period-is-range"]').checked = true;
+    container.querySelector('[data-field="period-end-year"]').value = '115';
+    container.querySelector('[data-field="period-end-month"]').value = '2';
+    container.querySelector('[data-action="add-form"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.textContent.includes('114年09月-115年02月'));
+    expect(container.textContent).toContain('114年09月-115年02月');
+  });
+
   it('calls onSelectForm with the clicked form', async () => {
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
 

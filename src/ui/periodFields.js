@@ -36,3 +36,13 @@ export function parsePeriod(period) {
   if (!match) return { year: null, month: null };
   return { year: Number(match[1]), month: Number(match[2]) };
 }
+
+// Two "115年01月"-style periods -> a single value ("115年01月") when they're the same, or a
+// "114年09月-115年02月" range (earlier-first, regardless of argument order) when they differ —
+// same min-max-range shape aggregateCoursePlan.js's own combinedPeriodRange produces when merging
+// several reports into one form, so a manually-entered multi-month 總表 period looks identical to
+// one produced by 彙整.
+export function combinedPeriod(periodA, periodB) {
+  const [first, last] = [periodA, periodB].sort();
+  return first === last ? first : `${first}-${last}`;
+}
