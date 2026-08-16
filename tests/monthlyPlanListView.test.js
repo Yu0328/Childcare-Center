@@ -5,6 +5,24 @@ import { renderMonthlyPlanListView } from '../src/ui/monthlyPlanListView.js';
 import { currentRocYear } from '../src/ui/periodFields.js';
 import { waitFor } from './helpers.js';
 import { parseMonthlyPlanDocxImport } from '../src/import/monthlyPlanDocxImport.js';
+import { generateMonthlyPlanDocxBlob } from '../src/export/monthlyPlanDocxExport.js';
+
+function selectFile(input, file) {
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  input.dispatchEvent(new Event('change'));
+}
+
+// Mirrors the fixture style in tests/monthlyPlanDocxExport.test.js: one child, one tier, no
+// slot items — enough for parseMonthlyPlanDocxImport to round-trip the period and the child's
+// name/tier out of the generated docx's title and per-child name cell.
+async function buildSampleMonthlyPlanDocxFile() {
+  const plan = { id: 1, period: '115年06月', childIds: [10], childTiers: { 10: 'Ⅴ' } };
+  const children = [{ id: 10, name: '林小明', birthDate: '2024-07-01' }];
+  const blob = await generateMonthlyPlanDocxBlob({ plan, children, slots: [], itemsBySlotId: {}, overrides: [] });
+  return new File([blob], '115年06月課程計畫.docx', {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+}
 
 describe('monthlyPlanListView', () => {
   let container, childA, childB;
@@ -88,5 +106,17 @@ describe('monthlyPlanListView', () => {
     const clickSpy = vi.spyOn(fileInput, 'click');
     button.click();
     expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it('opens the monthly-plan import preview after selecting a valid Word file, with the parsed period/child data pre-filled', async () => {
+    await renderMonthlyPlanListView(container, { onSelectPlan: vi.fn(), onBack: vi.fn() });
+
+    const file = await buildSampleMonthlyPlanDocxFile();
+    selectFile(container.querySelector('[data-field="import-monthly-plan-file"]'), file);
+
+    await waitFor(() => container.textContent.includes('確認匯入內容（課程月計畫）'));
+    expect(container.textContent).toContain('林小明');
+    expect(container.querySelector('[data-field="period-year"]').value).toBe('115');
+    expect(container.querySelector('[data-field="period-month"]').value).toBe('6');
   });
 });
