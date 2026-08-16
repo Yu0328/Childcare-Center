@@ -144,3 +144,73 @@ export function parseExportedDayCellItems(contentCellXml) {
   const paragraphs = [...contentCellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(m => m[0]);
   return paragraphs.map(parseExportedItemParagraph).filter(Boolean);
 }
+
+const INDICATOR_CODE_ANCHOR = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+const ABSENT_MARKER_ON_DATE = /[（(]\s*(請假|更換課程)\s*[）)]/;
+const ABSENT_REPLACEMENT_PARAGRAPH = /^(請假|更換課程)$/;
+
+function paragraphInfo(paragraphXml) {
+  const runs = extractRuns(paragraphXml);
+  return {
+    text: runs.map(r => r.text).join(''),
+    hasStrike: runs.some(r => r.hasStrike),
+    hasRedColor: runs.some(r => r.hasRedColor),
+  };
+}
+
+function stripNoise(text) {
+  return text.replace(/OK/gi, '').trim();
+}
+
+export function parseLegacyDayCellItems(dateCellXml, contentCellXml) {
+  const dateText = [...dateCellXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
+  const dateMarkerMatch = ABSENT_MARKER_ON_DATE.exec(dateText);
+
+  const paragraphs = [...contentCellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)]
+    .map(m => paragraphInfo(m[0]))
+    .filter(p => p.text.trim());
+
+  const items = [];
+  for (let i = 0; i < paragraphs.length; i += 1) {
+    const paragraph = paragraphs[i];
+    let replacementText = '';
+    const replaced = paragraph.hasStrike;
+
+    const next = paragraphs[i + 1];
+    if (paragraph.hasStrike && next && !next.hasStrike && ABSENT_REPLACEMENT_PARAGRAPH.test(next.text.trim())) {
+      replacementText = next.text.trim();
+      paragraphs.splice(i + 1, 1);
+    }
+
+    const notAchieved = paragraph.hasRedColor;
+    const codeMatches = [...paragraph.text.matchAll(INDICATOR_CODE_ANCHOR)];
+
+    if (codeMatches.length === 0) {
+      const cleaned = stripNoise(paragraph.text);
+      if (cleaned) items.push({ indicatorCode: null, activityName: cleaned, indicatorText: '', notAchieved, replaced, replacementText });
+      continue;
+    }
+
+    for (let m = 0; m < codeMatches.length; m += 1) {
+      // The first item's segment starts at 0 (not the code's own index) so a
+      // name-first ordering's leading 【…】 bracket is captured too.
+      const start = m === 0 ? 0 : codeMatches[m].index;
+      const end = m + 1 < codeMatches.length ? codeMatches[m + 1].index : paragraph.text.length;
+      const segment = paragraph.text.slice(start, end);
+      const indicatorCode = normalizeIndicatorCode(codeMatches[m][0]);
+      const bracketMatch = /【([^】]*)】/.exec(segment);
+      const activityName = bracketMatch ? bracketMatch[1] : '';
+      const indicatorText = stripNoise(segment.replace(codeMatches[m][0], '').replace(/【[^】]*】/, ''));
+      items.push({ indicatorCode, activityName, indicatorText, notAchieved, replaced, replacementText });
+    }
+  }
+
+  if (dateMarkerMatch && !items.some(item => item.replaced)) {
+    for (const item of items) {
+      item.replaced = true;
+      item.replacementText = dateMarkerMatch[1];
+    }
+  }
+
+  return items;
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems } from '../src/import/monthlyPlanDocxImport.js';
+import { parsePeriodFromTitleText, extractTitleText, parseChildNameCell, splitChildTables, parseExportedDayCellItems, parseLegacyDayCellItems } from '../src/import/monthlyPlanDocxImport.js';
 
 function zipWith({ headerXml, documentXml }) {
   const zip = new JSZip();
@@ -174,5 +174,61 @@ describe('parseExportedDayCellItems', () => {
 
   it('returns an empty array for an empty/placeholder cell', () => {
     expect(parseExportedDayCellItems('<w:p></w:p>')).toEqual([]);
+  });
+});
+
+function legacyParagraph(text, { strike = false } = {}) {
+  const rPr = strike ? '<w:rPr><w:strike/></w:rPr>' : '';
+  return `<w:p><w:r>${rPr}<w:t>${text}</w:t></w:r></w:p>`;
+}
+function legacyParagraphWithColor(text) {
+  return `<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>${text}</w:t></w:r></w:p>`;
+}
+
+describe('parseLegacyDayCellItems', () => {
+  it('splits one paragraph containing a single 【name】code text item, code-first ordering', () => {
+    const contentCellXml = legacyParagraph('Ⅲ-1-2內容文字【換一隻手】OK');
+    const [item] = parseLegacyDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(item).toMatchObject({ indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手', indicatorText: '內容文字' });
+  });
+
+  it('splits one paragraph containing a single 【name】code text item, name-first ordering', () => {
+    const contentCellXml = legacyParagraph('【換一隻手】Ⅲ-1-2內容文字');
+    const [item] = parseLegacyDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(item).toMatchObject({ indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手' });
+  });
+
+  it('splits two indicator codes concatenated in one paragraph into two items', () => {
+    const contentCellXml = legacyParagraph('Ⅲ-1-2【換一隻手】文字一Ⅲ-2-1【打招呼】文字二');
+    const items = parseLegacyDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(items.map(i => i.indicatorCode)).toEqual(['Ⅲ-1-2', 'Ⅲ-2-1']);
+  });
+
+  it('treats a paragraph with no indicator code as a free activity', () => {
+    const contentCellXml = legacyParagraph('大團體活動');
+    expect(parseLegacyDayCellItems('<w:p></w:p>', contentCellXml)[0]).toMatchObject({ indicatorCode: null, activityName: '大團體活動' });
+  });
+
+  it('detects notAchieved from a red-colored paragraph', () => {
+    const contentCellXml = legacyParagraphWithColor('Ⅲ-1-2【換一隻手】文字');
+    expect(parseLegacyDayCellItems('<w:p></w:p>', contentCellXml)[0]).toMatchObject({ notAchieved: true });
+  });
+
+  it('detects replaced via strike + a following plain "請假" paragraph', () => {
+    const contentCellXml = legacyParagraph('Ⅲ-1-2【換一隻手】文字', { strike: true }) + legacyParagraph('請假');
+    const items = parseLegacyDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(items).toHaveLength(1); // the "請假" paragraph is consumed, not its own item
+    expect(items[0]).toMatchObject({ replaced: true, replacementText: '請假' });
+  });
+
+  it('detects replaced via a "（請假）" marker on the date cell, applied to every item that day', () => {
+    const dateCellXml = '<w:p><w:r><w:t>01/14（請假）</w:t></w:r></w:p>';
+    const contentCellXml = legacyParagraph('Ⅲ-1-2【換一隻手】文字一') + legacyParagraph('大團體活動');
+    const items = parseLegacyDayCellItems(dateCellXml, contentCellXml);
+    expect(items.every(i => i.replaced && i.replacementText === '請假')).toBe(true);
+  });
+
+  it('returns an empty array for an empty cell', () => {
+    expect(parseLegacyDayCellItems('<w:p></w:p>', '<w:p></w:p>')).toEqual([]);
   });
 });
