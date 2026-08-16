@@ -6,12 +6,12 @@ import { escapeHtml } from './escapeHtml.js';
 function unresolvedListHtml(unresolved) {
   if (unresolved.length === 0) return '';
   return `
-    <p>以下 ${unresolved.length} 筆找不到對應的系統指標，將以「活動名稱」備援方式加入總表的備註區塊，請確認內容無誤：</p>
+    <p>以下 ${unresolved.length} 筆不屬於此階段的指標（或找不到對應的系統指標），將加入總表的備註區塊，不會另外建立或加進其他階段的總表，請確認內容無誤：</p>
     <ul>
       ${unresolved
         .map(
           row =>
-            `<li>${escapeHtml(row.indicatorCode)}　${escapeHtml(row.activityName ?? '')}　${escapeHtml(row.date)}　${escapeHtml(row.note)}</li>`
+            `<li>${escapeHtml(row.indicatorCode)}　${escapeHtml(row.description ?? row.activityName ?? '')}　${escapeHtml(row.date)}　${escapeHtml(row.note)}</li>`
         )
         .join('')}
     </ul>
@@ -19,20 +19,15 @@ function unresolvedListHtml(unresolved) {
 }
 
 // Shown before anything is written — see planCoursePlanAggregation. Only the entries that actually
-// need a human's attention (unresolved codes, cross-tier reroutes, exact-duplicate skips) are
-// called out; a clean plan skips this screen entirely (see the submit handler below).
+// need a human's attention (off-tier/unresolved codes, exact-duplicate skips) are called out; a
+// clean plan skips this screen entirely (see the submit handler below).
 function previewHtml(plan) {
-  const reroutedSection =
-    plan.totalReroutedCount > 0
-      ? `<p>另有 ${plan.totalReroutedCount} 筆指標不屬於此階段（或無法對應到系統指標），確認後將加進對應總表的備註（匯出總表 Word 時會顯示在最後的備註區塊）</p>`
-      : '';
   const skippedSection = plan.totalSkippedDuplicates > 0 ? `<p>將跳過 ${plan.totalSkippedDuplicates} 筆重複資料</p>` : '';
 
   return `
     <div class="field-error" data-aggregate-preview>
       <p>彙整前請先確認以下內容：</p>
       ${unresolvedListHtml(plan.unresolved)}
-      ${reroutedSection}
       ${skippedSection}
       <div class="entry-form__actions">
         <button type="button" class="btn btn--primary" data-action="confirm-aggregate">確認彙整</button>
@@ -192,7 +187,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
 
       try {
         const plan = await planCoursePlanAggregation({ childId: child.id, tier: selectedTier, reportIds, targetFormId });
-        const isClean = plan.unresolved.length === 0 && plan.totalReroutedCount === 0 && plan.totalSkippedDuplicates === 0;
+        const isClean = plan.unresolved.length === 0 && plan.totalSkippedDuplicates === 0;
         if (isClean) {
           const { form } = await applyCoursePlanAggregation(plan);
           onCreated(form);

@@ -112,69 +112,49 @@ describe('aggregateCoursePlanIntoForm', () => {
     expect(entries.map(e => e.date)).toEqual(['2026-01-05', '2026-01-20']);
   });
 
-  it('files an entry whose indicator belongs to a different tier into a form for its own tier, not the target form', async () => {
+  it('writes an entry whose indicator belongs to a different tier onto the target form as-is, without creating or touching any other tier\'s form', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     // Ⅳ-1-1 is a real indicator, but for the Ⅳ tier, not Ⅴ.
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
-    const { form, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { form } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
-    expect(reroutedCount).toBe(1);
-    expect(await listEntriesForForm(form.id)).toEqual([]);
+    expect(form.tier).toBe('Ⅴ');
+    // Not filed onto a separate Ⅳ form — it lands on the Ⅴ target form as-is, same as a genuinely
+    // unresolvable code, so formEditorView's 備註 section picks it up when this form is exported.
+    expect(await listEntriesForForm(form.id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' }]);
 
     const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
-    const ivForm = forms.find(f => f.tier === 'Ⅳ');
-    expect(ivForm).toBeDefined();
-    expect(ivForm.period).toBe('115年01月');
-    const ivEntries = await listEntriesForForm(ivForm.id);
-    expect(ivEntries).toMatchObject([{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' }]);
+    expect(forms).toHaveLength(1);
   });
 
-  it('reroutes (rather than failing) an entry whose code is stored with a Latin tier prefix from an older import', async () => {
+  it('normalizes (rather than failing on) an entry whose code is stored with a Latin tier prefix from an older import, before writing it onto the target form', async () => {
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     // A legacy import stored this with an ASCII "IV" prefix instead of the Unicode Ⅳ.
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'IV-1-1', activityName: '走路練習' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
-    const { reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { form } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
 
-    expect(reroutedCount).toBe(1);
-
-    const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
-    const ivForm = forms.find(f => f.tier === 'Ⅳ');
-    expect(ivForm).toBeDefined();
     // Written in its canonical (Unicode) form, not the legacy "IV-1-1" it was read as.
-    expect(await listEntriesForForm(ivForm.id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1' }]);
+    expect(await listEntriesForForm(form.id)).toMatchObject([{ indicatorCode: 'Ⅳ-1-1' }]);
   });
 
-  it('reuses an existing form for the rerouted tier instead of creating a second one', async () => {
-    const existingIvForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '114年10月' });
-    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
-    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
-    await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
-
-    await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
-
-    const forms = await import('../src/storage/db.js').then(m => m.listFormsForChild(child.id));
-    expect(forms.filter(f => f.tier === 'Ⅳ')).toHaveLength(1);
-    const ivEntries = await listEntriesForForm(existingIvForm.id);
-    expect(ivEntries).toHaveLength(1);
-  });
-
-  it('skips a rerouted row that exactly duplicates an entry already in that tier\'s form, and counts it', async () => {
-    const existingIvForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '114年10月' });
-    await addEntry({ formId: existingIvForm.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' });
+  it('skips a cross-tier row that exactly duplicates an entry already on the target form, and counts it', async () => {
+    const existingForm = await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addEntry({ formId: existingForm.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: 'x' });
 
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '走路練習' });
     await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
-    const { skippedDuplicates, reroutedCount } = await aggregateCoursePlanIntoForm({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
+    const { skippedDuplicates } = await aggregateCoursePlanIntoForm({
+      childId: child.id, tier: 'Ⅴ', reportIds: [report.id], targetFormId: existingForm.id,
+    });
 
     expect(skippedDuplicates).toBe(1);
-    expect(reroutedCount).toBe(0);
-    expect(await listEntriesForForm(existingIvForm.id)).toHaveLength(1);
+    expect(await listEntriesForForm(existingForm.id)).toHaveLength(1);
   });
 
   describe('planCoursePlanAggregation (preview, no writes)', () => {
@@ -209,11 +189,10 @@ describe('aggregateCoursePlanIntoForm', () => {
       await addCourseOccurrence({ entryId: entry.id, date: '2026-01-10', status: 'developed', absent: false, note: 'x' });
 
       const plan = await planCoursePlanAggregation({ childId: child.id, tier: 'Ⅴ', reportIds: [report.id] });
-      const { form, skippedDuplicates, reroutedCount } = await applyCoursePlanAggregation(plan);
+      const { form, skippedDuplicates } = await applyCoursePlanAggregation(plan);
 
       expect(form.tier).toBe('Ⅴ');
       expect(skippedDuplicates).toBe(0);
-      expect(reroutedCount).toBe(0);
       expect(await listEntriesForForm(form.id)).toMatchObject([{ indicatorCode: 'Ⅴ-1-6', date: '2026-01-10' }]);
     });
   });

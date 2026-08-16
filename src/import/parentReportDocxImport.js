@@ -370,7 +370,19 @@ export async function parseParentReportDocxImport(data) {
 
   const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map(m => m[0]);
   const coursePlanTableXmls = tables.filter(isCoursePlanShapedTable);
-  const secondTableXml = tables.find(t => !isCoursePlanShapedTable(t));
+  // Everything after the 課程計畫表 tables — 適性發展紀錄表, 行為觀察, 點滴分享, and the trailing
+  // 家長回饋 signature area — is normally ONE single <w:tbl>, but a real file (verified against
+  // 06陳禹彤-115年4月適性紀錄-家長 115.5.15.docx) can split it across several physical <w:tbl>
+  // elements (again most likely a page-break split, same as parseCoursePlanTables above). Taking
+  // only the first non-course-plan table used to silently drop every 點滴分享 photo group — and
+  // every photo behind it — that landed in a later fragment, without even a partial import: since
+  // that table had no 點滴分享 marker of its own, extractHighlightPhotoGroups found zero groups
+  // and every real media file in the whole document came back as unclaimed. Concatenating the raw
+  // XML of every non-course-plan table is safe here: parseRecordBlocks and
+  // extractHighlightPhotoGroups both regex-scan for <w:tr> pairs directly, unaware of <w:tbl>
+  // boundaries, and a table split at a page break keeps each header/content row pair intact within
+  // its own fragment.
+  const secondTableXml = tables.filter(t => !isCoursePlanShapedTable(t)).join('');
 
   const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXmls.length
     ? parseCoursePlanTables(coursePlanTableXmls)

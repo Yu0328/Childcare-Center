@@ -764,9 +764,12 @@ fieldset.panel-form__field legend {
 
 /* 未發展(發展中△)、請假、or 更換課程 occurrences read as red text so they stand out from a plain
    已發展○ row at a glance — added to .entry-row__date instead of relying on .entry-row--absent's
-   color alone so 發展中△ (not absent) gets the same red treatment. */
+   color alone so 發展中△ (not absent) gets the same red treatment. 適性總表's own flagged rows
+   (.entry-row--flagged) also color .entry-row__note red, since the 請假/更換課程 label itself now
+   prints there instead of next to the date. */
 .entry-row__date--flag,
-.entry-row--flagged .entry-row__date {
+.entry-row--flagged .entry-row__date,
+.entry-row--flagged .entry-row__note {
   color: var(--danger);
 }
 

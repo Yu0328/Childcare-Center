@@ -351,6 +351,52 @@ describe('parseParentReportDocxImport', () => {
     expect(contents).toEqual(['body-photo-A', 'body-photo-B', 'body-photo-C']);
   });
 
+  // Regression (real sample: 06陳禹彤-115年4月適性紀錄-家長 115.5.15.docx): everything after the
+  // 課程計畫表 — 適性發展紀錄表, 行為觀察, 點滴分享, 家長回饋 — is normally ONE single <w:tbl>, but
+  // a real file can split it across several physical <w:tbl> elements (again most likely a page
+  // break). Taking only the first non-course-plan table used to find zero 點滴分享 groups in that
+  // first fragment (since 點滴分享 itself started in the SECOND fragment) and treat every real
+  // media file as unclaimed — losing every photo behind the split, not just the ones in the later
+  // table.
+  it('merges 適性發展紀錄表/點滴分享 content split across two <w:tbl> elements, claiming photos from both', async () => {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const recordTableXml = `
+      <w:tbl>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>點滴分享</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:drawing/></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:drawing/></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>第一組照片</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>
+    `;
+    const secondFragmentXml = `
+      <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:drawing/></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr><w:tc><w:tcPr><w:gridSpan w:val="3"/></w:tcPr><w:p><w:r><w:t>第二組照片</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>
+    `;
+    const documentXml = `<w:document><w:body>${COURSE_PLAN_TABLE_XML}${recordTableXml}${secondFragmentXml}</w:body></w:document>`;
+    zip.file('word/document.xml', documentXml);
+    zip.file('word/media/image1.png', 'photo-A');
+    zip.file('word/media/image2.png', 'photo-B');
+    zip.file('word/media/image3.png', 'photo-C');
+    const blob = await zip.generateAsync({ type: 'blob' });
+
+    const result = await parseParentReportDocxImport(blob);
+
+    expect(result.warnings).not.toContain(expect.stringContaining('偵測到的照片數量多於點滴分享區塊'));
+    expect(result.highlightEntries).toEqual([
+      { photos: expect.arrayContaining([expect.anything(), expect.anything()]), caption: '第一組照片' },
+      { photos: expect.arrayContaining([expect.anything()]), caption: '第二組照片' },
+    ]);
+    expect(result.highlightEntries[0].photos).toHaveLength(2);
+    expect(result.highlightEntries[1].photos).toHaveLength(1);
+  });
+
   // Shape verified against a real legacy 適性紀錄(家長版) sample (gitignored, not committed to
   // this repo): it has NO word/header*.xml part at all — the 幼兒姓名/出生年月日/紀錄時間 info
   // lives directly in word/document.xml's own body text, near the top, before the first table.
