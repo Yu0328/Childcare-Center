@@ -37,6 +37,15 @@ export function parsePeriod(period) {
   return { year: Number(match[1]), month: Number(match[2]) };
 }
 
+// "114年09月-115年02月" -> { start: "114年09月", end: "115年02月" }; a non-range period returns the
+// same value for both, so callers can treat every period as a range uniformly.
+export function splitPeriodRange(period) {
+  const text = String(period ?? '').trim();
+  const dashIndex = text.indexOf('-');
+  if (dashIndex === -1) return { start: text, end: text };
+  return { start: text.slice(0, dashIndex), end: text.slice(dashIndex + 1) };
+}
+
 // Two "115年01月"-style periods -> a single value ("115年01月") when they're the same, or a
 // "114年09月-115年02月" range (earlier-first, regardless of argument order) when they differ —
 // same min-max-range shape aggregateCoursePlan.js's own combinedPeriodRange produces when merging

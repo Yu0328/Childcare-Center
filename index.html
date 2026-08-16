@@ -4681,14 +4681,41 @@ var CFormApp = (() => {
     const [, rocYear, month, day] = match;
     return `${Number(rocYear) + 1911}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
+  function parsePeriodFromHeaderText(headerText) {
+    const canonicalRangeMatch = /實施時間[：:]\s*(\d{1,3})年\s*(\d{1,2})月\s*[-－~～]\s*(\d{1,3})年\s*(\d{1,2})月/.exec(headerText);
+    if (canonicalRangeMatch) {
+      const [, y1, m1, y2, m2] = canonicalRangeMatch;
+      const start = `${y1}\u5E74${m1.padStart(2, "0")}\u6708`;
+      const end = `${y2}\u5E74${m2.padStart(2, "0")}\u6708`;
+      return start === end ? start : `${start}-${end}`;
+    }
+    const rangeMatch = /實施時間[：:]\s*(\d{1,3})\.(\d{1,2})\s*[-－~～]\s*(\d{1,3})\.(\d{1,2})/.exec(headerText);
+    if (rangeMatch) {
+      const [, y1, m1, y2, m2] = rangeMatch;
+      const start = `${y1}\u5E74${m1.padStart(2, "0")}\u6708`;
+      const end = `${y2}\u5E74${m2.padStart(2, "0")}\u6708`;
+      return start === end ? start : `${start}-${end}`;
+    }
+    const sameYearShorthandMatch = /實施時間[：:]\s*(\d{1,3})\.(\d{1,2})\s*月\s*[-－~～]\s*(\d{1,2})\s*月/.exec(headerText);
+    if (sameYearShorthandMatch) {
+      const [, year, m1, m2] = sameYearShorthandMatch;
+      const start = `${year}\u5E74${m1.padStart(2, "0")}\u6708`;
+      const end = `${year}\u5E74${m2.padStart(2, "0")}\u6708`;
+      return start === end ? start : `${start}-${end}`;
+    }
+    const dotMatch = /實施時間[：:]\s*(\d{1,3})\.(\d{1,2})/.exec(headerText);
+    if (dotMatch) return `${dotMatch[1]}\u5E74${dotMatch[2].padStart(2, "0")}\u6708`;
+    const canonicalMatch = /實施時間[：:]\s*(\d{1,3})年\s*(\d{1,2})月/.exec(headerText);
+    if (canonicalMatch) return `${canonicalMatch[1]}\u5E74${canonicalMatch[2].padStart(2, "0")}\u6708`;
+    return null;
+  }
   function parseHeaderInfo(headerText) {
     const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
     const birthMatch = /出生日期[：:]\s*(\d{1,3}\/\d{1,2}\/\d{1,2})/.exec(headerText);
-    const periodMatch = /實施時間[：:]\s*(\d{1,3})年\s*(\d{1,2})月/.exec(headerText);
     return {
       name: nameMatch ? nameMatch[1] : null,
       birthDate: birthMatch ? rocDateToIso(birthMatch[1]) : null,
-      period: periodMatch ? `${periodMatch[1]}\u5E74${periodMatch[2].padStart(2, "0")}\u6708` : null
+      period: parsePeriodFromHeaderText(headerText)
     };
   }
   async function findHeaderInfo(zip) {
@@ -4825,6 +4852,12 @@ var CFormApp = (() => {
     if (!match) return { year: null, month: null };
     return { year: Number(match[1]), month: Number(match[2]) };
   }
+  function splitPeriodRange(period) {
+    const text = String(period ?? "").trim();
+    const dashIndex = text.indexOf("-");
+    if (dashIndex === -1) return { start: text, end: text };
+    return { start: text.slice(0, dashIndex), end: text.slice(dashIndex + 1) };
+  }
   function combinedPeriod(periodA, periodB) {
     const [first, last] = [periodA, periodB].sort();
     return first === last ? first : `${first}-${last}`;
@@ -4849,7 +4882,10 @@ var CFormApp = (() => {
   function renderImportPreviewView(container, { parsed, onCancel, onImported }) {
     const defaultRocYear = currentRocYear();
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
-    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
+    const { start: parsedStart, end: parsedEnd } = splitPeriodRange(parsed.period);
+    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsedStart);
+    const { year: parsedEndYear, month: parsedEndMonth } = parsePeriod(parsedEnd);
+    const parsedIsRange = parsedStart !== parsedEnd;
     container.innerHTML = `
     <div class="page-header">
       <button type="button" class="btn btn--ghost" data-action="cancel">\u2190 \u53D6\u6D88\u532F\u5165</button>
@@ -4878,15 +4914,15 @@ var CFormApp = (() => {
     })}
       </label>
       <label class="entry-form__checkbox">
-        <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
+        <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? "checked" : ""}> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
       </label>
-      <label class="panel-form__field" data-field-group="period-end" hidden>
+      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? "" : "hidden"}>
         \u81F3
         ${periodSelectsHtml({
       yearFieldName: "period-end-year",
       monthFieldName: "period-end-month",
-      selectedYear: parsedYear ?? defaultRocYear,
-      selectedMonth: parsedMonth ?? defaultMonth
+      selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
+      selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth
     })}
       </label>
 
@@ -4980,8 +5016,7 @@ var CFormApp = (() => {
     if (!match) return null;
     return `${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
   }
-  function parseCoursePlanTable(documentXml) {
-    const bodyRows = rowsOf2(documentXml).slice(1);
+  function processCoursePlanBodyRows(bodyRows) {
     const entries = [];
     const occurrencesByEntryIndex = {};
     let currentEntryIndex = -1;
@@ -5009,6 +5044,15 @@ var CFormApp = (() => {
     }
     return { entries, occurrencesByEntryIndex };
   }
+  function parseCoursePlanTables(tableXmls) {
+    return processCoursePlanBodyRows(tableXmls.flatMap((xml) => rowsOf2(xml).slice(1)));
+  }
+  function isCoursePlanShapedTable(tableXml) {
+    const firstRow = rowsOf2(tableXml)[0];
+    if (!firstRow) return false;
+    const headerText = textOf(firstRow);
+    return headerText.includes("\u767C\u5C55\u9818\u57DF") && headerText.includes("\u8AB2\u7A0B\u5BE6\u65BD\u65E5\u671F");
+  }
   function rocDotDateToIso(rocDate) {
     const match = /^(\d{1,3})[./](\d{1,2})[./](\d{1,2})$/.exec(rocDate.trim());
     if (!match) return null;
@@ -5017,8 +5061,8 @@ var CFormApp = (() => {
   }
   function parseHeaderInfo2(headerText) {
     const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
-    const birthMatch = /出生年月日[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
-    const periodMatch = /紀錄時間[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
+    const birthMatch = /出生(?:年月日|日期)[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
+    const periodMatch = /(?:紀錄時間|實施時間)[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
     return {
       name: nameMatch ? nameMatch[1] : null,
       birthDate: birthMatch ? rocDotDateToIso(birthMatch[1]) : null,
@@ -5140,8 +5184,9 @@ var CFormApp = (() => {
     if (!headerInfo.birthDate) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u51FA\u751F\u65E5\u671F\uFF0C\u8ACB\u624B\u52D5\u8F38\u5165");
     if (!headerInfo.period) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u7D00\u9304\u5E74\u6708\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
     const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((m) => m[0]);
-    const [coursePlanTableXml, secondTableXml] = tables;
-    const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXml ? parseCoursePlanTable(coursePlanTableXml) : { entries: [], occurrencesByEntryIndex: {} };
+    const coursePlanTableXmls = tables.filter(isCoursePlanShapedTable);
+    const secondTableXml = tables.find((t) => !isCoursePlanShapedTable(t));
+    const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXmls.length ? parseCoursePlanTables(coursePlanTableXmls) : { entries: [], occurrencesByEntryIndex: {} };
     const inferredYear = headerInfo.period ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911 : (/* @__PURE__ */ new Date()).getFullYear();
     const coursePlanEntries = coursePlanEntriesRaw.map((entry, index) => ({
       ...entry,

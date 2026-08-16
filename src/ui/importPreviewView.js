@@ -1,7 +1,7 @@
 import { addChild, listChildren, addForm, addEntry } from '../storage/db.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
-import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod } from './periodFields.js';
+import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPeriodRange } from './periodFields.js';
 
 function entryRow(entry, index) {
   const unresolved = !entry.description;
@@ -22,7 +22,10 @@ function entryRow(entry, index) {
 export function renderImportPreviewView(container, { parsed, onCancel, onImported }) {
   const defaultRocYear = currentRocYear();
   const defaultMonth = new Date().getMonth() + 1;
-  const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
+  const { start: parsedStart, end: parsedEnd } = splitPeriodRange(parsed.period);
+  const { year: parsedYear, month: parsedMonth } = parsePeriod(parsedStart);
+  const { year: parsedEndYear, month: parsedEndMonth } = parsePeriod(parsedEnd);
+  const parsedIsRange = parsedStart !== parsedEnd;
 
   container.innerHTML = `
     <div class="page-header">
@@ -56,15 +59,15 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
         })}
       </label>
       <label class="entry-form__checkbox">
-        <input type="checkbox" data-field="period-is-range"> 涵蓋一段期間（跨多個月份）
+        <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? 'checked' : ''}> 涵蓋一段期間（跨多個月份）
       </label>
-      <label class="panel-form__field" data-field-group="period-end" hidden>
+      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? '' : 'hidden'}>
         至
         ${periodSelectsHtml({
           yearFieldName: 'period-end-year',
           monthFieldName: 'period-end-month',
-          selectedYear: parsedYear ?? defaultRocYear,
-          selectedMonth: parsedMonth ?? defaultMonth,
+          selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
+          selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth,
         })}
       </label>
 
