@@ -70,13 +70,14 @@
 
 ## 五、預覽畫面 `monthlyPlanImportPreviewView.js`
 
-比照 `parentReportImportPreviewView.js` 的既有版面慣例：
+實作時改採比 `parentReportImportPreviewView.js` 更輕量的版面（Task 10 的刻意範圍決定）：不在預覽畫面重現每一格的項目清單／checkbox include／可編輯文字（那一層完整編輯能力已經存在於匯入後可直接開啟的 `monthlyPlanEditorView.js`，沒有必要在預覽畫面重做一份），而是每位小朋友一個摘要區塊：
 
 - 頂部警告清單（`parsed.warnings`）。
 - 期別欄位（可改）。
-- 每位小朋友一個區塊：姓名比對下拉選單（唯一同名時預設選中；找不到/同名多位時預設空白、必須手動選或建立新小朋友）、階段（可改）。
-- 每格內容以文字方式列出各項目（代碼／活動名稱／指標內容／未達成／請假標記＋替代文字），可勾選排除、可編輯文字內容——比照 `importPreviewView.js` 的 `entryRow`／checkbox include 模式。
-- 送出後：對每位「已比對/已建立」的小朋友，寫入一筆新的 `MonthlyCoursePlan`（`addMonthlyCoursePlan`），依 canonical 內容建立 `PlanSlot`＋`PlanSlotItem`（`getOrCreatePlanSlot`／`addPlanSlotItem`），再依每位小朋友各自的 override 呼叫 `setChildItemOverride`。
+- 每位小朋友一個區塊：可勾選排除整位小朋友、姓名比對下拉選單（唯一同名時預設選中；找不到/同名多位時預設「建立新小朋友」，必須手動選或填新資料）、階段下拉選單（含「請選擇」佔位選項；偵測失敗時預設停在佔位選項，不會看起來像自動選中某個真實階段）、一行文字摘要（該小朋友有幾項標記為未達成／請假／更換課程）。
+- 送出前先對每位「已勾選」的小朋友做一次純驗證（新小朋友的姓名/出生日期須齊全、比對到的既有小朋友須存在、階段須對應到 `parsed.slotsByTier` 裡確實有內容的一筆），任何一位驗證失敗就整個中止、不寫入任何資料——避免多位小朋友一起送出時，前面幾位已寫入、某一位才驗證失敗，留下孤兒資料或重試時重複建立。
+- 驗證全部通過後才開始寫入：對每位「已比對/已建立」的小朋友，寫入一筆新的 `MonthlyCoursePlan`（`addMonthlyCoursePlan`），依 canonical 內容建立 `PlanSlot`＋`PlanSlotItem`（`getOrCreatePlanSlot`／`addPlanSlotItem`），再依每位小朋友各自的 override 呼叫 `setChildItemOverride`。
+- 若使用者想核對或修改個別項目的內容，匯入完成後直接開啟 `monthlyPlanEditorView.js` 即可，不需要在預覽畫面重複這層編輯。
 
 ## 測試
 
