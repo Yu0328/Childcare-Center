@@ -59,6 +59,7 @@ function childBlock(parsedChild, index, existingChildren) {
       <label class="panel-form__field">
         月齡階段
         <select data-child-tier="${index}">
+          <option value="" ${parsedChild.tier ? '' : 'selected'}>請選擇</option>
           ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsedChild.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
         </select>
       </label>
@@ -126,23 +127,47 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
       .filter(i => container.querySelector(`[data-child-include="${i}"]`).checked);
 
     try {
-      const resolvedChildren = [];
+      // Validation pre-pass: touch nothing in IndexedDB yet. Every included child must
+      // resolve cleanly (new-child fields filled in, existing-child lookup succeeds, tier
+      // matches a real slotsByTier entry) before any addChild/addMonthlyCoursePlan write
+      // happens — otherwise a later child's validation failure would leave an earlier
+      // child's addChild already committed as an orphan, and resubmitting after the fix
+      // would create it again as a duplicate.
+      const resolutions = [];
       for (const index of includedIndexes) {
         const select = container.querySelector(`[data-child-select="${index}"]`);
         const tier = container.querySelector(`[data-child-tier="${index}"]`).value;
-        let child;
+        const label = parsed.children[index].name || '（未知姓名）';
+
+        let pending;
         if (select.value === NEW_CHILD_VALUE) {
           const name = container.querySelector(`[data-child-new-name="${index}"]`).value;
           const birthDate = parseBirthDateSelects(container, birthDateFieldNames(index));
           if (!name || !birthDate) throw new Error('請完整填寫新小朋友的姓名與出生日期');
-          child = await addChild({ name, birthDate });
+          pending = { isNew: true, name, birthDate };
         } else {
           // select.value is always a string; existing child ids are numeric IndexedDB
           // autoIncrement keys, so compare as strings rather than losing the match to a type
           // mismatch.
-          child = existingChildren.find(c => String(c.id) === select.value);
+          const existingChild = existingChildren.find(c => String(c.id) === select.value);
+          if (!existingChild) throw new Error(`找不到「${label}」比對到的既有小朋友`);
+          pending = { isNew: false, child: existingChild };
         }
-        resolvedChildren.push({ child, tier, overrides: parsed.children[index].overrides });
+
+        if (!tier) throw new Error(`請為「${label}」選擇月齡階段`);
+        if (!(tier in parsed.slotsByTier)) {
+          throw new Error(`找不到「${tier}」的課程內容，請確認「${label}」的階段是否正確`);
+        }
+
+        resolutions.push({ ...pending, tier, overrides: parsed.children[index].overrides });
+      }
+
+      // Write pass: validation above already passed for every included child, so it's safe
+      // to start creating records now.
+      const resolvedChildren = [];
+      for (const r of resolutions) {
+        const child = r.isNew ? await addChild({ name: r.name, birthDate: r.birthDate }) : r.child;
+        resolvedChildren.push({ child, tier: r.tier, overrides: r.overrides });
       }
 
       const childIds = resolvedChildren.map(rc => rc.child.id);

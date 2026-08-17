@@ -107,4 +107,97 @@ describe('renderMonthlyPlanImportPreviewView', () => {
     expect(onCancel).toHaveBeenCalled();
     expect(await listMonthlyCoursePlans()).toEqual([]);
   });
+
+  it('shows an unselected placeholder (not a false-looking default tier) when tier detection failed', async () => {
+    const container = document.createElement('div');
+    const parsed = buildParsed({ children: [{ name: '趙萬竑', tier: null, overrides: [] }] });
+    await renderMonthlyPlanImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => {} });
+
+    const tierSelect = container.querySelector('[data-child-tier="0"]');
+    expect(tierSelect.value).toBe('');
+    expect(tierSelect.querySelector('option[value=""]').selected).toBe(true);
+  });
+
+  it('rejects submit with no tier chosen (detection failed, placeholder left as-is) and persists nothing', async () => {
+    const container = document.createElement('div');
+    const parsed = buildParsed({ children: [{ name: '趙萬竑', tier: null, overrides: [] }] });
+    let imported = false;
+    await renderMonthlyPlanImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-child-new-name="0"]').value = '趙萬竑';
+    container.querySelector('[data-child-new-birthDate-year="0"]').value = '2024';
+    container.querySelector('[data-child-new-birthDate-month="0"]').value = '7';
+    container.querySelector('[data-child-new-birthDate-day="0"]').value = '1';
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => container.querySelector('[data-error]').textContent.length > 0);
+
+    expect(imported).toBe(false);
+    expect(container.querySelector('[data-error]').textContent).toContain('選擇月齡階段');
+    expect(await listMonthlyCoursePlans()).toEqual([]);
+    expect(await listChildren()).toEqual([]);
+  });
+
+  it('rejects submit when the (manually corrected) tier has no matching parsed course content, instead of silently creating an empty plan', async () => {
+    const container = document.createElement('div');
+    // slotsByTier only has content for 'Ⅴ'; the user corrects this child to 'Ⅰ', which has none.
+    const parsed = buildParsed({ children: [{ name: '趙萬竑', tier: null, overrides: [] }] });
+    let imported = false;
+    await renderMonthlyPlanImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-child-new-name="0"]').value = '趙萬竑';
+    container.querySelector('[data-child-new-birthDate-year="0"]').value = '2024';
+    container.querySelector('[data-child-new-birthDate-month="0"]').value = '7';
+    container.querySelector('[data-child-new-birthDate-day="0"]').value = '1';
+    container.querySelector('[data-child-tier="0"]').value = 'Ⅰ';
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => container.querySelector('[data-error]').textContent.length > 0);
+
+    expect(imported).toBe(false);
+    expect(container.querySelector('[data-error]').textContent).toContain('找不到');
+    expect(await listMonthlyCoursePlans()).toEqual([]);
+    expect(await listChildren()).toEqual([]); // no orphan child left behind either
+  });
+
+  it('validates every included child before writing any of them, so a later failure leaves no orphan and a retry creates no duplicate', async () => {
+    const container = document.createElement('div');
+    const parsed = buildParsed({
+      children: [
+        { name: '甲', tier: 'Ⅴ', overrides: [] },
+        { name: '乙', tier: 'Ⅴ', overrides: [] },
+      ],
+    });
+    let imported = false;
+    await renderMonthlyPlanImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-child-new-name="0"]').value = '甲';
+    container.querySelector('[data-child-new-birthDate-year="0"]').value = '2024';
+    container.querySelector('[data-child-new-birthDate-month="0"]').value = '7';
+    container.querySelector('[data-child-new-birthDate-day="0"]').value = '1';
+
+    container.querySelector('[data-child-new-name="1"]').value = '乙';
+    // birthdate for child 1 left blank on purpose.
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => container.querySelector('[data-error]').textContent.length > 0);
+
+    expect(imported).toBe(false);
+    expect(await listChildren()).toEqual([]); // child "甲" must NOT have been written as an orphan
+
+    container.querySelector('[data-child-new-birthDate-year="1"]').value = '2024';
+    container.querySelector('[data-child-new-birthDate-month="1"]').value = '8';
+    container.querySelector('[data-child-new-birthDate-day="1"]').value = '1';
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const created = await listChildren();
+    expect(created).toHaveLength(2); // no duplicate of "甲" from the first failed attempt
+    expect(created.map(c => c.name).sort()).toEqual(['乙', '甲']);
+
+    const plans = await listMonthlyCoursePlans();
+    expect(plans).toHaveLength(1);
+    expect(plans[0].childIds).toHaveLength(2);
+  });
 });
