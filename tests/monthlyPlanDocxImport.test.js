@@ -250,6 +250,32 @@ describe('parseDayCellItems', () => {
   it('returns an empty array for a genuinely empty cell (no fallback false-positive)', () => {
     expect(parseDayCellItems('<w:p></w:p>', '<w:p></w:p>')).toEqual([]);
   });
+
+  it('does not merge a real precise-path code-only item into an unrelated following free-activity item', () => {
+    // This app's own editor allows saving a code-only item (indicatorCode set,
+    // activityName/indicatorText both empty), and the exporter round-trips it
+    // as a single-line paragraph. The legacy-only merge heuristic must not
+    // treat this as its "code / name / text as 3 paragraphs" pattern and eat
+    // the unrelated item that happens to follow it.
+    const contentCellXml = `<w:p>${plainRun('Ⅵ-1-1')}</w:p><w:p>${plainRun('自由活動時間')}</w:p>`;
+    const items = parseDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(items).toEqual([
+      { indicatorCode: 'Ⅵ-1-1', activityName: '', indicatorText: '', notAchieved: false, replaced: false, replacementText: '' },
+      { indicatorCode: null, activityName: '自由活動時間', indicatorText: '', notAchieved: false, replaced: false, replacementText: '' },
+    ]);
+  });
+
+  it('does not fall back to the legacy parser just because a real item\'s own text mentions another code', () => {
+    // A legitimate own-export item's indicatorText can itself contain a
+    // code-shaped substring (e.g. a note referencing another indicator).
+    // That substring is already inside a correctly-recognized field and must
+    // not be counted as a "missed" code that forces legacy re-parsing.
+    const contentCellXml = `<w:p>${plainRun('Ⅴ-4-3')}${plainRun('【分類遊戲】')}${plainRun('可搭配Ⅲ-1-2一起練習')}</w:p>`;
+    const items = parseDayCellItems('<w:p></w:p>', contentCellXml);
+    expect(items).toEqual([
+      { indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '可搭配Ⅲ-1-2一起練習', notAchieved: false, replaced: false, replacementText: '' },
+    ]);
+  });
 });
 
 describe('buildSlotsAndOverrides', () => {

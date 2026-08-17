@@ -224,14 +224,20 @@ const INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d
 
 // Task 12 real-file finding: some legacy documents write each entry as three
 // separate paragraphs (bare code / name / description) instead of combining
-// them with 【】 brackets in one paragraph — both the precise parser (clean
-// single-run code paragraph, so it finds the code fine and never trips the
-// "missed codes" check) and the legacy parser (per-paragraph code splitting)
-// produce one item per paragraph in this shape, not one item per entry. A
-// code-only item (nothing else on its own paragraph) immediately followed by
-// up to two code-less items absorbs them as its name/text, mirroring the
-// single-paragraph shape. Applied once here, after either parser is chosen,
-// rather than inside each one, since both need it.
+// them with 【】 brackets in one paragraph, so the legacy per-paragraph code
+// splitter produces one orphaned item per paragraph instead of one per entry.
+// A code-only item (nothing else on its own paragraph) immediately followed
+// by up to two code-less items absorbs them as its name/text, mirroring the
+// single-paragraph shape.
+//
+// Review-round-2 fix: this must ONLY run on legacy-parsed output. A
+// precise-parsed cell can legitimately contain a real code-only item (this
+// app's own editor allows saving one — see monthlyPlanEditorView.js — and the
+// exporter round-trips it as a single-line paragraph with no name/text) sitting
+// right next to an unrelated free-activity item. Applying this merge there
+// would silently graft the free activity's text onto the coded item and
+// delete the free activity as its own entry — precise items are already
+// complete by construction when correctly parsed, so they never need this.
 function mergeCodeOnlySequentialItems(items) {
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
@@ -249,6 +255,10 @@ function mergeCodeOnlySequentialItems(items) {
   return items;
 }
 
+function legacyItems(dateCellXml, contentCellXml) {
+  return mergeCodeOnlySequentialItems(parseLegacyDayCellItems(dateCellXml, contentCellXml));
+}
+
 export function parseDayCellItems(dateCellXml, contentCellXml) {
   const precise = parseExportedDayCellItems(contentCellXml);
   const looksMisparsed = precise.some(item => item.indicatorCode === null && INDICATOR_CODE_SUBSTRING.test(item.activityName));
@@ -259,13 +269,22 @@ export function parseDayCellItems(dateCellXml, contentCellXml) {
   // the leftover-substring check above never fires. Catching that requires
   // comparing against code matches found on the cell's whole flattened text
   // (ignoring run boundaries) rather than per-run.
+  //
+  // Review-round-2 fix: a legitimate own-export item's activityName/
+  // indicatorText free text can itself contain a code-shaped substring (e.g.
+  // a note mentioning another indicator's code in prose) — that shouldn't
+  // count as "missed", since the precise parser already correctly attributed
+  // it to a real item. Subtract code-shaped matches found inside already-
+  // recognized items' own text fields before comparing.
   const preciseCodeCount = precise.filter(item => item.indicatorCode).length;
   const rawCodeCount = [...flatJoinedText(contentCellXml).matchAll(INDICATOR_CODE_ANCHOR)].length;
-  const missedCodes = rawCodeCount > preciseCodeCount;
-  const chosen = precise.length > 0 && !looksMisparsed && !missedCodes
-    ? precise
-    : parseLegacyDayCellItems(dateCellXml, contentCellXml);
-  return mergeCodeOnlySequentialItems(chosen);
+  const alreadyAttributedCodeCount = precise.reduce(
+    (sum, item) => sum + [...(item.activityName + item.indicatorText).matchAll(INDICATOR_CODE_ANCHOR)].length,
+    0
+  );
+  const missedCodes = rawCodeCount - alreadyAttributedCodeCount > preciseCodeCount;
+  if (precise.length > 0 && !looksMisparsed && !missedCodes) return precise;
+  return legacyItems(dateCellXml, contentCellXml);
 }
 
 export function buildSlotsAndOverrides(children) {
