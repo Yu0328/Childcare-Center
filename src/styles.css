@@ -16,7 +16,6 @@
   --danger: #d03b3b;
   --danger-bg: #fbeaea;
   --success: #2f8f5b;
-  --success-bg: #e7f5ec;
 
   /* A warm accent for "human" touches (title block, header buttons) — distinct from the
      cooler domain hues below so it reads as its own thing, not a 6th domain color. */
@@ -1274,33 +1273,13 @@ fieldset.panel-form__field.import-preview__child legend {
   text-align: center;
 }
 
-.field-success {
-  color: var(--success);
-  background: var(--success-bg);
-  border-radius: 8px;
-  padding: 0.5em 0.8em;
-  font-size: 0.85rem;
-  margin: 0.5rem 0 0;
-}
-
-.field-success:empty {
-  display: none;
-}
-
-.field-success--center {
-  max-width: 420px;
-  margin-left: auto;
-  margin-right: auto;
-  text-align: center;
-}
-
 /* Marks a card-list row (or a child row) whose form/report/plan was created by docx import and
    hasn't been opened yet — cleared the moment its editor is opened (see formEditorView.js and
    its siblings), so this never persists as stale "unread" noise. */
 .new-badge {
   display: inline-block;
-  background: var(--warm-accent);
-  color: #fff;
+  background: #ffd400;
+  color: #4a3900;
   font-size: 0.65rem;
   font-weight: 700;
   line-height: 1;
@@ -1308,6 +1287,43 @@ fieldset.panel-form__field.import-preview__child legend {
   border-radius: 999px;
   margin-left: 0.4em;
   vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(74, 57, 0, 0.15);
+}
+
+/* ---------- Toasts ---------- */
+
+.toast-host {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  max-width: min(90vw, 360px);
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--success);
+  color: #fff;
+  padding: 0.6em 1em;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  animation: toast-in 0.2s ease-out;
+  word-break: break-word;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 640px) {

@@ -33,7 +33,6 @@ export async function renderReportTypeSelectView(container, { onSelectType }) {
       <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
-    <p class="field-success field-success--center" data-success="import"></p>
     <div class="type-select-card">
       <div class="type-select">
         ${TYPE_SELECT_OPTIONS.map(

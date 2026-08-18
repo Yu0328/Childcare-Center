@@ -29,6 +29,7 @@ describe('monthlyPlanListView', () => {
 
   beforeEach(async () => {
     await clearAllData();
+    document.querySelector('.toast-host')?.remove();
     container = document.createElement('div');
     // 2Y old as of 2026-06 -> tier Ⅴ (19-24個月); the exact birthdate only needs to land there.
     childA = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
@@ -134,7 +135,7 @@ describe('monthlyPlanListView', () => {
     expect(container.querySelector('[data-field="period-month"]').value).toBe('6');
   });
 
-  it('shows a success summary naming the file once the import is confirmed', async () => {
+  it('shows a toast naming the file the moment the import is confirmed', async () => {
     await renderMonthlyPlanListView(container, { onSelectPlan: vi.fn(), onBack: vi.fn() });
 
     const file = await buildSampleMonthlyPlanDocxFile();
@@ -149,7 +150,7 @@ describe('monthlyPlanListView', () => {
 
     container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-    await waitFor(() => container.querySelector('[data-success="import"]')?.textContent.includes('115年06月課程計畫.docx'));
-    expect(container.querySelector('[data-success="import"]').textContent).toBe('已成功匯入：115年06月課程計畫.docx');
+    await waitFor(() => document.querySelector('.toast')?.textContent.includes('115年06月課程計畫.docx'));
+    expect(document.querySelector('.toast').textContent).toBe('已成功匯入：115年06月課程計畫.docx');
   });
 });

@@ -59,6 +59,7 @@ async function buildSampleParentReportDocxFile() {
 describe('renderChildListView', () => {
   beforeEach(async () => {
     await clearAllData();
+    document.querySelector('.toast-host')?.remove();
   });
 
   it('renders existing children', async () => {
@@ -182,7 +183,8 @@ describe('renderChildListView', () => {
     await waitFor(() => container.textContent.includes('幼兒列表'));
     expect(container.textContent).toContain('陳小安');
     expect(container.textContent).toContain('林小美');
-    expect(container.querySelector('[data-success="import"]').textContent).toBe('已成功匯入：陳小安.docx、林小美.docx');
+    const toasts = [...document.querySelectorAll('.toast')].map(t => t.textContent);
+    expect(toasts).toEqual(['已成功匯入：陳小安.docx', '已成功匯入：林小美.docx']);
   });
 
   it('shows an error and stays on the child list when the selected file cannot be read', async () => {

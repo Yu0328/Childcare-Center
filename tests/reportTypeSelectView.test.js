@@ -94,6 +94,7 @@ describe('renderReportTypeSelectView', () => {
   describe('unified 匯入檔案 button', () => {
     beforeEach(async () => {
       await clearAllData();
+      document.querySelector('.toast-host')?.remove();
     });
 
     async function renderView() {
@@ -141,15 +142,36 @@ describe('renderReportTypeSelectView', () => {
       expect(container.querySelector('.type-select')).not.toBeNull();
     });
 
-    it('shows a success summary naming the file once its import is confirmed', async () => {
+    it('shows a toast naming the file the moment its import is confirmed', async () => {
       const container = await renderView();
       selectFile(container.querySelector('[data-field="import-any-file"]'), await buildAssessmentFile());
 
       await waitFor(() => container.textContent.includes('確認匯入內容（適性總表）'));
       container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-      await waitFor(() => container.querySelector('[data-success="import"]')?.textContent.includes('陳小安.docx'));
-      expect(container.querySelector('[data-success="import"]').textContent).toBe('已成功匯入：陳小安.docx');
+      await waitFor(() => document.querySelector('.toast')?.textContent.includes('陳小安.docx'));
+      expect(document.querySelector('.toast').textContent).toBe('已成功匯入：陳小安.docx');
+    });
+
+    it('shows one toast per file, in order, for a mixed-type multi-file batch', async () => {
+      const container = await renderView();
+      selectFiles(container.querySelector('[data-field="import-any-file"]'), [await buildAssessmentFile(), await buildMonthlyPlanFile()]);
+
+      await waitFor(() => container.textContent.includes('確認匯入內容（適性總表）'));
+      container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await waitFor(() => document.querySelectorAll('.toast').length === 1);
+
+      await waitFor(() => container.textContent.includes('確認匯入內容（課程月計畫）'));
+      // 林小明 doesn't match an existing child, so the monthly-plan docx (no birth date field)
+      // needs it filled in manually before the form validates.
+      container.querySelector('[data-field="child-new-birthDate-year-0"]').value = '2024';
+      container.querySelector('[data-field="child-new-birthDate-month-0"]').value = '7';
+      container.querySelector('[data-field="child-new-birthDate-day-0"]').value = '1';
+      container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+      await waitFor(() => document.querySelectorAll('.toast').length === 2);
+      const toasts = [...document.querySelectorAll('.toast')].map(t => t.textContent);
+      expect(toasts).toEqual(['已成功匯入：陳小安.docx', '已成功匯入：115年06月課程計畫.docx']);
     });
   });
 });

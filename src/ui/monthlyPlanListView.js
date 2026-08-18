@@ -28,7 +28,6 @@ export async function renderMonthlyPlanListView(
       <input type="file" accept=".docx" data-field="import-monthly-plan-file" multiple hidden>
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
-    <p class="field-success field-success--center" data-success="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
         <ul class="card-list">
