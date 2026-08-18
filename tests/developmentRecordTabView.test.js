@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import {
-  addParentReport, addCoursePlanEntry, addDevelopmentRecordEntry, listDevelopmentRecordEntriesForReport,
+  addParentReport, addCoursePlanEntry, addCourseOccurrence, addDevelopmentRecordEntry, listDevelopmentRecordEntriesForReport,
 } from '../src/storage/parentReportDb.js';
 import { renderDevelopmentRecordTab } from '../src/ui/developmentRecordTabView.js';
 import { waitFor } from './helpers.js';
@@ -54,6 +54,64 @@ describe('renderDevelopmentRecordTab', () => {
 
     const checkboxIds = [...container.querySelectorAll('[data-course-entry-checkbox]')].map(el => el.dataset.courseEntryCheckbox);
     expect(checkboxIds.indexOf(String(addedLater.id))).toBeLessThan(checkboxIds.indexOf(String(entry.id)));
+  });
+
+  it('marks a reference checkbox struck-through and red when its entry has a 請假 occurrence', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: true, courseChanged: false, note: '' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).closest('label');
+    expect(label.classList.contains('panel-form__checkbox-row--flag')).toBe(true);
+    expect(label.classList.contains('panel-form__checkbox-row--absent')).toBe(true);
+    expect(label.classList.contains('panel-form__checkbox-row--course-changed')).toBe(false);
+  });
+
+  it('marks a reference checkbox struck-through and red when its entry has a 更換課程 occurrence', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: false, courseChanged: true, note: '' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).closest('label');
+    expect(label.classList.contains('panel-form__checkbox-row--flag')).toBe(true);
+    expect(label.classList.contains('panel-form__checkbox-row--course-changed')).toBe(true);
+    expect(label.classList.contains('panel-form__checkbox-row--absent')).toBe(false);
+  });
+
+  it('marks a reference checkbox red but not struck-through when its entry only has a 發展中 occurrence', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developing', absent: false, courseChanged: false, note: '' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).closest('label');
+    expect(label.classList.contains('panel-form__checkbox-row--flag')).toBe(true);
+    expect(label.classList.contains('panel-form__checkbox-row--absent')).toBe(false);
+    expect(label.classList.contains('panel-form__checkbox-row--course-changed')).toBe(false);
+  });
+
+  it('leaves a reference checkbox unmarked when its entry only has a normal 已發展 occurrence', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: false, courseChanged: false, note: '' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).closest('label');
+    expect(label.classList.contains('panel-form__checkbox-row--flag')).toBe(false);
+  });
+
+  it('does not flag an existing record\'s referenced-indicator display or leave any flag class there, even when the linked entry has a 請假 occurrence', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: true, courseChanged: false, note: '' });
+    await addDevelopmentRecordEntry({ reportId: report.id, domain: 1, courseEntryIds: [entry.id], narrative: '小安能輕鬆畫畫' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {} });
+
+    const referencedLine = [...container.querySelectorAll('.entry-list li')].find(li => li.textContent.includes('Ⅴ-1-6'));
+    expect(referencedLine).toBeTruthy();
+    expect(referencedLine.className).toBe('');
   });
 
   it('only lists course plan entries belonging to the currently selected domain as checkboxes', async () => {

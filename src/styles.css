@@ -601,6 +601,19 @@ fieldset.panel-form__field legend {
   padding: 0.3rem 0;
 }
 
+/* 適性發展紀錄表's "勾選要引用的項目" checkboxes only — flags an entry that has a 請假/更換課程/
+   發展中 occurrence, same red/strikethrough language as .entry-row__date--flag and
+   .entry-row--absent/--course-changed in courseplanTabView's own occurrence rows. Deliberately not
+   applied to existingRecordCard's saved entry-list lines or the Word export (see
+   developmentRecordTabView.js's checkboxFlagClass for why). */
+.panel-form__checkbox-row--flag {
+  color: var(--danger);
+}
+.panel-form__checkbox-row--absent,
+.panel-form__checkbox-row--course-changed {
+  text-decoration: line-through;
+}
+
 /* Standalone-page variant for the 課程月計畫 import preview: unlike .panel-form--wide below, this
    form is the only thing on screen (no sibling tab-layout column to protect), and it can hold many
    children's blocks (see .import-preview__children), so it widens much further and isn't sticky. */

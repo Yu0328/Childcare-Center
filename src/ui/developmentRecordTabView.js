@@ -1,6 +1,6 @@
 import { DOMAINS, getIndicator } from '../data/indicators.js';
 import {
-  listCoursePlanEntriesForReport, addDevelopmentRecordEntry,
+  listCoursePlanEntriesForReport, listCourseOccurrencesForEntry, addDevelopmentRecordEntry,
   listDevelopmentRecordEntriesForReport, deleteDevelopmentRecordEntry, updateDevelopmentRecordEntry,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
@@ -13,12 +13,25 @@ function indicatorItemNumber(code) {
   return match ? Number(match[1]) : Infinity;
 }
 
-function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = null }) {
+// A reference checkbox reflects the 課程計畫表 entry it's tied to: if ANY of its occurrences was
+// 請假 or 更換課程, the checkbox reads struck-through and red (courseChanged wins if somehow both
+// occur across different dates, matching aggregateCoursePlan.js's own absent/courseChanged
+// precedent); a 發展中-only entry reads red without the strikethrough. This is scoped to the
+// checkbox picker only — the saved record's own referenced-indicator display (existingRecordCard's
+// entry-list) and the Word export are untouched by design.
+function checkboxFlagClass(occurrences) {
+  if (occurrences.some(o => o.courseChanged)) return ' panel-form__checkbox-row--flag panel-form__checkbox-row--course-changed';
+  if (occurrences.some(o => o.absent)) return ' panel-form__checkbox-row--flag panel-form__checkbox-row--absent';
+  if (occurrences.some(o => o.status === 'developing')) return ' panel-form__checkbox-row--flag';
+  return '';
+}
+
+function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = null, occurrencesByEntryId = {} }) {
   if (entries.length === 0) return '<p>這個領域尚未在課程計畫表填寫任何項目</p>';
   return entries
     .map(
       entry => `
-      <label class="panel-form__checkbox-row">
+      <label class="panel-form__checkbox-row${checkboxFlagClass(occurrencesByEntryId[entry.id] || [])}">
         <input type="checkbox" data-${checkboxAttr}="${escapeHtml(entry.id)}" ${recordId !== null ? `data-record-id="${escapeHtml(recordId)}"` : ''} ${checkedIds.includes(entry.id) ? 'checked' : ''}>
         ${escapeHtml(entry.indicatorCode)} 【${escapeHtml(entry.activityName)}】${escapeHtml(entry.indicatorText || '')}
       </label>
@@ -32,7 +45,7 @@ function recordLabel(record) {
   return narrative.length > 12 ? `${narrative.slice(0, 12)}…` : narrative;
 }
 
-function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDomainEntries, editDomainValue }) {
+function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDomainEntries, editDomainValue, occurrencesByEntryId }) {
   const lines = record.courseEntryIds
     .map(id => coursePlanEntriesById.get(id))
     .filter(Boolean)
@@ -52,7 +65,7 @@ function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDoma
       </label>
       <fieldset class="panel-form__field">
         <legend>已在課程計畫表填寫的項目（勾選要引用的項目）</legend>
-        ${checkboxListHtml(editDomainEntries, { checkboxAttr: 'record-edit-entry-checkbox', checkedIds: record.courseEntryIds, recordId: record.id })}
+        ${checkboxListHtml(editDomainEntries, { checkboxAttr: 'record-edit-entry-checkbox', checkedIds: record.courseEntryIds, recordId: record.id, occurrencesByEntryId })}
       </fieldset>
       <label class="panel-form__field">敘述 <textarea data-record-edit-field="narrative" data-record-id="${escapeHtml(record.id)}">${escapeHtml(record.narrative)}</textarea></label>
       <div class="entry-form__actions">
@@ -86,6 +99,14 @@ export async function renderDevelopmentRecordTab(
   const allEntries = await listCoursePlanEntriesForReport(report.id);
   const records = await listDevelopmentRecordEntriesForReport(report.id);
   const coursePlanEntriesById = new Map(allEntries.map(e => [e.id, e]));
+
+  // Feeds checkboxFlagClass so the reference checkboxes below can flag 請假/更換課程/發展中 —
+  // fetched once per entry here (not inside checkboxListHtml) since both the add-record panel and
+  // every existing record's edit form share the same entries/occurrences for this report.
+  const occurrencesByEntryId = {};
+  for (const entry of allEntries) {
+    occurrencesByEntryId[entry.id] = await listCourseOccurrencesForEntry(entry.id);
+  }
 
   const byDomain = new Map();
   for (const record of records) {
@@ -121,7 +142,7 @@ export async function renderDevelopmentRecordTab(
         </label>
         <fieldset class="panel-form__field">
           <legend>已在課程計畫表填寫的項目（勾選要引用的項目）</legend>
-          <div class="panel-form__checkbox-grid">${checkboxListHtml(domainEntries, { checkboxAttr: 'course-entry-checkbox' })}</div>
+          <div class="panel-form__checkbox-grid">${checkboxListHtml(domainEntries, { checkboxAttr: 'course-entry-checkbox', occurrencesByEntryId })}</div>
         </fieldset>
         <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">新增</button>
@@ -144,6 +165,7 @@ export async function renderDevelopmentRecordTab(
                         isEditing,
                         editDomainEntries: entriesByDomainNumber(domainValue),
                         editDomainValue: domainValue,
+                        occurrencesByEntryId,
                       });
                     })
                     .join('')}
