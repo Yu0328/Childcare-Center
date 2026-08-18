@@ -30,6 +30,20 @@ describe('renderDevelopmentRecordTab', () => {
     expect(container.querySelector('.domain-grid').classList.contains('domain-grid--single')).toBe(true);
   });
 
+  it('shows the indicator code, activity name, and indicator text on each reference checkbox so the teacher can tell entries apart', async () => {
+    const withText = await addCoursePlanEntry({
+      reportId: report.id, indicatorCode: 'Ⅴ-1-1', activityName: '上樓梯', indicatorText: '能獨立地走上樓梯',
+    }); // domain 1
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${withText.id}"]`).closest('label');
+    expect(label.textContent).toContain('Ⅴ-1-1');
+    expect(label.textContent).toContain('上樓梯');
+    expect(label.textContent).toContain('能獨立地走上樓梯');
+  });
+
   it('only lists course plan entries belonging to the currently selected domain as checkboxes', async () => {
     await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-2', activityName: '香蕉鬆餅' }); // domain 2
 

@@ -12,7 +12,7 @@ function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = n
       entry => `
       <label class="panel-form__checkbox-row">
         <input type="checkbox" data-${checkboxAttr}="${escapeHtml(entry.id)}" ${recordId !== null ? `data-record-id="${escapeHtml(recordId)}"` : ''} ${checkedIds.includes(entry.id) ? 'checked' : ''}>
-        ${escapeHtml(entry.indicatorCode)} 【${escapeHtml(entry.activityName)}】
+        ${escapeHtml(entry.indicatorCode)} 【${escapeHtml(entry.activityName)}】${escapeHtml(entry.indicatorText || '')}
       </label>
     `
     )

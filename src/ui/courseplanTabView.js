@@ -192,6 +192,12 @@ export async function renderCoursePlanTab(
   const openDomains = openDomainsByReportId.get(report.id);
   if (isFirstRenderForReport && domainGroups.length > 0) openDomains.add(String(domainGroups[0][0]));
 
+  // The <select> below has no explicit `selected` option, so the browser defaults it to the
+  // first indicator in the tier (same one indicatorOptionsHtml lists first) — prefill the two
+  // text fields to match on initial render, not just on the select's own change event, so a
+  // teacher who never touches the dropdown still gets that indicator's default content.
+  const defaultIndicator = getIndicatorsForTier(report.tier)[0] || null;
+
   container.innerHTML = `
     <div class="tab-layout">
       <form class="panel-form panel-form--wide" data-action="add-entry">
@@ -200,8 +206,8 @@ export async function renderCoursePlanTab(
           指標
           <select data-field="indicatorCode">${indicatorOptionsHtml(report.tier)}</select>
         </label>
-        <label class="panel-form__field">活動名稱 <input data-field="activityName" required></label>
-        <label class="panel-form__field">能力指標內容 <textarea data-field="indicatorText" rows="3"></textarea></label>
+        <label class="panel-form__field">活動名稱 <input data-field="activityName" required value="${escapeHtml(defaultIndicator ? defaultIndicator.activityName : '')}"></label>
+        <label class="panel-form__field">能力指標內容 <textarea data-field="indicatorText" rows="3">${escapeHtml(defaultIndicator ? defaultIndicator.description : '')}</textarea></label>
         <div class="panel-form__row">
           <label class="panel-form__field">日期 <input type="date" data-field="occurrenceDate"></label>
           <div class="panel-form__field">

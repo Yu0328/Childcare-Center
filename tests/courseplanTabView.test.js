@@ -67,6 +67,18 @@ describe('renderCoursePlanTab', () => {
     expect(container.querySelector('[data-field="indicatorText"]').value).toBe('能穩定握筆塗鴉');
   });
 
+  it("prefills activity name and indicator text for the indicator select's own default (first) option on initial render", async () => {
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+
+    // No change event fired — the select's default-selected option is the tier's first indicator
+    // (Ⅴ-1-1), and the two text fields must already reflect it without the teacher touching the
+    // dropdown at all.
+    expect(container.querySelector('[data-field="indicatorCode"]').value).toBe('Ⅴ-1-1');
+    expect(container.querySelector('[data-field="activityName"]').value).toBe('上樓梯');
+    expect(container.querySelector('[data-field="indicatorText"]').value).toBe('能獨立地走上樓梯');
+  });
+
   it('renders an existing entry grouped under its domain, with its teacher-entered indicator text (not the system description)', async () => {
     await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫', indicatorText: '能穩定握筆塗鴉' });
 
