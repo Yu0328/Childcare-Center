@@ -267,6 +267,13 @@ button {
   left: 0;
 }
 
+/* The report-type-select home screen's title is a centered pill, not a full-width bar — its
+   import button sits inline next to that pill (flowing with the centered flex row) rather than
+   pinned to the header's outer edge like the editor screens' back/export/import buttons above. */
+.page-header .btn[data-action="import-any-docx"] {
+  position: static;
+}
+
 .page-header__title {
   font-size: 1.4rem;
   display: inline-block;

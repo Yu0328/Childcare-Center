@@ -70,6 +70,25 @@ describe('detectDocxImportType', () => {
   it('returns null for a docx with none of the known markers', async () => {
     expect(await detectDocxImportType(await buildUnrecognizedFile())).toBeNull();
   });
+
+  it('detects a monthly-plan title split across multiple <w:r> runs (real legacy files do this)', async () => {
+    // Regression test: a real hand-typed legacy file (references/月計畫/西瓜班-01月計畫 .docx,
+    // gitignored) has its title text split mid-word across separate runs with no header part —
+    // matching raw XML directly missed it because "課程計畫" was never contiguous in the markup.
+    const zip = new JSZip();
+    zip.file(
+      'word/document.xml',
+      '<w:document><w:body><w:p>' +
+        '<w:r><w:t>某某機構115年01</w:t></w:r>' +
+        '<w:r><w:t>月課</w:t></w:r>' +
+        '<w:r><w:t>程計畫</w:t></w:r>' +
+        '</w:p></w:body></w:document>'
+    );
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const file = new File([blob], 'legacy.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+    expect(await detectDocxImportType(file)).toBe('monthly-plan');
+  });
 });
 
 describe('parseUnifiedDocxImport', () => {

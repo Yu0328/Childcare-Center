@@ -1,38 +1,46 @@
 import JSZip from 'jszip';
 import { parseDocxImport } from './docxImport.js';
 import { parseParentReportDocxImport } from './parentReportDocxImport.js';
-import { parseMonthlyPlanDocxImport } from './monthlyPlanDocxImport.js';
+import { parseMonthlyPlanDocxImport, extractTitleText, parsePeriodFromTitleText } from './monthlyPlanDocxImport.js';
+
+// A real hand-typed legacy file often splits one visible word across multiple <w:r> runs (mixed
+// formatting, copy-paste artifacts) — matching raw XML directly misses text that's contiguous on
+// screen but not contiguous in the markup, so every check below matches against joined <w:t>
+// contents instead. Same extraction monthlyPlanDocxImport.js's own flatJoinedText does.
+function flatJoinedText(xml) {
+  return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
+}
 
 async function readXmlParts(file) {
   const zip = await JSZip.loadAsync(file);
   const documentXml = (await zip.file('word/document.xml')?.async('text')) ?? '';
   const headerNames = Object.keys(zip.files).filter(name => /^word\/header\d*\.xml$/.test(name));
   const headerXmls = await Promise.all(headerNames.map(name => zip.file(name).async('text')));
-  return { documentXml, headerXmls };
+  return { zip, documentXml, headerXmls };
 }
 
-// Cheap regex sniff of each file's raw XML (matching the existing importers' own
-// regex-over-raw-XML convention, not a real XML parser) rather than a full parse, since we only
-// need "which of the three known document types is this" — the real parser for the matched type
-// does the actual precise work.
+// Cheap sniff of each file's text (matching the existing importers' own regex-over-XML
+// convention, not a real XML parser) rather than a full parse, since we only need "which of the
+// three known document types is this" — the real parser for the matched type does the actual
+// precise work.
 export async function detectDocxImportType(file) {
-  const { documentXml, headerXmls } = await readXmlParts(file);
+  const { zip, documentXml, headerXmls } = await readXmlParts(file);
   // docxExport.js/parentReportDocxExport.js put their 幼兒姓名 line in the page header
   // (word/header*.xml), not the body — every marker below is checked against both.
-  const allXml = [documentXml, ...headerXmls].join('\n');
+  const flatText = flatJoinedText([documentXml, ...headerXmls].join('\n'));
 
   // 點滴分享／行為觀察 are section headers parentReportDocxExport.js always emits — unique to
   // this document type, so check first regardless of the other two's own markers.
-  if (/點滴分享|行為觀察/.test(allXml)) return 'parent-report';
+  if (/點滴分享|行為觀察/.test(flatText)) return 'parent-report';
 
-  // Same anchor pattern monthlyPlanDocxImport.js already uses to find its own period — the
-  // title text monthlyPlanDocxExport.js emits ("{period}課程計畫"). Parent-report's own
-  // "每月課程計畫表" title never has digits immediately before 課程計畫, so it can't collide.
-  if (/\d{1,3}年\d{1,2}月課程計畫/.test(allXml)) return 'monthly-plan';
+  // Reuses monthlyPlanDocxImport.js's own period-detection (header-or-body search, plus its
+  // tolerance for a real legacy file's "...課程計" title typo missing the trailing 畫) instead
+  // of a second, narrower pattern here.
+  if (parsePeriodFromTitleText(await extractTitleText(zip, documentXml))) return 'monthly-plan';
 
   // 幼兒姓名 is emitted by both assessment and parent-report exports, but parent-report is
   // already ruled out above by the time we get here.
-  if (/幼兒姓名/.test(allXml)) return 'assessment';
+  if (/幼兒姓名/.test(flatText)) return 'assessment';
 
   return null;
 }

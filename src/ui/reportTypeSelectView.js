@@ -27,12 +27,10 @@ const TYPE_SELECT_OPTIONS = [
 
 export async function renderReportTypeSelectView(container, { onSelectType }) {
   container.innerHTML = `
-    <div class="page-header page-header--editor">
+    <div class="page-header">
       <h2 class="page-header__title">選擇要填寫的表</h2>
-      <div class="page-header__actions">
-        <button type="button" class="btn btn--purple" data-action="import-any-docx">匯入檔案</button>
-        <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
-      </div>
+      <button type="button" class="btn btn--purple" data-action="import-any-docx">匯入檔案</button>
+      <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="type-select-card">
