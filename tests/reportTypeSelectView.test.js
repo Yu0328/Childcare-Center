@@ -106,8 +106,7 @@ describe('renderReportTypeSelectView', () => {
       const container = await renderView();
       selectFile(container.querySelector('[data-field="import-any-file"]'), await buildAssessmentFile());
 
-      await waitFor(() => container.textContent.includes('確認匯入內容'));
-      expect(container.textContent).not.toContain('確認匯入內容（');
+      await waitFor(() => container.textContent.includes('確認匯入內容（適性總表）'));
     });
 
     it('opens the parent-report (適性紀錄) preview for a parent-report file', async () => {
@@ -128,7 +127,7 @@ describe('renderReportTypeSelectView', () => {
       const container = await renderView();
       selectFiles(container.querySelector('[data-field="import-any-file"]'), [await buildAssessmentFile(), await buildMonthlyPlanFile()]);
 
-      await waitFor(() => container.textContent.includes('確認匯入內容') && !container.textContent.includes('確認匯入內容（'));
+      await waitFor(() => container.textContent.includes('確認匯入內容（適性總表）'));
       container.querySelector('[data-action="cancel"]').click();
 
       await waitFor(() => container.textContent.includes('確認匯入內容（課程月計畫）'));

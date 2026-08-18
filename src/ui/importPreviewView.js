@@ -30,7 +30,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
   container.innerHTML = `
     <div class="page-header">
       <button type="button" class="btn btn--ghost" data-action="cancel">← 取消匯入</button>
-      <h2 class="page-header__title">確認匯入內容</h2>
+      <h2 class="page-header__title">確認匯入內容（適性總表）</h2>
     </div>
     ${
       parsed.warnings.length > 0
