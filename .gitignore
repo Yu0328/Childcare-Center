@@ -10,4 +10,4 @@ node_modules/
 dist/
 site/
 .superpowers/
-.claude/settings.local.json
+.claude/
