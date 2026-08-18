@@ -96,6 +96,9 @@ button {
 }
 
 .app-header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
   font-size: 1.05rem;
   color: var(--text-primary);
@@ -104,6 +107,13 @@ button {
   border: none;
   padding: 0;
   cursor: pointer;
+}
+
+.app-header__brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .app-version {
