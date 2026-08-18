@@ -1315,6 +1315,13 @@ fieldset.panel-form__field.import-preview__child legend {
   text-align: center;
 }
 
+.backup-progress {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  margin-top: 0.4em;
+}
+
 /* Marks a card-list row (or a child row) whose form/report/plan was created by docx import and
    hasn't been opened yet — cleared the moment its editor is opened (see formEditorView.js and
    its siblings), so this never persists as stale "unread" noise. */
@@ -28649,8 +28656,9 @@ var CFormApp = (() => {
     for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type });
   }
-  async function exportBackup() {
+  async function exportBackup(onProgress) {
     const children = await listChildren();
+    onProgress?.(0, children.length);
     const forms = [];
     const entries = [];
     const parentReports = [];
@@ -28659,7 +28667,7 @@ var CFormApp = (() => {
     const developmentRecordEntries = [];
     const behaviorObservations = [];
     const highlightEntries = [];
-    for (const child of children) {
+    for (const [childIndex, child] of children.entries()) {
       const childForms = await withContext(`\u8B80\u53D6\u300C${child.name}\u300D\u7684\u9069\u6027\u7E3D\u8868`, () => listFormsForChild(child.id));
       forms.push(...childForms);
       for (const form of childForms) {
@@ -28712,6 +28720,7 @@ var CFormApp = (() => {
           highlightEntries.push({ ...highlight, photos });
         }
       }
+      onProgress?.(childIndex + 1, children.length);
     }
     const monthlyCoursePlans = await withContext("\u8B80\u53D6\u8AB2\u7A0B\u6708\u8A08\u756B", () => listMonthlyCoursePlans());
     const planSlots = [];
@@ -29107,15 +29116,31 @@ var CFormApp = (() => {
       }
       errorEl.textContent = text;
     }
+    function showProgress(done, total) {
+      let bar = messageContainer.querySelector('[data-progress="backup"]');
+      if (!bar) {
+        bar = document.createElement("progress");
+        bar.dataset.progress = "backup";
+        bar.className = "backup-progress";
+        messageContainer.appendChild(bar);
+      }
+      bar.max = total;
+      bar.value = done;
+    }
+    function hideProgress() {
+      messageContainer.querySelector('[data-progress="backup"]')?.remove();
+    }
     exportButton.addEventListener("click", async () => {
       if (!isUnlocked()) return;
       try {
-        const parts = await exportBackup();
+        const parts = await exportBackup(showProgress);
         const blob = new Blob(parts, { type: "application/json" });
-        downloadBlob(blob, `c-form-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`);
+        downloadBlob(blob, `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}_\u5099\u4EFD.json`);
         showMessage("");
       } catch (err) {
         showMessage(`${EXPORT_FAILED_MESSAGE}\uFF08${err?.message || err}\uFF09`);
+      } finally {
+        hideProgress();
       }
     });
     importInput.addEventListener("change", async () => {
