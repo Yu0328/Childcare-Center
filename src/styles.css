@@ -15,6 +15,8 @@
   --brand-tint: #dceafb;
   --danger: #d03b3b;
   --danger-bg: #fbeaea;
+  --success: #2f8f5b;
+  --success-bg: #e7f5ec;
 
   /* A warm accent for "human" touches (title block, header buttons) — distinct from the
      cooler domain hues below so it reads as its own thing, not a 6th domain color. */
@@ -267,11 +269,21 @@ button {
   left: 0;
 }
 
-/* The report-type-select home screen's title is a centered pill, not a full-width bar — its
-   import button sits inline next to that pill (flowing with the centered flex row) rather than
-   pinned to the header's outer edge like the editor screens' back/export/import buttons above. */
-.page-header .btn[data-action="import-any-docx"] {
-  position: static;
+/* The report-type-select home screen's header would otherwise span the full 960px #app width
+   while its actual content (.type-select-card below) is a narrow 420px centered column — pinning
+   the import button to the header's own right:0 then put it far from the title pill. Matching the
+   header's width to that same column keeps the title centered *and* the button at a near, natural
+   right-of-title spot, while still following every other screen's "actions live top-right"
+   convention (childListView.js/monthlyPlanListView.js) for muscle-memory consistency. */
+.page-header--narrow {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.page-header--narrow .btn[data-action="import-any-docx"] {
+  left: auto;
+  right: 0;
 }
 
 .page-header__title {
@@ -1256,6 +1268,26 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 .field-error--center {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.field-success {
+  color: var(--success);
+  background: var(--success-bg);
+  border-radius: 8px;
+  padding: 0.5em 0.8em;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+.field-success:empty {
+  display: none;
+}
+
+.field-success--center {
   max-width: 420px;
   margin-left: auto;
   margin-right: auto;

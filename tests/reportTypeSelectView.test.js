@@ -140,5 +140,16 @@ describe('renderReportTypeSelectView', () => {
       await waitFor(() => container.querySelector('[data-error="import"]')?.textContent.includes('random.docx'));
       expect(container.querySelector('.type-select')).not.toBeNull();
     });
+
+    it('shows a success summary naming the file once its import is confirmed', async () => {
+      const container = await renderView();
+      selectFile(container.querySelector('[data-field="import-any-file"]'), await buildAssessmentFile());
+
+      await waitFor(() => container.textContent.includes('確認匯入內容（適性總表）'));
+      container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+      await waitFor(() => container.querySelector('[data-success="import"]')?.textContent.includes('陳小安.docx'));
+      expect(container.querySelector('[data-success="import"]').textContent).toBe('已成功匯入：陳小安.docx');
+    });
   });
 });

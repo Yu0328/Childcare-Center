@@ -119,4 +119,23 @@ describe('monthlyPlanListView', () => {
     expect(container.querySelector('[data-field="period-year"]').value).toBe('115');
     expect(container.querySelector('[data-field="period-month"]').value).toBe('6');
   });
+
+  it('shows a success summary naming the file once the import is confirmed', async () => {
+    await renderMonthlyPlanListView(container, { onSelectPlan: vi.fn(), onBack: vi.fn() });
+
+    const file = await buildSampleMonthlyPlanDocxFile();
+    selectFile(container.querySelector('[data-field="import-monthly-plan-file"]'), file);
+    await waitFor(() => container.textContent.includes('確認匯入內容（課程月計畫）'));
+
+    // 林小明 doesn't match an existing child, so the new-child birth date fields must be filled
+    // in before the form validates (the docx export has no birth date to auto-fill).
+    container.querySelector('[data-field="child-new-birthDate-year-0"]').value = '2024';
+    container.querySelector('[data-field="child-new-birthDate-month-0"]').value = '7';
+    container.querySelector('[data-field="child-new-birthDate-day-0"]').value = '1';
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => container.querySelector('[data-success="import"]')?.textContent.includes('115年06月課程計畫.docx'));
+    expect(container.querySelector('[data-success="import"]').textContent).toBe('已成功匯入：115年06月課程計畫.docx');
+  });
 });
