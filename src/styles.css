@@ -603,6 +603,30 @@ fieldset.panel-form__field.import-preview__child {
   background: var(--page-bg);
 }
 
+/* A bare <legend> straddles the fieldset's top border with no visual weight of its own — reads as
+   the name being awkwardly squashed onto the edge. Styled as a highlighter-style tag (reusing the
+   same warm tint as .page-header__title's pill) instead, so the straddle reads as an intentional
+   name tag, not a layout accident. */
+fieldset.panel-form__field.import-preview__child legend {
+  padding: 0.3em 0.7em;
+  margin-left: 0.5rem;
+  background: var(--warm-tint);
+  border: 1px solid var(--warm-border);
+  border-radius: 999px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--warm-accent);
+}
+
+/* 適性紀錄 import preview: its 4 sections (課程計畫表/適性發展紀錄表/行為觀察/點滴分享) are
+   independent lists, not repeated per-child cards like .import-preview__children — a 2-up grid on
+   wide screens uses the panel's extra width without implying they're related the way cards are. */
+.import-preview__sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 0 2rem;
+}
+
 .import-preview__new-child {
   display: flex;
   flex-direction: column;

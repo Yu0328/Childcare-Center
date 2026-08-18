@@ -39,25 +39,29 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
           </ul>`
         : ''
     }
-    <form class="panel-form" data-action="confirm-import">
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
       <h3 class="panel-form__title">幼兒基本資料</h3>
-      <label class="panel-form__field">姓名 <input data-field="name" value="${escapeHtml(parsed.child.name ?? '')}" required></label>
-      <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? '')}" required></label>
-      <label class="panel-form__field">
-        月齡階段
-        <select data-field="tier">
-          ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsed.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        紀錄年月
-        ${periodSelectsHtml({
-          yearFieldName: 'period-year',
-          monthFieldName: 'period-month',
-          selectedYear: parsedYear ?? defaultRocYear,
-          selectedMonth: parsedMonth ?? defaultMonth,
-        })}
-      </label>
+      <div class="panel-form__row">
+        <label class="panel-form__field">姓名 <input data-field="name" value="${escapeHtml(parsed.child.name ?? '')}" required></label>
+        <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? '')}" required></label>
+      </div>
+      <div class="panel-form__row">
+        <label class="panel-form__field">
+          月齡階段
+          <select data-field="tier">
+            ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsed.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          紀錄年月
+          ${periodSelectsHtml({
+            yearFieldName: 'period-year',
+            monthFieldName: 'period-month',
+            selectedYear: parsedYear ?? defaultRocYear,
+            selectedMonth: parsedMonth ?? defaultMonth,
+          })}
+        </label>
+      </div>
       <label class="entry-form__checkbox">
         <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? 'checked' : ''}> 涵蓋一段期間（跨多個月份）
       </label>

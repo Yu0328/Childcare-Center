@@ -71,32 +71,46 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
         ? `<ul class="import-preview__warnings">${parsed.warnings.map(w => `<li class="field-error">${escapeHtml(w)}</li>`).join('')}</ul>`
         : ''
     }
-    <form class="panel-form" data-action="confirm-import">
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
       <h3 class="panel-form__title">幼兒基本資料</h3>
-      <label class="panel-form__field">姓名 <input data-field="name" value="${escapeHtml(parsed.child.name ?? '')}" required></label>
-      <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? '')}" required></label>
-      <label class="panel-form__field">
-        月齡階段
-        <select data-field="tier">
-          ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsed.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        紀錄年月
-        ${periodSelectsHtml({ yearFieldName: 'period-year', monthFieldName: 'period-month', selectedYear: parsedYear ?? defaultRocYear, selectedMonth: parsedMonth ?? defaultMonth })}
-      </label>
+      <div class="panel-form__row">
+        <label class="panel-form__field">姓名 <input data-field="name" value="${escapeHtml(parsed.child.name ?? '')}" required></label>
+        <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? '')}" required></label>
+      </div>
+      <div class="panel-form__row">
+        <label class="panel-form__field">
+          月齡階段
+          <select data-field="tier">
+            ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsed.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          紀錄年月
+          ${periodSelectsHtml({ yearFieldName: 'period-year', monthFieldName: 'period-month', selectedYear: parsedYear ?? defaultRocYear, selectedMonth: parsedMonth ?? defaultMonth })}
+        </label>
+      </div>
 
-      <h3 class="panel-form__title">課程計畫表（共 ${parsed.coursePlanEntries.length} 項）</h3>
-      <ul class="import-preview__entry-list">${parsed.coursePlanEntries.map(coursePlanEntryRow).join('') || '<li>沒有偵測到任何項目</li>'}</ul>
+      <div class="import-preview__sections">
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">課程計畫表（共 ${parsed.coursePlanEntries.length} 項）</h3>
+          <ul class="import-preview__entry-list">${parsed.coursePlanEntries.map(coursePlanEntryRow).join('') || '<li>沒有偵測到任何項目</li>'}</ul>
+        </section>
 
-      <h3 class="panel-form__title">適性發展紀錄表（共 ${parsed.developmentRecordBlocks.length} 段）</h3>
-      <ul class="import-preview__entry-list">${parsed.developmentRecordBlocks.map(developmentRecordRow).join('') || '<li>沒有偵測到任何段落</li>'}</ul>
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">適性發展紀錄表（共 ${parsed.developmentRecordBlocks.length} 段）</h3>
+          <ul class="import-preview__entry-list">${parsed.developmentRecordBlocks.map(developmentRecordRow).join('') || '<li>沒有偵測到任何段落</li>'}</ul>
+        </section>
 
-      <h3 class="panel-form__title">行為觀察（共 ${parsed.behaviorObservations.length} 筆）</h3>
-      <ul class="import-preview__entry-list">${parsed.behaviorObservations.map(behaviorObservationRow).join('') || '<li>沒有偵測到任何觀察</li>'}</ul>
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">行為觀察（共 ${parsed.behaviorObservations.length} 筆）</h3>
+          <ul class="import-preview__entry-list">${parsed.behaviorObservations.map(behaviorObservationRow).join('') || '<li>沒有偵測到任何觀察</li>'}</ul>
+        </section>
 
-      <h3 class="panel-form__title">點滴分享（共 ${parsed.highlightEntries.length} 組）</h3>
-      <ul class="import-preview__entry-list">${parsed.highlightEntries.map(highlightRow).join('') || '<li>沒有偵測到任何照片</li>'}</ul>
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">點滴分享（共 ${parsed.highlightEntries.length} 組）</h3>
+          <ul class="import-preview__entry-list">${parsed.highlightEntries.map(highlightRow).join('') || '<li>沒有偵測到任何照片</li>'}</ul>
+        </section>
+      </div>
 
       <button type="submit" class="btn btn--primary">確認匯入</button>
       <p class="field-error" data-error></p>
