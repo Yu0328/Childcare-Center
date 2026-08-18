@@ -133,17 +133,27 @@ export async function exportBackup() {
     );
   }
 
-  return JSON.stringify(
-    {
-      version: BACKUP_VERSION,
-      children, forms, entries,
-      parentReports, coursePlanEntries, courseOccurrences,
-      developmentRecordEntries, behaviorObservations, highlightEntries,
-      monthlyCoursePlans, planSlots, planSlotItems, childItemOverrides,
-    },
-    null,
-    2
-  );
+  // Returns an array of string parts (for `new Blob(parts)`) rather than one JSON.stringify'd
+  // string: once accumulated 點滴分享 photos push the combined base64 payload past ~536 million
+  // characters, a single JSON.stringify over everything throws "RangeError: Invalid string
+  // length" on V8 (Chrome/Edge/Brave — reported on Windows) even though Safari's higher
+  // string-length ceiling lets the exact same data through (reported working on iPhone/Mac).
+  // highlightEntries carries all the photo base64 data, so it's serialized entry-by-entry into
+  // separate parts instead of being embedded in the one shell JSON.stringify call.
+  const shellJson = JSON.stringify({
+    version: BACKUP_VERSION,
+    children, forms, entries,
+    parentReports, coursePlanEntries, courseOccurrences,
+    developmentRecordEntries, behaviorObservations,
+    monthlyCoursePlans, planSlots, planSlotItems, childItemOverrides,
+  });
+  const parts = [shellJson.slice(0, -1), ',"highlightEntries":['];
+  highlightEntries.forEach((entry, i) => {
+    if (i > 0) parts.push(',');
+    parts.push(JSON.stringify(entry));
+  });
+  parts.push(']}');
+  return parts;
 }
 
 async function importV1Or2Children(data) {
@@ -275,8 +285,7 @@ async function importMonthlyCoursePlans(data, childIdMap) {
   }
 }
 
-export async function importBackup(json) {
-  const data = JSON.parse(json);
+async function importParsedBackup(data) {
   if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
     throw new Error(`Unsupported backup version: ${data.version}`);
   }
@@ -290,4 +299,99 @@ export async function importBackup(json) {
   if (data.version === 3) {
     await importMonthlyCoursePlans(data, childIdMap);
   }
+}
+
+export async function importBackup(json) {
+  const data = JSON.parse(json);
+  await importParsedBackup(data);
+}
+
+// Reading a huge backup file the normal way (`file.text()` then `JSON.parse`) hits the same V8
+// string-length ceiling that exportBackup() used to hit before the fix above — once the file's
+// own text is big enough, `file.text()` itself throws. This streams the file instead, splitting
+// the base64-heavy "highlightEntries" array into individually-parsed elements so no single JS
+// string ever needs to hold more than one element (or one stream chunk). It only understands the
+// exact layout the current exportBackup() produces (no extra whitespace, "highlightEntries" as
+// the last key) — a pre-fix backup large enough to need this could never have been exported
+// successfully in the first place, so there's no old-format case to support here.
+export const HUGE_IMPORT_THRESHOLD_BYTES = 400 * 1024 * 1024;
+
+export async function importHugeBackupFile(file) {
+  const marker = ',"highlightEntries":[';
+  const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+
+  let buffer = '';
+  let prefix = null;
+  let suffix = '';
+  let mode = 'seeking-marker'; // -> 'between-elements' -> 'in-element' -> 'done'
+  let elementBuf = '';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  const highlightEntries = [];
+
+  // Scans `buffer` for complete top-level array elements, JSON-string- and escape-aware so a
+  // caption/note containing literal {, }, [, ], or " doesn't miscount bracket depth.
+  function consumeBuffer() {
+    let i = 0;
+    while (i < buffer.length) {
+      const ch = buffer[i];
+      if (mode === 'between-elements') {
+        if (ch === ']') {
+          suffix += buffer.slice(i + 1);
+          mode = 'done';
+          buffer = '';
+          return;
+        }
+        if (ch === ',') { i += 1; continue; }
+        mode = 'in-element';
+        depth = 0;
+        inString = false;
+        escaped = false;
+        elementBuf = '';
+        continue; // reprocess this char as the start of the element
+      }
+      elementBuf += ch;
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === '"') inString = false;
+      } else if (ch === '"') {
+        inString = true;
+      } else if (ch === '{' || ch === '[') {
+        depth += 1;
+      } else if (ch === '}' || ch === ']') {
+        depth -= 1;
+        if (depth === 0) {
+          highlightEntries.push(JSON.parse(elementBuf));
+          elementBuf = '';
+          mode = 'between-elements';
+        }
+      }
+      i += 1;
+    }
+    buffer = '';
+  }
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (mode === 'done') { suffix += value; continue; }
+    buffer += value;
+    if (mode === 'seeking-marker') {
+      const idx = buffer.indexOf(marker);
+      if (idx === -1) continue; // keep accumulating; the shell (no photos) stays small regardless of file size
+      prefix = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + marker.length);
+      mode = 'between-elements';
+    }
+    if (mode !== 'done') consumeBuffer();
+  }
+
+  if (prefix === null) {
+    throw new Error('找不到 highlightEntries 區塊，這份備份檔可能已損毀或格式不支援分段匯入');
+  }
+
+  const data = { ...JSON.parse(prefix + suffix), highlightEntries };
+  await importParsedBackup(data);
 }

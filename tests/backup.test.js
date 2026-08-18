@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
 import * as parentReportDb from '../src/storage/parentReportDb.js';
 import { addChild, addForm, addEntry, listChildren, listFormsForChild, listEntriesForForm, clearAllData } from '../src/storage/db.js';
-import { exportBackup, importBackup } from '../src/storage/backup.js';
+import { exportBackup, importBackup, importHugeBackupFile } from '../src/storage/backup.js';
 
 // jsdom's Blob polyfill isn't recognized by Node's native structuredClone (used internally by
 // fake-indexeddb to clone stored values), so a Blob round-tripped through IndexedDB in this
@@ -27,13 +27,13 @@ describe('backup export/import', () => {
     await clearAllData();
   });
 
-  it('exports all data as a JSON string', async () => {
+  it('exports all data as JSON parts that concatenate into a valid document', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
     await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
 
-    const json = await exportBackup();
-    const data = JSON.parse(json);
+    const parts = await exportBackup();
+    const data = JSON.parse(parts.join(''));
 
     expect(data.version).toBe(3);
     expect(data.children).toHaveLength(1);
@@ -46,9 +46,9 @@ describe('backup export/import', () => {
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
     await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
 
-    const json = await exportBackup();
+    const parts = await exportBackup();
     await clearAllData();
-    await importBackup(json);
+    await importBackup(parts.join(''));
 
     const children = await listChildren();
     expect(children).toHaveLength(1);
@@ -82,9 +82,9 @@ describe('backup export/import', () => {
       caption: '我最喜歡騎車車了！',
     });
 
-    const json = await exportBackup();
+    const parts = await exportBackup();
     await clearAllData();
-    await importBackup(json);
+    await importBackup(parts.join(''));
 
     const [restoredChild] = await listChildren();
     const [restoredReport] = await listParentReportsForChild(restoredChild.id);
@@ -108,6 +108,71 @@ describe('backup export/import', () => {
     const restoredBytes = new Uint8Array(await restoredHighlight.photos[0].blob.arrayBuffer());
     expect([...restoredBytes]).toEqual([1, 2, 3, 4]);
     expect(restoredHighlight.photos[0].width).toBe(100);
+  });
+
+  it('keeps each highlight entry as its own export part, so no single JSON.stringify call ever spans the whole photo payload', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+    await addHighlightEntry({ reportId: report.id, photos: [{ blob: new Blob(['a']), width: 1, height: 1 }], caption: '第一張' });
+    await addHighlightEntry({ reportId: report.id, photos: [{ blob: new Blob(['b']), width: 1, height: 1 }], caption: '第二張' });
+
+    const parts = await exportBackup();
+    // One shell part (children/forms/... up through the highlightEntries key), one part per
+    // highlight entry, one comma between them, one closing part — never one part holding both
+    // entries' base64 data concatenated together.
+    expect(parts.filter(p => p.includes('第一張') || p.includes('第二張'))).toHaveLength(2);
+
+    await clearAllData();
+    await importBackup(parts.join(''));
+    const [restoredReport] = await listParentReportsForChild((await listChildren())[0].id);
+    const restoredHighlights = await listHighlightEntriesForReport(restoredReport.id);
+    expect(restoredHighlights.map(h => h.caption).sort()).toEqual(['第一張', '第二張']);
+  });
+
+  it('imports a large backup by streaming it, without ever reading the whole file as one string', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+    // Captions deliberately contain JSON-special characters ({, }, [, ], ", \) to prove the
+    // streaming scanner is string/escape-aware, not a naive bracket counter.
+    await addHighlightEntry({
+      reportId: report.id,
+      photos: [{ blob: new Blob(['a']), width: 1, height: 1 }],
+      caption: '第一張：{哈囉} [測試] "引號" 反斜線\\結束',
+    });
+    await addHighlightEntry({
+      reportId: report.id,
+      photos: [
+        { blob: new Blob(['b']), width: 1, height: 1 },
+        { blob: new Blob(['c']), width: 2, height: 2 },
+      ],
+      caption: '第二張，多張照片',
+    });
+    await addHighlightEntry({ reportId: report.id, photos: [], caption: '第三張，沒有照片' });
+
+    const parts = await exportBackup();
+    // A real Blob (not jsdom's, which lacks .stream()) — same interface importHugeBackupFile
+    // needs from a real File dropped into the file input.
+    const file = new Blob(parts, { type: 'application/json' });
+
+    await clearAllData();
+    await importHugeBackupFile(file);
+
+    const [restoredReport] = await listParentReportsForChild((await listChildren())[0].id);
+    const restoredHighlights = await listHighlightEntriesForReport(restoredReport.id);
+    expect(restoredHighlights.map(h => h.caption).sort()).toEqual(
+      ['第一張：{哈囉} [測試] "引號" 反斜線\\結束', '第三張，沒有照片', '第二張，多張照片'].sort()
+    );
+    const multiPhotoEntry = restoredHighlights.find(h => h.caption === '第二張，多張照片');
+    expect(multiPhotoEntry.photos).toHaveLength(2);
+    const restoredBytes = new Uint8Array(await multiPhotoEntry.photos[0].blob.arrayBuffer());
+    expect([...restoredBytes]).toEqual([...new TextEncoder().encode('b')]);
+  });
+
+  it('throws a clear error streaming a backup with no highlightEntries block instead of hanging or silently dropping data', async () => {
+    const v1Json = JSON.stringify({ version: 1, children: [], forms: [], entries: [] });
+    const file = new Blob([v1Json], { type: 'application/json' });
+
+    await expect(importHugeBackupFile(file)).rejects.toThrow('找不到 highlightEntries 區塊');
   });
 
   it('still imports a version-1 backup file (no parent-report data) without error, mapping its achieved flag to a status', async () => {
@@ -142,9 +207,9 @@ describe('backup export/import', () => {
     const item = await addPlanSlotItem({ slotId: slot.id, indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類' });
     await setChildItemOverride({ planId: plan.id, childId: child.id, itemId: item.id, notAchieved: true, replaced: false });
 
-    const json = await exportBackup();
+    const parts = await exportBackup();
     await clearAllData();
-    await importBackup(json);
+    await importBackup(parts.join(''));
 
     const [restoredChild] = await listChildren();
     const [restoredPlan] = await listMonthlyCoursePlans();
@@ -167,8 +232,8 @@ describe('backup export/import', () => {
     const child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
     await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
 
-    const json = await exportBackup();
-    const data = JSON.parse(json);
+    const parts = await exportBackup();
+    const data = JSON.parse(parts.join(''));
     // Simulate a stale backup where a plan still references a child no longer present in
     // `children` — e.g. one written before deleteChild cascaded to monthly plans (see db.js),
     // or hand-edited/corrupted. The import must not carry that dead reference forward as

@@ -7,7 +7,7 @@ import { renderParentReportEditorView } from './ui/parentReportEditorView.js';
 import { renderAggregateCoursePlanView } from './ui/aggregateCoursePlanView.js';
 import { renderMonthlyPlanListView } from './ui/monthlyPlanListView.js';
 import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
-import { exportBackup, importBackup } from './storage/backup.js';
+import { exportBackup, importBackup, importHugeBackupFile, HUGE_IMPORT_THRESHOLD_BYTES } from './storage/backup.js';
 import { downloadBlob } from './export/downloadBlob.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 
@@ -143,8 +143,8 @@ export function wireBackupControls({
   exportButton.addEventListener('click', async () => {
     if (!isUnlocked()) return; // belt-and-suspenders: the button should already be disabled
     try {
-      const json = await exportBackup();
-      const blob = new Blob([json], { type: 'application/json' });
+      const parts = await exportBackup();
+      const blob = new Blob(parts, { type: 'application/json' });
       downloadBlob(blob, `c-form-backup-${new Date().toISOString().slice(0, 10)}.json`);
       showMessage('');
     } catch (err) {
@@ -167,8 +167,14 @@ export function wireBackupControls({
     }
 
     try {
-      const text = await file.text();
-      await importBackup(text);
+      // A file at/above the threshold can't be read via file.text() at all (same V8
+      // string-length ceiling exportBackup() used to hit) — stream it instead.
+      if (file.size >= HUGE_IMPORT_THRESHOLD_BYTES) {
+        await importHugeBackupFile(file);
+      } else {
+        const text = await file.text();
+        await importBackup(text);
+      }
       showMessage('');
     } catch (err) {
       // Do not reload after a failed import: the store may be half-written and a reload
