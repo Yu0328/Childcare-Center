@@ -27035,6 +27035,10 @@ var CFormApp = (() => {
   }
 
   // src/ui/developmentRecordTabView.js
+  function indicatorItemNumber2(code) {
+    const match = /-(\d+)$/.exec(String(code ?? ""));
+    return match ? Number(match[1]) : Infinity;
+  }
   function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = null }) {
     if (entries.length === 0) return "<p>\u9019\u500B\u9818\u57DF\u5C1A\u672A\u5728\u8AB2\u7A0B\u8A08\u756B\u8868\u586B\u5BEB\u4EFB\u4F55\u9805\u76EE</p>";
     return entries.map(
@@ -27103,14 +27107,11 @@ var CFormApp = (() => {
       if (!byDomain.has(record.domain)) byDomain.set(record.domain, []);
       byDomain.get(record.domain).push(record);
     }
-    const domainEntries = allEntries.filter((entry) => {
-      const indicator = getIndicator(entry.indicatorCode);
-      return indicator && indicator.domain === Number(selectedDomain);
-    });
     const entriesByDomainNumber = (domainNumber) => allEntries.filter((entry) => {
       const indicator = getIndicator(entry.indicatorCode);
       return indicator && indicator.domain === Number(domainNumber);
-    });
+    }).sort((a, b) => indicatorItemNumber2(a.indicatorCode) - indicatorItemNumber2(b.indicatorCode));
+    const domainEntries = entriesByDomainNumber(selectedDomain);
     const previousDomainCards = [...container.querySelectorAll(".domain-card")];
     const previousOpenDomains = new Set(previousDomainCards.filter((el) => el.open).map((el) => el.dataset.domain));
     const hadPreviousRender = previousDomainCards.length > 0;
