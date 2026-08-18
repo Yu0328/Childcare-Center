@@ -592,28 +592,19 @@ fieldset.panel-form__field legend {
   gap: 1rem;
 }
 
-.import-preview__child {
-  display: flex;
-  flex-direction: column;
+/* Specificity must beat fieldset.panel-form__field's border:none/padding:0 reset above (0,1,1),
+   since this fieldset carries both classes at once — plain .import-preview__child (0,1,0) would
+   lose regardless of source order. */
+fieldset.panel-form__field.import-preview__child {
+  margin: 0;
+  padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--page-bg);
-  overflow: hidden; /* clips the header bar's square corners to the card's own rounded corners */
 }
 
-.import-preview__child-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
-  background: var(--warm-tint);
-  border-bottom: 1px solid var(--warm-border);
-  color: var(--warm-accent);
-  cursor: pointer;
-}
-
-.import-preview__child-name {
-  font-size: 1.05rem;
+fieldset.panel-form__field.import-preview__child legend {
+  font-size: 1.1rem;
   font-weight: 700;
 }
 

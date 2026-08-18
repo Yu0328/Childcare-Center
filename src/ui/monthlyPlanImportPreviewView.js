@@ -36,38 +36,35 @@ function childBlock(parsedChild, index, existingChildren) {
   const itemCount = parsedChild.overrides.length;
 
   return `
-    <div class="import-preview__child" data-child-block="${index}">
-      <label class="import-preview__child-header">
-        <input type="checkbox" data-child-include="${index}" checked>
-        <span class="import-preview__child-name">${escapeHtml(parsedChild.name || '（未知姓名）')}</span>
+    <fieldset class="panel-form__field import-preview__child" data-child-block="${index}">
+      <legend>
+        <label><input type="checkbox" data-child-include="${index}" checked> ${escapeHtml(parsedChild.name || '（未知姓名）')}</label>
+      </legend>
+      <label class="panel-form__field">
+        比對小朋友
+        <select data-child-select="${index}">
+          <option value="${NEW_CHILD_VALUE}" ${preselected === NEW_CHILD_VALUE ? 'selected' : ''}>建立新小朋友</option>
+          ${existingChildren
+            .map(c => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? 'selected' : ''}>${escapeHtml(c.name)}（${escapeHtml(c.birthDate)}）</option>`)
+            .join('')}
+        </select>
       </label>
-      <div class="import-preview__child-body">
+      <div class="import-preview__new-child" data-child-new-fields="${index}" ${preselected === NEW_CHILD_VALUE ? '' : 'hidden'}>
+        <label class="panel-form__field">姓名 <input data-child-new-name="${index}" value="${escapeHtml(parsedChild.name ?? '')}"></label>
         <label class="panel-form__field">
-          比對小朋友
-          <select data-child-select="${index}">
-            <option value="${NEW_CHILD_VALUE}" ${preselected === NEW_CHILD_VALUE ? 'selected' : ''}>建立新小朋友</option>
-            ${existingChildren
-              .map(c => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? 'selected' : ''}>${escapeHtml(c.name)}（${escapeHtml(c.birthDate)}）</option>`)
-              .join('')}
-          </select>
+          出生日期
+          ${newChildBirthDateHtml(index)}
         </label>
-        <div class="import-preview__new-child" data-child-new-fields="${index}" ${preselected === NEW_CHILD_VALUE ? '' : 'hidden'}>
-          <label class="panel-form__field">姓名 <input data-child-new-name="${index}" value="${escapeHtml(parsedChild.name ?? '')}"></label>
-          <label class="panel-form__field">
-            出生日期
-            ${newChildBirthDateHtml(index)}
-          </label>
-        </div>
-        <label class="panel-form__field">
-          月齡階段
-          <select data-child-tier="${index}">
-            <option value="" ${parsedChild.tier ? '' : 'selected'}>請選擇</option>
-            ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsedChild.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
-          </select>
-        </label>
-        <p class="import-preview__entry-note">共 ${itemCount} 項標記為未達成／請假／更換課程</p>
       </div>
-    </div>
+      <label class="panel-form__field">
+        月齡階段
+        <select data-child-tier="${index}">
+          <option value="" ${parsedChild.tier ? '' : 'selected'}>請選擇</option>
+          ${TIERS.map(t => `<option value="${t.code}" ${t.code === parsedChild.tier ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
+        </select>
+      </label>
+      <p class="import-preview__entry-note">共 ${itemCount} 項標記為未達成／請假／更換課程</p>
+    </fieldset>
   `;
 }
 
