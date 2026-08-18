@@ -613,6 +613,19 @@ fieldset.panel-form__field legend {
   padding: 0.3rem 0;
 }
 
+/* 適性發展紀錄表's "勾選要引用的項目" checkboxes only — flags an entry that has a 請假/更換課程/
+   發展中 occurrence, same red/strikethrough language as .entry-row__date--flag and
+   .entry-row--absent/--course-changed in courseplanTabView's own occurrence rows. Deliberately not
+   applied to existingRecordCard's saved entry-list lines or the Word export (see
+   developmentRecordTabView.js's checkboxFlagClass for why). */
+.panel-form__checkbox-row--flag {
+  color: var(--danger);
+}
+.panel-form__checkbox-row--absent,
+.panel-form__checkbox-row--course-changed {
+  text-decoration: line-through;
+}
+
 /* Standalone-page variant for the 課程月計畫 import preview: unlike .panel-form--wide below, this
    form is the only thing on screen (no sibling tab-layout column to protect), and it can hold many
    children's blocks (see .import-preview__children), so it widens much further and isn't sticky. */
@@ -27039,11 +27052,17 @@ var CFormApp = (() => {
     const match = /-(\d+)$/.exec(String(code ?? ""));
     return match ? Number(match[1]) : Infinity;
   }
-  function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = null }) {
+  function checkboxFlagClass(occurrences) {
+    if (occurrences.some((o) => o.courseChanged)) return " panel-form__checkbox-row--flag panel-form__checkbox-row--course-changed";
+    if (occurrences.some((o) => o.absent)) return " panel-form__checkbox-row--flag panel-form__checkbox-row--absent";
+    if (occurrences.some((o) => o.status === "developing")) return " panel-form__checkbox-row--flag";
+    return "";
+  }
+  function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = null, occurrencesByEntryId = {} }) {
     if (entries.length === 0) return "<p>\u9019\u500B\u9818\u57DF\u5C1A\u672A\u5728\u8AB2\u7A0B\u8A08\u756B\u8868\u586B\u5BEB\u4EFB\u4F55\u9805\u76EE</p>";
     return entries.map(
       (entry) => `
-      <label class="panel-form__checkbox-row">
+      <label class="panel-form__checkbox-row${checkboxFlagClass(occurrencesByEntryId[entry.id] || [])}">
         <input type="checkbox" data-${checkboxAttr}="${escapeHtml(entry.id)}" ${recordId !== null ? `data-record-id="${escapeHtml(recordId)}"` : ""} ${checkedIds.includes(entry.id) ? "checked" : ""}>
         ${escapeHtml(entry.indicatorCode)} \u3010${escapeHtml(entry.activityName)}\u3011${escapeHtml(entry.indicatorText || "")}
       </label>
@@ -27054,7 +27073,7 @@ var CFormApp = (() => {
     const narrative = record.narrative || "";
     return narrative.length > 12 ? `${narrative.slice(0, 12)}\u2026` : narrative;
   }
-  function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDomainEntries, editDomainValue }) {
+  function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDomainEntries, editDomainValue, occurrencesByEntryId }) {
     const lines = record.courseEntryIds.map((id) => coursePlanEntriesById.get(id)).filter(Boolean).map((entry) => {
       const indicator = getIndicator(entry.indicatorCode);
       return `<li>${escapeHtml(entry.indicatorCode)}\u3000${escapeHtml(indicator ? indicator.description : "")}</li>`;
@@ -27069,7 +27088,7 @@ var CFormApp = (() => {
       </label>
       <fieldset class="panel-form__field">
         <legend>\u5DF2\u5728\u8AB2\u7A0B\u8A08\u756B\u8868\u586B\u5BEB\u7684\u9805\u76EE\uFF08\u52FE\u9078\u8981\u5F15\u7528\u7684\u9805\u76EE\uFF09</legend>
-        ${checkboxListHtml(editDomainEntries, { checkboxAttr: "record-edit-entry-checkbox", checkedIds: record.courseEntryIds, recordId: record.id })}
+        ${checkboxListHtml(editDomainEntries, { checkboxAttr: "record-edit-entry-checkbox", checkedIds: record.courseEntryIds, recordId: record.id, occurrencesByEntryId })}
       </fieldset>
       <label class="panel-form__field">\u6558\u8FF0 <textarea data-record-edit-field="narrative" data-record-id="${escapeHtml(record.id)}">${escapeHtml(record.narrative)}</textarea></label>
       <div class="entry-form__actions">
@@ -27102,6 +27121,10 @@ var CFormApp = (() => {
     const allEntries = await listCoursePlanEntriesForReport(report.id);
     const records = await listDevelopmentRecordEntriesForReport(report.id);
     const coursePlanEntriesById = new Map(allEntries.map((e) => [e.id, e]));
+    const occurrencesByEntryId = {};
+    for (const entry of allEntries) {
+      occurrencesByEntryId[entry.id] = await listCourseOccurrencesForEntry(entry.id);
+    }
     const byDomain = /* @__PURE__ */ new Map();
     for (const record of records) {
       if (!byDomain.has(record.domain)) byDomain.set(record.domain, []);
@@ -27127,7 +27150,7 @@ var CFormApp = (() => {
         </label>
         <fieldset class="panel-form__field">
           <legend>\u5DF2\u5728\u8AB2\u7A0B\u8A08\u756B\u8868\u586B\u5BEB\u7684\u9805\u76EE\uFF08\u52FE\u9078\u8981\u5F15\u7528\u7684\u9805\u76EE\uFF09</legend>
-          <div class="panel-form__checkbox-grid">${checkboxListHtml(domainEntries, { checkboxAttr: "course-entry-checkbox" })}</div>
+          <div class="panel-form__checkbox-grid">${checkboxListHtml(domainEntries, { checkboxAttr: "course-entry-checkbox", occurrencesByEntryId })}</div>
         </fieldset>
         <label class="panel-form__field">\u6558\u8FF0 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
@@ -27146,7 +27169,8 @@ var CFormApp = (() => {
         return existingRecordCard(record, coursePlanEntriesById, {
           isEditing,
           editDomainEntries: entriesByDomainNumber(domainValue),
-          editDomainValue: domainValue
+          editDomainValue: domainValue,
+          occurrencesByEntryId
         });
       }).join("")}
                 </div>
