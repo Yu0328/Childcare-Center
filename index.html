@@ -1698,9 +1698,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // ../../../node_modules/jszip/dist/jszip.min.js
+  // node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -5990,7 +5990,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // ../../../node_modules/docx/dist/index.mjs
+  // node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -28729,26 +28729,28 @@ var CFormApp = (() => {
         ...await withContext(`\u8B80\u53D6\u8AB2\u7A0B\u6708\u8A08\u756B\u300C${plan.period}\u300D\u7684\u500B\u5225\u8ABF\u6574`, () => listChildItemOverridesForPlan(plan.id))
       );
     }
-    return JSON.stringify(
-      {
-        version: BACKUP_VERSION,
-        children,
-        forms,
-        entries,
-        parentReports,
-        coursePlanEntries,
-        courseOccurrences,
-        developmentRecordEntries,
-        behaviorObservations,
-        highlightEntries,
-        monthlyCoursePlans,
-        planSlots,
-        planSlotItems,
-        childItemOverrides
-      },
-      null,
-      2
-    );
+    const shellJson = JSON.stringify({
+      version: BACKUP_VERSION,
+      children,
+      forms,
+      entries,
+      parentReports,
+      coursePlanEntries,
+      courseOccurrences,
+      developmentRecordEntries,
+      behaviorObservations,
+      monthlyCoursePlans,
+      planSlots,
+      planSlotItems,
+      childItemOverrides
+    });
+    const parts = [shellJson.slice(0, -1), ',"highlightEntries":['];
+    highlightEntries.forEach((entry, i) => {
+      if (i > 0) parts.push(",");
+      parts.push(JSON.stringify(entry));
+    });
+    parts.push("]}");
+    return parts;
   }
   async function importV1Or2Children(data) {
     const childIdMap = /* @__PURE__ */ new Map();
@@ -28865,8 +28867,7 @@ var CFormApp = (() => {
       });
     }
   }
-  async function importBackup(json) {
-    const data = JSON.parse(json);
+  async function importParsedBackup(data) {
     if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
       throw new Error(`Unsupported backup version: ${data.version}`);
     }
@@ -28878,6 +28879,89 @@ var CFormApp = (() => {
     if (data.version === 3) {
       await importMonthlyCoursePlans(data, childIdMap);
     }
+  }
+  async function importBackup(json) {
+    const data = JSON.parse(json);
+    await importParsedBackup(data);
+  }
+  var HUGE_IMPORT_THRESHOLD_BYTES = 400 * 1024 * 1024;
+  async function importHugeBackupFile(file) {
+    const marker = ',"highlightEntries":[';
+    const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    let prefix = null;
+    let suffix = "";
+    let mode = "seeking-marker";
+    let elementBuf = "";
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    const highlightEntries = [];
+    function consumeBuffer() {
+      let i = 0;
+      while (i < buffer.length) {
+        const ch = buffer[i];
+        if (mode === "between-elements") {
+          if (ch === "]") {
+            suffix += buffer.slice(i + 1);
+            mode = "done";
+            buffer = "";
+            return;
+          }
+          if (ch === ",") {
+            i += 1;
+            continue;
+          }
+          mode = "in-element";
+          depth = 0;
+          inString = false;
+          escaped = false;
+          elementBuf = "";
+          continue;
+        }
+        elementBuf += ch;
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (ch === "\\") escaped = true;
+          else if (ch === '"') inString = false;
+        } else if (ch === '"') {
+          inString = true;
+        } else if (ch === "{" || ch === "[") {
+          depth += 1;
+        } else if (ch === "}" || ch === "]") {
+          depth -= 1;
+          if (depth === 0) {
+            highlightEntries.push(JSON.parse(elementBuf));
+            elementBuf = "";
+            mode = "between-elements";
+          }
+        }
+        i += 1;
+      }
+      buffer = "";
+    }
+    for (; ; ) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (mode === "done") {
+        suffix += value;
+        continue;
+      }
+      buffer += value;
+      if (mode === "seeking-marker") {
+        const idx = buffer.indexOf(marker);
+        if (idx === -1) continue;
+        prefix = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + marker.length);
+        mode = "between-elements";
+      }
+      if (mode !== "done") consumeBuffer();
+    }
+    if (prefix === null) {
+      throw new Error("\u627E\u4E0D\u5230 highlightEntries \u5340\u584A\uFF0C\u9019\u4EFD\u5099\u4EFD\u6A94\u53EF\u80FD\u5DF2\u640D\u6BC0\u6216\u683C\u5F0F\u4E0D\u652F\u63F4\u5206\u6BB5\u532F\u5165");
+    }
+    const data = { ...JSON.parse(prefix + suffix), highlightEntries };
+    await importParsedBackup(data);
   }
 
   // src/auth/passwordGate.js
@@ -29026,8 +29110,8 @@ var CFormApp = (() => {
     exportButton.addEventListener("click", async () => {
       if (!isUnlocked()) return;
       try {
-        const json = await exportBackup();
-        const blob = new Blob([json], { type: "application/json" });
+        const parts = await exportBackup();
+        const blob = new Blob(parts, { type: "application/json" });
         downloadBlob(blob, `c-form-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`);
         showMessage("");
       } catch (err) {
@@ -29046,8 +29130,12 @@ var CFormApp = (() => {
         return;
       }
       try {
-        const text = await file.text();
-        await importBackup(text);
+        if (file.size >= HUGE_IMPORT_THRESHOLD_BYTES) {
+          await importHugeBackupFile(file);
+        } else {
+          const text = await file.text();
+          await importBackup(text);
+        }
         showMessage("");
       } catch (err) {
         importInput.value = "";
