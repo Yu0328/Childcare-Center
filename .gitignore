@@ -5,6 +5,7 @@
 
 # App-exported data backups (full plaintext PII: names, birthdates, notes, photos).
 c-form-backup-*.json
+*_備份.json
 
 node_modules/
 dist/

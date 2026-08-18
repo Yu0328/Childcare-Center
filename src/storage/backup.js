@@ -47,8 +47,9 @@ function base64ToBlob(base64, type) {
   return new Blob([bytes], { type });
 }
 
-export async function exportBackup() {
+export async function exportBackup(onProgress) {
   const children = await listChildren();
+  onProgress?.(0, children.length);
   const forms = [];
   const entries = [];
   const parentReports = [];
@@ -58,7 +59,7 @@ export async function exportBackup() {
   const behaviorObservations = [];
   const highlightEntries = [];
 
-  for (const child of children) {
+  for (const [childIndex, child] of children.entries()) {
     const childForms = await withContext(`讀取「${child.name}」的適性總表`, () => listFormsForChild(child.id));
     forms.push(...childForms);
     for (const form of childForms) {
@@ -114,6 +115,10 @@ export async function exportBackup() {
         highlightEntries.push({ ...highlight, photos });
       }
     }
+    // Per-child granularity: the slow part (converting every 點滴分享 photo to base64) happens
+    // inside this loop, and a childcare center's data grows per-child over time, so this stays
+    // a reasonable progress proxy without a separate up-front pass to count every photo.
+    onProgress?.(childIndex + 1, children.length);
   }
 
   const monthlyCoursePlans = await withContext('讀取課程月計畫', () => listMonthlyCoursePlans());

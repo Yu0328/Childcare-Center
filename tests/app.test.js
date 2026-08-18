@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import * as db from '../src/storage/db.js';
 import * as backup from '../src/storage/backup.js';
+import * as downloadBlobModule from '../src/export/downloadBlob.js';
 import { mountApp, wireBackupControls } from '../src/app.js';
 import { unlock } from '../src/auth/passwordGate.js';
 import { waitFor } from './helpers.js';
@@ -191,6 +192,31 @@ describe('wireBackupControls', () => {
   afterEach(() => {
     header.remove();
     vi.restoreAllMocks();
+  });
+
+  it('shows a progress bar while exporting, downloads with a date_備份 filename, and removes the bar afterwards', async () => {
+    let resolveExport;
+    vi.spyOn(backup, 'exportBackup').mockImplementation(async onProgress => {
+      onProgress(0, 2);
+      return new Promise(resolve => {
+        resolveExport = () => { onProgress(2, 2); resolve(['{"version":3}']); };
+      });
+    });
+    const downloadSpy = vi.spyOn(downloadBlobModule, 'downloadBlob').mockImplementation(() => {});
+    wireBackupControls({ exportButton, importInput });
+
+    exportButton.click();
+
+    await waitFor(() => header.querySelector('[data-progress="backup"]') !== null);
+    const bar = header.querySelector('[data-progress="backup"]');
+    expect(bar.max).toBe(2);
+    expect(bar.value).toBe(0);
+
+    resolveExport();
+
+    await waitFor(() => downloadSpy.mock.calls.length > 0);
+    expect(downloadSpy.mock.calls[0][1]).toMatch(/^\d{4}-\d{2}-\d{2}_備份\.json$/);
+    await waitFor(() => header.querySelector('[data-progress="backup"]') === null);
   });
 
   it('shows feedback when the export fails', async () => {

@@ -140,18 +140,38 @@ export function wireBackupControls({
     errorEl.textContent = text;
   }
 
+  // Exporting can take a while once 點滴分享 photos pile up across children, so show a native
+  // <progress> bar (updated per-child by exportBackup's onProgress callback) instead of leaving
+  // the button looking unresponsive.
+  function showProgress(done, total) {
+    let bar = messageContainer.querySelector('[data-progress="backup"]');
+    if (!bar) {
+      bar = document.createElement('progress');
+      bar.dataset.progress = 'backup';
+      bar.className = 'backup-progress';
+      messageContainer.appendChild(bar);
+    }
+    bar.max = total;
+    bar.value = done;
+  }
+  function hideProgress() {
+    messageContainer.querySelector('[data-progress="backup"]')?.remove();
+  }
+
   exportButton.addEventListener('click', async () => {
     if (!isUnlocked()) return; // belt-and-suspenders: the button should already be disabled
     try {
-      const parts = await exportBackup();
+      const parts = await exportBackup(showProgress);
       const blob = new Blob(parts, { type: 'application/json' });
-      downloadBlob(blob, `c-form-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      downloadBlob(blob, `${new Date().toISOString().slice(0, 10)}_備份.json`);
       showMessage('');
     } catch (err) {
       // The generic message alone gives no way to diagnose device-specific failures (e.g. Safari-only
       // bugs already found this way) — showing the actual error inline means the person hitting it can
       // just read/relay it instead of needing devtools access, which may not even be reachable on iOS.
       showMessage(`${EXPORT_FAILED_MESSAGE}（${err?.message || err}）`);
+    } finally {
+      hideProgress();
     }
   });
 

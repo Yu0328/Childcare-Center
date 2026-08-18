@@ -41,6 +41,18 @@ describe('backup export/import', () => {
     expect(data.entries).toHaveLength(1);
   });
 
+  it('reports progress once per child, ending at done === total', async () => {
+    await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    await addChild({ name: '林小美', birthDate: '2024-12-01' });
+    const onProgress = vi.fn();
+
+    await exportBackup(onProgress);
+
+    expect(onProgress).toHaveBeenCalledWith(0, 2);
+    expect(onProgress).toHaveBeenCalledWith(1, 2);
+    expect(onProgress).toHaveBeenCalledWith(2, 2);
+  });
+
   it('round-trips through export and import, preserving relationships', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
