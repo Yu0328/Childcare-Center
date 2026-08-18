@@ -37,7 +37,7 @@ export async function renderMonthlyPlanListView(
               plan =>
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-plan-id="${escapeHtml(plan.id)}">
-                    <span class="card-list__name">${escapeHtml(plan.period)}</span>
+                    <span class="card-list__name">${escapeHtml(plan.period)}${plan.isNew ? '<span class="new-badge">新</span>' : ''}</span>
                     <span class="card-list__meta">${plan.childIds.length} 位幼兒</span>
                   </button>
                   <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="刪除${escapeHtml(plan.period)}的課程月計畫">×</button>

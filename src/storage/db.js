@@ -52,10 +52,10 @@ export async function clearAllData() {
   });
 }
 
-export async function addForm({ childId, tier, period }) {
+export async function addForm({ childId, tier, period, isNew = false }) {
   const createdAt = new Date().toISOString();
-  const id = await runRequest('forms', 'readwrite', store => store.add({ childId, tier, period, createdAt }));
-  return { id, childId, tier, period, createdAt };
+  const id = await runRequest('forms', 'readwrite', store => store.add({ childId, tier, period, createdAt, isNew }));
+  return { id, childId, tier, period, createdAt, isNew };
 }
 
 export async function listFormsForChild(childId) {

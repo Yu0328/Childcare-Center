@@ -1,4 +1,5 @@
-import { addChild, listChildren, deleteChild } from '../storage/db.js';
+import { addChild, listChildren, deleteChild, listFormsForChild } from '../storage/db.js';
+import { listParentReportsForChild } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 import { parseDocxImport } from '../import/docxImport.js';
 import { renderImportPreviewView } from './importPreviewView.js';
@@ -13,6 +14,17 @@ export async function renderChildListView(
 ) {
   const children = await listChildren();
   const isParentReport = reportType === 'parent-report';
+  // A child gets the 新 badge if any of their forms/reports for *this* screen's type (matching
+  // whichever list the badge on that form/report itself would show) was created by docx import
+  // and hasn't been opened yet — not a separate flag of its own, just an aggregate over children.
+  const listForType = isParentReport ? listParentReportsForChild : listFormsForChild;
+  const newChildIds = new Set(
+    (
+      await Promise.all(
+        children.map(async child => ((await listForType(child.id)).some(item => item.isNew) ? child.id : null))
+      )
+    ).filter(id => id !== null)
+  );
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -36,7 +48,7 @@ export async function renderChildListView(
               child =>
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
-                    <span class="card-list__name">${escapeHtml(child.name)}</span>
+                    <span class="card-list__name">${escapeHtml(child.name)}${newChildIds.has(child.id) ? '<span class="new-badge">新</span>' : ''}</span>
                     <span class="card-list__meta">出生日期：${escapeHtml(child.birthDate)}</span>
                   </button>
                   <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="刪除${escapeHtml(child.name)}">×</button>

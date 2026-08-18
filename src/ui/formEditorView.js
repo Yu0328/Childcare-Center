@@ -1,5 +1,5 @@
 import { getIndicatorsForTier, tierFormLabel, previousTier, getIndicator } from '../data/indicators.js';
-import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry } from '../storage/db.js';
+import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry, updateForm } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
 
@@ -156,6 +156,15 @@ export async function renderFormEditorView(
   container,
   { child, form, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
 ) {
+  // Opening the form for editing is "having seen it" — clears the 新 badge shown on
+  // formListView.js's row for a form created via docx import. Mutating the passed-in `form`
+  // (not just the DB) avoids repeating this write on every re-render this view does internally
+  // (e.g. after adding/editing an entry, which re-invokes this function with the same `form`).
+  if (form.isNew) {
+    await updateForm(form.id, { isNew: false });
+    form.isNew = false;
+  }
+
   const indicators = getIndicatorsForTier(form.tier);
   const entries = await listEntriesForForm(form.id);
   const ownIndicatorCodes = new Set(indicators.map(i => i.code));

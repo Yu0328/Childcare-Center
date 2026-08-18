@@ -16,10 +16,10 @@ function serializeByKey(key, fn) {
   return next;
 }
 
-export async function addMonthlyCoursePlan({ period, childIds, childTiers }) {
+export async function addMonthlyCoursePlan({ period, childIds, childTiers, isNew = false }) {
   const createdAt = new Date().toISOString();
-  const id = await runRequest('monthlyCoursePlans', 'readwrite', store => store.add({ period, childIds, childTiers, createdAt }));
-  return { id, period, childIds, childTiers, createdAt };
+  const id = await runRequest('monthlyCoursePlans', 'readwrite', store => store.add({ period, childIds, childTiers, createdAt, isNew }));
+  return { id, period, childIds, childTiers, createdAt, isNew };
 }
 
 export async function listMonthlyCoursePlans() {

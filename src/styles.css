@@ -1294,6 +1294,22 @@ fieldset.panel-form__field.import-preview__child legend {
   text-align: center;
 }
 
+/* Marks a card-list row (or a child row) whose form/report/plan was created by docx import and
+   hasn't been opened yet — cleared the moment its editor is opened (see formEditorView.js and
+   its siblings), so this never persists as stale "unread" noise. */
+.new-badge {
+  display: inline-block;
+  background: var(--warm-accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2em 0.5em;
+  border-radius: 999px;
+  margin-left: 0.4em;
+  vertical-align: middle;
+}
+
 @media (max-width: 640px) {
   .page-header {
     flex-direction: column;

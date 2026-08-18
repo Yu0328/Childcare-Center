@@ -110,6 +110,14 @@ function childCalendarHtml(child, tier, data) {
 }
 
 export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
+  // See formEditorView.js's identical guard: opening the plan clears the 新 badge shown on
+  // monthlyPlanListView.js's row, and mutating `plan` (not just the DB) prevents repeating this
+  // write on every re-render this view does internally (same `plan` reference each time).
+  if (plan.isNew) {
+    await updateMonthlyCoursePlan(plan.id, { isNew: false });
+    plan.isNew = false;
+  }
+
   const data = await loadEditorData(plan);
   let selected = null; // { child, tier, week, day }
 

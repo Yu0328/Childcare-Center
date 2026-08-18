@@ -22,6 +22,20 @@ describe('renderParentReportListView', () => {
     expect(container.textContent).toContain('115年06月');
   });
 
+  it('shows a 新 badge for a report created via import, not for a normally-added one', async () => {
+    await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月', isNew: true });
+    await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年07月' });
+
+    const container = document.createElement('div');
+    await renderParentReportListView(container, { child, onSelectReport: () => {}, onBack: () => {} });
+
+    const rows = [...container.querySelectorAll('.card-list__row')];
+    const newRow = rows.find(r => r.textContent.includes('115年06月'));
+    const normalRow = rows.find(r => r.textContent.includes('115年07月'));
+    expect(newRow.querySelector('.new-badge')).not.toBeNull();
+    expect(normalRow.querySelector('.new-badge')).toBeNull();
+  });
+
   it('adds a new parent report via the form and re-renders the list', async () => {
     const container = document.createElement('div');
     await renderParentReportListView(container, { child, onSelectReport: () => {}, onBack: () => {} });

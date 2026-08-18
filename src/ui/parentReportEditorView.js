@@ -1,6 +1,6 @@
 import { escapeHtml } from './escapeHtml.js';
 import { generateParentReportDocxBlob, downloadParentReportDocx } from '../export/parentReportDocxExport.js';
-import { listCoursePlanEntriesForReport, listCourseOccurrencesForEntry, listDevelopmentRecordEntriesForReport, listBehaviorObservationsForReport, listHighlightEntriesForReport } from '../storage/parentReportDb.js';
+import { listCoursePlanEntriesForReport, listCourseOccurrencesForEntry, listDevelopmentRecordEntriesForReport, listBehaviorObservationsForReport, listHighlightEntriesForReport, updateParentReport } from '../storage/parentReportDb.js';
 import { renderCoursePlanTab } from './courseplanTabView.js';
 import { renderDevelopmentRecordTab } from './developmentRecordTabView.js';
 import { renderBehaviorObservationTab } from './behaviorObservationTabView.js';
@@ -30,6 +30,14 @@ async function exportReport(child, report) {
 }
 
 export async function renderParentReportEditorView(container, { child, report, onBack, activeTab = 'coursePlan' }) {
+  // See formEditorView.js's identical guard: opening the report clears the 新 badge shown on
+  // parentReportListView.js's row, and mutating `report` (not just the DB) prevents repeating
+  // this write on every tab switch, which re-invokes this function with the same `report`.
+  if (report.isNew) {
+    await updateParentReport(report.id, { isNew: false });
+    report.isNew = false;
+  }
+
   container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">← 返回適性紀錄列表</button>

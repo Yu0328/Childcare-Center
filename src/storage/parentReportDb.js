@@ -1,9 +1,9 @@
 import { runRequest } from './dbCore.js';
 
-export async function addParentReport({ childId, tier, period }) {
+export async function addParentReport({ childId, tier, period, isNew = false }) {
   const createdAt = new Date().toISOString();
-  const id = await runRequest('parentReports', 'readwrite', store => store.add({ childId, tier, period, createdAt }));
-  return { id, childId, tier, period, createdAt };
+  const id = await runRequest('parentReports', 'readwrite', store => store.add({ childId, tier, period, createdAt, isNew }));
+  return { id, childId, tier, period, createdAt, isNew };
 }
 
 export async function listParentReportsForChild(childId) {
@@ -12,6 +12,14 @@ export async function listParentReportsForChild(childId) {
 
 export async function getParentReport(id) {
   return runRequest('parentReports', 'readonly', store => store.get(id));
+}
+
+export async function updateParentReport(id, changes) {
+  const existing = await runRequest('parentReports', 'readonly', store => store.get(id));
+  if (!existing) throw new Error(`ParentReport ${id} not found`);
+  const updated = { ...existing, ...changes, id };
+  await runRequest('parentReports', 'readwrite', store => store.put(updated));
+  return updated;
 }
 
 // Cascades: deleting a report also deletes every CoursePlanEntry (+ its CourseOccurrences),

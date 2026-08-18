@@ -174,7 +174,7 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
 
       const childIds = resolvedChildren.map(rc => rc.child.id);
       const childTiers = Object.fromEntries(resolvedChildren.map(rc => [rc.child.id, rc.tier]));
-      const plan = await addMonthlyCoursePlan({ period, childIds, childTiers });
+      const plan = await addMonthlyCoursePlan({ period, childIds, childTiers, isNew: true });
 
       const tiersUsed = [...new Set(resolvedChildren.map(rc => rc.tier))];
       const itemIdsBySlotKey = new Map();

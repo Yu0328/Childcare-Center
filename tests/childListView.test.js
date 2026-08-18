@@ -70,6 +70,35 @@ describe('renderChildListView', () => {
     expect(container.textContent).toContain('陳小安');
   });
 
+  it('shows a 新 badge on a child with an unseen imported form (assessment), not on a child without one', async () => {
+    const { addForm } = await import('../src/storage/db.js');
+    const withNew = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const without = await addChild({ name: '林小美', birthDate: '2024-06-01' });
+    await addForm({ childId: withNew.id, tier: 'Ⅳ', period: '115年01月', isNew: true });
+    await addForm({ childId: without.id, tier: 'Ⅳ', period: '115年01月' });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, reportType: 'assessment' });
+
+    const rows = [...container.querySelectorAll('.card-list__row')];
+    const newRow = rows.find(r => r.textContent.includes('陳小安'));
+    const normalRow = rows.find(r => r.textContent.includes('林小美'));
+    expect(newRow.querySelector('.new-badge')).not.toBeNull();
+    expect(normalRow.querySelector('.new-badge')).toBeNull();
+  });
+
+  it('shows a 新 badge on a child with an unseen imported parent report when reportType is parent-report', async () => {
+    const { addParentReport } = await import('../src/storage/parentReportDb.js');
+    const withNew = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    await addParentReport({ childId: withNew.id, tier: 'Ⅴ', period: '115年06月', isNew: true });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {}, reportType: 'parent-report' });
+
+    const row = [...container.querySelectorAll('.card-list__row')].find(r => r.textContent.includes('陳小安'));
+    expect(row.querySelector('.new-badge')).not.toBeNull();
+  });
+
   it('adds a new child via the form and re-renders the list', async () => {
     const container = document.createElement('div');
     await renderChildListView(container, { onSelectChild: () => {} });

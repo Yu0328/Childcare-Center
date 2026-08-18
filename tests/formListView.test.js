@@ -21,6 +21,20 @@ describe('renderFormListView', () => {
     expect(container.textContent).toContain('115年01月');
   });
 
+  it('shows a 新 badge for a form created via import, not for a normally-added one', async () => {
+    await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月', isNew: true });
+    await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年02月' });
+
+    const container = document.createElement('div');
+    await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {} });
+
+    const rows = [...container.querySelectorAll('.card-list__row')];
+    const newRow = rows.find(r => r.textContent.includes('115年01月'));
+    const normalRow = rows.find(r => r.textContent.includes('115年02月'));
+    expect(newRow.querySelector('.new-badge')).not.toBeNull();
+    expect(normalRow.querySelector('.new-badge')).toBeNull();
+  });
+
   it('pre-selects the tier suggested by the child\'s current age', async () => {
     const container = document.createElement('div');
     await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {} });

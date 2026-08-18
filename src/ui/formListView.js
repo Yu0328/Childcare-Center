@@ -28,7 +28,7 @@ export async function renderFormListView(
               form =>
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-form-id="${escapeHtml(form.id)}">
-                    <span class="card-list__name">${escapeHtml(form.tier)} 階段</span>
+                    <span class="card-list__name">${escapeHtml(form.tier)} 階段${form.isNew ? '<span class="new-badge">新</span>' : ''}</span>
                     <span class="card-list__meta">${escapeHtml(form.period)}</span>
                   </button>
                   <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="刪除${escapeHtml(form.tier)} ${escapeHtml(form.period)}">×</button>

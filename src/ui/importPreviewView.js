@@ -130,7 +130,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
       if (entriesByTier.size === 0) entriesByTier.set(tier, []); // still create an empty form to import into
 
       for (const [entryTier, tierEntries] of entriesByTier) {
-        const form = await addForm({ childId: child.id, tier: entryTier, period });
+        const form = await addForm({ childId: child.id, tier: entryTier, period, isNew: true });
         for (const entry of tierEntries) {
           await addEntry({
             formId: form.id,

@@ -148,7 +148,7 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
       // this report to their existing record instead of creating a duplicate child.
       const existingChild = (await listChildren()).find(c => c.name === name && c.birthDate === birthDate);
       const child = existingChild ?? (await addChild({ name, birthDate }));
-      const report = await addParentReport({ childId: child.id, tier, period });
+      const report = await addParentReport({ childId: child.id, tier, period, isNew: true });
 
       const entryIdByOriginalIndex = new Map();
       for (const index of includedEntryIndexes) {

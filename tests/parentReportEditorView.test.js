@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
-import { addParentReport } from '../src/storage/parentReportDb.js';
+import { addParentReport, getParentReport } from '../src/storage/parentReportDb.js';
 import { renderParentReportEditorView } from '../src/ui/parentReportEditorView.js';
 import { waitFor } from './helpers.js';
 
@@ -11,6 +11,16 @@ describe('renderParentReportEditorView', () => {
     await clearAllData();
     child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
     report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+  });
+
+  it('clears the imported report\'s isNew flag as soon as it is opened', async () => {
+    const importedReport = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年07月', isNew: true });
+
+    const container = document.createElement('div');
+    await renderParentReportEditorView(container, { child, report: importedReport, onBack: () => {} });
+
+    expect(importedReport.isNew).toBe(false);
+    expect((await getParentReport(importedReport.id)).isNew).toBe(false);
   });
 
   it('shows the child name, tier, and period in the header', async () => {

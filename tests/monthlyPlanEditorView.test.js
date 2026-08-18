@@ -25,6 +25,17 @@ describe('monthlyPlanEditorView: rendering', () => {
     plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
   });
 
+  it('clears the imported plan\'s isNew flag as soon as it is opened', async () => {
+    const importedPlan = await addMonthlyCoursePlan({
+      period: '115年07月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' }, isNew: true,
+    });
+
+    await renderMonthlyPlanEditorView(container, { plan: importedPlan, onBack: vi.fn() });
+
+    expect(importedPlan.isNew).toBe(false);
+    expect((await getMonthlyCoursePlan(importedPlan.id)).isNew).toBe(false);
+  });
+
   it('renders one calendar section per child, with the child\'s name visible', async () => {
     await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
 

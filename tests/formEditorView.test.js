@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllData, addChild, addForm, addEntry, listEntriesForForm } from '../src/storage/db.js';
+import { clearAllData, addChild, addForm, addEntry, listEntriesForForm, getForm } from '../src/storage/db.js';
 import { renderFormEditorView } from '../src/ui/formEditorView.js';
 import { waitFor } from './helpers.js';
 
@@ -11,6 +11,16 @@ describe('renderFormEditorView', () => {
     await clearAllData();
     child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
     form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+  });
+
+  it('clears the imported form\'s isNew flag as soon as it is opened', async () => {
+    const importedForm = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年02月', isNew: true });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form: importedForm, onBack: () => {} });
+
+    expect(importedForm.isNew).toBe(false);
+    expect((await getForm(importedForm.id)).isNew).toBe(false);
   });
 
   it('renders every indicator for the form’s tier, grouped with its domain', async () => {

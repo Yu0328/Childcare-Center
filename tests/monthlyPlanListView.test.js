@@ -44,6 +44,20 @@ describe('monthlyPlanListView', () => {
     expect(container.textContent).toContain('115年06月');
   });
 
+  it('shows a 新 badge for a plan created via import, not for a normally-added one', async () => {
+    const { addMonthlyCoursePlan } = await import('../src/storage/monthlyPlanDb.js');
+    await addMonthlyCoursePlan({ period: '115年06月', childIds: [childA.id], childTiers: { [childA.id]: 'Ⅴ' }, isNew: true });
+    await addMonthlyCoursePlan({ period: '115年07月', childIds: [childA.id], childTiers: { [childA.id]: 'Ⅴ' } });
+
+    await renderMonthlyPlanListView(container, { onSelectPlan: vi.fn(), onBack: vi.fn() });
+
+    const rows = [...container.querySelectorAll('.card-list__row')];
+    const newRow = rows.find(r => r.textContent.includes('115年06月'));
+    const normalRow = rows.find(r => r.textContent.includes('115年07月'));
+    expect(newRow.querySelector('.new-badge')).not.toBeNull();
+    expect(normalRow.querySelector('.new-badge')).toBeNull();
+  });
+
   it('creating a plan: computes each child\'s tier for the period, seeds Mon/Tue defaults, and calls onSelectPlan', async () => {
     const onSelectPlan = vi.fn();
     await renderMonthlyPlanListView(container, { onSelectPlan, onBack: vi.fn() });
