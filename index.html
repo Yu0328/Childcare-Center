@@ -584,6 +584,64 @@ fieldset.panel-form__field legend {
   padding: 0.3rem 0;
 }
 
+/* Standalone-page variant for the 課程月計畫 import preview: unlike .panel-form--wide below, this
+   form is the only thing on screen (no sibling tab-layout column to protect), and it can hold many
+   children's blocks (see .import-preview__children), so it widens much further and isn't sticky. */
+.panel-form--import-grid {
+  max-width: 960px;
+}
+
+@media (min-width: 641px) {
+  #app:has(.panel-form--import-grid) {
+    max-width: 1100px;
+  }
+}
+
+.import-preview__children {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* Specificity must beat fieldset.panel-form__field's border:none/padding:0 reset above (0,1,1),
+   since this fieldset carries both classes at once — plain .import-preview__child (0,1,0) would
+   lose regardless of source order. */
+fieldset.panel-form__field.import-preview__child {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--page-bg);
+}
+
+fieldset.panel-form__field.import-preview__child legend {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.import-preview__child-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+/* 適性紀錄 import preview: its 4 sections (課程計畫表/適性發展紀錄表/行為觀察/點滴分享) are
+   independent lists, not repeated per-child cards like .import-preview__children — a 2-up grid on
+   wide screens uses the panel's extra width without implying they're related the way cards are. */
+.import-preview__sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 0 2rem;
+}
+
+.import-preview__new-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
 /* Wider variant for the 適性紀錄 課程計畫表/適性發展紀錄表 "新增..." panels specifically (not
    every .panel-form — the short "新增幼兒"/"新增適性總表" forms elsewhere stay at the normal
    420px cap). Widens both this panel's own column and #app itself (native :has(), no markup
@@ -1538,9 +1596,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/jszip/dist/jszip.min.js
+  // ../../../node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -4957,25 +5015,29 @@ var CFormApp = (() => {
     ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">
             ${parsed.warnings.map((warning) => `<li class="field-error">${escapeHtml(warning)}</li>`).join("")}
           </ul>` : ""}
-    <form class="panel-form" data-action="confirm-import">
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
       <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
-      <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
-      <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? "")}" required></label>
-      <label class="panel-form__field">
-        \u6708\u9F61\u968E\u6BB5
-        <select data-field="tier">
-          ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        \u7D00\u9304\u5E74\u6708
-        ${periodSelectsHtml({
+      <div class="panel-form__row">
+        <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? "")}" required></label>
+      </div>
+      <div class="panel-form__row">
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          \u7D00\u9304\u5E74\u6708
+          ${periodSelectsHtml({
       yearFieldName: "period-year",
       monthFieldName: "period-month",
       selectedYear: parsedYear ?? defaultRocYear,
       selectedMonth: parsedMonth ?? defaultMonth
     })}
-      </label>
+        </label>
+      </div>
       <label class="entry-form__checkbox">
         <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? "checked" : ""}> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
       </label>
@@ -5353,32 +5415,46 @@ var CFormApp = (() => {
       <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7D00\u9304\uFF09</h2>
     </div>
     ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">${parsed.warnings.map((w) => `<li class="field-error">${escapeHtml(w)}</li>`).join("")}</ul>` : ""}
-    <form class="panel-form" data-action="confirm-import">
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
       <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
-      <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
-      <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? "")}" required></label>
-      <label class="panel-form__field">
-        \u6708\u9F61\u968E\u6BB5
-        <select data-field="tier">
-          ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-        </select>
-      </label>
-      <label class="panel-form__field">
-        \u7D00\u9304\u5E74\u6708
-        ${periodSelectsHtml({ yearFieldName: "period-year", monthFieldName: "period-month", selectedYear: parsedYear ?? defaultRocYear, selectedMonth: parsedMonth ?? defaultMonth })}
-      </label>
+      <div class="panel-form__row">
+        <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? "")}" required></label>
+      </div>
+      <div class="panel-form__row">
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          \u7D00\u9304\u5E74\u6708
+          ${periodSelectsHtml({ yearFieldName: "period-year", monthFieldName: "period-month", selectedYear: parsedYear ?? defaultRocYear, selectedMonth: parsedMonth ?? defaultMonth })}
+        </label>
+      </div>
 
-      <h3 class="panel-form__title">\u8AB2\u7A0B\u8A08\u756B\u8868\uFF08\u5171 ${parsed.coursePlanEntries.length} \u9805\uFF09</h3>
-      <ul class="import-preview__entry-list">${parsed.coursePlanEntries.map(coursePlanEntryRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u9805\u76EE</li>"}</ul>
+      <div class="import-preview__sections">
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u8AB2\u7A0B\u8A08\u756B\u8868\uFF08\u5171 ${parsed.coursePlanEntries.length} \u9805\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.coursePlanEntries.map(coursePlanEntryRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u9805\u76EE</li>"}</ul>
+        </section>
 
-      <h3 class="panel-form__title">\u9069\u6027\u767C\u5C55\u7D00\u9304\u8868\uFF08\u5171 ${parsed.developmentRecordBlocks.length} \u6BB5\uFF09</h3>
-      <ul class="import-preview__entry-list">${parsed.developmentRecordBlocks.map(developmentRecordRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u6BB5\u843D</li>"}</ul>
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u9069\u6027\u767C\u5C55\u7D00\u9304\u8868\uFF08\u5171 ${parsed.developmentRecordBlocks.length} \u6BB5\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.developmentRecordBlocks.map(developmentRecordRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u6BB5\u843D</li>"}</ul>
+        </section>
 
-      <h3 class="panel-form__title">\u884C\u70BA\u89C0\u5BDF\uFF08\u5171 ${parsed.behaviorObservations.length} \u7B46\uFF09</h3>
-      <ul class="import-preview__entry-list">${parsed.behaviorObservations.map(behaviorObservationRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u89C0\u5BDF</li>"}</ul>
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u884C\u70BA\u89C0\u5BDF\uFF08\u5171 ${parsed.behaviorObservations.length} \u7B46\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.behaviorObservations.map(behaviorObservationRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u89C0\u5BDF</li>"}</ul>
+        </section>
 
-      <h3 class="panel-form__title">\u9EDE\u6EF4\u5206\u4EAB\uFF08\u5171 ${parsed.highlightEntries.length} \u7D44\uFF09</h3>
-      <ul class="import-preview__entry-list">${parsed.highlightEntries.map(highlightRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u7167\u7247</li>"}</ul>
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u9EDE\u6EF4\u5206\u4EAB\uFF08\u5171 ${parsed.highlightEntries.length} \u7D44\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.highlightEntries.map(highlightRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u7167\u7247</li>"}</ul>
+        </section>
+      </div>
 
       <button type="submit" class="btn btn--primary">\u78BA\u8A8D\u532F\u5165</button>
       <p class="field-error" data-error></p>
@@ -5491,7 +5567,7 @@ var CFormApp = (() => {
     return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
-  // src/ui/childListView.js
+  // src/ui/importQueue.js
   async function processImportQueue(files, { parseFn, renderPreview, container, backToList }) {
     const queue2 = Array.from(files);
     const skipped = [];
@@ -5521,6 +5597,8 @@ var CFormApp = (() => {
     }
     await next(0);
   }
+
+  // src/ui/childListView.js
   async function renderChildListView(container, { onSelectChild, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false, onBack, reportType }) {
     const children = await listChildren();
     const isParentReport = reportType === "parent-report";
@@ -5776,7 +5854,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // node_modules/docx/dist/index.mjs
+  // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -27177,6 +27255,453 @@ var CFormApp = (() => {
     }
   }
 
+  // src/import/monthlyPlanDocxImport.js
+  var import_jszip3 = __toESM(require_jszip_min(), 1);
+  function flatJoinedText2(xml) {
+    return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("");
+  }
+  var PERIOD_PATTERN = /(\d{1,3})年\s*(\d{1,2})月課程計畫?/;
+  function parsePeriodFromTitleText(text) {
+    const match = PERIOD_PATTERN.exec(text ?? "");
+    if (!match) return null;
+    return `${match[1]}\u5E74${match[2].padStart(2, "0")}\u6708`;
+  }
+  async function extractTitleText(zip, documentXml) {
+    const headerNames = Object.keys(zip.files).filter((name) => /^word\/header\d*\.xml$/i.test(name));
+    for (const name of headerNames) {
+      const xml = await zip.file(name).async("text");
+      const text = flatJoinedText2(xml);
+      if (PERIOD_PATTERN.test(text)) return text;
+    }
+    const firstTableIndex = documentXml.indexOf("<w:tbl>");
+    const introXml = firstTableIndex === -1 ? documentXml : documentXml.slice(0, firstTableIndex);
+    return flatJoinedText2(introXml);
+  }
+  function extractCellParagraphTexts(cellXml) {
+    return [...cellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(
+      (m) => [...m[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((t) => t[1]).join("")
+    );
+  }
+  var TIER_LETTER_TO_CODE = new Map(TIERS.filter((t) => t.formLetter).map((t) => [t.formLetter, t.code]));
+  var TIER_LABEL_TO_CODE = new Map(TIERS.map((t) => [t.label, t.code]));
+  function normalizeFullwidthLetters(text) {
+    return text.replace(/[Ａ-Ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 65248));
+  }
+  function parseChildNameCell(cellXml) {
+    const paragraphs = extractCellParagraphTexts(cellXml).map((t) => t.trim()).filter(Boolean);
+    const PURE_CJK = /^[一-鿿]+$/;
+    let nameParagraphCount = 0;
+    while (nameParagraphCount < paragraphs.length && PURE_CJK.test(paragraphs[nameParagraphCount])) {
+      nameParagraphCount += 1;
+    }
+    const name = nameParagraphCount > 0 ? paragraphs.slice(0, nameParagraphCount).join("") : null;
+    const joined = normalizeFullwidthLetters(paragraphs.join(" "));
+    let tier = null;
+    const letterMatch = /([A-E])表/.exec(joined) || /\/\s*([A-E])\b/.exec(joined);
+    if (letterMatch) {
+      tier = TIER_LETTER_TO_CODE.get(letterMatch[1]) || null;
+    } else {
+      for (const [label, code] of TIER_LABEL_TO_CODE) {
+        if (joined.includes(label)) {
+          tier = code;
+          break;
+        }
+      }
+    }
+    return { name, tier };
+  }
+  function rowCells(rowXml) {
+    return [...rowXml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((m) => m[1]);
+  }
+  function splitChildTables(documentXml) {
+    const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((m) => m[0]);
+    return tables.map((tableXml) => {
+      const rows = [...tableXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((m) => m[0]);
+      const bodyRows = rows.slice(1, 11);
+      const nameCellXml = bodyRows[0] ? rowCells(bodyRows[0])[0] || "" : "";
+      const days = [];
+      for (let pairIndex = 0; pairIndex * 2 + 1 < bodyRows.length; pairIndex += 1) {
+        const weekday = pairIndex + 1;
+        const dateRowCells = rowCells(bodyRows[pairIndex * 2]);
+        const contentRowCells = rowCells(bodyRows[pairIndex * 2 + 1]);
+        for (let col = 1; col < contentRowCells.length; col += 1) {
+          days.push({
+            weekIndex: col,
+            weekday,
+            dateCellXml: dateRowCells[col] || "",
+            contentCellXml: contentRowCells[col] || ""
+          });
+        }
+      }
+      return { nameCellXml, days };
+    });
+  }
+  var INDICATOR_CODE_EXACT = /^(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+$/;
+  function extractRuns(xml) {
+    return [...xml.matchAll(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/g)].map((m) => {
+      const runXml = m[1];
+      const rPr = /<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(runXml)?.[1] || "";
+      return {
+        text: [...runXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((t) => t[1]).join(""),
+        hasStrike: /<w:strike\s*\/>/.test(rPr),
+        hasRedColor: /<w:color\b[^>]*w:val="FF0000"/i.test(rPr)
+      };
+    });
+  }
+  function linesToItem(lines, flags) {
+    const [first, ...rest] = lines;
+    if (!INDICATOR_CODE_EXACT.test(first || "")) {
+      return { indicatorCode: null, activityName: first || "", indicatorText: "", ...flags };
+    }
+    const indicatorCode = normalizeIndicatorCode(first);
+    let activityName = "";
+    let indicatorText = "";
+    if (rest[0] && rest[0].startsWith("\u3010") && rest[0].endsWith("\u3011")) {
+      activityName = rest[0].slice(1, -1);
+      indicatorText = rest[1] || "";
+    } else {
+      indicatorText = rest[0] || "";
+    }
+    return { indicatorCode, activityName, indicatorText, ...flags };
+  }
+  function parseExportedItemParagraph(paragraphXml) {
+    const runs = extractRuns(paragraphXml);
+    if (runs.length === 0) return null;
+    const hasAnyStrike = runs.some((r) => r.hasStrike);
+    let itemRuns = runs;
+    let replacementText = "";
+    if (hasAnyStrike) {
+      const last = runs[runs.length - 1];
+      if (!last.hasStrike) {
+        replacementText = last.text;
+        itemRuns = runs.slice(0, -1);
+      }
+    }
+    const lines = itemRuns.map((r) => r.text);
+    const notAchieved = itemRuns.some((r) => r.hasRedColor);
+    const replaced = itemRuns.some((r) => r.hasStrike);
+    return linesToItem(lines, { notAchieved, replaced, replacementText });
+  }
+  function parseExportedDayCellItems(contentCellXml) {
+    const paragraphs = [...contentCellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((m) => m[0]);
+    return paragraphs.map(parseExportedItemParagraph).filter(Boolean);
+  }
+  var INDICATOR_CODE_ANCHOR = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+  var ABSENT_MARKER_ON_DATE = /[（(]\s*(請假|更換課程)\s*[）)]/;
+  var ABSENT_REPLACEMENT_PARAGRAPH = /^(請假|更換課程)$/;
+  function paragraphInfo(paragraphXml) {
+    const runs = extractRuns(paragraphXml);
+    return {
+      text: runs.map((r) => r.text).join(""),
+      hasStrike: runs.some((r) => r.hasStrike),
+      hasRedColor: runs.some((r) => r.hasRedColor)
+    };
+  }
+  function stripNoise(text) {
+    return text.replace(/OK/gi, "").trim();
+  }
+  function parseLegacyDayCellItems(dateCellXml, contentCellXml) {
+    const dateText = [...dateCellXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("");
+    const dateMarkerMatch = ABSENT_MARKER_ON_DATE.exec(dateText);
+    const paragraphs = [...contentCellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((m) => paragraphInfo(m[0])).filter((p) => p.text.trim());
+    const items = [];
+    for (let i = 0; i < paragraphs.length; i += 1) {
+      const paragraph = paragraphs[i];
+      let replacementText = "";
+      const replaced = paragraph.hasStrike;
+      const next = paragraphs[i + 1];
+      if (paragraph.hasStrike && next && !next.hasStrike && ABSENT_REPLACEMENT_PARAGRAPH.test(next.text.trim())) {
+        replacementText = next.text.trim();
+        paragraphs.splice(i + 1, 1);
+      }
+      const notAchieved = paragraph.hasRedColor;
+      const codeMatches = [...paragraph.text.matchAll(INDICATOR_CODE_ANCHOR)];
+      if (codeMatches.length === 0) {
+        const cleaned = stripNoise(paragraph.text);
+        if (cleaned) items.push({ indicatorCode: null, activityName: cleaned, indicatorText: "", notAchieved, replaced, replacementText });
+        continue;
+      }
+      for (let m = 0; m < codeMatches.length; m += 1) {
+        const start = m === 0 ? 0 : codeMatches[m].index;
+        const end = m + 1 < codeMatches.length ? codeMatches[m + 1].index : paragraph.text.length;
+        const segment = paragraph.text.slice(start, end);
+        const indicatorCode = normalizeIndicatorCode(codeMatches[m][0]);
+        const bracketMatch = /【([^】]*)】/.exec(segment);
+        const activityName = bracketMatch ? bracketMatch[1] : "";
+        const indicatorText = stripNoise(segment.replace(codeMatches[m][0], "").replace(/【[^】]*】/, ""));
+        items.push({ indicatorCode, activityName, indicatorText, notAchieved, replaced, replacementText });
+      }
+    }
+    if (dateMarkerMatch && !items.some((item) => item.replaced)) {
+      for (const item of items) {
+        item.replaced = true;
+        item.replacementText = dateMarkerMatch[1];
+      }
+    }
+    return items;
+  }
+  var INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/;
+  function mergeCodeOnlySequentialItems(items) {
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      if (!item.indicatorCode || item.activityName || item.indicatorText) continue;
+      const nameItem = items[i + 1];
+      if (!nameItem || nameItem.indicatorCode) continue;
+      item.activityName = nameItem.activityName;
+      items.splice(i + 1, 1);
+      const textItem = items[i + 1];
+      if (textItem && !textItem.indicatorCode) {
+        item.indicatorText = textItem.activityName;
+        items.splice(i + 1, 1);
+      }
+    }
+    return items;
+  }
+  function legacyItems(dateCellXml, contentCellXml) {
+    return mergeCodeOnlySequentialItems(parseLegacyDayCellItems(dateCellXml, contentCellXml));
+  }
+  function parseDayCellItems(dateCellXml, contentCellXml) {
+    const precise = parseExportedDayCellItems(contentCellXml);
+    const looksMisparsed = precise.some((item) => item.indicatorCode === null && INDICATOR_CODE_SUBSTRING.test(item.activityName));
+    const preciseCodeCount = precise.filter((item) => item.indicatorCode).length;
+    const rawCodeCount = [...flatJoinedText2(contentCellXml).matchAll(INDICATOR_CODE_ANCHOR)].length;
+    const alreadyAttributedCodeCount = precise.reduce(
+      (sum, item) => sum + [...(item.activityName + item.indicatorText).matchAll(INDICATOR_CODE_ANCHOR)].length,
+      0
+    );
+    const missedCodes = rawCodeCount - alreadyAttributedCodeCount > preciseCodeCount;
+    if (precise.length > 0 && !looksMisparsed && !missedCodes) return precise;
+    return legacyItems(dateCellXml, contentCellXml);
+  }
+  function buildSlotsAndOverrides(children) {
+    const canonicalByTier = /* @__PURE__ */ new Map();
+    for (const child of children) {
+      if (child.tier && !canonicalByTier.has(child.tier)) canonicalByTier.set(child.tier, child);
+    }
+    const slotsByTier = /* @__PURE__ */ new Map();
+    for (const [tier, canonical] of canonicalByTier) {
+      slotsByTier.set(
+        tier,
+        canonical.days.map((day) => ({
+          weekIndex: day.weekIndex,
+          weekday: day.weekday,
+          items: day.items.map(({ indicatorCode, activityName, indicatorText }) => ({ indicatorCode, activityName, indicatorText }))
+        }))
+      );
+    }
+    const childrenWithOverrides = children.map((child) => {
+      const overrides = [];
+      for (const day of child.days) {
+        day.items.forEach((item, itemIndex) => {
+          if (item.notAchieved || item.replaced) {
+            overrides.push({
+              weekIndex: day.weekIndex,
+              weekday: day.weekday,
+              itemIndex,
+              notAchieved: item.notAchieved,
+              replaced: item.replaced,
+              replacementText: item.replacementText || ""
+            });
+          }
+        });
+      }
+      return { name: child.name, tier: child.tier, overrides };
+    });
+    return { slotsByTier, children: childrenWithOverrides };
+  }
+  async function parseMonthlyPlanDocxImport(data) {
+    const zip = await import_jszip3.default.loadAsync(data);
+    const documentXml = await zip.file("word/document.xml").async("text");
+    const warnings = [];
+    const titleText = await extractTitleText(zip, documentXml);
+    const period = parsePeriodFromTitleText(titleText);
+    if (!period) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u8AB2\u7A0B\u8A08\u756B\u7684\u5E74\u6708\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
+    const tables = splitChildTables(documentXml);
+    const parsedChildren = tables.map((table) => {
+      const { name, tier } = parseChildNameCell(table.nameCellXml);
+      const days = table.days.map((day) => ({
+        weekIndex: day.weekIndex,
+        weekday: day.weekday,
+        items: parseDayCellItems(day.dateCellXml, day.contentCellXml)
+      }));
+      return { name, tier, days };
+    });
+    for (const child of parsedChildren) {
+      if (!child.name) warnings.push("\u5075\u6E2C\u5230\u4E00\u4F4D\u7121\u6CD5\u5224\u65B7\u59D3\u540D\u7684\u5C0F\u670B\u53CB\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u624B\u52D5\u78BA\u8A8D");
+      if (!child.tier) warnings.push(`\u7121\u6CD5\u5224\u65B7\u300C${child.name || "\uFF08\u672A\u77E5\u59D3\u540D\uFF09"}\u300D\u7684\u6708\u9F61\u968E\u6BB5\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7`);
+    }
+    const { slotsByTier, children: childrenWithOverrides } = buildSlotsAndOverrides(parsedChildren);
+    const hasUnresolvedIndicator = [...slotsByTier.values()].flat().flatMap((slot) => slot.items).some((item) => item.indicatorCode && !getIndicator(item.indicatorCode));
+    if (hasUnresolvedIndicator) {
+      warnings.push("\u90E8\u5206\u6307\u6A19\u4EE3\u78BC\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u5167\u5EFA\u7684\u6307\u6A19\uFF0C\u9019\u4E9B\u9805\u76EE\u532F\u5165\u5F8C\u53EF\u80FD\u7121\u6CD5\u6B63\u78BA\u986F\u793A\uFF0C\u5EFA\u8B70\u78BA\u8A8D\u5F8C\u518D\u532F\u5165");
+    }
+    return {
+      period,
+      children: childrenWithOverrides,
+      slotsByTier: Object.fromEntries(slotsByTier),
+      warnings
+    };
+  }
+
+  // src/ui/monthlyPlanImportPreviewView.js
+  var NEW_CHILD_VALUE = "__new__";
+  function birthDateFieldNames(index) {
+    return {
+      yearFieldName: `child-new-birthDate-year-${index}`,
+      monthFieldName: `child-new-birthDate-month-${index}`,
+      dayFieldName: `child-new-birthDate-day-${index}`
+    };
+  }
+  function newChildBirthDateHtml(index) {
+    const fieldNames = birthDateFieldNames(index);
+    return birthDateSelectsHtml(fieldNames).replace(`data-field="${fieldNames.yearFieldName}"`, `data-field="${fieldNames.yearFieldName}" data-child-new-birthDate-year="${index}"`).replace(`data-field="${fieldNames.monthFieldName}"`, `data-field="${fieldNames.monthFieldName}" data-child-new-birthDate-month="${index}"`).replace(`data-field="${fieldNames.dayFieldName}"`, `data-field="${fieldNames.dayFieldName}" data-child-new-birthDate-day="${index}"`);
+  }
+  function childBlock(parsedChild, index, existingChildren) {
+    const nameMatches = parsedChild.name ? existingChildren.filter((c) => c.name === parsedChild.name) : [];
+    const preselected = nameMatches.length === 1 ? nameMatches[0].id : NEW_CHILD_VALUE;
+    const itemCount = parsedChild.overrides.length;
+    return `
+    <fieldset class="panel-form__field import-preview__child" data-child-block="${index}">
+      <legend>
+        <label><input type="checkbox" data-child-include="${index}" checked> ${escapeHtml(parsedChild.name || "\uFF08\u672A\u77E5\u59D3\u540D\uFF09")}</label>
+      </legend>
+      <label class="panel-form__field">
+        \u6BD4\u5C0D\u5C0F\u670B\u53CB
+        <select data-child-select="${index}">
+          <option value="${NEW_CHILD_VALUE}" ${preselected === NEW_CHILD_VALUE ? "selected" : ""}>\u5EFA\u7ACB\u65B0\u5C0F\u670B\u53CB</option>
+          ${existingChildren.map((c) => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? "selected" : ""}>${escapeHtml(c.name)}\uFF08${escapeHtml(c.birthDate)}\uFF09</option>`).join("")}
+        </select>
+      </label>
+      <div class="import-preview__new-child" data-child-new-fields="${index}" ${preselected === NEW_CHILD_VALUE ? "" : "hidden"}>
+        <label class="panel-form__field">\u59D3\u540D <input data-child-new-name="${index}" value="${escapeHtml(parsedChild.name ?? "")}"></label>
+        <label class="panel-form__field">
+          \u51FA\u751F\u65E5\u671F
+          ${newChildBirthDateHtml(index)}
+        </label>
+      </div>
+      <label class="panel-form__field">
+        \u6708\u9F61\u968E\u6BB5
+        <select data-child-tier="${index}">
+          <option value="" ${parsedChild.tier ? "" : "selected"}>\u8ACB\u9078\u64C7</option>
+          ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsedChild.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+        </select>
+      </label>
+      <p class="import-preview__entry-note">\u5171 ${itemCount} \u9805\u6A19\u8A18\u70BA\u672A\u9054\u6210\uFF0F\u8ACB\u5047\uFF0F\u66F4\u63DB\u8AB2\u7A0B</p>
+    </fieldset>
+  `;
+  }
+  function renderMonthlyPlanImportPreviewView(container, { parsed, onCancel, onImported }) {
+    return renderAsync(container, { parsed, onCancel, onImported });
+  }
+  async function renderAsync(container, { parsed, onCancel, onImported }) {
+    const existingChildren = await listChildren();
+    const defaultRocYear = currentRocYear();
+    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
+    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
+    container.innerHTML = `
+    <div class="page-header">
+      <button type="button" class="btn btn--ghost" data-action="cancel">\u2190 \u53D6\u6D88\u532F\u5165</button>
+      <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u8AB2\u7A0B\u6708\u8A08\u756B\uFF09</h2>
+    </div>
+    ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">${parsed.warnings.map((w) => `<li class="field-error">${escapeHtml(w)}</li>`).join("")}</ul>` : ""}
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
+      <h3 class="panel-form__title">\u5E74\u6708</h3>
+      ${periodSelectsHtml({
+      yearFieldName: "period-year",
+      monthFieldName: "period-month",
+      selectedYear: parsedYear ?? defaultRocYear,
+      selectedMonth: parsedMonth ?? defaultMonth
+    })}
+
+      <h3 class="panel-form__title">\u5C0F\u670B\u53CB\uFF08\u5171 ${parsed.children.length} \u4F4D\uFF09</h3>
+      <div class="import-preview__children">
+        ${parsed.children.map((c, i) => childBlock(c, i, existingChildren)).join("") || "<p>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u5C0F\u670B\u53CB</p>"}
+      </div>
+
+      <button type="submit" class="btn btn--primary">\u78BA\u8A8D\u532F\u5165</button>
+      <p class="field-error" data-error></p>
+    </form>
+  `;
+    container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
+    parsed.children.forEach((_, index) => {
+      wireBirthDateSelects(container, birthDateFieldNames(index));
+      container.querySelector(`[data-child-select="${index}"]`).addEventListener("change", (event) => {
+        container.querySelector(`[data-child-new-fields="${index}"]`).hidden = event.target.value !== NEW_CHILD_VALUE;
+      });
+    });
+    container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorEl = container.querySelector("[data-error]");
+      const year = container.querySelector('[data-field="period-year"]').value;
+      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
+      const period = `${year}\u5E74${month}\u6708`;
+      const includedIndexes = parsed.children.map((_, i) => i).filter((i) => container.querySelector(`[data-child-include="${i}"]`).checked);
+      try {
+        const resolutions = [];
+        for (const index of includedIndexes) {
+          const select = container.querySelector(`[data-child-select="${index}"]`);
+          const tier = container.querySelector(`[data-child-tier="${index}"]`).value;
+          const label = parsed.children[index].name || "\uFF08\u672A\u77E5\u59D3\u540D\uFF09";
+          let pending;
+          if (select.value === NEW_CHILD_VALUE) {
+            const name = container.querySelector(`[data-child-new-name="${index}"]`).value;
+            const birthDate = parseBirthDateSelects(container, birthDateFieldNames(index));
+            if (!name || !birthDate) throw new Error("\u8ACB\u5B8C\u6574\u586B\u5BEB\u65B0\u5C0F\u670B\u53CB\u7684\u59D3\u540D\u8207\u51FA\u751F\u65E5\u671F");
+            pending = { isNew: true, name, birthDate };
+          } else {
+            const existingChild = existingChildren.find((c) => String(c.id) === select.value);
+            if (!existingChild) throw new Error(`\u627E\u4E0D\u5230\u300C${label}\u300D\u6BD4\u5C0D\u5230\u7684\u65E2\u6709\u5C0F\u670B\u53CB`);
+            pending = { isNew: false, child: existingChild };
+          }
+          if (!tier) throw new Error(`\u8ACB\u70BA\u300C${label}\u300D\u9078\u64C7\u6708\u9F61\u968E\u6BB5`);
+          if (!(tier in parsed.slotsByTier)) {
+            throw new Error(`\u627E\u4E0D\u5230\u300C${tier}\u300D\u7684\u8AB2\u7A0B\u5167\u5BB9\uFF0C\u8ACB\u78BA\u8A8D\u300C${label}\u300D\u7684\u968E\u6BB5\u662F\u5426\u6B63\u78BA`);
+          }
+          resolutions.push({ ...pending, tier, overrides: parsed.children[index].overrides });
+        }
+        const resolvedChildren = [];
+        for (const r of resolutions) {
+          const child = r.isNew ? await addChild({ name: r.name, birthDate: r.birthDate }) : r.child;
+          resolvedChildren.push({ child, tier: r.tier, overrides: r.overrides });
+        }
+        const childIds = resolvedChildren.map((rc) => rc.child.id);
+        const childTiers = Object.fromEntries(resolvedChildren.map((rc) => [rc.child.id, rc.tier]));
+        const plan = await addMonthlyCoursePlan({ period, childIds, childTiers });
+        const tiersUsed = [...new Set(resolvedChildren.map((rc) => rc.tier))];
+        const itemIdsBySlotKey = /* @__PURE__ */ new Map();
+        for (const tier of tiersUsed) {
+          for (const slot of parsed.slotsByTier[tier] || []) {
+            const createdSlot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: slot.weekIndex, weekday: slot.weekday });
+            const itemIds = [];
+            for (const item of slot.items) {
+              const created = await addPlanSlotItem({ slotId: createdSlot.id, indicatorCode: item.indicatorCode, activityName: item.activityName, indicatorText: item.indicatorText });
+              itemIds.push(created.id);
+            }
+            itemIdsBySlotKey.set(`${tier}:${slot.weekIndex}:${slot.weekday}`, itemIds);
+          }
+        }
+        for (const rc of resolvedChildren) {
+          for (const override of rc.overrides) {
+            const itemIds = itemIdsBySlotKey.get(`${rc.tier}:${override.weekIndex}:${override.weekday}`);
+            const itemId = itemIds && itemIds[override.itemIndex];
+            if (!itemId) continue;
+            await setChildItemOverride({
+              planId: plan.id,
+              childId: rc.child.id,
+              itemId,
+              notAchieved: override.notAchieved,
+              replaced: override.replaced,
+              replacementText: override.replacementText
+            });
+          }
+        }
+        onImported();
+      } catch (err) {
+        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
+      }
+    });
+  }
+
   // src/ui/monthlyPlanListView.js
   async function renderMonthlyPlanListView(container, { onSelectPlan, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
     const plans = await listMonthlyCoursePlans();
@@ -27187,7 +27712,12 @@ var CFormApp = (() => {
     <div class="page-header page-header--editor">
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
       <h2 class="page-header__title">\u8AB2\u7A0B\u6708\u8A08\u756B</h2>
+      <div class="page-header__actions">
+        <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">\u8AB2\u7A0B\u6708\u8A08\u756B\u532F\u5165</button>
+      </div>
+      <input type="file" accept=".docx" data-field="import-monthly-plan-file" multiple hidden>
     </div>
+    <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
         <ul class="card-list">
@@ -27272,6 +27802,17 @@ var CFormApp = (() => {
       } catch (err) {
         errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
       }
+    });
+    const importFileInput = container.querySelector('[data-field="import-monthly-plan-file"]');
+    container.querySelector('[data-action="import-monthly-plan-docx"]').addEventListener("click", () => importFileInput.click());
+    importFileInput.addEventListener("change", async () => {
+      if (importFileInput.files.length === 0) return;
+      await processImportQueue(importFileInput.files, {
+        parseFn: parseMonthlyPlanDocxImport,
+        renderPreview: renderMonthlyPlanImportPreviewView,
+        container,
+        backToList: () => renderMonthlyPlanListView(container, { onSelectPlan, onBack, confirmDelete })
+      });
     });
   }
 
