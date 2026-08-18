@@ -1316,10 +1316,19 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 .backup-progress {
-  display: block;
-  width: 100%;
-  max-width: 240px;
-  margin-top: 0.4em;
+  align-self: center;
+  width: 60px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.backup-progress__fill {
+  height: 100%;
+  width: 0%;
+  background: var(--brand);
+  transition: width 0.25s ease-out;
 }
 
 /* Marks a card-list row (or a child row) whose form/report/plan was created by docx import and
@@ -29117,18 +29126,20 @@ var CFormApp = (() => {
       errorEl.textContent = text;
     }
     function showProgress(done, total) {
-      let bar = messageContainer.querySelector('[data-progress="backup"]');
+      const container = exportButton.parentNode;
+      let bar = container.querySelector('[data-progress="backup"]');
       if (!bar) {
-        bar = document.createElement("progress");
+        bar = document.createElement("div");
         bar.dataset.progress = "backup";
         bar.className = "backup-progress";
-        messageContainer.appendChild(bar);
+        bar.innerHTML = '<div class="backup-progress__fill"></div>';
+        container.insertBefore(bar, exportButton);
       }
-      bar.max = total;
-      bar.value = done;
+      const percent = total > 0 ? done / total * 100 : 100;
+      bar.firstElementChild.style.width = `${percent}%`;
     }
     function hideProgress() {
-      messageContainer.querySelector('[data-progress="backup"]')?.remove();
+      exportButton.parentNode.querySelector('[data-progress="backup"]')?.remove();
     }
     exportButton.addEventListener("click", async () => {
       if (!isUnlocked()) return;
