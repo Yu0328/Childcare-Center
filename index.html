@@ -778,6 +778,13 @@ fieldset.panel-form__field.import-preview__child legend {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+/* 適性紀錄's 適性發展紀錄表 only: one domain card per row, full width, stacked in domain order
+   (the opposite of .domain-grid--row above) — narrative text and reference checkboxes need real
+   width to edit comfortably, which the default auto-fit multi-column layout doesn't give them. */
+.domain-grid--single {
+  grid-template-columns: 1fr;
+}
+
 /* #app's normal 960px cap (sized for the narrow panel-form pages) leaves each of the five
    columns above too little room for real indicator text, dates, and notes to stay readable —
    widen the page specifically when domain-grid--row is present, native :has() so no JS/markup
@@ -1678,9 +1685,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/jszip/dist/jszip.min.js
+  // ../../../node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -5970,7 +5977,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // node_modules/docx/dist/index.mjs
+  // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -26892,6 +26899,12 @@ var CFormApp = (() => {
       </div>
     </div>
   `;
+    container.querySelector('[data-field="indicatorCode"]').addEventListener("change", (event) => {
+      const indicator = getIndicator(event.target.value);
+      if (!indicator) return;
+      container.querySelector('[data-field="activityName"]').value = indicator.activityName;
+      container.querySelector('[data-field="indicatorText"]').value = indicator.description;
+    });
     container.querySelector('[data-action="add-entry"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const indicatorCode = container.querySelector('[data-field="indicatorCode"]').value;
@@ -27118,7 +27131,7 @@ var CFormApp = (() => {
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
         <p class="field-error" data-error></p>
       </form>
-      <div class="domain-grid">
+      <div class="domain-grid domain-grid--single">
         ${DOMAINS.filter((d) => byDomain.has(d.id)).map((domain, index) => {
       const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domain.id)) : index === 0;
       return `
