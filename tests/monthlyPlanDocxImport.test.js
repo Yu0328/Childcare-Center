@@ -27,6 +27,10 @@ describe('parsePeriodFromTitleText', () => {
   it('returns null when no period pattern is found', () => {
     expect(parsePeriodFromTitleText('沒有標題文字')).toBeNull();
   });
+
+  it('tolerates a title typo\'d without the trailing "畫" (real legacy file: 西瓜班-01月計畫.docx)', () => {
+    expect(parsePeriodFromTitleText('...托嬰中心115年01月課程計')).toBe('115年01月');
+  });
 });
 
 describe('extractTitleText', () => {
@@ -64,6 +68,16 @@ describe('parseChildNameCell', () => {
   it('parses a legacy file\'s "name / age＋slash＋trailing letter" layout, letter possibly in its own colored run', () => {
     const cellXml = `<w:p><w:r><w:t>測試寶寶</w:t></w:r></w:p><w:p><w:r><w:t>1y6m/</w:t></w:r><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>C</w:t></w:r></w:p>`;
     expect(parseChildNameCell(cellXml)).toEqual({ name: '測試寶寶', tier: 'Ⅳ' });
+  });
+
+  it('parses a legacy file\'s fullwidth tier letter (real legacy file: 西瓜班-02月計畫.docx uses "Ｃ")', () => {
+    const cellXml = `<w:p><w:r><w:t>測試寶寶</w:t></w:r></w:p><w:p><w:r><w:t>1y6m/Ｃ</w:t></w:r></w:p>`;
+    expect(parseChildNameCell(cellXml)).toEqual({ name: '測試寶寶', tier: 'Ⅳ' });
+  });
+
+  it('joins a legacy file\'s name split one-CJK-character-per-paragraph (real legacy file: 西瓜班-01月計畫.docx "鍾"/"晴"/"妍")', () => {
+    const cellXml = `<w:p><w:r><w:t>鍾</w:t></w:r></w:p><w:p><w:r><w:t>晴</w:t></w:r></w:p><w:p><w:r><w:t>妍</w:t></w:r></w:p><w:p><w:r><w:t>1y</w:t></w:r></w:p><w:p><w:r><w:t>05m/C</w:t></w:r></w:p>`;
+    expect(parseChildNameCell(cellXml)).toEqual({ name: '鍾晴妍', tier: 'Ⅳ' });
   });
 
   it('returns null tier when no recognizable tier marker is present', () => {

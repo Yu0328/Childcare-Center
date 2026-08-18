@@ -22,7 +22,9 @@ export async function renderMonthlyPlanListView(
     <div class="page-header page-header--editor">
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
       <h2 class="page-header__title">課程月計畫</h2>
-      <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">課程月計畫匯入</button>
+      <div class="page-header__actions">
+        <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">課程月計畫匯入</button>
+      </div>
       <input type="file" accept=".docx" data-field="import-monthly-plan-file" multiple hidden>
     </div>
     <p class="field-error field-error--center" data-error="import"></p>

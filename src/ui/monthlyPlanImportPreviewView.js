@@ -88,7 +88,7 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
         ? `<ul class="import-preview__warnings">${parsed.warnings.map(w => `<li class="field-error">${escapeHtml(w)}</li>`).join('')}</ul>`
         : ''
     }
-    <form class="panel-form" data-action="confirm-import">
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
       <h3 class="panel-form__title">年月</h3>
       ${periodSelectsHtml({
         yearFieldName: 'period-year',
@@ -98,7 +98,9 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
       })}
 
       <h3 class="panel-form__title">小朋友（共 ${parsed.children.length} 位）</h3>
-      ${parsed.children.map((c, i) => childBlock(c, i, existingChildren)).join('') || '<p>沒有偵測到任何小朋友</p>'}
+      <div class="import-preview__children">
+        ${parsed.children.map((c, i) => childBlock(c, i, existingChildren)).join('') || '<p>沒有偵測到任何小朋友</p>'}
+      </div>
 
       <button type="submit" class="btn btn--primary">確認匯入</button>
       <p class="field-error" data-error></p>

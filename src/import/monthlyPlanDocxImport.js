@@ -5,7 +5,9 @@ function flatJoinedText(xml) {
   return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
 }
 
-const PERIOD_PATTERN = /(\d{1,3})年\s*(\d{1,2})月課程計畫/;
+// "畫" is optional: a real legacy file (西瓜班-01月計畫.docx) has the title paragraph itself
+// typo'd as "...課程計" with the trailing character missing, not a parsing artifact.
+const PERIOD_PATTERN = /(\d{1,3})年\s*(\d{1,2})月課程計畫?/;
 
 export function parsePeriodFromTitleText(text) {
   const match = PERIOD_PATTERN.exec(text ?? '');
@@ -34,12 +36,27 @@ function extractCellParagraphTexts(cellXml) {
 const TIER_LETTER_TO_CODE = new Map(TIERS.filter(t => t.formLetter).map(t => [t.formLetter, t.code]));
 const TIER_LABEL_TO_CODE = new Map(TIERS.map(t => [t.label, t.code]));
 
+// Some legacy files type the tier letter as fullwidth (e.g. "Ｃ" U+FF23) instead of ASCII "C".
+function normalizeFullwidthLetters(text) {
+  return text.replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+}
+
 export function parseChildNameCell(cellXml) {
   const paragraphs = extractCellParagraphTexts(cellXml)
     .map(t => t.trim())
     .filter(Boolean);
-  const name = paragraphs[0] || null;
-  const joined = paragraphs.join(' ');
+
+  // A hand-typed legacy cell can wrap the name across multiple paragraphs, one CJK character per
+  // line (real file: 西瓜班-01月計畫.docx, "鍾晴妍" as "鍾"/"晴"/"妍" paragraphs) — accumulate
+  // leading pure-CJK paragraphs into the name, since the age/tier marker that always follows
+  // contains a digit or ASCII letter.
+  const PURE_CJK = /^[一-鿿]+$/;
+  let nameParagraphCount = 0;
+  while (nameParagraphCount < paragraphs.length && PURE_CJK.test(paragraphs[nameParagraphCount])) {
+    nameParagraphCount += 1;
+  }
+  const name = nameParagraphCount > 0 ? paragraphs.slice(0, nameParagraphCount).join('') : null;
+  const joined = normalizeFullwidthLetters(paragraphs.join(' '));
 
   let tier = null;
   const letterMatch = /([A-E])表/.exec(joined) || /\/\s*([A-E])\b/.exec(joined);

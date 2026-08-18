@@ -573,6 +573,43 @@ fieldset.panel-form__field legend {
   padding: 0.3rem 0;
 }
 
+/* Standalone-page variant for the 課程月計畫 import preview: unlike .panel-form--wide below, this
+   form is the only thing on screen (no sibling tab-layout column to protect), and it can hold many
+   children's blocks (see .import-preview__children), so it widens much further and isn't sticky. */
+.panel-form--import-grid {
+  max-width: 960px;
+}
+
+@media (min-width: 641px) {
+  #app:has(.panel-form--import-grid) {
+    max-width: 1100px;
+  }
+}
+
+.import-preview__children {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* Specificity must beat fieldset.panel-form__field's border:none/padding:0 reset above (0,1,1),
+   since this fieldset carries both classes at once — plain .import-preview__child (0,1,0) would
+   lose regardless of source order. */
+fieldset.panel-form__field.import-preview__child {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--page-bg);
+}
+
+.import-preview__new-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
 /* Wider variant for the 適性紀錄 課程計畫表/適性發展紀錄表 "新增..." panels specifically (not
    every .panel-form — the short "新增幼兒"/"新增適性總表" forms elsewhere stay at the normal
    420px cap). Widens both this panel's own column and #app itself (native :has(), no markup
