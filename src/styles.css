@@ -766,6 +766,13 @@ fieldset.panel-form__field.import-preview__child legend {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+/* 適性紀錄's 適性發展紀錄表 only: one domain card per row, full width, stacked in domain order
+   (the opposite of .domain-grid--row above) — narrative text and reference checkboxes need real
+   width to edit comfortably, which the default auto-fit multi-column layout doesn't give them. */
+.domain-grid--single {
+  grid-template-columns: 1fr;
+}
+
 /* #app's normal 960px cap (sized for the narrow panel-form pages) leaves each of the five
    columns above too little room for real indicator text, dates, and notes to stay readable —
    widen the page specifically when domain-grid--row is present, native :has() so no JS/markup

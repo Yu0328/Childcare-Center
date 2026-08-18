@@ -120,7 +120,7 @@ export async function renderDevelopmentRecordTab(
         <button type="submit" class="btn btn--primary">新增</button>
         <p class="field-error" data-error></p>
       </form>
-      <div class="domain-grid">
+      <div class="domain-grid domain-grid--single">
         ${DOMAINS.filter(d => byDomain.has(d.id))
           .map((domain, index) => {
             const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domain.id)) : index === 0;

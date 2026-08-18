@@ -51,6 +51,22 @@ describe('renderCoursePlanTab', () => {
     expect(entry.indicatorText).toBe('能穩定握筆塗鴉');
   });
 
+  it('prefills activity name and indicator text from the selected indicator, still editable by the teacher afterward', async () => {
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+
+    const indicatorSelect = container.querySelector('[data-field="indicatorCode"]');
+    indicatorSelect.value = 'Ⅴ-1-6';
+    indicatorSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(container.querySelector('[data-field="activityName"]').value).toBe('我會塗鴉');
+    expect(container.querySelector('[data-field="indicatorText"]').value).toBe('能拿筆塗鴉');
+
+    // Teacher can still overwrite the prefilled text.
+    container.querySelector('[data-field="indicatorText"]').value = '能穩定握筆塗鴉';
+    expect(container.querySelector('[data-field="indicatorText"]').value).toBe('能穩定握筆塗鴉');
+  });
+
   it('renders an existing entry grouped under its domain, with its teacher-entered indicator text (not the system description)', async () => {
     await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫', indicatorText: '能穩定握筆塗鴉' });
 

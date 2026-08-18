@@ -23,6 +23,13 @@ describe('renderDevelopmentRecordTab', () => {
     expect(container.querySelector('[data-action="add-record"]').classList.contains('panel-form--wide')).toBe(true);
   });
 
+  it('stacks domain cards in a single full-width column instead of side by side', async () => {
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {} });
+
+    expect(container.querySelector('.domain-grid').classList.contains('domain-grid--single')).toBe(true);
+  });
+
   it('only lists course plan entries belonging to the currently selected domain as checkboxes', async () => {
     await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-2', activityName: '香蕉鬆餅' }); // domain 2
 

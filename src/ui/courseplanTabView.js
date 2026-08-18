@@ -240,6 +240,17 @@ export async function renderCoursePlanTab(
     </div>
   `;
 
+  container.querySelector('[data-field="indicatorCode"]').addEventListener('change', event => {
+    const indicator = getIndicator(event.target.value);
+    if (!indicator) return;
+    // Prefills with the indicator's own official label/text so the teacher isn't retyping the
+    // same content for every child — same pattern as monthlyPlanEditorView's indicator select.
+    // Still freely editable afterward: this only runs on the select's own change event, not on
+    // every render, so it never clobbers text the teacher has since typed.
+    container.querySelector('[data-field="activityName"]').value = indicator.activityName;
+    container.querySelector('[data-field="indicatorText"]').value = indicator.description;
+  });
+
   container.querySelector('[data-action="add-entry"]').addEventListener('submit', async event => {
     event.preventDefault();
     const indicatorCode = container.querySelector('[data-field="indicatorCode"]').value;
