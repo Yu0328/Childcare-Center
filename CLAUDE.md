@@ -32,6 +32,13 @@ Staff previously filled these out by hand in Word, re-copying the same indicator
 - **Indicator reference data** (`src/data/indicators.js`): 178 developmental indicators across **6** age tiers (Ⅰ–Ⅵ; Ⅵ is "25個月以上", unbounded) × 5 domains, embedded as static JSON, sourced from the official practice guide — not user-entered. `TIERS[].formLetter` maps a tier to its exported filename letter; Ⅰ has none (no "X表" segment at all), Ⅱ→A, Ⅲ→B, Ⅳ→C, Ⅴ→D, Ⅵ→E — use `tierFormLabel(tierCode)` rather than reading `formLetter` directly. If you're ever unsure which tier a real file's own name implies, trust the file, not an assumption.
 - Age tier is auto-suggested from (today − child's birthdate) via `src/domain/ageTier.js` but stays manually overridable per form, since staff sometimes backfill records for a tier the child has already grown out of.
 
+## Version control
+
+- `main` is the only long-lived branch and is the source of truth — it tracks `origin/main`, which GitHub Pages serves from. (It was renamed from a local-only `public` branch on 2026-08-18 after that branch and `origin/main` drifted apart; don't recreate a separately-named local branch for this.)
+- Feature work happens on a worktree + branch per feature. Once a feature branch is reviewed and ready, fast-forward it into `main` and immediately delete the branch and worktree — don't leave finished branches lying around (this repo once accumulated 8 stale/superseded branches from skipping this step).
+- After merging a `src/`-affecting change into `main`, immediately do the deploy snapshot (see Architecture above: `npm run build:web`, copy `site/index.html`/`site/sw.js` to the repo root, commit as one "public snapshot update") and push to `origin/main` right away. Don't let local `main` sit ahead of `origin/main` — a branch pushed straight to `origin/main` from elsewhere while local `main` lags behind is exactly how the split above happened.
+- `master` is a frozen legacy branch (predates a history rewrite of what's now `main` — it shares no common ancestor with `main`). Keep it around for archival reference only; never merge it into `main` or build on top of it.
+
 ## Testing
 
 - `npm test` (vitest + jsdom + fake-indexeddb). TDD is the norm here — check a sibling test file before writing a new feature to match existing conventions (fixture style, `waitFor` helper usage, hand-built zip fixtures for docx-parsing edge cases).
