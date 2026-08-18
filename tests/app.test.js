@@ -209,8 +209,8 @@ describe('wireBackupControls', () => {
 
     await waitFor(() => header.querySelector('[data-progress="backup"]') !== null);
     const bar = header.querySelector('[data-progress="backup"]');
-    expect(bar.max).toBe(2);
-    expect(bar.value).toBe(0);
+    expect(bar.nextElementSibling).toBe(exportButton); // sits immediately to the left of the button
+    expect(bar.firstElementChild.style.width).toBe('0%');
 
     resolveExport();
 

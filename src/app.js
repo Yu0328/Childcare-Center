@@ -140,22 +140,26 @@ export function wireBackupControls({
     errorEl.textContent = text;
   }
 
-  // Exporting can take a while once 點滴分享 photos pile up across children, so show a native
-  // <progress> bar (updated per-child by exportBackup's onProgress callback) instead of leaving
-  // the button looking unresponsive.
+  // Exporting can take a while once 點滴分享 photos pile up across children, so show a small
+  // fill bar to the left of the export button (updated per-child by exportBackup's onProgress
+  // callback) instead of leaving it looking unresponsive. A custom div pair rather than a
+  // native <progress> — <progress>'s fill can't be given a smooth CSS transition consistently
+  // across browsers, and per-child steps without one look like a jumpy snap rather than a glide.
   function showProgress(done, total) {
-    let bar = messageContainer.querySelector('[data-progress="backup"]');
+    const container = exportButton.parentNode;
+    let bar = container.querySelector('[data-progress="backup"]');
     if (!bar) {
-      bar = document.createElement('progress');
+      bar = document.createElement('div');
       bar.dataset.progress = 'backup';
       bar.className = 'backup-progress';
-      messageContainer.appendChild(bar);
+      bar.innerHTML = '<div class="backup-progress__fill"></div>';
+      container.insertBefore(bar, exportButton);
     }
-    bar.max = total;
-    bar.value = done;
+    const percent = total > 0 ? (done / total) * 100 : 100;
+    bar.firstElementChild.style.width = `${percent}%`;
   }
   function hideProgress() {
-    messageContainer.querySelector('[data-progress="backup"]')?.remove();
+    exportButton.parentNode.querySelector('[data-progress="backup"]')?.remove();
   }
 
   exportButton.addEventListener('click', async () => {

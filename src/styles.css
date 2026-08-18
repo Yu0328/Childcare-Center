@@ -1304,10 +1304,19 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 .backup-progress {
-  display: block;
-  width: 100%;
-  max-width: 240px;
-  margin-top: 0.4em;
+  align-self: center;
+  width: 60px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.backup-progress__fill {
+  height: 100%;
+  width: 0%;
+  background: var(--brand);
+  transition: width 0.25s ease-out;
 }
 
 /* Marks a card-list row (or a child row) whose form/report/plan was created by docx import and
