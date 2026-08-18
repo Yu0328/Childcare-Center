@@ -5,6 +5,14 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 
+// "Ⅳ-2-4" -> 4 (the item number within its domain) — see courseplanTabView.js's identical helper
+// for why: sorts the reference checkboxes in the indicator picker's own order regardless of the
+// order entries were added in (insertion/id order otherwise, unrelated to indicator numbering).
+function indicatorItemNumber(code) {
+  const match = /-(\d+)$/.exec(String(code ?? ''));
+  return match ? Number(match[1]) : Infinity;
+}
+
 function checkboxListHtml(entries, { checkboxAttr, checkedIds = [], recordId = null }) {
   if (entries.length === 0) return '<p>這個領域尚未在課程計畫表填寫任何項目</p>';
   return entries
@@ -85,16 +93,15 @@ export async function renderDevelopmentRecordTab(
     byDomain.get(record.domain).push(record);
   }
 
-  const domainEntries = allEntries.filter(entry => {
-    const indicator = getIndicator(entry.indicatorCode);
-    return indicator && indicator.domain === Number(selectedDomain);
-  });
-
   const entriesByDomainNumber = domainNumber =>
-    allEntries.filter(entry => {
-      const indicator = getIndicator(entry.indicatorCode);
-      return indicator && indicator.domain === Number(domainNumber);
-    });
+    allEntries
+      .filter(entry => {
+        const indicator = getIndicator(entry.indicatorCode);
+        return indicator && indicator.domain === Number(domainNumber);
+      })
+      .sort((a, b) => indicatorItemNumber(a.indicatorCode) - indicatorItemNumber(b.indicatorCode));
+
+  const domainEntries = entriesByDomainNumber(selectedDomain);
 
   // See courseplanTabView.js's identical block for why reading the container's existing
   // <details> state (before overwriting it) is what lets collapse/expand survive re-renders.

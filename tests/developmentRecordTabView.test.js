@@ -44,6 +44,18 @@ describe('renderDevelopmentRecordTab', () => {
     expect(label.textContent).toContain('能獨立地走上樓梯');
   });
 
+  it('orders the reference checkboxes by indicator sequence, not by when each was added', async () => {
+    // `entry` from beforeEach is Ⅴ-1-6, added first; this one (Ⅴ-1-2) is added second but must
+    // still sort ahead of it, matching the indicator picker's own Ⅴ-1-1..Ⅴ-1-7 order.
+    const addedLater = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-2', activityName: '我會跑' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const checkboxIds = [...container.querySelectorAll('[data-course-entry-checkbox]')].map(el => el.dataset.courseEntryCheckbox);
+    expect(checkboxIds.indexOf(String(addedLater.id))).toBeLessThan(checkboxIds.indexOf(String(entry.id)));
+  });
+
   it('only lists course plan entries belonging to the currently selected domain as checkboxes', async () => {
     await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-2', activityName: '香蕉鬆餅' }); // domain 2
 
