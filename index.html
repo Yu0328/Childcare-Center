@@ -28653,6 +28653,9 @@ var CFormApp = (() => {
   }
   async function blobToBase64(blob) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
+    if (typeof bytes.toBase64 === "function") {
+      return bytes.toBase64();
+    }
     let binary = "";
     for (let i = 0; i < bytes.length; i += 1) {
       binary += String.fromCharCode(bytes[i]);
@@ -28660,6 +28663,9 @@ var CFormApp = (() => {
     return btoa(binary);
   }
   function base64ToBlob(base64, type) {
+    if (typeof Uint8Array.fromBase64 === "function") {
+      return new Blob([Uint8Array.fromBase64(base64)], { type });
+    }
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
