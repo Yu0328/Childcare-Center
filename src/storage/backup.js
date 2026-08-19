@@ -27,12 +27,20 @@ async function withContext(label, fn) {
   }
 }
 
-// Appends one character at a time rather than spreading bytes into String.fromCharCode: spreading
-// even a chunked subarray (this used to chunk at 0x8000) can exceed Safari's call-stack/argument-
-// spread limit, which is lower than Chrome's, for a real (non-trivial) photo. One argument per
-// call has no such limit on any engine.
+// Uint8Array.prototype.toBase64/fromBase64 (added to the JS spec in 2024) are native, spread-free
+// base64 conversions — much faster than a JS byte loop, and immune to the Safari call-stack/
+// argument-spread limit below since they never spread bytes into String.fromCharCode at all. Not
+// yet universal (this is why it's feature-detected rather than assumed), so both directions keep
+// the old byte-by-byte fallback for engines that lack it.
 async function blobToBase64(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
+  if (typeof bytes.toBase64 === 'function') {
+    return bytes.toBase64();
+  }
+  // Appends one character at a time rather than spreading bytes into String.fromCharCode:
+  // spreading even a chunked subarray (this used to chunk at 0x8000) can exceed Safari's
+  // call-stack/argument-spread limit, which is lower than Chrome's, for a real (non-trivial)
+  // photo. One argument per call has no such limit on any engine.
   let binary = '';
   for (let i = 0; i < bytes.length; i += 1) {
     binary += String.fromCharCode(bytes[i]);
@@ -41,6 +49,9 @@ async function blobToBase64(blob) {
 }
 
 function base64ToBlob(base64, type) {
+  if (typeof Uint8Array.fromBase64 === 'function') {
+    return new Blob([Uint8Array.fromBase64(base64)], { type });
+  }
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
