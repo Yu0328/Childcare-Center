@@ -25118,7 +25118,7 @@ var CFormApp = (() => {
       }
     });
   }
-  function headerIconRunInFrontOfText(offsetEmu) {
+  function headerIconRunOverlapping(offsetEmu, behindDocument) {
     return new ImageRun({
       type: "png",
       data: HEADER_ICON_BASE64,
@@ -25130,12 +25130,18 @@ var CFormApp = (() => {
       floating: {
         allowOverlap: true,
         layoutInCell: true,
-        behindDocument: false,
+        behindDocument,
         horizontalPosition: { relative: HorizontalPositionRelativeFrom.COLUMN, offset: offsetEmu.horizontal },
         verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: offsetEmu.vertical },
         wrap: { type: TextWrappingType.NONE }
       }
     });
+  }
+  function headerIconRunInFrontOfText(offsetEmu) {
+    return headerIconRunOverlapping(offsetEmu, false);
+  }
+  function headerIconRunBehindText(offsetEmu) {
+    return headerIconRunOverlapping(offsetEmu, true);
   }
   function toRocDate(isoDate) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate ?? ""));
@@ -26680,7 +26686,7 @@ var CFormApp = (() => {
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
-            headerIconRunInFrontOfText(HEADER_ICON_OFFSET_EMU2),
+            headerIconRunBehindText(HEADER_ICON_OFFSET_EMU2),
             new TextRun({
               text: `${INSTITUTION_NAME2}${title}`,
               font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
