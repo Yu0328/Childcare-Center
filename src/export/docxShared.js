@@ -75,20 +75,19 @@ export function headerIconRunAt(offsetEmu) {
   });
 }
 
-// A floating header icon using Word's "文字在前" (In Front of Text) layout: the image floats
-// freely on top of the text instead of pushing it away (contrast headerIconRunAt's "四周型"/Square
-// wrapping, which reserves space around the icon so text never overlaps it). Used only by
-// parentReportDocxExport.js's header, which wants the icon positioned close to/overlapping the
-// start of the title rather than pushed far to the side — headerIconRunAt's existing behavior,
-// and 適性總表's (docxExport.js) approved output, are untouched by this function's existence.
+// A floating header icon that overlaps the title text instead of being pushed aside (contrast
+// headerIconRunAt's "四周型"/Square wrapping, which reserves space around the icon so text never
+// overlaps it). Used by parentReportDocxExport.js's and monthlyPlanDocxExport.js's headers, which
+// want the icon positioned close to/overlapping the start of the title rather than pushed far to
+// the side — headerIconRunAt's existing behavior, and 適性總表's (docxExport.js) approved output,
+// are untouched by this function's existence.
 //
 // docx's Anchor renders `wrap: { type: TextWrappingType.NONE }` as an OOXML <wp:wrapNone/> element
 // (no text-wrapping avoidance at all), and separately renders the floating `behindDocument` flag
-// as the <wp:anchor behindDoc="..."> attribute — the same wrap type covers both "In Front of Text"
-// and "Behind Text" in Word's UI; the only difference is behindDoc, which we explicitly set false
-// here for "in front" (docx's own IFloating default is already false, but this is spelled out
-// since front/behind ordering is the entire point of this function).
-export function headerIconRunInFrontOfText(offsetEmu) {
+// as the <wp:anchor behindDoc="..."> attribute — the same wrap type covers both Word's "文字在前"
+// (In Front of Text, behindDoc="0") and "文字在後" (Behind Text, behindDoc="1") layouts; the only
+// difference is which layer paints on top.
+function headerIconRunOverlapping(offsetEmu, behindDocument) {
   return new ImageRun({
     type: 'png',
     data: HEADER_ICON_BASE64,
@@ -100,12 +99,24 @@ export function headerIconRunInFrontOfText(offsetEmu) {
     floating: {
       allowOverlap: true,
       layoutInCell: true,
-      behindDocument: false,
+      behindDocument,
       horizontalPosition: { relative: HorizontalPositionRelativeFrom.COLUMN, offset: offsetEmu.horizontal },
       verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: offsetEmu.vertical },
       wrap: { type: TextWrappingType.NONE },
     },
   });
+}
+
+export function headerIconRunInFrontOfText(offsetEmu) {
+  return headerIconRunOverlapping(offsetEmu, false);
+}
+
+// "文字在後" (Behind Text): the icon paints behind the title text instead of on top of it, so an
+// overlapping icon never cuts through a glyph — used where the icon offset is close enough to the
+// title's first character that "in front of text" was covering part of it (see
+// parentReportDocxExport.acceptance.test.js).
+export function headerIconRunBehindText(offsetEmu) {
+  return headerIconRunOverlapping(offsetEmu, true);
 }
 
 // 2024-11-01 -> 113/11/01

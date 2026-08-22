@@ -55,16 +55,18 @@ describe('generateParentReportDocxBlob acceptance', () => {
     expect(documentXml).toContain('主任簽名');
   });
 
-  // The header icon must use Word's "文字在前"(In Front of Text) layout — the image floats freely
-  // over the title instead of pushing it away — not "四周型"(Square), which docxExport.js's
-  // sibling 適性總表 export still uses (see docxExport.acceptance.test.js). In OOXML, Square
-  // wrapping emits <wp:wrapSquare .../>, while "In Front of Text" (as opposed to "behind text",
-  // the same wrap type with behindDoc="1") emits <wp:wrapNone/> with behindDoc="0".
-  it('floats the header icon "in front of text" (wrapNone, not behindDoc) rather than Square-wrapped', async () => {
+  // The header icon must use Word's "文字在後"(Behind Text) layout — the image floats freely near
+  // the title without pushing it away, but paints BEHIND the text so it never cuts through a
+  // glyph — not "四周型"(Square), which docxExport.js's sibling 適性總表 export still uses (see
+  // docxExport.acceptance.test.js), and not "文字在前"(In Front of Text, behindDoc="0"), which was
+  // this document's original layout until real output showed the icon overlapping and obscuring
+  // part of the title's first character. In OOXML, Square wrapping emits <wp:wrapSquare .../>,
+  // while both "in front of"/"behind text" emit <wp:wrapNone/>, distinguished only by behindDoc.
+  it('floats the header icon "behind text" (wrapNone, behindDoc) rather than Square-wrapped or in front', async () => {
     const { headerXml } = await exportParts();
     expect(headerXml).toContain('<wp:wrapNone/>');
     expect(headerXml).not.toContain('wrapSquare');
-    expect(headerXml).toMatch(/<wp:anchor[^>]*\bbehindDoc="0"/);
+    expect(headerXml).toMatch(/<wp:anchor[^>]*\bbehindDoc="1"/);
   });
 
   it('includes all four section titles when data is present in every section', async () => {

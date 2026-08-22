@@ -7,7 +7,7 @@ import { TIERS, DOMAINS, getIndicator } from '../data/indicators.js';
 import { downloadBlob } from './downloadBlob.js';
 import {
   FONT, DEFAULT_TEXT_SIZE, PAGE_SIZE, HEADER_ICON_EMU, EMU_PER_PIXEL,
-  textParagraph, emptyParagraph, headerIconRunInFrontOfText, toRocDate,
+  textParagraph, emptyParagraph, headerIconRunBehindText, toRocDate,
 } from './docxShared.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 
@@ -469,8 +469,8 @@ export async function buildHighlightsTable(highlightEntries) {
   });
 }
 
-// Positions the icon (via headerIconRunInFrontOfText's "in front of text" wrapping, which lets the
-// icon float freely over the text instead of pushing it away) near the start of the centered title
+// Positions the icon (via headerIconRunBehindText's "behind text" wrapping, so the icon can float
+// close to the title without ever cutting through a glyph) near the start of the centered title
 // — the first character, "屏" of INSTITUTION_NAME — rather than far off to the left as
 // docxExport.js's 適性總表 header does. Chosen by visual iteration against a rendered sample (see
 // Fix B's report), not derived by calculation: exact glyph-start position depends on Word's own
@@ -495,7 +495,7 @@ function pageHeader({ child, report, title }) {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          headerIconRunInFrontOfText(HEADER_ICON_OFFSET_EMU),
+          headerIconRunBehindText(HEADER_ICON_OFFSET_EMU),
           new TextRun({
             text: `${INSTITUTION_NAME}${title}`,
             font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
