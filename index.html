@@ -307,6 +307,13 @@ button {
   right: 0;
 }
 
+/* .btn--ghost has no border of its own (it's used bare elsewhere, e.g. childListView's "←
+   返回" buttons) — scoped here to match 匯入檔案's bordered look without adding a border to
+   every other .btn--ghost use. */
+.page-header--narrow .btn[data-action="manage-children"] {
+  border-color: var(--brand);
+}
+
 .page-header__title {
   font-size: 1.4rem;
   display: inline-block;
@@ -26217,7 +26224,7 @@ var CFormApp = (() => {
   async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
     container.innerHTML = `
     <div class="page-header page-header--narrow">
-      <button type="button" class="btn btn--outline" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
+      <button type="button" class="btn btn--ghost" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
       <h2 class="page-header__title">\u9078\u64C7\u8981\u586B\u5BEB\u7684\u8868</h2>
       <button type="button" class="btn btn--purple" data-action="import-any-docx">\u532F\u5165\u6A94\u6848</button>
       <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
