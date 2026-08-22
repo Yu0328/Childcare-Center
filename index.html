@@ -26212,9 +26212,10 @@ var CFormApp = (() => {
     { type: "parent-report", title: "\u9069\u6027\u7D00\u9304(\u5BB6\u9577\u7248)", desc: "\u6BCF\u6708\u8AB2\u7A0B\u8A08\u756B\u8207\u767C\u5C55\u7D00\u9304", variant: "edit" },
     { type: "monthly-plan", title: "\u8AB2\u7A0B\u6708\u8A08\u756B", desc: "\u73ED\u7D1A\u6BCF\u6708\u6D3B\u52D5\u5B89\u6392", variant: "filled" }
   ];
-  async function renderReportTypeSelectView(container, { onSelectType }) {
+  async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
     container.innerHTML = `
     <div class="page-header page-header--narrow">
+      <button type="button" class="btn btn--ghost" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
       <h2 class="page-header__title">\u9078\u64C7\u8981\u586B\u5BEB\u7684\u8868</h2>
       <button type="button" class="btn btn--purple" data-action="import-any-docx">\u532F\u5165\u6A94\u6848</button>
       <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
@@ -26236,6 +26237,7 @@ var CFormApp = (() => {
       </div>
     </div>
   `;
+    container.querySelector('[data-action="manage-children"]').addEventListener("click", onManageChildren);
     container.querySelector('[data-type="assessment"]').addEventListener("click", () => onSelectType("assessment"));
     container.querySelector('[data-type="parent-report"]').addEventListener("click", () => onSelectType("parent-report"));
     container.querySelector('[data-type="monthly-plan"]').addEventListener("click", () => onSelectType("monthly-plan"));
@@ -29045,7 +29047,8 @@ var CFormApp = (() => {
     }
     function showReportTypeSelect() {
       renderReportTypeSelectView(container, {
-        onSelectType: (type) => type === "monthly-plan" ? showMonthlyPlanList() : showChildList(type)
+        onSelectType: (type) => type === "monthly-plan" ? showMonthlyPlanList() : showChildList(type),
+        onManageChildren: () => showChildList("assessment")
       }).catch(showRenderError);
     }
     function showMonthlyPlanList() {
