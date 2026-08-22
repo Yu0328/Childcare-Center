@@ -25,9 +25,10 @@ const TYPE_SELECT_OPTIONS = [
   { type: 'monthly-plan', title: '課程月計畫', desc: '班級每月活動安排', variant: 'filled' },
 ];
 
-export async function renderReportTypeSelectView(container, { onSelectType }) {
+export async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
   container.innerHTML = `
     <div class="page-header page-header--narrow">
+      <button type="button" class="btn btn--ghost" data-action="manage-children">管理幼兒</button>
       <h2 class="page-header__title">選擇要填寫的表</h2>
       <button type="button" class="btn btn--purple" data-action="import-any-docx">匯入檔案</button>
       <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
@@ -49,6 +50,8 @@ export async function renderReportTypeSelectView(container, { onSelectType }) {
       </div>
     </div>
   `;
+
+  container.querySelector('[data-action="manage-children"]').addEventListener('click', onManageChildren);
 
   container.querySelector('[data-type="assessment"]').addEventListener('click', () => onSelectType('assessment'));
   container.querySelector('[data-type="parent-report"]').addEventListener('click', () => onSelectType('parent-report'));

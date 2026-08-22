@@ -31,6 +31,7 @@ export function mountApp(container, { onUnlock } = {}) {
   function showReportTypeSelect() {
     renderReportTypeSelectView(container, {
       onSelectType: type => (type === 'monthly-plan' ? showMonthlyPlanList() : showChildList(type)),
+      onManageChildren: () => showChildList('assessment'),
     }).catch(showRenderError);
   }
 

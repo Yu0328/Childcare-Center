@@ -73,6 +73,15 @@ describe('renderReportTypeSelectView', () => {
     expect(selected).toBe('assessment');
   });
 
+  it('calls onManageChildren when 管理幼兒 is clicked', async () => {
+    const container = document.createElement('div');
+    let called = false;
+    await renderReportTypeSelectView(container, { onSelectType: () => {}, onManageChildren: () => { called = true; } });
+
+    container.querySelector('[data-action="manage-children"]').click();
+    expect(called).toBe(true);
+  });
+
   it('calls onSelectType with "parent-report" when 適性紀錄(家長版) is clicked', async () => {
     const container = document.createElement('div');
     let selected = null;
