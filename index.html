@@ -5793,8 +5793,10 @@ var CFormApp = (() => {
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     }
     wireBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
-    for (const child of children) {
-      container.querySelector(`[data-child-id="${child.id}"]`).addEventListener("click", () => onSelectChild(child));
+    if (onSelectChild) {
+      for (const child of children) {
+        container.querySelector(`[data-child-id="${child.id}"]`).addEventListener("click", () => onSelectChild(child));
+      }
     }
     for (const child of children) {
       container.querySelector(`[data-delete-child="${child.id}"]`).addEventListener("click", async () => {
@@ -26215,7 +26217,7 @@ var CFormApp = (() => {
   async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
     container.innerHTML = `
     <div class="page-header page-header--narrow">
-      <button type="button" class="btn btn--ghost" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
+      <button type="button" class="btn btn--outline" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
       <h2 class="page-header__title">\u9078\u64C7\u8981\u586B\u5BEB\u7684\u8868</h2>
       <button type="button" class="btn btn--purple" data-action="import-any-docx">\u532F\u5165\u6A94\u6848</button>
       <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
@@ -29048,7 +29050,7 @@ var CFormApp = (() => {
     function showReportTypeSelect() {
       renderReportTypeSelectView(container, {
         onSelectType: (type) => type === "monthly-plan" ? showMonthlyPlanList() : showChildList(type),
-        onManageChildren: () => showChildList("assessment")
+        onManageChildren: showManageChildren
       }).catch(showRenderError);
     }
     function showMonthlyPlanList() {
@@ -29059,6 +29061,9 @@ var CFormApp = (() => {
     }
     function showMonthlyPlanEditor(plan) {
       renderMonthlyPlanEditorView(container, { plan, onBack: showMonthlyPlanList }).catch(showRenderError);
+    }
+    function showManageChildren() {
+      renderChildListView(container, { onBack: showReportTypeSelect, reportType: "assessment" }).catch(showRenderError);
     }
     function showChildList(reportType) {
       renderChildListView(container, {
