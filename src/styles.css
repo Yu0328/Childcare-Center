@@ -295,6 +295,13 @@ button {
   right: 0;
 }
 
+/* .btn--ghost has no border of its own (it's used bare elsewhere, e.g. childListView's "←
+   返回" buttons) — scoped here to match 匯入檔案's bordered look without adding a border to
+   every other .btn--ghost use. */
+.page-header--narrow .btn[data-action="manage-children"] {
+  border-color: var(--brand);
+}
+
 .page-header__title {
   font-size: 1.4rem;
   display: inline-block;
