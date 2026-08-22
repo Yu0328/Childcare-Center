@@ -28,7 +28,7 @@ const TYPE_SELECT_OPTIONS = [
 export async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
   container.innerHTML = `
     <div class="page-header page-header--narrow">
-      <button type="button" class="btn btn--ghost" data-action="manage-children">管理幼兒</button>
+      <button type="button" class="btn btn--outline" data-action="manage-children">管理幼兒</button>
       <h2 class="page-header__title">選擇要填寫的表</h2>
       <button type="button" class="btn btn--purple" data-action="import-any-docx">匯入檔案</button>
       <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>

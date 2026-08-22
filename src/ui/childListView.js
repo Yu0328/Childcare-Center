@@ -75,8 +75,10 @@ export async function renderChildListView(
 
   wireBirthDateSelects(container, { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' });
 
-  for (const child of children) {
-    container.querySelector(`[data-child-id="${child.id}"]`).addEventListener('click', () => onSelectChild(child));
+  if (onSelectChild) {
+    for (const child of children) {
+      container.querySelector(`[data-child-id="${child.id}"]`).addEventListener('click', () => onSelectChild(child));
+    }
   }
 
   for (const child of children) {

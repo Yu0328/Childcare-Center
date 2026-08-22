@@ -125,6 +125,15 @@ describe('renderChildListView', () => {
     expect(selected).toEqual(child);
   });
 
+  it('does nothing when a child is clicked and onSelectChild is not provided', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+
+    const container = document.createElement('div');
+    await renderChildListView(container, {});
+
+    expect(() => container.querySelector(`[data-child-id="${child.id}"]`).click()).not.toThrow();
+  });
+
   it('shows error message when addChild fails and preserves form input', async () => {
     // Mock the addChild import in childListView
     const dbModule = await import('../src/storage/db.js');

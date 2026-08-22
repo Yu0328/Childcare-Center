@@ -31,7 +31,7 @@ export function mountApp(container, { onUnlock } = {}) {
   function showReportTypeSelect() {
     renderReportTypeSelectView(container, {
       onSelectType: type => (type === 'monthly-plan' ? showMonthlyPlanList() : showChildList(type)),
-      onManageChildren: () => showChildList('assessment'),
+      onManageChildren: showManageChildren,
     }).catch(showRenderError);
   }
 
@@ -44,6 +44,10 @@ export function mountApp(container, { onUnlock } = {}) {
 
   function showMonthlyPlanEditor(plan) {
     renderMonthlyPlanEditorView(container, { plan, onBack: showMonthlyPlanList }).catch(showRenderError);
+  }
+
+  function showManageChildren() {
+    renderChildListView(container, { onBack: showReportTypeSelect, reportType: 'assessment' }).catch(showRenderError);
   }
 
   function showChildList(reportType) {
