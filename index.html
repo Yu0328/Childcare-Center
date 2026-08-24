@@ -25150,7 +25150,7 @@ var CFormApp = (() => {
   }
 
   // src/export/docxExport.js
-  var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u793E\u5340\u516C\u5171\u6258\u80B2\u5BB6\u5712";
+  var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u80B2\u82F1\u516C\u8A2D\u6C11\u71DF\u6258\u5B30\u4E2D\u5FC3";
   var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
   var TABLE_WIDTH_DXA = COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0);
   var TABLE_CELL_MARGIN_DXA = 115;
@@ -26424,6 +26424,19 @@ var CFormApp = (() => {
   function isFlaggedRow(row) {
     return Boolean(row.absent || row.courseChanged || row.status === "developing");
   }
+  var FLAGGED_STATUS_LABELS3 = { absent: "\u8ACB\u5047", courseChanged: "\u66F4\u63DB\u8AB2\u7A0B" };
+  function flaggedLabelFor(row) {
+    if (row.absent) return FLAGGED_STATUS_LABELS3.absent;
+    if (row.courseChanged) return FLAGGED_STATUS_LABELS3.courseChanged;
+    return null;
+  }
+  function formatNoteText(row) {
+    const label = flaggedLabelFor(row);
+    if (!label) return String(row.note ?? "");
+    const note = String(row.note ?? "").trim();
+    if (!note || note === label) return label;
+    return `${label}\u3000${row.note}`;
+  }
   function occurrenceDateRun(row) {
     if (!row.date) return new TextRun({ text: "", font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT }, size: DEFAULT_TEXT_SIZE });
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
@@ -26439,7 +26452,7 @@ var CFormApp = (() => {
   }
   function occurrenceNoteRun(row) {
     return new TextRun({
-      text: String(row.note ?? ""),
+      text: formatNoteText(row),
       font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
       size: DEFAULT_TEXT_SIZE,
       ...isStruckRow(row) ? { strike: true } : {},
@@ -26546,7 +26559,7 @@ var CFormApp = (() => {
       ];
     });
     const behaviorRows = behaviorObservations.flatMap((observation) => [
-      domainHeaderRow(`\u884C\u70BA\u89C0\u5BDF\uFF0D${observation.title}`, SECTION_HEADER_FILL),
+      domainHeaderRow(observation.title ? `\u884C\u70BA\u89C0\u5BDF\uFF0D${observation.title}` : "\u884C\u70BA\u89C0\u5BDF", SECTION_HEADER_FILL),
       new TableRow({ children: [fullWidthCell([narrativeParagraph(observation.narrative)])] })
     ]);
     return new Table({
@@ -27286,14 +27299,18 @@ var CFormApp = (() => {
   }
 
   // src/ui/behaviorObservationTabView.js
+  function observationHeading(observation) {
+    return observation.title ? `\u884C\u70BA\u89C0\u5BDF\uFF0D${observation.title}` : "\u884C\u70BA\u89C0\u5BDF";
+  }
   function observationCard(observation) {
+    const heading = observationHeading(observation);
     return `
     <div class="indicator-block" data-behavior-observation="${escapeHtml(observation.id)}">
       <h4 class="indicator-block__title">
-        \u884C\u70BA\u89C0\u5BDF\uFF0D${escapeHtml(observation.title)}
+        ${escapeHtml(heading)}
         <span class="indicator-block__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-observation="${escapeHtml(observation.id)}" aria-label="\u7DE8\u8F2F\u884C\u70BA\u89C0\u5BDF\uFF1A${escapeHtml(observation.title)}">\u7DE8\u8F2F</button>
-          <button type="button" class="btn--delete-circle" data-delete-observation="${escapeHtml(observation.id)}" aria-label="\u522A\u9664\u884C\u70BA\u89C0\u5BDF\uFF1A${escapeHtml(observation.title)}">\xD7</button>
+          <button type="button" class="btn btn--edit btn--small" data-edit-observation="${escapeHtml(observation.id)}" aria-label="\u7DE8\u8F2F${escapeHtml(heading)}">\u7DE8\u8F2F</button>
+          <button type="button" class="btn--delete-circle" data-delete-observation="${escapeHtml(observation.id)}" aria-label="\u522A\u9664${escapeHtml(heading)}">\xD7</button>
         </span>
       </h4>
       <p class="entry-row__note">${escapeHtml(observation.narrative)}</p>
@@ -27315,7 +27332,7 @@ var CFormApp = (() => {
     <div class="tab-layout">
       <form class="panel-form" data-action="add-observation">
         <h3 class="panel-form__title">\u65B0\u589E\u884C\u70BA\u89C0\u5BDF</h3>
-        <label class="panel-form__field">\u6A19\u984C <input data-field="title" required></label>
+        <label class="panel-form__field">\u6A19\u984C <input data-field="title"></label>
         <label class="panel-form__field">\u6558\u8FF0 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
         <p class="field-error" data-error></p>
@@ -27336,7 +27353,7 @@ var CFormApp = (() => {
     });
     for (const observation of observations) {
       container.querySelector(`[data-delete-observation="${observation.id}"]`).addEventListener("click", async () => {
-        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${observation.title}\u300D\u9019\u7B46\u884C\u70BA\u89C0\u5BDF\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
+        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${observationHeading(observation)}\u300D\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
         try {
           await deleteBehaviorObservation(observation.id);
           onChange();
