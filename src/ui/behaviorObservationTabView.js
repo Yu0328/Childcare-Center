@@ -3,14 +3,19 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 
+function observationHeading(observation) {
+  return observation.title ? `行為觀察－${observation.title}` : '行為觀察';
+}
+
 function observationCard(observation) {
+  const heading = observationHeading(observation);
   return `
     <div class="indicator-block" data-behavior-observation="${escapeHtml(observation.id)}">
       <h4 class="indicator-block__title">
-        行為觀察－${escapeHtml(observation.title)}
+        ${escapeHtml(heading)}
         <span class="indicator-block__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-observation="${escapeHtml(observation.id)}" aria-label="編輯行為觀察：${escapeHtml(observation.title)}">編輯</button>
-          <button type="button" class="btn--delete-circle" data-delete-observation="${escapeHtml(observation.id)}" aria-label="刪除行為觀察：${escapeHtml(observation.title)}">×</button>
+          <button type="button" class="btn btn--edit btn--small" data-edit-observation="${escapeHtml(observation.id)}" aria-label="編輯${escapeHtml(heading)}">編輯</button>
+          <button type="button" class="btn--delete-circle" data-delete-observation="${escapeHtml(observation.id)}" aria-label="刪除${escapeHtml(heading)}">×</button>
         </span>
       </h4>
       <p class="entry-row__note">${escapeHtml(observation.narrative)}</p>
@@ -37,7 +42,7 @@ export async function renderBehaviorObservationTab(
     <div class="tab-layout">
       <form class="panel-form" data-action="add-observation">
         <h3 class="panel-form__title">新增行為觀察</h3>
-        <label class="panel-form__field">標題 <input data-field="title" required></label>
+        <label class="panel-form__field">標題 <input data-field="title"></label>
         <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">新增</button>
         <p class="field-error" data-error></p>
@@ -60,7 +65,7 @@ export async function renderBehaviorObservationTab(
 
   for (const observation of observations) {
     container.querySelector(`[data-delete-observation="${observation.id}"]`).addEventListener('click', async () => {
-      if (!confirmDelete(`確定要刪除「${observation.title}」這筆行為觀察嗎？此操作無法復原。`)) return;
+      if (!confirmDelete(`確定要刪除「${observationHeading(observation)}」嗎？此操作無法復原。`)) return;
       try {
         await deleteBehaviorObservation(observation.id);
         onChange();

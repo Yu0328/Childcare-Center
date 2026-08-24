@@ -32,7 +32,7 @@ import {
 
 // Name of the institution this form is submitted for. Taken from the real C表 sample document
 // (陳小安C表-2.docx). Kept as a constant so another centre adopting this tool can change it in one place.
-const INSTITUTION_NAME = '屏東縣內埔鄉社區公共托育家園';
+const INSTITUTION_NAME = '屏東縣內埔鄉育英公設民營托嬰中心';
 
 // Column widths in DXA (twips), copied from the real form's <w:tblGrid> (verified against both
 // 陳小安C表-2.docx and a 彙整 sample, 林浩宇-C表-...彙整.docx — both agree on these widths).

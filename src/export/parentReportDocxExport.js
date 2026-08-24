@@ -138,6 +138,25 @@ function isFlaggedRow(row) {
   return Boolean(row.absent || row.courseChanged || row.status === 'developing');
 }
 
+// Mirrors docxExport.js's FLAGGED_STATUS_LABELS/formatNoteCell: 請假/更換課程 prints in the 說明
+// column itself rather than relying on the strikethrough alone to convey why. absent wins if
+// somehow both are set (mutually exclusive in the UI, but matches aggregateCoursePlan.js's rule).
+const FLAGGED_STATUS_LABELS = { absent: '請假', courseChanged: '更換課程' };
+
+function flaggedLabelFor(row) {
+  if (row.absent) return FLAGGED_STATUS_LABELS.absent;
+  if (row.courseChanged) return FLAGGED_STATUS_LABELS.courseChanged;
+  return null;
+}
+
+function formatNoteText(row) {
+  const label = flaggedLabelFor(row);
+  if (!label) return String(row.note ?? '');
+  const note = String(row.note ?? '').trim();
+  if (!note || note === label) return label;
+  return `${label}　${row.note}`;
+}
+
 function occurrenceDateRun(row) {
   if (!row.date) return new TextRun({ text: '', font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT }, size: DEFAULT_TEXT_SIZE });
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
@@ -154,7 +173,7 @@ function occurrenceDateRun(row) {
 
 function occurrenceNoteRun(row) {
   return new TextRun({
-    text: String(row.note ?? ''),
+    text: formatNoteText(row),
     font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
     size: DEFAULT_TEXT_SIZE,
     ...(isStruckRow(row) ? { strike: true } : {}),
@@ -282,7 +301,7 @@ export function buildDevelopmentRecordTable(developmentRecordEntries, behaviorOb
   });
 
   const behaviorRows = behaviorObservations.flatMap(observation => [
-    domainHeaderRow(`行為觀察－${observation.title}`, SECTION_HEADER_FILL),
+    domainHeaderRow(observation.title ? `行為觀察－${observation.title}` : '行為觀察', SECTION_HEADER_FILL),
     new TableRow({ children: [fullWidthCell([narrativeParagraph(observation.narrative)])] }),
   ]);
 

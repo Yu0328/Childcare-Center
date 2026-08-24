@@ -83,7 +83,7 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
   it('renders the institution/child block in a real Word page header', async () => {
     const { headerXml, documentXml } = await exportParts();
 
-    expect(headerXml).toContain('屏東縣內埔鄉社區公共托育家園嬰幼兒適性發展總表13-18個月');
+    expect(headerXml).toContain('屏東縣內埔鄉育英公設民營托嬰中心嬰幼兒適性發展總表13-18個月');
     expect(headerXml).toContain('幼兒姓名：陳小安');
     // ROC-era birth date, not the stored ISO string.
     expect(headerXml).toContain('113/11/01');

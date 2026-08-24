@@ -136,6 +136,25 @@ describe('buildCoursePlanTable', () => {
     expect(xml).toMatch(/<w:strike\s*\/>[\s\S]{0,400}請假/);
   });
 
+  it('auto-fills 請假/更換課程 into the 說明 column even when no note was typed', async () => {
+    const absentXml = await tableToXml(
+      buildCoursePlanTable(entries, { 1: [{ date: '2026-06-10', status: 'developed', absent: true, note: '' }] })
+    );
+    expect(absentXml).toContain('請假');
+
+    const changedXml = await tableToXml(
+      buildCoursePlanTable(entries, { 1: [{ date: '2026-06-10', status: 'developed', courseChanged: true, note: '' }] })
+    );
+    expect(changedXml).toContain('更換課程');
+  });
+
+  it('prefixes the flagged label onto an existing note instead of replacing it', async () => {
+    const xml = await tableToXml(
+      buildCoursePlanTable(entries, { 1: [{ date: '2026-06-10', status: 'developed', absent: true, note: '感冒' }] })
+    );
+    expect(xml).toContain('請假　感冒');
+  });
+
   it('shades the domain cell with that domain\'s fill color', async () => {
     const xml = await tableToXml(buildCoursePlanTable(entries, {}));
     expect(xml).toContain('w:fill="FBE4D5"'); // Ⅴ-1-6 -> domain 1 身體動作
@@ -251,6 +270,13 @@ describe('buildDevelopmentRecordTable', () => {
     const xml = await tableToXml(buildDevelopmentRecordTable([], behaviorObservations, coursePlanEntries));
     expect(xml).toContain('w:fill="F7CAAC"');
     expect(xml).not.toContain('w:fill="D9D9D9"');
+  });
+
+  it('prints just "行為觀察" with no trailing dash when the title is empty', async () => {
+    const behaviorObservations = [{ id: 1, reportId: 1, title: '', narrative: 'n' }];
+    const xml = await tableToXml(buildDevelopmentRecordTable([], behaviorObservations, coursePlanEntries));
+    expect(xml).toContain('行為觀察');
+    expect(xml).not.toContain('行為觀察－');
   });
 });
 

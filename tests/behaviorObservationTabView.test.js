@@ -23,6 +23,30 @@ describe('renderBehaviorObservationTab', () => {
     expect(container.textContent).toContain('本月觀察發現');
   });
 
+  it('renders just "行為觀察" with no trailing dash when the title is empty', async () => {
+    await addBehaviorObservation({ reportId: report.id, title: '', narrative: '本月觀察發現...' });
+
+    const container = document.createElement('div');
+    await renderBehaviorObservationTab(container, { report, onChange: () => {} });
+
+    expect(container.querySelector('.indicator-block__title').textContent).toContain('行為觀察');
+    expect(container.querySelector('.indicator-block__title').textContent).not.toContain('行為觀察－');
+  });
+
+  it('allows adding a new observation with an empty title', async () => {
+    const container = document.createElement('div');
+    let changed = false;
+    await renderBehaviorObservationTab(container, { report, onChange: () => { changed = true; } });
+
+    container.querySelector('[data-field="title"]').value = '';
+    container.querySelector('[data-field="narrative"]').value = '本月觀察發現...';
+    container.querySelector('[data-action="add-observation"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => changed);
+    const [added] = await listBehaviorObservationsForReport(report.id);
+    expect(added.title).toBe('');
+  });
+
   it('adds a new observation via the form', async () => {
     const container = document.createElement('div');
     let changed = false;
