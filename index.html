@@ -308,10 +308,11 @@ button {
 }
 
 /* .btn--ghost has no border of its own (it's used bare elsewhere, e.g. childListView's "←
-   返回" buttons) — scoped here to match 匯入檔案's bordered look without adding a border to
-   every other .btn--ghost use. */
+   返回" buttons) — scoped here so 管理幼兒 mirrors 匯入檔案 (.btn--purple)'s tint+soft-border
+   look, just in blue: a soft blue border that sits to --brand-tint the way --edit-border sits
+   to --edit-tint, rather than the loud full --brand line. */
 .page-header--narrow .btn[data-action="manage-children"] {
-  border-color: var(--brand);
+  border-color: #b6d0f2;
 }
 
 .page-header__title {
