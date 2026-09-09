@@ -2,6 +2,7 @@ import { getIndicatorsForTier, tierFormLabel, previousTier, getIndicator } from 
 import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry, updateForm } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
+import { keepScroll } from './keepScroll.js';
 
 function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
   return `
@@ -178,6 +179,14 @@ export async function renderFormEditorView(
   const domains = [...new Map(indicators.map(i => [i.domainName, i.domain])).entries()];
   const remarks = await remarkEntries(child.id, form.tier, entries, ownIndicatorCodes);
 
+  // Preserve which domain cards the teacher has collapsed across this view's own re-renders
+  // (every add/edit/delete rebuilds the whole thing). First render: everything open, same as
+  // before this became collapsible. Same technique as developmentRecordTabView.js.
+  const previousCards = [...container.querySelectorAll('.domain-card')];
+  const hadPreviousRender = previousCards.length > 0;
+  const previouslyOpen = new Set(previousCards.filter(el => el.open).map(el => el.dataset.domain || 'remark'));
+  const isOpen = key => !hadPreviousRender || previouslyOpen.has(key);
+
   container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">← 返回適性總表列表</button>
@@ -189,20 +198,20 @@ export async function renderFormEditorView(
       ${domains
         .map(
           ([domainName, domainId]) => `
-            <section class="domain-card" data-domain="${domainId}">
-              <h3 class="domain-card__title">${escapeHtml(domainName)}</h3>
+            <details class="domain-card" data-domain="${domainId}" ${isOpen(String(domainId)) ? 'open' : ''}>
+              <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
               <div class="domain-card__body">
                 ${indicators
                   .filter(i => i.domainName === domainName)
                   .map(indicator => indicatorBlock(indicator, entriesByIndicatorCode[indicator.code] || []))
                   .join('')}
               </div>
-            </section>
+            </details>
           `
         )
         .join('')}
-      <section class="domain-card" data-remark-section>
-        <h3 class="domain-card__title">備註</h3>
+      <details class="domain-card" data-remark-section ${isOpen('remark') ? 'open' : ''}>
+        <summary class="domain-card__title">備註</summary>
         <div class="domain-card__body">
           ${remarks.map(remarkBlock).join('')}
           <button type="button" class="btn btn--outline btn--small" data-action="add-remark">＋ 新增備註</button>
@@ -218,9 +227,13 @@ export async function renderFormEditorView(
             <p class="field-error" data-error></p>
           </div>
         </div>
-      </section>
+      </details>
     </div>
   `;
+
+  // Every add/edit/delete below re-renders this whole (very tall, 5-column) view — keepScroll
+  // holds the teacher's place instead of snapping back to the top after each save.
+  const rerender = () => keepScroll(() => renderFormEditorView(container, { child, form, onBack, confirmDelete }));
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
@@ -256,7 +269,7 @@ export async function renderFormEditorView(
     const note = container.querySelector('[data-remark-field="note"]').value;
     try {
       await addEntry({ formId: form.id, indicatorCode: code, date, status, note, activityName: activityName || undefined });
-      await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+      await rerender();
     } catch (err) {
       if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
     }
@@ -267,7 +280,7 @@ export async function renderFormEditorView(
       if (!confirmDelete(`確定要刪除這筆備註嗎？此操作無法復原。`)) return;
       try {
         await deleteEntry(entry.id);
-        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        await rerender();
       } catch (err) {
         const errorEl = container.querySelector('[data-remark-form] [data-error]');
         if (errorEl) errorEl.textContent = '刪除失敗，請再試一次';
@@ -293,7 +306,7 @@ export async function renderFormEditorView(
       const note = container.querySelector(`[data-remark-edit-field="note"][data-remark-id="${entry.id}"]`).value;
       try {
         await updateEntry(entry.id, { indicatorCode: code, date, status, note, activityName: activityName || undefined });
-        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        await rerender();
       } catch (err) {
         const errorEl = container.querySelector(`[data-remark-edit-form-for="${entry.id}"] [data-error]`);
         if (errorEl) errorEl.textContent = '更新失敗，請再試一次';
@@ -315,7 +328,7 @@ export async function renderFormEditorView(
       const note = container.querySelector(`[data-entry-field="note"][data-indicator-code="${indicator.code}"]`).value;
       try {
         await addEntry({ formId: form.id, indicatorCode: indicator.code, date, status, note });
-        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        await rerender();
       } catch (err) {
         const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
         const errorEl = entryForm.querySelector('[data-error]');
@@ -331,7 +344,7 @@ export async function renderFormEditorView(
       if (!confirmDelete(`確定要刪除「${entry.indicatorCode} ${entry.date}」這筆觀察紀錄嗎？此操作無法復原。`)) return;
       try {
         await deleteEntry(entry.id);
-        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        await rerender();
       } catch (err) {
         const indicatorBlockEl = container.querySelector(`[data-indicator-code="${entry.indicatorCode}"]`);
         let errorEl = indicatorBlockEl.querySelector('[data-error="delete"]');
@@ -362,7 +375,7 @@ export async function renderFormEditorView(
       const note = container.querySelector(`[data-entry-edit-field="note"][data-entry-id="${entry.id}"]`).value;
       try {
         await updateEntry(entry.id, { date, status, note });
-        await renderFormEditorView(container, { child, form, onBack, confirmDelete });
+        await rerender();
       } catch (err) {
         const errorEl = container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`);
         if (errorEl) errorEl.textContent = '更新失敗，請再試一次';

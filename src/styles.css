@@ -17,6 +17,16 @@
   --danger-bg: #fbeaea;
   --success: #2f8f5b;
 
+  /* Keyboard focus ring — one token used by every interactive element's :focus-visible below,
+     so a teacher tabbing through a long form always sees where focus is. */
+  --focus-ring: #1c5cab;
+
+  /* Shared by both circular delete buttons (.card-list__delete corner-× and .btn--delete-circle
+     inline-×) so per-item and whole-item deletion read as the same action. The dark translucent
+     .highlight-thumb-remove stays its own thing — it's a lower-stakes per-photo remove. */
+  --delete-bg: #d3455b;
+  --delete-bg-hover: #b5324a;
+
   /* A warm accent for "human" touches (title block, header buttons) — distinct from the
      cooler domain hues below so it reads as its own thing, not a 6th domain color. */
   --warm-tint: #fbe9d2;
@@ -79,6 +89,38 @@ h1, h2, h3, h4 {
 
 button {
   font: inherit;
+}
+
+/* One consistent, clearly visible keyboard-focus ring for every interactive element. Mouse
+   clicks don't trigger :focus-visible, so this never shows on pointer use. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The header's 匯入備份 control and the 點滴分享 upload slots are <label>s wrapping a visually
+   hidden <input type="file"> — surface the input's focus on the label the teacher actually sees. */
+.btn--header-file:has(input:focus-visible),
+.highlight-upload-slot:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.view-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 3rem 1rem;
 }
 
 /* ---------- App shell ---------- */
@@ -230,9 +272,10 @@ button {
 }
 
 /* Small fixed-size circular delete button used for per-item deletes inside 適性紀錄's
-   course-plan / development-record / behavior-observation tabs. Sibling of .card-list__delete
-   (same shape/sizing pattern) but a distinct light pink — .card-list__delete's crimson stays
-   as-is since it's still used for child/report deletion elsewhere. Fixed circle + symbol-only
+   course-plan / development-record / behavior-observation tabs. Shares .card-list__delete's
+   crimson (--delete-bg) so per-item and whole-item deletion read as one action; it keeps the
+   inline (not corner-overlaid) layout and drops that button's 2px surface ring, which only
+   exists to separate the corner × from the card edge it sits on. Fixed circle + symbol-only
    label means it can never text-wrap the way the old text-labeled "刪除" buttons did in
    narrow layouts. */
 .btn--delete-circle {
@@ -245,8 +288,8 @@ button {
   justify-content: center;
   border-radius: 50%;
   border: none;
-  background: #f9c9da;
-  color: #99304f;
+  background: var(--delete-bg);
+  color: #fff;
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
@@ -254,7 +297,7 @@ button {
   transition: background 0.15s ease, transform 0.1s ease;
 }
 .btn--delete-circle:hover {
-  background: #f3a8c3;
+  background: var(--delete-bg-hover);
   transform: scale(1.08);
 }
 .btn--delete-circle:active {
@@ -517,7 +560,7 @@ button {
   justify-content: center;
   border-radius: 50%;
   border: 2px solid var(--surface);
-  background: #d3455b;
+  background: var(--delete-bg);
   color: #fff;
   font-size: 1rem;
   line-height: 1;
@@ -526,7 +569,7 @@ button {
   transition: background 0.15s ease, transform 0.1s ease;
 }
 .card-list__delete:hover {
-  background: #b5324a;
+  background: var(--delete-bg-hover);
   transform: scale(1.08);
 }
 

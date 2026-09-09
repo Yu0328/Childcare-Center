@@ -28,67 +28,79 @@ export function mountApp(container, { onUnlock } = {}) {
     container.appendChild(message);
   }
 
+  // Shows a delayed "載入中…" placeholder so a slow load (e.g. the child list fanning out over
+  // every child's forms) doesn't leave the previous screen sitting there with no feedback. The
+  // 180ms delay means a fast navigation — the common case — never flashes it.
+  function runView(render) {
+    const timer = setTimeout(() => {
+      container.innerHTML = '<p class="view-loading" role="status">載入中…</p>';
+    }, 180);
+    render()
+      .catch(showRenderError)
+      .finally(() => clearTimeout(timer));
+  }
+
   function showReportTypeSelect() {
-    renderReportTypeSelectView(container, {
+    runView(() => renderReportTypeSelectView(container, {
       onSelectType: type => (type === 'monthly-plan' ? showMonthlyPlanList() : showChildList(type)),
       onManageChildren: showManageChildren,
-    }).catch(showRenderError);
+    }));
   }
 
   function showMonthlyPlanList() {
-    renderMonthlyPlanListView(container, {
+    runView(() => renderMonthlyPlanListView(container, {
       onSelectPlan: plan => showMonthlyPlanEditor(plan),
       onBack: showReportTypeSelect,
-    }).catch(showRenderError);
+    }));
   }
 
   function showMonthlyPlanEditor(plan) {
-    renderMonthlyPlanEditorView(container, { plan, onBack: showMonthlyPlanList }).catch(showRenderError);
+    runView(() => renderMonthlyPlanEditorView(container, { plan, onBack: showMonthlyPlanList }));
   }
 
   function showManageChildren() {
-    renderChildListView(container, { onBack: showReportTypeSelect, reportType: 'assessment' }).catch(showRenderError);
+    runView(() => renderChildListView(container, { onBack: showReportTypeSelect, reportType: 'assessment' }));
   }
 
   function showChildList(reportType) {
-    renderChildListView(container, {
+    runView(() => renderChildListView(container, {
       onSelectChild: child => (reportType === 'parent-report' ? showParentReportList(child) : showFormList(child)),
       onBack: showReportTypeSelect,
       reportType,
-    }).catch(showRenderError);
+    }));
   }
 
   function showFormList(child) {
-    renderFormListView(container, {
+    runView(() => renderFormListView(container, {
       child,
       onSelectForm: form => showFormEditor(child, form),
       onBack: () => showChildList('assessment'),
       onAggregate: () => showAggregateSelect(child),
-    }).catch(showRenderError);
+    }));
   }
 
   function showAggregateSelect(child) {
-    renderAggregateCoursePlanView(container, {
+    runView(() => renderAggregateCoursePlanView(container, {
       child,
       onCreated: form => showFormEditor(child, form),
       onBack: () => showFormList(child),
-    }).catch(showRenderError);
+    }));
   }
 
   function showFormEditor(child, form) {
-    renderFormEditorView(container, { child, form, onBack: () => showFormList(child) }).catch(showRenderError);
+    runView(() => renderFormEditorView(container, { child, form, onBack: () => showFormList(child) }));
   }
 
   function showParentReportList(child) {
-    renderParentReportListView(container, {
+    runView(() => renderParentReportListView(container, {
       child,
       onSelectReport: report => showParentReportEditor(child, report),
       onBack: () => showChildList('parent-report'),
-    }).catch(showRenderError);
+    }));
   }
 
   function showParentReportEditor(child, report) {
-    renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }).catch(showRenderError);
+    runView(() => renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }));
   }
 
   const homeButton = document.getElementById('home-button');

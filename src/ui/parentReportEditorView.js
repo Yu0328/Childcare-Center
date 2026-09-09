@@ -5,6 +5,7 @@ import { renderCoursePlanTab } from './courseplanTabView.js';
 import { renderDevelopmentRecordTab } from './developmentRecordTabView.js';
 import { renderBehaviorObservationTab } from './behaviorObservationTabView.js';
 import { renderHighlightsTab } from './highlightsTabView.js';
+import { keepScroll } from './keepScroll.js';
 
 const TABS = [
   { key: 'coursePlan', label: '課程計畫表', render: renderCoursePlanTab },
@@ -75,6 +76,8 @@ export async function renderParentReportEditorView(container, { child, report, o
 
   const activeTabConfig = TABS.find(tab => tab.key === activeTab);
   const panel = container.querySelector('[data-tab-panel]');
-  const onChange = () => renderParentReportEditorView(container, { child, report, onBack, activeTab });
+  // Wrapped so an add/edit/delete inside a tab (which rebuilds this whole view) doesn't scroll
+  // the teacher back to the top of a long tab.
+  const onChange = () => keepScroll(() => renderParentReportEditorView(container, { child, report, onBack, activeTab }));
   await activeTabConfig.render(panel, { report, onChange });
 }

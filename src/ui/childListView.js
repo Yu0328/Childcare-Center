@@ -7,6 +7,7 @@ import { parseParentReportDocxImport } from '../import/parentReportDocxImport.js
 import { renderParentReportImportPreviewView } from './parentReportImportPreviewView.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { processImportQueue } from './importQueue.js';
+import { keepScroll } from './keepScroll.js';
 
 export async function renderChildListView(
   container,
@@ -90,7 +91,7 @@ export async function renderChildListView(
       if (!confirmDelete(`確定要刪除「${child.name}」的所有資料嗎？此操作無法復原。`)) return;
       try {
         await deleteChild(child.id);
-        await renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType });
+        await keepScroll(() => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }));
       } catch (err) {
         container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
       }
@@ -115,7 +116,7 @@ export async function renderChildListView(
     }
     try {
       await addChild({ name, birthDate });
-      await renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType });
+      await keepScroll(() => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }));
     } catch (err) {
       const form = container.querySelector('[data-action="add-child"]');
       let errorEl = form.querySelector('[data-error]');
