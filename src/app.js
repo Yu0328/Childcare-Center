@@ -35,9 +35,17 @@ export function mountApp(container, { onUnlock } = {}) {
     const timer = setTimeout(() => {
       container.innerHTML = '<p class="view-loading" role="status">載入中…</p>';
     }, 180);
-    render()
-      .catch(showRenderError)
-      .finally(() => clearTimeout(timer));
+    const work = () =>
+      render()
+        .catch(showRenderError)
+        .finally(() => clearTimeout(timer));
+    // Cross-fade between screens where supported (Firefox falls back to the plain swap).
+    // prefers-reduced-motion is honored via the ::view-transition rules in styles.css.
+    if (document.startViewTransition) {
+      document.startViewTransition(work);
+    } else {
+      work();
+    }
   }
 
   function showReportTypeSelect() {

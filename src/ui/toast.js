@@ -14,11 +14,17 @@ function getHost() {
   return host;
 }
 
+const EXIT_MS = 200; // keep in sync with .toast--out's animation duration in styles.css
+
 export function showToast(message, { durationMs = 4000 } = {}) {
   const toast = document.createElement('p');
   toast.className = 'toast';
   toast.textContent = message;
   getHost().appendChild(toast);
-  setTimeout(() => toast.remove(), durationMs);
+  // Slide out (add the class) rather than snapping away, then remove once that's done.
+  setTimeout(() => {
+    toast.classList.add('toast--out');
+    setTimeout(() => toast.remove(), EXIT_MS);
+  }, durationMs);
   return toast;
 }
