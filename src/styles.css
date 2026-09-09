@@ -565,7 +565,7 @@ button {
    --compact: smaller icon + padding, centred, no description line. */
 .type-select__option--rose {
   background: var(--domain-5-tint);
-  border-color: var(--domain-5-border);
+  border-color: var(--domain-5-tint);
 }
 .type-select__option--rose .type-select__icon {
   background: var(--surface);
