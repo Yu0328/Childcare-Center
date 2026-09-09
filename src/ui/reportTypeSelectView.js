@@ -31,11 +31,13 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
 
   container.innerHTML = `
     <div class="type-select-home">
-      <header class="type-select-home__head">
-        <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
-        <p class="type-select-home__sub">點選下方項目開始填寫</p>
-      </header>
+      <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
       <p class="field-error field-error--center" data-error="import"></p>
+      <div class="type-select-home__utils">
+        <button type="button" class="type-select-home__util" data-action="manage-children">管理幼兒</button>
+        <button type="button" class="type-select-home__util" data-action="import-any-docx">匯入檔案</button>
+        <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
+      </div>
       <div class="type-select">
         ${TYPE_SELECT_OPTIONS.map(
           ({ type, title, desc, variant }) => `
@@ -49,11 +51,6 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
             </button>
           `
         ).join('')}
-      </div>
-      <div class="type-select-home__utils">
-        <button type="button" class="btn btn--ghost btn--small" data-action="manage-children">管理幼兒</button>
-        <button type="button" class="btn btn--ghost btn--small" data-action="import-any-docx">匯入檔案</button>
-        <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
       </div>
     </div>
   `;

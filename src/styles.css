@@ -413,7 +413,7 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1.5rem;
+  gap: 1.1rem;
 }
 
 /* Soft wash of brand colour behind the heading so the screen doesn't read as flat grey. */
@@ -435,35 +435,46 @@ button {
   z-index: 1;
 }
 
-.type-select-home__head {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
 .type-select-home__title {
+  text-align: center;
   font-size: 1.45rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 
-.type-select-home__sub {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-muted);
+/* 管理幼兒 / 匯入檔案 — two equal buttons that together span the choice-card width, sitting above
+   the choices. Same card styling as .type-select__option, warm-tinted so they read as a distinct
+   4th colour (tools) against the blue/purple/green form cards. */
+.type-select-home__utils {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
 }
 
-/* 管理幼兒 / 匯入檔案 are setup actions, secondary to "pick a form" — a quiet row under a hairline
-   divider rather than buttons competing with the choices above. */
-.type-select-home__utils {
+.type-select-home__util {
+  width: 100%;
+  padding: 0.85rem 1rem;
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--border);
+  font: inherit;
+  font-weight: 600;
+  color: #7a4614;
+  background: var(--warm-tint);
+  border: 1px solid var(--warm-border);
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 20, 0.05);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.type-select-home__util:hover {
+  transform: translateY(-2px);
+  border-color: var(--warm-accent);
+  box-shadow: 0 12px 26px rgba(181, 105, 27, 0.22);
+}
+.type-select-home__util:active {
+  transform: translateY(0) scale(0.99);
 }
 
 .type-select {
