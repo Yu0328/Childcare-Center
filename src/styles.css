@@ -22,10 +22,12 @@
   --focus-ring: #1c5cab;
 
   /* Shared by both circular delete buttons (.card-list__delete corner-× and .btn--delete-circle
-     inline-×) so per-item and whole-item deletion read as the same action. The dark translucent
-     .highlight-thumb-remove stays its own thing — it's a lower-stakes per-photo remove. */
-  --delete-bg: #d3455b;
-  --delete-bg-hover: #b5324a;
+     inline-×) so per-item and whole-item deletion read as the same action — the soft pink, not a
+     loud crimson. The dark translucent .highlight-thumb-remove stays its own thing — it's a
+     lower-stakes per-photo remove. */
+  --delete-bg: #f9c9da;
+  --delete-bg-hover: #f3a8c3;
+  --delete-fg: #99304f;
 
   /* A warm accent for "human" touches (title block, header buttons) — distinct from the
      cooler domain hues below so it reads as its own thing, not a 6th domain color. */
@@ -272,10 +274,10 @@ button {
 }
 
 /* Small fixed-size circular delete button used for per-item deletes inside 適性紀錄's
-   course-plan / development-record / behavior-observation tabs. Shares .card-list__delete's
-   crimson (--delete-bg) so per-item and whole-item deletion read as one action; it keeps the
-   inline (not corner-overlaid) layout and drops that button's 2px surface ring, which only
-   exists to separate the corner × from the card edge it sits on. Fixed circle + symbol-only
+   course-plan / development-record / behavior-observation tabs. Shares the soft-pink delete
+   tokens with .card-list__delete so per-item and whole-item deletion read as one action; it
+   keeps the inline (not corner-overlaid) layout and drops that button's 2px surface ring, which
+   only exists to separate the corner × from the card edge it sits on. Fixed circle + symbol-only
    label means it can never text-wrap the way the old text-labeled "刪除" buttons did in
    narrow layouts. */
 .btn--delete-circle {
@@ -289,7 +291,7 @@ button {
   border-radius: 50%;
   border: none;
   background: var(--delete-bg);
-  color: #fff;
+  color: var(--delete-fg);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
@@ -561,7 +563,7 @@ button {
   border-radius: 50%;
   border: 2px solid var(--surface);
   background: var(--delete-bg);
-  color: #fff;
+  color: var(--delete-fg);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
