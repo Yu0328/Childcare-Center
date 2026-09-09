@@ -26,8 +26,9 @@ const TYPE_SELECT_OPTIONS = [
 ];
 
 const UTIL_ICONS = {
+  // baby / infant — deliberately different from parent-report's two-person icon
   'manage-children':
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>',
   'import-any-docx':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>',
 };
@@ -41,13 +42,11 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
       <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
       <hr class="type-select-home__divider">
       <div class="type-select-home__utils">
-        <button type="button" class="type-select__option type-select__option--tool type-select__option--compact" data-action="manage-children">
-          <span class="type-select__icon">${UTIL_ICONS['manage-children']}</span>
-          <span class="type-select__title">管理幼兒</span>
+        <button type="button" class="type-select__tool" data-action="manage-children">
+          ${UTIL_ICONS['manage-children']}<span>管理幼兒</span>
         </button>
-        <button type="button" class="type-select__option type-select__option--tool type-select__option--compact" data-action="import-any-docx">
-          <span class="type-select__icon">${UTIL_ICONS['import-any-docx']}</span>
-          <span class="type-select__title">匯入檔案</span>
+        <button type="button" class="type-select__tool" data-action="import-any-docx">
+          ${UTIL_ICONS['import-any-docx']}<span>匯入檔案</span>
         </button>
         <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
       </div>
