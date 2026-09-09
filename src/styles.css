@@ -130,11 +130,30 @@ button {
   }
 }
 
-/* Screen-to-screen and after-save re-render cross-fade (see app.js runView / keepScroll). Kept
-   short so it reads as "smooth", never as "slow". */
-::view-transition-old(root),
+/* Screen-to-screen and after-save re-render transition (see app.js runView / keepScroll): the old
+   screen fades out where it is, the new one fades + rises in. Kept short so it reads as "smooth",
+   never as "slow". */
+::view-transition-old(root) {
+  animation: vt-out 130ms ease both;
+}
 ::view-transition-new(root) {
-  animation-duration: 130ms;
+  animation: vt-in 240ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes vt-out {
+  to { opacity: 0; }
+}
+@keyframes vt-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+/* In-view re-render after a save/delete (keepScroll adds .vt-subtle): a plain quick fade, no
+   rise — the navigation rise would be too much repeated on every entry. */
+:root.vt-subtle::view-transition-old(root) {
+  animation: vt-out 90ms ease both;
+}
+:root.vt-subtle::view-transition-new(root) {
+  animation: vt-out 110ms ease reverse both;
 }
 
 .view-loading {
@@ -321,7 +340,7 @@ button {
   transform: scale(1.08);
 }
 .btn--delete-circle:active {
-  transform: scale(0.96);
+  transform: scale(0.88);
 }
 
 /* ---------- Page header (child list / form list / form editor) ---------- */
@@ -339,31 +358,6 @@ button {
 .page-header .btn {
   position: absolute;
   left: 0;
-}
-
-/* The report-type-select home screen's header would otherwise span the full 960px #app width
-   while its actual content (.type-select-card below) is a narrow 420px centered column — pinning
-   the import button to the header's own right:0 then put it far from the title pill. Matching the
-   header's width to that same column keeps the title centered *and* the button at a near, natural
-   right-of-title spot, while still following every other screen's "actions live top-right"
-   convention (childListView.js/monthlyPlanListView.js) for muscle-memory consistency. */
-.page-header--narrow {
-  max-width: 420px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.page-header--narrow .btn[data-action="import-any-docx"] {
-  left: auto;
-  right: 0;
-}
-
-/* .btn--ghost has no border of its own (it's used bare elsewhere, e.g. childListView's "←
-   返回" buttons) — scoped here so 管理幼兒 mirrors 匯入檔案 (.btn--purple)'s tint+soft-border
-   look, just in blue: a soft blue border that sits to --brand-tint the way --edit-border sits
-   to --edit-tint, rather than the loud full --brand line. */
-.page-header--narrow .btn[data-action="manage-children"] {
-  border-color: #b6d0f2;
 }
 
 .page-header__title {
@@ -408,9 +402,40 @@ button {
 
 /* ---------- Report-type select screen ---------- */
 
-.type-select-card {
+/* Centre the whole block (title + card + utility buttons) in the viewport instead of leaving a
+   fixed gap that reads as dead space on tall screens. */
+.type-select-home {
   max-width: 420px;
-  margin: min(12vh, 5.5rem) auto 0;
+  margin: 0 auto;
+  /* Centre the block in the space below the app header (≈3.6rem) minus #app's own 2rem/4rem
+     padding. Falls back to vh where dvh is unsupported; grows past this (page scrolls) only if
+     the viewport is very short. */
+  min-height: calc(100vh - 11rem);
+  min-height: calc(100dvh - 11rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.type-select-home__title {
+  text-align: center;
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* 管理幼兒 / 匯入檔案 are setup actions, secondary to "pick a form" — a quiet centred row under
+   the card rather than pills competing with the title up top. */
+.type-select-home__utils {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.type-select-card {
   padding: 2rem 1.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -598,6 +623,9 @@ button {
 .card-list__delete:hover {
   background: var(--delete-bg-hover);
   transform: scale(1.08);
+}
+.card-list__delete:active {
+  transform: scale(0.88);
 }
 
 /* ---------- Forms (add-child / add-form / entry-form) ---------- */

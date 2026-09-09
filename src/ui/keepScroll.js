@@ -11,10 +11,14 @@ export function keepScroll(rerender) {
       return result;
     });
   // Cross-fade the swap where the browser supports it (Firefox just runs `run` directly), so an
-  // add/edit/delete reads as a soft refresh rather than a hard snap. prefers-reduced-motion is
-  // honored via the ::view-transition rules in styles.css.
+  // add/edit/delete reads as a soft refresh rather than a hard snap. The `vt-subtle` class keeps
+  // this a plain quick fade — the rise-in used for screen navigation would be too much repeated
+  // on every save. prefers-reduced-motion is honored via the ::view-transition rules in styles.css.
   if (typeof document !== 'undefined' && document.startViewTransition) {
-    return document.startViewTransition(run).updateCallbackDone;
+    document.documentElement.classList.add('vt-subtle');
+    const transition = document.startViewTransition(run);
+    transition.finished.finally(() => document.documentElement.classList.remove('vt-subtle'));
+    return transition.updateCallbackDone;
   }
   return run();
 }
