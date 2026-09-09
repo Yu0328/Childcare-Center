@@ -42,11 +42,13 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
       <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
       <hr class="type-select-home__divider">
       <div class="type-select-home__utils">
-        <button type="button" class="type-select__tool" data-action="manage-children">
-          ${UTIL_ICONS['manage-children']}<span>管理幼兒</span>
+        <button type="button" class="type-select__option type-select__option--rose type-select__option--compact" data-action="manage-children">
+          <span class="type-select__icon">${UTIL_ICONS['manage-children']}</span>
+          <span class="type-select__title">管理幼兒</span>
         </button>
-        <button type="button" class="type-select__tool" data-action="import-any-docx">
-          ${UTIL_ICONS['import-any-docx']}<span>匯入檔案</span>
+        <button type="button" class="type-select__option type-select__option--rose type-select__option--compact" data-action="import-any-docx">
+          <span class="type-select__icon">${UTIL_ICONS['import-any-docx']}</span>
+          <span class="type-select__title">匯入檔案</span>
         </button>
         <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
       </div>
