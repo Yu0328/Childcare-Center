@@ -25,6 +25,13 @@ const TYPE_SELECT_OPTIONS = [
   { type: 'monthly-plan', title: '課程月計畫', desc: '班級每月活動安排', variant: 'filled' },
 ];
 
+const UTIL_ICONS = {
+  'manage-children':
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  'import-any-docx':
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>',
+};
+
 export async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
   const CHEVRON =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
@@ -32,12 +39,19 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
   container.innerHTML = `
     <div class="type-select-home">
       <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
-      <p class="field-error field-error--center" data-error="import"></p>
+      <hr class="type-select-home__divider">
       <div class="type-select-home__utils">
-        <button type="button" class="type-select-home__util" data-action="manage-children">管理幼兒</button>
-        <button type="button" class="type-select-home__util" data-action="import-any-docx">匯入檔案</button>
+        <button type="button" class="type-select__option type-select__option--tool type-select__option--compact" data-action="manage-children">
+          <span class="type-select__icon">${UTIL_ICONS['manage-children']}</span>
+          <span class="type-select__title">管理幼兒</span>
+        </button>
+        <button type="button" class="type-select__option type-select__option--tool type-select__option--compact" data-action="import-any-docx">
+          <span class="type-select__icon">${UTIL_ICONS['import-any-docx']}</span>
+          <span class="type-select__title">匯入檔案</span>
+        </button>
         <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
       </div>
+      <p class="field-error field-error--center" data-error="import"></p>
       <div class="type-select">
         ${TYPE_SELECT_OPTIONS.map(
           ({ type, title, desc, variant }) => `
