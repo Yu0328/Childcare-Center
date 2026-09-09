@@ -550,10 +550,14 @@ button {
   padding: 1.5rem 1rem;
 }
 
+/* Tucked just inside the card's own top-right corner rather than hanging off it — the card
+   content is centre-aligned with generous padding, so the × sits over empty corner space and
+   never collides with the (short) name/period text. No surface ring needed now that it no
+   longer straddles the card edge. */
 .card-list__delete {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: 6px;
+  right: 6px;
   width: 26px;
   height: 26px;
   padding: 0;
@@ -561,13 +565,13 @@ button {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 2px solid var(--surface);
+  border: none;
   background: var(--delete-bg);
   color: var(--delete-fg);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.2);
+  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.15);
   transition: background 0.15s ease, transform 0.1s ease;
 }
 .card-list__delete:hover {
