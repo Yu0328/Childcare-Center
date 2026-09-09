@@ -289,6 +289,14 @@ describe('renderChildListView', () => {
     expect(container.querySelector('[data-action="import-parent-report-docx"]')).toBeNull();
   });
 
+  it('omits the docx import trigger in manage-children mode (no onSelectChild)', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onBack: () => {}, reportType: 'assessment' });
+
+    expect(container.querySelector('[data-action="import-docx"]')).toBeNull();
+    expect(container.querySelector('[data-field="import-file"]')).toBeNull();
+  });
+
   it('shows the 適性紀錄 import trigger, not the 適性總表 one, when reportType is parent-report', async () => {
     const container = document.createElement('div');
     await renderChildListView(container, { onSelectChild: () => {}, reportType: 'parent-report' });

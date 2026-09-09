@@ -31,11 +31,15 @@ export async function renderChildListView(
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
       <h2 class="page-header__title">幼兒列表</h2>
       ${
-        isParentReport
-          ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">適性紀錄匯入</button>
-             <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>`
-          : `<button type="button" class="btn btn--purple" data-action="import-docx">適性總表匯入</button>
-             <input type="file" accept=".docx" data-field="import-file" multiple hidden>`
+        // The docx-import button only makes sense when picking a child to open a form/report.
+        // In pure "管理幼兒" mode (no onSelectChild) it's just noise, so drop it.
+        !onSelectChild
+          ? ''
+          : isParentReport
+            ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">適性紀錄匯入</button>
+               <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>`
+            : `<button type="button" class="btn btn--purple" data-action="import-docx">適性總表匯入</button>
+               <input type="file" accept=".docx" data-field="import-file" multiple hidden>`
       }
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
@@ -125,7 +129,7 @@ export async function renderChildListView(
     }
   });
 
-  if (isParentReport) {
+  if (onSelectChild && isParentReport) {
     const fileInput = container.querySelector('[data-field="import-parent-report-file"]');
     container.querySelector('[data-action="import-parent-report-docx"]').addEventListener('click', () => fileInput.click());
 
@@ -140,7 +144,7 @@ export async function renderChildListView(
         backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }),
       });
     });
-  } else {
+  } else if (onSelectChild) {
     const fileInput = container.querySelector('[data-field="import-file"]');
     container.querySelector('[data-action="import-docx"]').addEventListener('click', () => fileInput.click());
 
