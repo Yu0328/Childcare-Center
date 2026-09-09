@@ -5766,9 +5766,11 @@ var CFormApp = (() => {
     <div class="page-header page-header--editor">
       ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
       <h2 class="page-header__title">\u5E7C\u5152\u5217\u8868</h2>
-      ${isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">\u9069\u6027\u7D00\u9304\u532F\u5165</button>
-             <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
-             <input type="file" accept=".docx" data-field="import-file" multiple hidden>`}
+      ${// The docx-import button only makes sense when picking a child to open a form/report.
+    // In pure "管理幼兒" mode (no onSelectChild) it's just noise, so drop it.
+    !onSelectChild ? "" : isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">\u9069\u6027\u7D00\u9304\u532F\u5165</button>
+               <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
+               <input type="file" accept=".docx" data-field="import-file" multiple hidden>`}
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
@@ -5848,7 +5850,7 @@ var CFormApp = (() => {
         errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
       }
     });
-    if (isParentReport) {
+    if (onSelectChild && isParentReport) {
       const fileInput = container.querySelector('[data-field="import-parent-report-file"]');
       container.querySelector('[data-action="import-parent-report-docx"]').addEventListener("click", () => fileInput.click());
       fileInput.addEventListener("change", async () => {
@@ -5860,7 +5862,7 @@ var CFormApp = (() => {
           backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
         });
       });
-    } else {
+    } else if (onSelectChild) {
       const fileInput = container.querySelector('[data-field="import-file"]');
       container.querySelector('[data-action="import-docx"]').addEventListener("click", () => fileInput.click());
       fileInput.addEventListener("change", async () => {
