@@ -26,28 +26,33 @@ const TYPE_SELECT_OPTIONS = [
 ];
 
 export async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
+  const CHEVRON =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+
   container.innerHTML = `
     <div class="type-select-home">
-      <h2 class="type-select-home__title">選擇要填寫的表單</h2>
+      <header class="type-select-home__head">
+        <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
+        <p class="type-select-home__sub">點選下方項目開始填寫</p>
+      </header>
       <p class="field-error field-error--center" data-error="import"></p>
-      <div class="type-select-card">
-        <div class="type-select">
-          ${TYPE_SELECT_OPTIONS.map(
-            ({ type, title, desc, variant }) => `
-              <button type="button" class="type-select__option type-select__option--${variant}" data-type="${type}">
-                <span class="type-select__icon">${TYPE_SELECT_ICONS[type]}</span>
-                <span class="type-select__text">
-                  <span class="type-select__title">${title}</span>
-                  <span class="type-select__desc">${desc}</span>
-                </span>
-              </button>
-            `
-          ).join('')}
-        </div>
+      <div class="type-select">
+        ${TYPE_SELECT_OPTIONS.map(
+          ({ type, title, desc, variant }) => `
+            <button type="button" class="type-select__option type-select__option--${variant}" data-type="${type}">
+              <span class="type-select__icon">${TYPE_SELECT_ICONS[type]}</span>
+              <span class="type-select__text">
+                <span class="type-select__title">${title}</span>
+                <span class="type-select__desc">${desc}</span>
+              </span>
+              <span class="type-select__go" aria-hidden="true">${CHEVRON}</span>
+            </button>
+          `
+        ).join('')}
       </div>
       <div class="type-select-home__utils">
-        <button type="button" class="btn btn--outline btn--small" data-action="manage-children">管理幼兒</button>
-        <button type="button" class="btn btn--outline btn--small" data-action="import-any-docx">匯入檔案</button>
+        <button type="button" class="btn btn--ghost btn--small" data-action="manage-children">管理幼兒</button>
+        <button type="button" class="btn btn--ghost btn--small" data-action="import-any-docx">匯入檔案</button>
         <input type="file" accept=".docx" data-field="import-any-file" multiple hidden>
       </div>
     </div>
