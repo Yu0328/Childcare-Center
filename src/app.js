@@ -42,9 +42,11 @@ export function mountApp(container, { onUnlock } = {}) {
     // Cross-fade between screens where supported (Firefox falls back to the plain swap).
     // prefers-reduced-motion is honored via the ::view-transition rules in styles.css.
     if (document.startViewTransition) {
-      // .finished rejects if a fast follow-up navigation aborts this transition — catch it so it
-      // doesn't surface as an unhandled rejection.
-      document.startViewTransition(work).finished.catch(() => {});
+      // A fast follow-up navigation aborts this transition; its ready/finished promises then
+      // reject — catch both so they don't surface as unhandled rejections.
+      const transition = document.startViewTransition(work);
+      transition.ready.catch(() => {});
+      transition.finished.catch(() => {});
     } else {
       work();
     }

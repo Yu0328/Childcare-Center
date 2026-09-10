@@ -130,9 +130,8 @@ button {
   }
 }
 
-/* Screen-to-screen and after-save re-render transition (see app.js runView / keepScroll): the old
-   screen fades out where it is, the new one fades + rises in. Kept short so it reads as "smooth",
-   never as "slow". */
+/* Screen-to-screen transition (see app.js runView): the old screen fades out where it is, the
+   new one fades + rises in. Kept short so it reads as "smooth", never as "slow". */
 ::view-transition-old(root) {
   animation: vt-out 130ms ease both;
 }
@@ -145,15 +144,6 @@ button {
 }
 @keyframes vt-in {
   from { opacity: 0; transform: translateY(12px); }
-}
-
-/* In-view re-render after a save/delete (keepScroll adds .vt-subtle): a plain quick fade, no
-   rise — the navigation rise would be too much repeated on every entry. */
-:root.vt-subtle::view-transition-old(root) {
-  animation: vt-out 90ms ease both;
-}
-:root.vt-subtle::view-transition-new(root) {
-  animation: vt-out 110ms ease reverse both;
 }
 
 .view-loading {
