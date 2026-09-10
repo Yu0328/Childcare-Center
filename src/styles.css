@@ -806,6 +806,12 @@ fieldset.panel-form__field legend {
   background: var(--page-bg);
   color: var(--text-primary);
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+  /* A <select>'s intrinsic width is its widest <option> text (courseplanTabView's indicator
+     picker options run a full description, e.g. "Ⅲ-3-3 會以肢體動作進行溝通(如以手指物或搖頭、點頭)")
+     — without this, that intrinsic width becomes this flex item's floor and it refuses to shrink
+     below it, pushing the field (and everything downstream, see .tab-layout > * below) wider than
+     a phone screen instead of just truncating the closed select's own display text. */
+  min-width: 0;
 }
 
 /* Inputs get their own focus treatment (border + soft ring) rather than the global outline —
@@ -1661,6 +1667,14 @@ fieldset.panel-form__field.import-preview__child legend {
 @media (max-width: 640px) {
   .tab-layout {
     grid-template-columns: 1fr;
+  }
+  /* Grid items default to min-width:auto (their own min-content size) — normally harmless, but
+     a .panel-form(--wide) column can contain a <select> whose min-content is its widest option
+     text (see .panel-form select's own min-width:0 above), and without this that min-content
+     forces .tab-layout's single mobile column — and the whole page — wider than the phone
+     screen instead of just letting the column (and the select inside it) shrink to fit. */
+  .tab-layout > * {
+    min-width: 0;
   }
   .domain-grid--row {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
