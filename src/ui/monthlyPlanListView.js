@@ -31,15 +31,14 @@ export async function renderMonthlyPlanListView(
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
-        <ul class="card-list card-list--chips">
+        <ul class="card-list card-list--rows">
           ${plans
             .map(
               plan =>
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-plan-id="${escapeHtml(plan.id)}">
-                    <span class="card-list__name">${escapeHtml(plan.period)}</span>
+                    <span class="card-list__name">${escapeHtml(plan.period)}${plan.isNew ? '<span class="new-badge">新</span>' : ''}</span>
                     <span class="card-list__meta">${plan.childIds.length} 位幼兒</span>
-                    ${plan.isNew ? '<span class="new-badge">新</span>' : ''}
                   </button>
                   <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="刪除${escapeHtml(plan.period)}的課程月計畫">×</button>
                 </li>`

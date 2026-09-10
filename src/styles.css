@@ -669,62 +669,7 @@ button {
   right: 0.7rem;
 }
 
-/* ----- 方向 F — 適性總表 / 適性紀錄 / 課程月計畫 lists: wrapping pill chips ----- */
-.card-list--chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-.card-list--chips .card-list__row {
-  display: inline-flex;
-}
-.card-list--chips .card-list__item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.55rem 2.3rem 0.55rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  transition: border-color 0.14s ease, transform 0.12s ease;
-}
-.card-list--chips .card-list__item:hover {
-  border-color: var(--brand);
-  transform: translateY(-1px);
-}
-.card-list--chips .card-list__item:active {
-  transform: translateY(0) scale(0.98);
-}
-.card-list--chips .card-list__name {
-  font-size: 0.92rem;
-}
-.card-list--chips .card-list__meta::before {
-  content: "·";
-  margin-right: 0.4rem;
-  color: var(--text-muted);
-}
-.card-list--chips .card-list__empty {
-  flex-basis: 100%;
-  text-align: left;
-  padding: 0.75rem 0;
-}
-.card-list--chips .card-list__delete {
-  top: 50%;
-  right: 0.3rem;
-  width: 20px;
-  height: 20px;
-  box-shadow: none;
-  font-size: 0.8rem;
-  transform: translateY(-50%);
-}
-.card-list--chips .card-list__delete:hover {
-  transform: translateY(-50%) scale(1.12);
-}
-.card-list--chips .card-list__delete:active {
-  transform: translateY(-50%) scale(0.9);
-}
-
-/* Circular delete button, shared by both list styles (position set per style above). */
+/* Circular delete button (position set by .card-list--rows above). */
 .card-list__delete {
   position: absolute;
   width: 26px;
@@ -746,6 +691,9 @@ button {
 .card-list__delete:hover {
   background: var(--delete-bg-hover);
   transform: scale(1.08);
+}
+.card-list__delete:active {
+  transform: scale(0.9);
 }
 
 /* ---------- Forms (add-child / add-form / entry-form) ---------- */
