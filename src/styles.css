@@ -215,7 +215,10 @@ button {
 }
 
 #app {
-  max-width: 960px;
+  /* Narrow default so a list/form page's header and body share one comfortable column instead
+     of spreading across the old 960px with the content clustered in the middle. Wide editor
+     screens opt back out below via #app:has(...). */
+  max-width: 840px;
   margin: 0 auto;
   padding: 2rem 1.5rem 4rem;
 }
@@ -362,12 +365,9 @@ button {
 
 .page-header__title {
   font-size: 1.4rem;
-  display: inline-block;
-  background: var(--warm-tint);
-  border: 1px solid var(--warm-border);
-  color: #7a4614;
-  padding: 0.45em 1.3em;
-  border-radius: 999px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .page-header--editor {
@@ -600,23 +600,22 @@ button {
   margin: 0 0 2rem;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
-  gap: 0.9rem;
-  justify-content: center;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
 }
 
 .card-list__item {
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 1.1rem 1rem;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.95rem 2.75rem 0.95rem 1.15rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
   box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
   transition: box-shadow 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
 }
@@ -1158,6 +1157,12 @@ fieldset.panel-form__field.import-preview__child legend {
    default [hidden] { display: none } (a lower-priority UA rule) — without this, toggling the
    `hidden` attribute on a .panel-form (e.g. the manage-children card) has no visual effect at all. */
 .panel-form[hidden] {
+  display: none;
+}
+
+/* Same problem for .panel-form__field (also display: flex): the "至 ○年○月" end-of-range group in
+   the 新增適性總表 / 適性總表匯入 forms stayed visible even with the "涵蓋一段期間" box unchecked. */
+.panel-form__field[hidden] {
   display: none;
 }
 
