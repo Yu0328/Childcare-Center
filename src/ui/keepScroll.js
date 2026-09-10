@@ -17,7 +17,9 @@ export function keepScroll(rerender) {
   if (typeof document !== 'undefined' && document.startViewTransition) {
     document.documentElement.classList.add('vt-subtle');
     const transition = document.startViewTransition(run);
-    transition.finished.finally(() => document.documentElement.classList.remove('vt-subtle'));
+    // .finished rejects when a rapid follow-up save aborts this transition — harmless, but it
+    // must be caught or it surfaces as an unhandled rejection.
+    transition.finished.catch(() => {}).finally(() => document.documentElement.classList.remove('vt-subtle'));
     return transition.updateCallbackDone;
   }
   return run();
