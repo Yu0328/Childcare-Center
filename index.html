@@ -93,6 +93,16 @@
   box-sizing: border-box;
 }
 
+/* Reserves the vertical scrollbar's width always, whether or not the page currently needs to
+   scroll. Without this, switching between the 適性紀錄 editor's tabs (課程計畫表 vs 適性發展紀錄表
+   etc. — a full re-render, since each tab click re-renders the whole view) can cross the
+   scroll/no-scroll threshold as the page's height changes, popping the scrollbar in or out and
+   shifting the whole page (including the sticky panel-form's buttons) sideways by its width —
+   the flicker/"buttons jump" this fixes. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--page-bg);
@@ -350,16 +360,19 @@ button {
 
 /* ---------- Page header (child list / form list / form editor) ---------- */
 
+/* Plain flex row (back button — title — action button(s)), in DOM order left to right. No
+   absolute positioning: an absolutely-positioned button ignores both the title's width and the
+   other button's width, so on a narrow phone (or a long child name/period) the boxes could
+   literally overlap and hide each other's text — confirmed with real screenshots at 320–414px
+   where the title was fully hidden behind the buttons before this rewrite. A flex row plus the
+   title's min-width:0/ellipsis below lets the title shrink and truncate instead of colliding. */
 .page-header {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 1rem;
   margin-bottom: 1.5rem;
   padding-bottom: 1.2rem;
   border-bottom: 1px solid var(--border);
-  position: relative;
-  text-align: center;
 }
 
 /* Skip the divider where a separator already exists right below the header: the 課程月計畫
@@ -370,46 +383,48 @@ button {
   border-bottom: none;
 }
 
+/* Buttons keep their natural width — only the title gives up space when it's tight. */
 .page-header .btn {
-  position: absolute;
-  left: 0;
+  flex: none;
 }
 
 .page-header__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-}
-
-.page-header--editor {
-  flex-wrap: wrap;
-}
-
-.page-header--editor .btn[data-action="export"],
-.page-header--editor .btn[data-action="aggregate"],
-.page-header--editor .btn[data-action="import-docx"],
-.page-header--editor .btn[data-action="import-parent-report-docx"] {
-  position: absolute;
-  right: 0;
-  left: auto;
+  text-align: center;
 }
 
 /* Groups multiple right-side header actions (課程月計畫 editor: 管理小朋友 + 匯出 Word) as one
-   unit instead of extending the single-button data-action allowlist above — each new button
-   there would otherwise land at the same right:0 spot and stack on itself. The wrapper takes
-   the absolute right positioning; buttons inside it fall back to normal flex flow (overriding
-   the base `.page-header .btn { position: absolute; left: 0 }` rule, which would otherwise win
-   here too since it's a plain descendant selector). */
-.page-header--editor .page-header__actions {
-  position: absolute;
-  right: 0;
+   flex item, so they sit together after the title instead of each button needing its own rule. */
+.page-header__actions {
   display: flex;
   gap: 0.5rem;
+  flex: none;
 }
 
-.page-header--editor .page-header__actions .btn {
-  position: static;
+/* A page-header button's shorter mobile label (e.g. "← 返回" instead of "← 返回幼兒列表") — see
+   headerButtonLabel() in headerButtonLabel.js. Deliberately swaps the whole label rather than
+   just shrinking font-size: leaves the desktop wording (and its own screenshots/docs) untouched,
+   and stays reachable to assistive tech either way since it's still real text, not a hidden
+   truncation of the same string. */
+.btn__label-short {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .btn__label-full {
+    display: none;
+  }
+  .btn__label-short {
+    display: inline;
+  }
 }
 
 /* ---------- Report-type select screen ---------- */
@@ -803,6 +818,12 @@ fieldset.panel-form__field legend {
   background: var(--page-bg);
   color: var(--text-primary);
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+  /* A <select>'s intrinsic width is its widest <option> text (courseplanTabView's indicator
+     picker options run a full description, e.g. "Ⅲ-3-3 會以肢體動作進行溝通(如以手指物或搖頭、點頭)")
+     — without this, that intrinsic width becomes this flex item's floor and it refuses to shrink
+     below it, pushing the field (and everything downstream, see .tab-layout > * below) wider than
+     a phone screen instead of just truncating the closed select's own display text. */
+  min-width: 0;
 }
 
 /* Inputs get their own focus treatment (border + soft ring) rather than the global outline —
@@ -1656,22 +1677,34 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 @media (max-width: 640px) {
-  .page-header {
-    flex-direction: column;
-  }
-  .page-header .btn,
-  .page-header--editor .btn[data-action="export"],
-  .page-header--editor .btn[data-action="aggregate"],
-  .page-header--editor .btn[data-action="import-docx"],
-  .page-header--editor .btn[data-action="import-parent-report-docx"],
-  .page-header--editor .page-header__actions {
-    position: static;
-  }
   .tab-layout {
     grid-template-columns: 1fr;
   }
+  /* Grid items default to min-width:auto (their own min-content size) — normally harmless, but
+     a .panel-form(--wide) column can contain a <select> whose min-content is its widest option
+     text (see .panel-form select's own min-width:0 above), and without this that min-content
+     forces .tab-layout's single mobile column — and the whole page — wider than the phone
+     screen instead of just letting the column (and the select inside it) shrink to fit. */
+  .tab-layout > * {
+    min-width: 0;
+  }
   .domain-grid--row {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  /* Long button labels + a long title fighting for one narrow row (see .btn__label-short below
+     for the other half of this fix) still left the title squeezed to an unreadable ellipsis on
+     real phones. Wrapping the title onto its own full-width line above a second line of buttons
+     keeps the same left/right button positions as desktop (via justify-content:space-between —
+     a lone back button still lands on the left, matching desktop) while giving the title the
+     whole row to itself, above the header's own bottom hairline. */
+  .page-header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .page-header__title {
+    order: -1;
+    flex-basis: 100%;
   }
 }
 
@@ -4823,6 +4856,11 @@ var CFormApp = (() => {
     return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
   }
 
+  // src/ui/headerButtonLabel.js
+  function headerButtonLabel(full, short) {
+    return `<span class="btn__label-full">${full}</span><span class="btn__label-short">${short}</span>`;
+  }
+
   // src/import/docxImport.js
   var import_jszip = __toESM(require_jszip_min(), 1);
 
@@ -5405,7 +5443,7 @@ var CFormApp = (() => {
     const parsedIsRange = parsedStart !== parsedEnd;
     container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">\u2190 \u53D6\u6D88\u532F\u5165</button>
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
       <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7E3D\u8868\uFF09</h2>
     </div>
     ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">
@@ -5807,7 +5845,7 @@ var CFormApp = (() => {
     const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
     container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">\u2190 \u53D6\u6D88\u532F\u5165</button>
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
       <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7D00\u9304\uFF09</h2>
     </div>
     ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">${parsed.warnings.map((w) => `<li class="field-error">${escapeHtml(w)}</li>`).join("")}</ul>` : ""}
@@ -6081,12 +6119,12 @@ var CFormApp = (() => {
     );
     container.innerHTML = `
     <div class="page-header page-header--editor">
-      ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
+      ${onBack ? `<button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE", "\u2190 \u8FD4\u56DE")}</button>` : ""}
       <h2 class="page-header__title">\u5E7C\u5152\u5217\u8868</h2>
       ${// The docx-import button only makes sense when picking a child to open a form/report.
     // In pure "管理幼兒" mode (no onSelectChild) it's just noise, so drop it.
-    !onSelectChild ? "" : isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">\u9069\u6027\u7D00\u9304\u532F\u5165</button>
-               <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">\u9069\u6027\u7E3D\u8868\u532F\u5165</button>
+    !onSelectChild ? "" : isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">${headerButtonLabel("\u9069\u6027\u7D00\u9304\u532F\u5165", "\u532F\u5165")}</button>
+               <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">${headerButtonLabel("\u9069\u6027\u7E3D\u8868\u532F\u5165", "\u532F\u5165")}</button>
                <input type="file" accept=".docx" data-field="import-file" multiple hidden>`}
     </div>
     <p class="field-error field-error--center" data-error="import"></p>
@@ -6206,9 +6244,9 @@ var CFormApp = (() => {
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
     container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} \u7684\u9069\u6027\u7E3D\u8868</h2>
-      <button type="button" class="btn btn--purple" data-action="aggregate">\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</button>
+      <button type="button" class="btn btn--purple" data-action="aggregate">${headerButtonLabel("\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574", "\u5F59\u6574")}</button>
     </div>
     <div class="tab-layout">
       <div class="entry-list-wrap">
@@ -25873,9 +25911,9 @@ var CFormApp = (() => {
     const isOpen = (key) => !hadPreviousRender || previouslyOpen.has(key);
     container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(form.tier)} \u968E\u6BB5\u3000${escapeHtml(form.period)}</h2>
-      <button type="button" class="btn btn--primary" data-action="export">\u532F\u51FA Word</button>
+      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="domain-grid domain-grid--row">
@@ -26421,7 +26459,7 @@ var CFormApp = (() => {
     const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
     container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">\u2190 \u53D6\u6D88\u532F\u5165</button>
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
       <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u8AB2\u7A0B\u6708\u8A08\u756B\uFF09</h2>
     </div>
     ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">${parsed.warnings.map((w) => `<li class="field-error">${escapeHtml(w)}</li>`).join("")}</ul>` : ""}
@@ -26604,7 +26642,7 @@ var CFormApp = (() => {
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
     container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} \u7684\u9069\u6027\u7D00\u9304(\u5BB6\u9577\u7248)</h2>
     </div>
     <div class="tab-layout">
@@ -27939,9 +27977,9 @@ var CFormApp = (() => {
     }
     container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7D00\u9304\u5217\u8868</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7D00\u9304\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(report.tier)} \u968E\u6BB5\u3000${escapeHtml(report.period)}</h2>
-      <button type="button" class="btn btn--primary" data-action="export">\u532F\u51FA Word</button>
+      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tabs" role="tablist">
@@ -28097,7 +28135,7 @@ var CFormApp = (() => {
     if (reports.length === 0) {
       container.innerHTML = `
       <div class="page-header">
-        <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
+        <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
         <h2 class="page-header__title">${escapeHtml(child.name)}\u3000\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</h2>
       </div>
       <p>\u9019\u4F4D\u5E7C\u5152\u5C1A\u7121\u9069\u6027\u7D00\u9304\u53EF\u5F59\u6574</p>
@@ -28123,7 +28161,7 @@ var CFormApp = (() => {
       if (tierForms.length === 0) selectedMode = "new";
       container.innerHTML = `
       <div class="page-header">
-        <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868</button>
+        <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
         <h2 class="page-header__title">${escapeHtml(child.name)}\u3000\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</h2>
       </div>
       ${previewPlan ? previewHtml(previewPlan) : `<form class="panel-form" data-action="aggregate">
@@ -28299,10 +28337,10 @@ var CFormApp = (() => {
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
     container.innerHTML = `
     <div class="page-header page-header--editor">
-      ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE</button>' : ""}
+      ${onBack ? `<button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE", "\u2190 \u8FD4\u56DE")}</button>` : ""}
       <h2 class="page-header__title">\u8AB2\u7A0B\u6708\u8A08\u756B</h2>
       <div class="page-header__actions">
-        <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">\u8AB2\u7A0B\u6708\u8A08\u756B\u532F\u5165</button>
+        <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">${headerButtonLabel("\u8AB2\u7A0B\u6708\u8A08\u756B\u532F\u5165", "\u532F\u5165")}</button>
       </div>
       <input type="file" accept=".docx" data-field="import-monthly-plan-file" multiple hidden>
     </div>
@@ -28711,11 +28749,11 @@ var CFormApp = (() => {
     let selected = null;
     container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">\u2190 \u8FD4\u56DE\u8AB2\u7A0B\u6708\u8A08\u756B\u5217\u8868</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u8AB2\u7A0B\u6708\u8A08\u756B\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} \u8AB2\u7A0B\u6708\u8A08\u756B</h2>
       <div class="page-header__actions">
-        <button type="button" class="btn btn--purple" data-action="manage-children">\u7BA1\u7406\u5E7C\u5152</button>
-        <button type="button" class="btn btn--purple" data-action="export-docx">\u532F\u51FA Word</button>
+        <button type="button" class="btn btn--purple" data-action="manage-children">${headerButtonLabel("\u7BA1\u7406\u5E7C\u5152", "\u7BA1\u7406")}</button>
+        <button type="button" class="btn btn--purple" data-action="export-docx">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
       </div>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
