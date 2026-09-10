@@ -659,6 +659,29 @@ button {
   right: 0.7rem;
 }
 
+/* ----- Two-column variant (幼兒 / 課程月計畫 lists, only once they have ≥5 entries — see the
+   views). CSS multicol fills column-first: down the left column, then down the right. ----- */
+@media (min-width: 641px) {
+  #app:has(.card-list--split) {
+    max-width: 1060px;
+  }
+}
+.card-list--split {
+  columns: 2;
+  column-gap: 0;
+  column-rule: 1px solid var(--border);
+}
+.card-list--split .card-list__row {
+  break-inside: avoid;
+  border-bottom: 1px solid var(--border);
+}
+.card-list--split .card-list__row + .card-list__row {
+  border-top: none;
+}
+.card-list--split .card-list__row:last-child {
+  border-bottom: none;
+}
+
 /* Circular delete button (position set by .card-list--rows above). */
 .card-list__delete {
   position: absolute;

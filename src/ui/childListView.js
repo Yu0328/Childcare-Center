@@ -51,11 +51,11 @@ export async function renderChildListView(
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
-        <ul class="card-list card-list--rows">
+        <ul class="card-list card-list--rows${children.length >= 5 ? ' card-list--split' : ''}">
           ${children
             .map(child => {
               const meta = child.birthDate
-                ? `出生 ${escapeHtml(child.birthDate)}　·　${calculateAgeInMonths(child.birthDate, today)} 個月`
+                ? `${escapeHtml(child.birthDate)}　·　${calculateAgeInMonths(child.birthDate, today)} 個月`
                 : '未填出生日期';
               return `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
