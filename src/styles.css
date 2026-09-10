@@ -81,6 +81,16 @@
   box-sizing: border-box;
 }
 
+/* Reserves the vertical scrollbar's width always, whether or not the page currently needs to
+   scroll. Without this, switching between the 適性紀錄 editor's tabs (課程計畫表 vs 適性發展紀錄表
+   etc. — a full re-render, since each tab click re-renders the whole view) can cross the
+   scroll/no-scroll threshold as the page's height changes, popping the scrollbar in or out and
+   shifting the whole page (including the sticky panel-form's buttons) sideways by its width —
+   the flicker/"buttons jump" this fixes. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--page-bg);
