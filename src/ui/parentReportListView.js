@@ -22,14 +22,15 @@ export async function renderParentReportListView(
     </div>
     <div class="tab-layout">
       <div class="entry-list-wrap">
-        <ul class="card-list">
+        <ul class="card-list card-list--chips">
           ${reports
             .map(
               report =>
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-report-id="${escapeHtml(report.id)}">
-                    <span class="card-list__name">${escapeHtml(report.tier)} 階段${report.isNew ? '<span class="new-badge">新</span>' : ''}</span>
+                    <span class="card-list__name">${escapeHtml(report.tier)} 階段</span>
                     <span class="card-list__meta">${escapeHtml(report.period)}</span>
+                    ${report.isNew ? '<span class="new-badge">新</span>' : ''}
                   </button>
                   <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="刪除${escapeHtml(report.tier)} ${escapeHtml(report.period)}">×</button>
                 </li>`

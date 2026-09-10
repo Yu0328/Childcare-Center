@@ -8,6 +8,7 @@ import { renderParentReportImportPreviewView } from './parentReportImportPreview
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { processImportQueue } from './importQueue.js';
 import { keepScroll } from './keepScroll.js';
+import { calculateAgeInMonths } from '../domain/ageTier.js';
 
 export async function renderChildListView(
   container,
@@ -17,6 +18,7 @@ export async function renderChildListView(
   const children = (await listChildren()).sort((a, b) =>
     (a.birthDate || '9999-99-99').localeCompare(b.birthDate || '9999-99-99')
   );
+  const today = new Date().toISOString().slice(0, 10);
   const isParentReport = reportType === 'parent-report';
   // A child gets the 新 badge if any of their forms/reports for *this* screen's type (matching
   // whichever list the badge on that form/report itself would show) was created by docx import
@@ -49,18 +51,20 @@ export async function renderChildListView(
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
-        <ul class="card-list">
+        <ul class="card-list card-list--rows">
           ${children
-            .map(
-              child =>
-                `<li class="card-list__row">
+            .map(child => {
+              const meta = child.birthDate
+                ? `出生 ${escapeHtml(child.birthDate)}　·　${calculateAgeInMonths(child.birthDate, today)} 個月`
+                : '未填出生日期';
+              return `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
                     <span class="card-list__name">${escapeHtml(child.name)}${newChildIds.has(child.id) ? '<span class="new-badge">新</span>' : ''}</span>
-                    <span class="card-list__meta">出生日期：${escapeHtml(child.birthDate)}</span>
+                    <span class="card-list__meta">${meta}</span>
                   </button>
                   <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="刪除${escapeHtml(child.name)}">×</button>
-                </li>`
-            )
+                </li>`;
+            })
             .join('') || '<li class="card-list__empty">目前還沒有幼兒資料，請在右側「新增幼兒」新增</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>

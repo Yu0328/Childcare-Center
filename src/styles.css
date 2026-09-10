@@ -603,71 +603,130 @@ button {
   font-size: 1rem;
 }
 
-/* ---------- Card lists (幼兒列表 / 評量表列表) ---------- */
+/* ---------- Card lists ---------- */
 
 .card-list {
   list-style: none;
   margin: 0 0 2rem;
   padding: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.6rem;
-}
-
-.card-list__item {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
-  padding: 0.95rem 2.75rem 0.95rem 1.15rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  cursor: pointer;
-  text-align: left;
-  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
-  transition: box-shadow 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
-}
-.card-list__item:hover {
-  border-color: var(--brand);
-  box-shadow: 0 10px 22px rgba(15, 23, 20, 0.12);
-  transform: translateY(-2px);
-}
-.card-list__item:active {
-  transform: translateY(-1px) scale(0.99);
-}
-
-.card-list__name {
-  font-weight: 700;
-  font-size: 1.05rem;
-}
-
-.card-list__meta {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
 }
 
 .card-list__row {
   position: relative;
-  width: 100%;
 }
 
+.card-list__item {
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: none;
+  border: none;
+}
+
+.card-list__name {
+  font-weight: 700;
+}
+.card-list__meta {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
 .card-list__empty {
-  grid-column: 1 / -1;
   color: var(--text-secondary);
   text-align: center;
   padding: 1.5rem 1rem;
 }
 
-/* Tucked just inside the card's own top-right corner rather than hanging off it — the card
-   content is centre-aligned with generous padding, so the × sits over empty corner space and
-   never collides with the (short) name/period text. No surface ring needed now that it no
-   longer straddles the card edge. */
+/* ----- 方向 E — 幼兒列表: one card, rows separated by hairlines (no per-item card) ----- */
+.card-list--rows {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
+}
+.card-list--rows .card-list__row + .card-list__row {
+  border-top: 1px solid var(--border);
+}
+.card-list--rows .card-list__item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.85rem 2.75rem 0.85rem 1.15rem;
+  transition: background 0.14s ease;
+}
+.card-list--rows .card-list__name {
+  font-size: 1.05rem;
+}
+.card-list--rows .card-list__item:hover {
+  background: var(--page-bg);
+}
+.card-list--rows .card-list__item:active {
+  background: var(--border);
+}
+.card-list--rows .card-list__delete {
+  top: 0.7rem;
+  right: 0.7rem;
+}
+
+/* ----- 方向 F — 適性總表 / 適性紀錄 / 課程月計畫 lists: wrapping pill chips ----- */
+.card-list--chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.card-list--chips .card-list__row {
+  display: inline-flex;
+}
+.card-list--chips .card-list__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.55rem 2.3rem 0.55rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  transition: border-color 0.14s ease, transform 0.12s ease;
+}
+.card-list--chips .card-list__item:hover {
+  border-color: var(--brand);
+  transform: translateY(-1px);
+}
+.card-list--chips .card-list__item:active {
+  transform: translateY(0) scale(0.98);
+}
+.card-list--chips .card-list__name {
+  font-size: 0.92rem;
+}
+.card-list--chips .card-list__meta::before {
+  content: "·";
+  margin-right: 0.4rem;
+  color: var(--text-muted);
+}
+.card-list--chips .card-list__empty {
+  flex-basis: 100%;
+  text-align: left;
+  padding: 0.75rem 0;
+}
+.card-list--chips .card-list__delete {
+  top: 50%;
+  right: 0.3rem;
+  width: 20px;
+  height: 20px;
+  box-shadow: none;
+  font-size: 0.8rem;
+  transform: translateY(-50%);
+}
+.card-list--chips .card-list__delete:hover {
+  transform: translateY(-50%) scale(1.12);
+}
+.card-list--chips .card-list__delete:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+/* Circular delete button, shared by both list styles (position set per style above). */
 .card-list__delete {
   position: absolute;
-  top: 6px;
-  right: 6px;
   width: 26px;
   height: 26px;
   padding: 0;
@@ -687,9 +746,6 @@ button {
 .card-list__delete:hover {
   background: var(--delete-bg-hover);
   transform: scale(1.08);
-}
-.card-list__delete:active {
-  transform: scale(0.88);
 }
 
 /* ---------- Forms (add-child / add-form / entry-form) ---------- */
