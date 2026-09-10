@@ -1644,17 +1644,6 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 @media (max-width: 640px) {
-  .page-header {
-    flex-direction: column;
-  }
-  .page-header .btn,
-  .page-header--editor .btn[data-action="export"],
-  .page-header--editor .btn[data-action="aggregate"],
-  .page-header--editor .btn[data-action="import-docx"],
-  .page-header--editor .btn[data-action="import-parent-report-docx"],
-  .page-header--editor .page-header__actions {
-    position: static;
-  }
   .tab-layout {
     grid-template-columns: 1fr;
   }
