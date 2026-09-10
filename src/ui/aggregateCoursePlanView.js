@@ -2,6 +2,7 @@ import { listParentReportsForChild } from '../storage/parentReportDb.js';
 import { listFormsForChild } from '../storage/db.js';
 import { planCoursePlanAggregation, applyCoursePlanAggregation } from '../domain/aggregateCoursePlan.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 
 function unresolvedListHtml(unresolved) {
   if (unresolved.length === 0) return '';
@@ -43,7 +44,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
   if (reports.length === 0) {
     container.innerHTML = `
       <div class="page-header">
-        <button type="button" class="btn btn--ghost" data-action="back">← 返回適性總表列表</button>
+        <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性總表列表', '← 返回')}</button>
         <h2 class="page-header__title">${escapeHtml(child.name)}　從適性紀錄彙整</h2>
       </div>
       <p>這位幼兒尚無適性紀錄可彙整</p>
@@ -74,7 +75,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
 
     container.innerHTML = `
       <div class="page-header">
-        <button type="button" class="btn btn--ghost" data-action="back">← 返回適性總表列表</button>
+        <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性總表列表', '← 返回')}</button>
         <h2 class="page-header__title">${escapeHtml(child.name)}　從適性紀錄彙整</h2>
       </div>
       ${

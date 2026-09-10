@@ -2,6 +2,7 @@ import { addForm, listFormsForChild, deleteForm } from '../storage/db.js';
 import { suggestTier } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, combinedPeriod } from './periodFields.js';
 import { wireScrollShade } from './scrollShade.js';
 
@@ -18,9 +19,9 @@ export async function renderFormListView(
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">← 返回幼兒列表</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回幼兒列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} 的適性總表</h2>
-      <button type="button" class="btn btn--purple" data-action="aggregate">從適性紀錄彙整</button>
+      <button type="button" class="btn btn--purple" data-action="aggregate">${headerButtonLabel('從適性紀錄彙整', '彙整')}</button>
     </div>
     <div class="tab-layout">
       <div class="entry-list-wrap">

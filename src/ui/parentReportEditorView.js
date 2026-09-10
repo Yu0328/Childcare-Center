@@ -1,4 +1,5 @@
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { generateParentReportDocxBlob, downloadParentReportDocx } from '../export/parentReportDocxExport.js';
 import { listCoursePlanEntriesForReport, listCourseOccurrencesForEntry, listDevelopmentRecordEntriesForReport, listBehaviorObservationsForReport, listHighlightEntriesForReport, updateParentReport } from '../storage/parentReportDb.js';
 import { renderCoursePlanTab } from './courseplanTabView.js';
@@ -41,9 +42,9 @@ export async function renderParentReportEditorView(container, { child, report, o
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">← 返回適性紀錄列表</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性紀錄列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}　${escapeHtml(report.tier)} 階段　${escapeHtml(report.period)}</h2>
-      <button type="button" class="btn btn--primary" data-action="export">匯出 Word</button>
+      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tabs" role="tablist">

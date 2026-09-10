@@ -10,6 +10,7 @@ import { parsePeriod } from './periodFields.js';
 import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../data/indicators.js';
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 import { downloadBlob } from '../export/downloadBlob.js';
 
@@ -123,11 +124,11 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">← 返回課程月計畫列表</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回課程月計畫列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} 課程月計畫</h2>
       <div class="page-header__actions">
-        <button type="button" class="btn btn--purple" data-action="manage-children">管理幼兒</button>
-        <button type="button" class="btn btn--purple" data-action="export-docx">匯出 Word</button>
+        <button type="button" class="btn btn--purple" data-action="manage-children">${headerButtonLabel('管理幼兒', '管理')}</button>
+        <button type="button" class="btn btn--purple" data-action="export-docx">${headerButtonLabel('匯出 Word', '匯出')}</button>
       </div>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>

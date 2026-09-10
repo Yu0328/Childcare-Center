@@ -5,6 +5,7 @@ import { buildMonthlyCalendar } from '../domain/monthlyCalendar.js';
 import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
 import { periodSelectsHtml, parsePeriod, currentRocYear } from './periodFields.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { processImportQueue } from './importQueue.js';
 import { parseMonthlyPlanDocxImport } from '../import/monthlyPlanDocxImport.js';
 import { renderMonthlyPlanImportPreviewView } from './monthlyPlanImportPreviewView.js';
@@ -22,10 +23,10 @@ export async function renderMonthlyPlanListView(
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
-      ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
+      ${onBack ? `<button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回選擇表單', '← 返回')}</button>` : ''}
       <h2 class="page-header__title">課程月計畫</h2>
       <div class="page-header__actions">
-        <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">課程月計畫匯入</button>
+        <button type="button" class="btn btn--purple" data-action="import-monthly-plan-docx">${headerButtonLabel('課程月計畫匯入', '匯入')}</button>
       </div>
       <input type="file" accept=".docx" data-field="import-monthly-plan-file" multiple hidden>
     </div>

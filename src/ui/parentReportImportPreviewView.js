@@ -5,6 +5,7 @@ import {
 } from '../storage/parentReportDb.js';
 import { DOMAINS, TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
 
 function coursePlanEntryRow(entry, index) {
@@ -63,7 +64,7 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
 
   container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">← 取消匯入</button>
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel('← 取消匯入', '← 取消')}</button>
       <h2 class="page-header__title">確認匯入內容（適性紀錄）</h2>
     </div>
     ${

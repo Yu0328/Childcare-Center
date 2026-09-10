@@ -387,6 +387,24 @@ button {
   flex: none;
 }
 
+/* A page-header button's shorter mobile label (e.g. "← 返回" instead of "← 返回幼兒列表") — see
+   headerButtonLabel() in headerButtonLabel.js. Deliberately swaps the whole label rather than
+   just shrinking font-size: leaves the desktop wording (and its own screenshots/docs) untouched,
+   and stays reachable to assistive tech either way since it's still real text, not a hidden
+   truncation of the same string. */
+.btn__label-short {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .btn__label-full {
+    display: none;
+  }
+  .btn__label-short {
+    display: inline;
+  }
+}
+
 /* ---------- Report-type select screen ---------- */
 
 /* Anchored a little below the app header (not vertically centred — with only five short cards
@@ -1636,6 +1654,21 @@ fieldset.panel-form__field.import-preview__child legend {
   }
   .domain-grid--row {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  /* Long button labels + a long title fighting for one narrow row (see .btn__label-short below
+     for the other half of this fix) still left the title squeezed to an unreadable ellipsis on
+     real phones. Wrapping the title onto its own full-width line above a second line of buttons
+     keeps the same left/right button positions as desktop (via justify-content:space-between —
+     a lone back button still lands on the left, matching desktop) while giving the title the
+     whole row to itself, above the header's own bottom hairline. */
+  .page-header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .page-header__title {
+    order: -1;
+    flex-basis: 100%;
   }
 }
 

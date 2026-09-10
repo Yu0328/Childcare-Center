@@ -1,6 +1,7 @@
 import { addChild, listChildren, deleteChild, listFormsForChild } from '../storage/db.js';
 import { listParentReportsForChild } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { parseDocxImport } from '../import/docxImport.js';
 import { renderImportPreviewView } from './importPreviewView.js';
 import { parseParentReportDocxImport } from '../import/parentReportDocxImport.js';
@@ -35,7 +36,7 @@ export async function renderChildListView(
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
-      ${onBack ? '<button type="button" class="btn btn--ghost" data-action="back">← 返回選擇表單</button>' : ''}
+      ${onBack ? `<button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回選擇表單', '← 返回')}</button>` : ''}
       <h2 class="page-header__title">幼兒列表</h2>
       ${
         // The docx-import button only makes sense when picking a child to open a form/report.
@@ -43,9 +44,9 @@ export async function renderChildListView(
         !onSelectChild
           ? ''
           : isParentReport
-            ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">適性紀錄匯入</button>
+            ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">${headerButtonLabel('適性紀錄匯入', '匯入')}</button>
                <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>`
-            : `<button type="button" class="btn btn--purple" data-action="import-docx">適性總表匯入</button>
+            : `<button type="button" class="btn btn--purple" data-action="import-docx">${headerButtonLabel('適性總表匯入', '匯入')}</button>
                <input type="file" accept=".docx" data-field="import-file" multiple hidden>`
       }
     </div>

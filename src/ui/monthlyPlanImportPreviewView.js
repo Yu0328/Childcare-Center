@@ -2,6 +2,7 @@ import { addChild, listChildren } from '../storage/db.js';
 import { addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride } from '../storage/monthlyPlanDb.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 
@@ -80,7 +81,7 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
 
   container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">← 取消匯入</button>
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel('← 取消匯入', '← 取消')}</button>
       <h2 class="page-header__title">確認匯入內容（課程月計畫）</h2>
     </div>
     ${

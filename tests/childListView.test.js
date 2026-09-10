@@ -277,7 +277,7 @@ describe('renderChildListView', () => {
     const container = document.createElement('div');
     await renderChildListView(container, { onSelectChild: () => {} });
 
-    expect(container.querySelector('[data-action="import-docx"]').textContent).toBe('適性總表匯入');
+    expect(container.querySelector('[data-action="import-docx"]').textContent).toContain('適性總表匯入');
     expect(container.querySelector('[data-action="import-parent-report-docx"]')).toBeNull();
   });
 
@@ -285,7 +285,7 @@ describe('renderChildListView', () => {
     const container = document.createElement('div');
     await renderChildListView(container, { onSelectChild: () => {}, reportType: 'assessment' });
 
-    expect(container.querySelector('[data-action="import-docx"]').textContent).toBe('適性總表匯入');
+    expect(container.querySelector('[data-action="import-docx"]').textContent).toContain('適性總表匯入');
     expect(container.querySelector('[data-action="import-parent-report-docx"]')).toBeNull();
   });
 
@@ -301,7 +301,7 @@ describe('renderChildListView', () => {
     const container = document.createElement('div');
     await renderChildListView(container, { onSelectChild: () => {}, reportType: 'parent-report' });
 
-    expect(container.querySelector('[data-action="import-parent-report-docx"]').textContent).toBe('適性紀錄匯入');
+    expect(container.querySelector('[data-action="import-parent-report-docx"]').textContent).toContain('適性紀錄匯入');
     expect(container.querySelector('[data-action="import-docx"]')).toBeNull();
   });
 

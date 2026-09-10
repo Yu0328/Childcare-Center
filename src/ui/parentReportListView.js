@@ -3,6 +3,7 @@ import { suggestTier } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
 import { currentRocYear, periodSelectsHtml } from './periodFields.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { wireScrollShade } from './scrollShade.js';
 
 export async function renderParentReportListView(
@@ -18,7 +19,7 @@ export async function renderParentReportListView(
 
   container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="back">← 返回幼兒列表</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回幼兒列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)} 的適性紀錄(家長版)</h2>
     </div>
     <div class="tab-layout">

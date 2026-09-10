@@ -2,6 +2,7 @@ import { getIndicatorsForTier, tierFormLabel, previousTier, getIndicator } from 
 import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry, updateForm } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { keepScroll } from './keepScroll.js';
 
 function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
@@ -189,9 +190,9 @@ export async function renderFormEditorView(
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">← 返回適性總表列表</button>
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性總表列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}　${escapeHtml(form.tier)} 階段　${escapeHtml(form.period)}</h2>
-      <button type="button" class="btn btn--primary" data-action="export">匯出 Word</button>
+      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="domain-grid domain-grid--row">

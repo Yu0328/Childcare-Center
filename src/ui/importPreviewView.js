@@ -1,6 +1,7 @@
 import { addChild, listChildren, addForm, addEntry } from '../storage/db.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPeriodRange } from './periodFields.js';
 
 function entryRow(entry, index) {
@@ -29,7 +30,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
 
   container.innerHTML = `
     <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">← 取消匯入</button>
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel('← 取消匯入', '← 取消')}</button>
       <h2 class="page-header__title">確認匯入內容（適性總表）</h2>
     </div>
     ${
