@@ -353,9 +353,18 @@ button {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border);
   position: relative;
   text-align: center;
+}
+
+/* The 課程月計畫 editor's calendar already reads as its own bordered panel right under the
+   header — a divider there would just be a double line. */
+#app:has(.monthly-calendar-list) .page-header {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .page-header .btn {
