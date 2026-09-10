@@ -640,18 +640,13 @@ button {
 .card-list--rows .card-list__item {
   width: 100%;
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.15rem 0.75rem;
-  padding: 0.9rem 2.75rem 0.9rem 1.15rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.85rem 2.75rem 0.85rem 1.6rem;
   transition: background 0.14s ease;
 }
 .card-list--rows .card-list__name {
   font-size: 1.05rem;
-}
-.card-list--rows .card-list__meta {
-  text-align: right;
 }
 .card-list--rows .card-list__item:hover {
   background: var(--page-bg);
@@ -1019,28 +1014,6 @@ fieldset.panel-form__field.import-preview__child legend {
   border-left: 4px solid transparent;
   margin-bottom: 0.6rem;
   cursor: pointer;
-}
-
-/* Replace the browser's default disclosure triangle with a chevron that rotates on open. */
-summary.domain-card__title {
-  list-style: none;
-}
-summary.domain-card__title::-webkit-details-marker {
-  display: none;
-}
-.domain-card__title::before {
-  content: "";
-  display: inline-block;
-  width: 0.42em;
-  height: 0.42em;
-  margin-right: 0.55em;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: translateY(-0.12em) rotate(-45deg);
-  transition: transform 0.18s ease;
-}
-.domain-card[open] > .domain-card__title::before {
-  transform: translateY(0.04em) rotate(45deg);
 }
 .domain-card[data-domain="1"] .domain-card__title { border-color: var(--domain-1-accent); color: var(--domain-1-accent); }
 .domain-card[data-domain="2"] .domain-card__title { border-color: var(--domain-2-accent); color: var(--domain-2-accent); }
