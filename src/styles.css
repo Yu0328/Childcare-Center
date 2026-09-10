@@ -629,31 +629,48 @@ button {
 /* ----- 方向 E — 幼兒 / 表單 / 紀錄 / 月計畫 lists: one card, rows separated by hairlines.
    Left-aligned rows; caps its height and scrolls (thin, soft scrollbar) once the list gets long. ----- */
 .card-list--rows {
+  --_card-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
+  --_shade-top: inset 0 13px 11px -13px rgba(15, 23, 20, 0.1);
+  --_shade-bottom: inset 0 -13px 11px -13px rgba(15, 23, 20, 0.1);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow-y: auto;
   max-height: 62vh;
   scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-color: rgba(31, 36, 34, 0.22) transparent;
+  box-shadow: var(--_card-shadow);
+  transition: box-shadow 0.15s ease;
+}
+/* Only reserve the scrollbar gutter + show the edge shade when the list actually scrolls
+   (JS toggles these — see scrollShade.js). */
+.card-list--rows.is-scrollable {
   scrollbar-gutter: stable;
-  /* base card shadow + a soft inner shade top & bottom that hints there's more to scroll */
-  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04),
-    inset 0 12px 10px -12px rgba(15, 23, 20, 0.09), inset 0 -12px 10px -12px rgba(15, 23, 20, 0.09);
+}
+.card-list--rows.has-overflow-top {
+  box-shadow: var(--_card-shadow), var(--_shade-top);
+}
+.card-list--rows.has-overflow-bottom {
+  box-shadow: var(--_card-shadow), var(--_shade-bottom);
+}
+.card-list--rows.has-overflow-top.has-overflow-bottom {
+  box-shadow: var(--_card-shadow), var(--_shade-top), var(--_shade-bottom);
 }
 .card-list--rows::-webkit-scrollbar {
-  width: 12px;
-}
-.card-list--rows::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border: 3px solid var(--surface);
-  border-radius: 999px;
-}
-.card-list--rows::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  width: 10px;
 }
 .card-list--rows::-webkit-scrollbar-track {
   background: transparent;
+}
+.card-list--rows::-webkit-scrollbar-thumb {
+  background: rgba(31, 36, 34, 0.18);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+.card-list--rows:hover::-webkit-scrollbar-thumb {
+  background: rgba(31, 36, 34, 0.32);
+  background-clip: padding-box;
 }
 .card-list--rows .card-list__row + .card-list__row {
   border-top: 1px solid var(--border);

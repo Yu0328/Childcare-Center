@@ -3,6 +3,7 @@ import { suggestTier } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
 import { currentRocYear, periodSelectsHtml } from './periodFields.js';
+import { wireScrollShade } from './scrollShade.js';
 
 export async function renderParentReportListView(
   container,
@@ -59,6 +60,8 @@ export async function renderParentReportListView(
       </form>
     </div>
   `;
+
+  wireScrollShade(container.querySelector('.card-list--rows'));
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 

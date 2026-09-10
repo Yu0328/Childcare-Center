@@ -8,6 +8,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { processImportQueue } from './importQueue.js';
 import { parseMonthlyPlanDocxImport } from '../import/monthlyPlanDocxImport.js';
 import { renderMonthlyPlanImportPreviewView } from './monthlyPlanImportPreviewView.js';
+import { wireScrollShade } from './scrollShade.js';
 
 export async function renderMonthlyPlanListView(
   container,
@@ -76,6 +77,8 @@ export async function renderMonthlyPlanListView(
       </form>
     </div>
   `;
+
+  wireScrollShade(container.querySelector('.card-list--rows'));
 
   if (onBack) {
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);

@@ -9,6 +9,7 @@ import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } fro
 import { processImportQueue } from './importQueue.js';
 import { keepScroll } from './keepScroll.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { wireScrollShade } from './scrollShade.js';
 
 export async function renderChildListView(
   container,
@@ -80,6 +81,8 @@ export async function renderChildListView(
       </form>
     </div>
   `;
+
+  wireScrollShade(container.querySelector('.card-list--rows'));
 
   if (onBack) {
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);
