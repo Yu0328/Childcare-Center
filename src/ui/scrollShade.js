@@ -10,8 +10,15 @@ export function wireScrollShade(el) {
     el.classList.toggle('has-overflow-top', scrollable && el.scrollTop > 1);
     el.classList.toggle('has-overflow-bottom', scrollable && el.scrollTop < overflow - 1);
   };
+  let scrollingTimer;
+  const onScroll = () => {
+    update();
+    el.classList.add('is-scrolling');
+    clearTimeout(scrollingTimer);
+    scrollingTimer = setTimeout(() => el.classList.remove('is-scrolling'), 700);
+  };
   update();
-  el.addEventListener('scroll', update, { passive: true });
+  el.addEventListener('scroll', onScroll, { passive: true });
   // Re-check when the container resizes (e.g. viewport height change shrinks its max-height cap).
   // The observer is cleaned up automatically once `el` is dropped on the next re-render.
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(update).observe(el);

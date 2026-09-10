@@ -638,9 +638,14 @@ button {
   overflow-y: auto;
   max-height: 62vh;
   scrollbar-width: thin;
-  scrollbar-color: rgba(31, 36, 34, 0.22) transparent;
+  scrollbar-color: transparent transparent;
   box-shadow: var(--_card-shadow);
   transition: box-shadow 0.15s ease;
+}
+/* Scrollbar reveals only while scrolling or hovering the list. */
+.card-list--rows:hover,
+.card-list--rows.is-scrolling {
+  scrollbar-color: rgba(31, 36, 34, 0.28) transparent;
 }
 /* Only reserve the scrollbar gutter + show the edge shade when the list actually scrolls
    (JS toggles these — see scrollShade.js). */
@@ -663,13 +668,19 @@ button {
   background: transparent;
 }
 .card-list--rows::-webkit-scrollbar-thumb {
-  background: rgba(31, 36, 34, 0.18);
+  background: transparent;
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
+  transition: background 0.2s ease;
 }
-.card-list--rows:hover::-webkit-scrollbar-thumb {
-  background: rgba(31, 36, 34, 0.32);
+.card-list--rows:hover::-webkit-scrollbar-thumb,
+.card-list--rows.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(31, 36, 34, 0.22);
+  background-clip: padding-box;
+}
+.card-list--rows:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 36, 34, 0.36);
   background-clip: padding-box;
 }
 .card-list--rows .card-list__row + .card-list__row {
