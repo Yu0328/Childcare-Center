@@ -360,9 +360,10 @@ button {
   text-align: center;
 }
 
-/* The 課程月計畫 editor's calendar already reads as its own bordered panel right under the
-   header — a divider there would just be a double line. */
-#app:has(.monthly-calendar-list) .page-header {
+/* Skip the divider where a separator already exists right below the header: the 課程月計畫
+   editor (calendar borders itself) and the 適性紀錄 editor (its tab bar has its own underline). */
+#app:has(.monthly-calendar-list) .page-header,
+#app:has(.tabs) .page-header {
   padding-bottom: 0;
   border-bottom: none;
 }
