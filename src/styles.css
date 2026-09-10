@@ -338,16 +338,19 @@ button {
 
 /* ---------- Page header (child list / form list / form editor) ---------- */
 
+/* Plain flex row (back button — title — action button(s)), in DOM order left to right. No
+   absolute positioning: an absolutely-positioned button ignores both the title's width and the
+   other button's width, so on a narrow phone (or a long child name/period) the boxes could
+   literally overlap and hide each other's text — confirmed with real screenshots at 320–414px
+   where the title was fully hidden behind the buttons before this rewrite. A flex row plus the
+   title's min-width:0/ellipsis below lets the title shrink and truncate instead of colliding. */
 .page-header {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 1rem;
   margin-bottom: 1.5rem;
   padding-bottom: 1.2rem;
   border-bottom: 1px solid var(--border);
-  position: relative;
-  text-align: center;
 }
 
 /* Skip the divider where a separator already exists right below the header: the 課程月計畫
@@ -358,46 +361,30 @@ button {
   border-bottom: none;
 }
 
+/* Buttons keep their natural width — only the title gives up space when it's tight. */
 .page-header .btn {
-  position: absolute;
-  left: 0;
+  flex: none;
 }
 
 .page-header__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-}
-
-.page-header--editor {
-  flex-wrap: wrap;
-}
-
-.page-header--editor .btn[data-action="export"],
-.page-header--editor .btn[data-action="aggregate"],
-.page-header--editor .btn[data-action="import-docx"],
-.page-header--editor .btn[data-action="import-parent-report-docx"] {
-  position: absolute;
-  right: 0;
-  left: auto;
+  text-align: center;
 }
 
 /* Groups multiple right-side header actions (課程月計畫 editor: 管理小朋友 + 匯出 Word) as one
-   unit instead of extending the single-button data-action allowlist above — each new button
-   there would otherwise land at the same right:0 spot and stack on itself. The wrapper takes
-   the absolute right positioning; buttons inside it fall back to normal flex flow (overriding
-   the base `.page-header .btn { position: absolute; left: 0 }` rule, which would otherwise win
-   here too since it's a plain descendant selector). */
-.page-header--editor .page-header__actions {
-  position: absolute;
-  right: 0;
+   flex item, so they sit together after the title instead of each button needing its own rule. */
+.page-header__actions {
   display: flex;
   gap: 0.5rem;
-}
-
-.page-header--editor .page-header__actions .btn {
-  position: static;
+  flex: none;
 }
 
 /* ---------- Report-type select screen ---------- */
