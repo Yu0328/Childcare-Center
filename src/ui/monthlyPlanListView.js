@@ -31,7 +31,7 @@ export async function renderMonthlyPlanListView(
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
-        <ul class="card-list card-list--rows${plans.length >= 5 ? ' card-list--split' : ''}">
+        <ul class="card-list card-list--rows">
           ${plans
             .map(
               plan =>

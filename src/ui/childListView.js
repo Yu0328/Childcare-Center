@@ -51,7 +51,7 @@ export async function renderChildListView(
     <p class="field-error field-error--center" data-error="import"></p>
     <div class="tab-layout">
       <div class="entry-list-wrap">
-        <ul class="card-list card-list--rows${children.length >= 5 ? ' card-list--split' : ''}">
+        <ul class="card-list card-list--rows">
           ${children
             .map(child => {
               const meta = child.birthDate

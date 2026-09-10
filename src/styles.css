@@ -208,7 +208,7 @@ button {
   /* Narrow default so a list/form page's header and body share one comfortable column instead
      of spreading across the old 960px with the content clustered in the middle. Wide editor
      screens opt back out below via #app:has(...). */
-  max-width: 840px;
+  max-width: 780px;
   margin: 0 auto;
   padding: 2rem 1.5rem 4rem;
 }
@@ -626,12 +626,14 @@ button {
   padding: 1.5rem 1rem;
 }
 
-/* ----- 方向 E — 幼兒列表: one card, rows separated by hairlines (no per-item card) ----- */
+/* ----- 方向 E — 幼兒 / 表單 / 紀錄 / 月計畫 lists: one card, rows separated by hairlines.
+   Centre-aligned rows; caps its height and scrolls once the list gets long. ----- */
 .card-list--rows {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 62vh;
   box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
 }
 .card-list--rows .card-list__row + .card-list__row {
@@ -641,8 +643,10 @@ button {
   width: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.15rem;
-  padding: 0.85rem 2.75rem 0.85rem 1.6rem;
+  padding: 0.85rem 1.6rem;
+  text-align: center;
   transition: background 0.14s ease;
 }
 .card-list--rows .card-list__name {
@@ -655,31 +659,8 @@ button {
   background: var(--border);
 }
 .card-list--rows .card-list__delete {
-  top: 0.7rem;
-  right: 0.7rem;
-}
-
-/* ----- Two-column variant (幼兒 / 課程月計畫 lists, only once they have ≥5 entries — see the
-   views). CSS multicol fills column-first: down the left column, then down the right. ----- */
-@media (min-width: 641px) {
-  #app:has(.card-list--split) {
-    max-width: 1060px;
-  }
-}
-.card-list--split {
-  columns: 2;
-  column-gap: 0;
-  column-rule: 1px solid var(--border);
-}
-.card-list--split .card-list__row {
-  break-inside: avoid;
-  border-bottom: 1px solid var(--border);
-}
-.card-list--split .card-list__row + .card-list__row {
-  border-top: none;
-}
-.card-list--split .card-list__row:last-child {
-  border-bottom: none;
+  top: 0.55rem;
+  right: 0.55rem;
 }
 
 /* Circular delete button (position set by .card-list--rows above). */
