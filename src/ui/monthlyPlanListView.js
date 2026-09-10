@@ -13,7 +13,8 @@ export async function renderMonthlyPlanListView(
   container,
   { onSelectPlan, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
 ) {
-  const plans = await listMonthlyCoursePlans();
+  // Most recent month first.
+  const plans = (await listMonthlyCoursePlans()).sort((a, b) => b.period.localeCompare(a.period));
   const children = await listChildren();
   const defaultYear = currentRocYear();
   const defaultMonth = new Date().getMonth() + 1;

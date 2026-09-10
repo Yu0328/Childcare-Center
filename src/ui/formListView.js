@@ -8,7 +8,8 @@ export async function renderFormListView(
   container,
   { child, onSelectForm, onBack, onAggregate = () => {}, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
 ) {
-  const forms = await listFormsForChild(child.id);
+  // Most recent record period first.
+  const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period));
   const today = new Date().toISOString().slice(0, 10);
   const suggested = suggestTier(child.birthDate, today);
   const defaultYear = currentRocYear();

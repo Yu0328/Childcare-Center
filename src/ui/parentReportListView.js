@@ -8,7 +8,8 @@ export async function renderParentReportListView(
   container,
   { child, onSelectReport, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
 ) {
-  const reports = await listParentReportsForChild(child.id);
+  // Most recent record period first.
+  const reports = (await listParentReportsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period));
   const today = new Date().toISOString().slice(0, 10);
   const suggested = suggestTier(child.birthDate, today);
   const defaultYear = currentRocYear();

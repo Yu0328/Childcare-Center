@@ -13,7 +13,10 @@ export async function renderChildListView(
   container,
   { onSelectChild, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false), onBack, reportType }
 ) {
-  const children = await listChildren();
+  // Oldest first (earliest birthdate); a child with no birthdate sorts to the end.
+  const children = (await listChildren()).sort((a, b) =>
+    (a.birthDate || '9999-99-99').localeCompare(b.birthDate || '9999-99-99')
+  );
   const isParentReport = reportType === 'parent-report';
   // A child gets the 新 badge if any of their forms/reports for *this* screen's type (matching
   // whichever list the badge on that form/report itself would show) was created by docx import
