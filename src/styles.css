@@ -627,14 +627,33 @@ button {
 }
 
 /* ----- 方向 E — 幼兒 / 表單 / 紀錄 / 月計畫 lists: one card, rows separated by hairlines.
-   Centre-aligned rows; caps its height and scrolls once the list gets long. ----- */
+   Left-aligned rows; caps its height and scrolls (thin, soft scrollbar) once the list gets long. ----- */
 .card-list--rows {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow-y: auto;
   max-height: 62vh;
-  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-gutter: stable;
+  /* base card shadow + a soft inner shade top & bottom that hints there's more to scroll */
+  box-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04),
+    inset 0 12px 10px -12px rgba(15, 23, 20, 0.09), inset 0 -12px 10px -12px rgba(15, 23, 20, 0.09);
+}
+.card-list--rows::-webkit-scrollbar {
+  width: 12px;
+}
+.card-list--rows::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid var(--surface);
+  border-radius: 999px;
+}
+.card-list--rows::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+.card-list--rows::-webkit-scrollbar-track {
+  background: transparent;
 }
 .card-list--rows .card-list__row + .card-list__row {
   border-top: 1px solid var(--border);
