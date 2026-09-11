@@ -794,7 +794,11 @@ button {
   padding: 0;
   background: transparent;
   max-height: 85vh;
-  overflow: auto;
+  overflow-y: auto;
+  /* A native <input type="date"> can render wider than this popup on iOS Safari (its internal
+     control has a minimum width CSS can't shrink below) — clip that overflow instead of letting
+     it make the whole popup pan sideways on a touch swipe. */
+  overflow-x: hidden;
 }
 
 .form-popup > .panel-form,
@@ -889,6 +893,9 @@ button {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+  /* Same defense as .entry-form's own overflow-x: hidden — a native date input can render wider
+     than its container on iOS Safari and isn't always clipped by a distant ancestor. */
+  overflow-x: hidden;
 }
 
 .panel-form__title {
@@ -1410,6 +1417,10 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--page-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
+  /* Belt-and-suspenders alongside .form-popup's own overflow-x: hidden — iOS Safari's native
+     date-input control can render wider than its container and isn't always contained by a
+     distant ancestor's overflow clipping, so clip at this closer wrapper too. */
+  overflow-x: hidden;
 }
 
 .entry-form__field {
