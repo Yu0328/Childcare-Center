@@ -209,17 +209,6 @@ button {
   flex-shrink: 0;
 }
 
-.app-version {
-  position: fixed;
-  left: 8px;
-  bottom: 4px;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  opacity: 0.6;
-  pointer-events: none;
-  user-select: none;
-}
-
 .app-header__actions {
   display: flex;
   gap: 0.6rem;
@@ -833,15 +822,26 @@ button {
 @media (max-width: 640px) {
   /* Only constrained to a centered popup width on mobile, where showModal() promotes the dialog
      to the top layer as a floating overlay. On desktop .form-popup is a plain in-flow grid item
-     (see base rule above) and must stay unconstrained so it can stretch to fill its grid column. */
+     (see base rule above) and must stay unconstrained so it can stretch to fill its grid column.
+     The base rule's `position: relative` (needed for desktop's grid layout) also overrides the
+     browser's own dialog:modal centering — author CSS wins over the UA stylesheet even once
+     showModal() promotes the element to the top layer — so without this override the popup was
+     positioned wherever its `relative` box happened to fall in the page instead of staying
+     centered on screen as the page scrolled. `fixed` + `inset: 0` + `margin: auto` restores that
+     centering and keeps it pinned there regardless of scroll position. */
   .form-popup {
     width: min(90vw, 420px);
+    position: fixed;
+    inset: 0;
+    margin: auto;
   }
 
   .fab {
     position: fixed;
     right: 1rem;
-    bottom: 1rem;
+    /* Left thumb-reach-friendly and clear of one-handed grip at the very bottom edge — roughly
+       2/5 of the viewport height up from the bottom. */
+    bottom: 40vh;
     width: 64px;
     height: 64px;
     display: flex;
@@ -1127,8 +1127,18 @@ fieldset.panel-form__field.import-preview__child legend {
 
 .tab-layout > .panel-form,
 .tab-layout > .form-popup {
-  margin: 0;
   order: 2;
+}
+
+/* margin: 0 only matters for desktop's in-flow grid item (avoids a double margin next to the
+   grid gap) — guarded to min-width so it doesn't win, by specificity, over the mobile media
+   query's `margin: auto` centering trick below, which needs auto margins to center the
+   showModal()-promoted popup on screen. */
+@media (min-width: 641px) {
+  .tab-layout > .panel-form,
+  .tab-layout > .form-popup {
+    margin: 0;
+  }
 }
 
 .tab-layout > .domain-grid,
@@ -29957,6 +29967,5 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v1.2.0</footer>
 </body>
 </html>
