@@ -810,20 +810,30 @@ button {
     position: fixed;
     right: 1rem;
     bottom: 1rem;
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: none;
     border-radius: 50%;
-    background: var(--brand);
+    background: linear-gradient(155deg, var(--brand) 0%, var(--brand-dark) 100%);
     color: #fff;
-    font-size: 1.5rem;
-    line-height: 1;
-    box-shadow: 0 2px 8px rgba(15, 23, 20, 0.3);
+    box-shadow: 0 4px 14px rgba(15, 23, 20, 0.35), 0 1px 3px rgba(15, 23, 20, 0.25);
     cursor: pointer;
     z-index: 10;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .fab__icon {
+    width: 30px;
+    height: 30px;
   }
   .fab:active {
     transform: scale(0.94);
+    box-shadow: 0 2px 8px rgba(15, 23, 20, 0.3);
+  }
+  .fab[hidden] {
+    display: none;
   }
 }
 
@@ -1777,6 +1787,14 @@ fieldset.panel-form__field.import-preview__child legend {
     order: -1;
     flex-basis: 100%;
   }
+
+  /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
+     viewport's bottom edge. #app's default 4rem (64px) bottom padding leaves the last calendar
+     row's bottom 16px sitting under it once scrolled to the end; bump the reserved space here so
+     the FAB never sits on top of a real day cell. */
+  #app:has(.monthly-calendar-list) {
+    padding-bottom: 6rem;
+  }
 }
 
 /* ---------- Checkbox lists (課程月計畫's child-selection: create form + 管理小朋友) ----------
@@ -1944,6 +1962,9 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--page-bg);
   cursor: pointer;
   min-height: 3.5rem;
+  /* Without this, mobile Safari/Chrome treat a second tap within the double-tap window as a
+     zoom gesture instead of firing dblclick, since the viewport meta doesn't disable zoom. */
+  touch-action: manipulation;
   /* Grid items default to min-width: auto, which lets long unbroken indicator text push the
      cell wider than its track instead of wrapping — this is what caused the crushed/overflowing
      layout. min-width: 0 lets the wrap rules below actually take effect. */

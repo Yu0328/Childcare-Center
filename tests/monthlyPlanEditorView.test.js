@@ -158,7 +158,10 @@ describe('monthlyPlanEditorView: slot item editing', () => {
   it('editing an existing item\'s activity name updates storage and the rendered cell', async () => {
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
     const item = await addPlanSlotItem({ slotId: slot.id, activityName: '原活動' });
-    // Re-select the cell so the panel picks up the newly added item.
+    // Reselecting the same already-selected cell now skips the panel re-render (so unsaved input
+    // survives a FAB-reopen/double-tap in the app) — select a different cell first, then back, to
+    // force a fresh render that picks up the newly added item.
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="4"]`).click();
     container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
     await waitFor(() => container.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`));
 
@@ -178,6 +181,9 @@ describe('monthlyPlanEditorView: slot item editing', () => {
   it('deleting an item removes it from storage and the cell', async () => {
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
     const item = await addPlanSlotItem({ slotId: slot.id, activityName: '要刪除' });
+    // See the comment in the "editing an existing item" test above: reselecting the same cell no
+    // longer force-refreshes the panel, so select away and back to pick up the direct storage write.
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="4"]`).click();
     container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
     await waitFor(() => container.querySelector(`[data-delete-item="${item.id}"]`));
 

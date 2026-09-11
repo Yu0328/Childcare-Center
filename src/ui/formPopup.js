@@ -5,6 +5,15 @@
 const MOBILE_QUERY = '(max-width: 640px)';
 export const isMobile = () => typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches;
 
+// Shared by every "+" trigger (the list-level FABs below and monthlyPlanEditorView's day-cell
+// one) so all of them render identically — a vector plus scales crisply at any button size,
+// unlike a text "＋" glyph whose weight/centering drifts across fonts.
+export const fabIconHtml = () => `
+  <svg class="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" focusable="false">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+`;
+
 export function formPopupMarkup({ formHtml, fabLabel }) {
   const mobile = isMobile();
   return `
@@ -12,7 +21,7 @@ export function formPopupMarkup({ formHtml, fabLabel }) {
       <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="關閉">×</button>
       ${formHtml}
     </dialog>
-    ${mobile ? `<button type="button" class="fab" data-action="open-form-popup" aria-label="${fabLabel}">＋</button>` : ''}
+    ${mobile ? `<button type="button" class="fab" data-action="open-form-popup" aria-label="${fabLabel}">${fabIconHtml()}</button>` : ''}
   `;
 }
 
