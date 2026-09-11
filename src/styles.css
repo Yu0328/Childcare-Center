@@ -1933,13 +1933,15 @@ fieldset.panel-form__field.import-preview__child legend {
   gap: 1rem;
 }
 
-/* .panel-form's own max-width:420px + margin:0 auto (sized for a standalone centered page) makes
-   it size to its own content's max-content width and center within any wider parent instead of
-   stretching — inside this flex sidebar that means the card visibly resizes/shifts sideways as its
-   content changes (e.g. the empty "點選左側的日期格子" panel vs. a cell's full edit form). Forcing
-   full width here keeps the manage-children card and the day-cell panel a fixed, stable width. */
+/* .panel-form's own margin:0 auto (sized for a standalone centered page) is the actual cause of the
+   old shift bug: auto margins on a flex item opt it out of the sidebar's default stretch behavior,
+   so it shrink-wraps to its own content's max-content width and re-centers within the column —
+   visibly resizing/shifting sideways as content changes (e.g. the empty "點選左側的日期格子" panel
+   vs. a cell's full edit form). Dropping the auto margin restores stretch, so the card always fills
+   the column's actual width instead of its own content width; max-width still caps how wide that can
+   get, matching the original standalone-page sizing, without reintroducing the resize/shift bug. */
 .monthly-plan-side > .panel-form {
-  max-width: none;
+  max-width: 420px;
   margin: 0;
 }
 
