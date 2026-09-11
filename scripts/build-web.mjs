@@ -20,11 +20,6 @@ const result = await esbuild.build({
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles.css', 'utf-8');
 
-// Semantic Versioning (MAJOR.MINOR.PATCH) — bump package.json's "version" by hand per release,
-// same as any npm package. A commit-count-derived number (the previous approach) isn't meaningful
-// on its own and swung wildly depending which branch happened to be checked out at build time.
-const { version } = JSON.parse(readFileSync('package.json', 'utf-8'));
-
 // Every rebuild gets a fresh cache name derived from the bundle's own content, so a redeploy
 // reliably invalidates old clients' cached copy instead of a cache-first Service Worker serving
 // a stale version forever.
@@ -73,7 +68,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
 }
 </script>
-<footer class="app-version">v${version}</footer>
 </body>
 </html>
 `;

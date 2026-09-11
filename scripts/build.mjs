@@ -15,11 +15,6 @@ const result = await esbuild.build({
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles.css', 'utf-8');
 
-// Semantic Versioning (MAJOR.MINOR.PATCH) — bump package.json's "version" by hand per release,
-// same as any npm package. A commit-count-derived number (the previous approach) isn't meaningful
-// on its own and swung wildly depending which branch happened to be checked out at build time.
-const { version } = JSON.parse(readFileSync('package.json', 'utf-8'));
-
 // This build has no external files at all (the whole point is one self-contained offline HTML
 // file), so the header icon/favicon has to be inlined as a data URI rather than a normal <img src>.
 const iconDataUri = `data:image/png;base64,${readFileSync('assets/icons/icon-192.png').toString('base64')}`;
@@ -55,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
   CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
 });
 </script>
-<footer class="app-version">v${version}</footer>
 </body>
 </html>
 `;
