@@ -827,9 +827,9 @@ button {
   .fab {
     position: fixed;
     right: 1rem;
-    /* Left thumb-reach-friendly and clear of one-handed grip at the very bottom edge — roughly
-       2/5 of the viewport height up from the bottom. */
-    bottom: 40vh;
+    /* Left thumb-reach-friendly and clear of one-handed grip at the very bottom edge — 1/4 of
+       the viewport height up from the bottom. */
+    bottom: 25vh;
     width: 64px;
     height: 64px;
     display: flex;

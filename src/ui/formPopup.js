@@ -5,6 +5,16 @@
 const MOBILE_QUERY = '(max-width: 640px)';
 export const isMobile = () => typeof matchMedia === 'function' && matchMedia(MOBILE_QUERY).matches;
 
+// showModal() alone doesn't stop the page behind the popup from scrolling on touch devices —
+// locking body scroll while a popup is open keeps the backdrop from feeling like it's just
+// floating over a page the user can still drag around underneath it.
+export const lockBodyScroll = () => {
+  document.body.style.overflow = 'hidden';
+};
+export const unlockBodyScroll = () => {
+  document.body.style.overflow = '';
+};
+
 // Shared by every "+" trigger (the list-level FABs below and monthlyPlanEditorView's day-cell
 // one) so all of them render identically — a vector plus scales crisply at any button size,
 // unlike a text "＋" glyph whose weight/centering drifts across fonts.
@@ -27,11 +37,20 @@ export function formPopupMarkup({ formHtml, fabLabel }) {
 
 export function wireFormPopup(container) {
   const dialog = container.querySelector('.form-popup');
-  container.querySelector('[data-action="open-form-popup"]')?.addEventListener('click', () => dialog.showModal());
+  // A fresh render's dialog always starts closed, even if the previous one was open when it got
+  // replaced (e.g. a successful submit re-renders the whole container instead of closing the
+  // dialog first) — clear any lock left over from that so scrolling doesn't stay stuck off.
+  unlockBodyScroll();
+  container.querySelector('[data-action="open-form-popup"]')?.addEventListener('click', () => {
+    dialog.showModal();
+    lockBodyScroll();
+  });
   container.querySelector('[data-action="close-form-popup"]')?.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => {
     if (event.target === dialog) dialog.close();
   });
+  // Covers every way the dialog can close — the button above, backdrop click, and the Escape key.
+  dialog.addEventListener('close', unlockBodyScroll);
 }
 
 // For per-item nested add-forms — one trigger button per row rather than a single list-level FAB
@@ -50,11 +69,16 @@ export function wireNestedEntryForm(trigger, entryForm) {
     });
     return;
   }
-  trigger.addEventListener('click', () => dialog.showModal());
+  unlockBodyScroll(); // see wireFormPopup above — a fresh render's dialog always starts closed
+  trigger.addEventListener('click', () => {
+    dialog.showModal();
+    lockBodyScroll();
+  });
   dialog.querySelector('[data-action="close-form-popup"]').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => {
     if (event.target === dialog) dialog.close();
   });
+  dialog.addEventListener('close', unlockBodyScroll);
 }
 
 // Wraps a nested entry-form's markup in the same `<dialog class="form-popup">` chrome as
