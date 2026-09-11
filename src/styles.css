@@ -817,16 +817,21 @@ button {
     justify-content: center;
     border: none;
     border-radius: 50%;
-    background: linear-gradient(155deg, var(--brand) 0%, var(--brand-dark) 100%);
+    /* Same flat brand color as .btn--primary (not a gradient), so the FAB reads as the same
+       button family as the rest of the app instead of a one-off visual treatment. */
+    background: var(--brand);
     color: #fff;
     box-shadow: 0 4px 14px rgba(15, 23, 20, 0.35), 0 1px 3px rgba(15, 23, 20, 0.25);
     cursor: pointer;
     z-index: 10;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .fab:hover {
+    background: var(--brand-dark);
   }
   .fab__icon {
-    width: 30px;
-    height: 30px;
+    width: 38px;
+    height: 38px;
   }
   .fab:active {
     transform: scale(0.94);
@@ -1805,8 +1810,6 @@ fieldset.panel-form__field.import-preview__child legend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  max-height: 260px;
-  overflow-y: auto;
   padding: 0.15rem;
 }
 
@@ -1910,6 +1913,16 @@ fieldset.panel-form__field.import-preview__child legend {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+/* .panel-form's own max-width:420px + margin:0 auto (sized for a standalone centered page) makes
+   it size to its own content's max-content width and center within any wider parent instead of
+   stretching — inside this flex sidebar that means the card visibly resizes/shifts sideways as its
+   content changes (e.g. the empty "點選左側的日期格子" panel vs. a cell's full edit form). Forcing
+   full width here keeps the manage-children card and the day-cell panel a fixed, stable width. */
+.monthly-plan-side > .panel-form {
+  max-width: none;
+  margin: 0;
 }
 
 .monthly-calendar-list {

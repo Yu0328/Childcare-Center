@@ -206,6 +206,24 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
 
   container.querySelector('[data-action="open-panel-popup"]')?.addEventListener('click', () => openPanelPopup());
 
+  // Native `dblclick` is unreliable for a double-tap gesture on real mobile browsers (its timing
+  // window is tighter and less consistent than what a finger tap actually produces), so double-tap
+  // is detected by hand here: two clicks on the same cell within DOUBLE_TAP_WINDOW_MS count as one.
+  const DOUBLE_TAP_WINDOW_MS = 500;
+  let lastTapKey = null;
+  let lastTapTime = 0;
+
+  function handleCellTap(child, tier, week, day) {
+    const key = `${child.id}:${week.weekIndex}:${day.weekday}`;
+    const now = Date.now();
+    const isDoubleTap = key === lastTapKey && now - lastTapTime < DOUBLE_TAP_WINDOW_MS;
+    lastTapKey = isDoubleTap ? null : key;
+    lastTapTime = now;
+    selectCell(child, tier, week, day).then(() => {
+      if (isDoubleTap) openPanelPopup();
+    });
+  }
+
   container.querySelector('[data-action="export-docx"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
@@ -498,11 +516,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       const freshCell = container.querySelector(
         `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
       );
-      freshCell.addEventListener('click', () => selectCell(child, tier, week, day));
-      freshCell.addEventListener('dblclick', async () => {
-        await selectCell(child, tier, week, day);
-        openPanelPopup();
-      });
+      freshCell.addEventListener('click', () => handleCellTap(child, tier, week, day));
     }
     await renderPanelItems();
   }
@@ -513,11 +527,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         const cell = container.querySelector(
           `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
         );
-        cell.addEventListener('click', () => selectCell(child, plan.childTiers[child.id], week, day));
-        cell.addEventListener('dblclick', async () => {
-          await selectCell(child, plan.childTiers[child.id], week, day);
-          openPanelPopup();
-        });
+        cell.addEventListener('click', () => handleCellTap(child, plan.childTiers[child.id], week, day));
       }
     }
   }
