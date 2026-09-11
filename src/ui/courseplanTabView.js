@@ -4,6 +4,7 @@ import {
   addCourseOccurrence, listCourseOccurrencesForEntry, deleteCourseOccurrence, updateCourseOccurrence,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 // Which domain <details> cards are open persists across renders keyed by report.id, since
 // renderCoursePlanTab's own `container` is a brand-new, empty element on every call — its parent
@@ -200,34 +201,39 @@ export async function renderCoursePlanTab(
 
   container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form panel-form--wide" data-action="add-entry">
-        <h3 class="panel-form__title">新增課程計畫項目</h3>
-        <label class="panel-form__field">
-          指標
-          <select data-field="indicatorCode">${indicatorOptionsHtml(report.tier)}</select>
-        </label>
-        <label class="panel-form__field">活動名稱 <input data-field="activityName" required value="${escapeHtml(defaultIndicator ? defaultIndicator.activityName : '')}"></label>
-        <label class="panel-form__field">能力指標內容 <textarea data-field="indicatorText" rows="3">${escapeHtml(defaultIndicator ? defaultIndicator.description : '')}</textarea></label>
-        <div class="panel-form__row">
-          <label class="panel-form__field">日期 <input type="date" data-field="occurrenceDate"></label>
-          <div class="panel-form__field">
-            狀態
-            <div class="entry-form__radio-group">
-              <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> 已發展○</label>
-              <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> 發展中△</label>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form panel-form--wide" data-action="add-entry">
+            <h3 class="panel-form__title">新增課程計畫項目</h3>
+            <label class="panel-form__field">
+              指標
+              <select data-field="indicatorCode">${indicatorOptionsHtml(report.tier)}</select>
+            </label>
+            <label class="panel-form__field">活動名稱 <input data-field="activityName" required value="${escapeHtml(defaultIndicator ? defaultIndicator.activityName : '')}"></label>
+            <label class="panel-form__field">能力指標內容 <textarea data-field="indicatorText" rows="3">${escapeHtml(defaultIndicator ? defaultIndicator.description : '')}</textarea></label>
+            <div class="panel-form__row">
+              <label class="panel-form__field">日期 <input type="date" data-field="occurrenceDate"></label>
+              <div class="panel-form__field">
+                狀態
+                <div class="entry-form__radio-group">
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> 已發展○</label>
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> 發展中△</label>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-field="occurrenceAbsent"> 請假／未執行（劃掉日期與說明）
-        </label>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-field="occurrenceCourseChanged"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
-        </label>
-        <label class="panel-form__field">說明內容 <input type="text" data-field="occurrenceNote"></label>
-        <button type="submit" class="btn btn--primary">新增</button>
-        <p class="field-error" data-error></p>
-      </form>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="occurrenceAbsent"> 請假／未執行（劃掉日期與說明）
+            </label>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="occurrenceCourseChanged"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
+            </label>
+            <label class="panel-form__field">說明內容 <input type="text" data-field="occurrenceNote"></label>
+            <button type="submit" class="btn btn--primary">新增</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+        fabLabel: '新增課程計畫項目',
+      })}
       <div class="domain-grid">
         ${domainGroups
           .map(([domainId, domainName, group], index) => {
@@ -245,6 +251,8 @@ export async function renderCoursePlanTab(
       </div>
     </div>
   `;
+
+  wireFormPopup(container);
 
   container.querySelector('[data-field="indicatorCode"]').addEventListener('change', event => {
     const indicator = getIndicator(event.target.value);

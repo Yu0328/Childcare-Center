@@ -766,6 +766,56 @@ button {
   }
 }
 
+/* ---------- Mobile add-form popup (FAB + dialog) ---------- */
+
+.form-popup {
+  border: none;
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: min(90vw, 420px);
+  max-height: 85vh;
+  overflow: auto;
+}
+.form-popup::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.form-popup__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .fab {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-size: 1.5rem;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(15, 23, 20, 0.3);
+    cursor: pointer;
+    z-index: 10;
+  }
+  .fab:active {
+    transform: scale(0.94);
+  }
+}
+
 /* ---------- Forms (add-child / add-form / entry-form) ---------- */
 
 .panel-form {

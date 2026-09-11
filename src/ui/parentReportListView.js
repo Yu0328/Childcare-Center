@@ -6,6 +6,7 @@ import { currentRocYear, periodSelectsHtml } from './periodFields.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { wireScrollShade } from './scrollShade.js';
 import { keepScroll } from './keepScroll.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 export async function renderParentReportListView(
   container,
@@ -41,29 +42,35 @@ export async function renderParentReportListView(
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-report">
-        <h3 class="panel-form__title">新增適性紀錄</h3>
-        <label class="panel-form__field">
-          月齡階段
-          <select data-field="tier">
-            ${TIERS.map(t => `<option value="${t.code}" ${t.code === suggested ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
-          </select>
-        </label>
-        <label class="panel-form__field">
-          紀錄年月
-          ${periodSelectsHtml({
-            yearFieldName: 'period-year',
-            monthFieldName: 'period-month',
-            selectedYear: defaultYear,
-            selectedMonth: defaultMonth,
-          })}
-        </label>
-        <button type="submit" class="btn btn--primary">新增</button>
-      </form>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form" data-action="add-report">
+            <h3 class="panel-form__title">新增適性紀錄</h3>
+            <label class="panel-form__field">
+              月齡階段
+              <select data-field="tier">
+                ${TIERS.map(t => `<option value="${t.code}" ${t.code === suggested ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
+              </select>
+            </label>
+            <label class="panel-form__field">
+              紀錄年月
+              ${periodSelectsHtml({
+                yearFieldName: 'period-year',
+                monthFieldName: 'period-month',
+                selectedYear: defaultYear,
+                selectedMonth: defaultMonth,
+              })}
+            </label>
+            <button type="submit" class="btn btn--primary">新增</button>
+          </form>
+        `,
+        fabLabel: '新增適性紀錄',
+      })}
     </div>
   `;
 
   wireScrollShade(container.querySelector('.card-list--rows'));
+  wireFormPopup(container);
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 

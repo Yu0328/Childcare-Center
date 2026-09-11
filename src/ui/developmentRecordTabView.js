@@ -4,6 +4,7 @@ import {
   listDevelopmentRecordEntriesForReport, deleteDevelopmentRecordEntry, updateDevelopmentRecordEntry,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 // "Ⅳ-2-4" -> 4 (the item number within its domain) — see courseplanTabView.js's identical helper
 // for why: sorts the reference checkboxes in the indicator picker's own order regardless of the
@@ -132,7 +133,9 @@ export async function renderDevelopmentRecordTab(
 
   container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form panel-form--wide" data-action="add-record">
+      ${formPopupMarkup({
+        formHtml: `
+        <form class="panel-form panel-form--wide" data-action="add-record">
         <h3 class="panel-form__title">新增段落</h3>
         <label class="panel-form__field">
           領域
@@ -147,7 +150,10 @@ export async function renderDevelopmentRecordTab(
         <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">新增</button>
         <p class="field-error" data-error></p>
-      </form>
+        </form>
+        `,
+        fabLabel: '新增段落',
+      })}
       <div class="domain-grid domain-grid--single">
         ${DOMAINS.filter(d => byDomain.has(d.id))
           .map((domain, index) => {
@@ -177,6 +183,8 @@ export async function renderDevelopmentRecordTab(
       </div>
     </div>
   `;
+
+  wireFormPopup(container);
 
   container.querySelector('[data-field="domain"]').addEventListener('change', event => {
     renderDevelopmentRecordTab(container, {

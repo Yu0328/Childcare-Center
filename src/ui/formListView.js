@@ -6,6 +6,7 @@ import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, combinedPeriod } from './periodFields.js';
 import { wireScrollShade } from './scrollShade.js';
 import { keepScroll } from './keepScroll.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 export async function renderFormListView(
   container,
@@ -42,41 +43,47 @@ export async function renderFormListView(
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-form">
-        <h3 class="panel-form__title">新增適性總表</h3>
-        <label class="panel-form__field">
-          月齡階段
-          <select data-field="tier">
-            ${TIERS.map(t => `<option value="${t.code}" ${t.code === suggested ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
-          </select>
-        </label>
-        <label class="panel-form__field">
-          紀錄年月
-          ${periodSelectsHtml({
-            yearFieldName: 'period-year',
-            monthFieldName: 'period-month',
-            selectedYear: defaultYear,
-            selectedMonth: defaultMonth,
-          })}
-        </label>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-field="period-is-range"> 涵蓋一段期間（跨多個月份）
-        </label>
-        <label class="panel-form__field" data-field-group="period-end" hidden>
-          至
-          ${periodSelectsHtml({
-            yearFieldName: 'period-end-year',
-            monthFieldName: 'period-end-month',
-            selectedYear: defaultYear,
-            selectedMonth: defaultMonth,
-          })}
-        </label>
-        <button type="submit" class="btn btn--primary">新增</button>
-      </form>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form" data-action="add-form">
+            <h3 class="panel-form__title">新增適性總表</h3>
+            <label class="panel-form__field">
+              月齡階段
+              <select data-field="tier">
+                ${TIERS.map(t => `<option value="${t.code}" ${t.code === suggested ? 'selected' : ''}>${t.code}（${t.label}）</option>`).join('')}
+              </select>
+            </label>
+            <label class="panel-form__field">
+              紀錄年月
+              ${periodSelectsHtml({
+                yearFieldName: 'period-year',
+                monthFieldName: 'period-month',
+                selectedYear: defaultYear,
+                selectedMonth: defaultMonth,
+              })}
+            </label>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="period-is-range"> 涵蓋一段期間（跨多個月份）
+            </label>
+            <label class="panel-form__field" data-field-group="period-end" hidden>
+              至
+              ${periodSelectsHtml({
+                yearFieldName: 'period-end-year',
+                monthFieldName: 'period-end-month',
+                selectedYear: defaultYear,
+                selectedMonth: defaultMonth,
+              })}
+            </label>
+            <button type="submit" class="btn btn--primary">新增</button>
+          </form>
+        `,
+        fabLabel: '新增適性總表',
+      })}
     </div>
   `;
 
   wireScrollShade(container.querySelector('.card-list--rows'));
+  wireFormPopup(container);
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
   container.querySelector('[data-action="aggregate"]').addEventListener('click', onAggregate);

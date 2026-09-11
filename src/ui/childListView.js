@@ -11,6 +11,7 @@ import { processImportQueue } from './importQueue.js';
 import { keepScroll } from './keepScroll.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 import { wireScrollShade } from './scrollShade.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 export async function renderChildListView(
   container,
@@ -71,19 +72,25 @@ export async function renderChildListView(
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-child">
-        <h3 class="panel-form__title">新增幼兒</h3>
-        <label class="panel-form__field">姓名 <input data-field="name" required></label>
-        <label class="panel-form__field">
-          出生日期
-          ${birthDateSelectsHtml({ yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' })}
-        </label>
-        <button type="submit" class="btn btn--primary">新增</button>
-      </form>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form" data-action="add-child">
+            <h3 class="panel-form__title">新增幼兒</h3>
+            <label class="panel-form__field">姓名 <input data-field="name" required></label>
+            <label class="panel-form__field">
+              出生日期
+              ${birthDateSelectsHtml({ yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' })}
+            </label>
+            <button type="submit" class="btn btn--primary">新增</button>
+          </form>
+        `,
+        fabLabel: '新增幼兒',
+      })}
     </div>
   `;
 
   wireScrollShade(container.querySelector('.card-list--rows'));
+  wireFormPopup(container);
 
   if (onBack) {
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);
