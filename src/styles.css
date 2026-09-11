@@ -777,9 +777,17 @@ button {
   /* The UA stylesheet gives every <dialog>, even a plain open-attribute one (not shown via
      showModal()), `position: absolute`, which pulls it out of the two-column .tab-layout grid it
      sits in on desktop and floats it centered over the whole grid — overlapping the list column
-     instead of sitting in its own cell. Forcing it back to a normal in-flow box fixes desktop;
-     mobile's showModal() promotes it to the top layer regardless of this CSS. */
-  position: static;
+     instead of sitting in its own cell. `relative` overrides that back to a normal in-flow box
+     (fixing desktop) while still anchoring .form-popup__close's `position: absolute` to this card
+     instead of the next positioned ancestor up the page — with `static` here (no positioning
+     context of its own) the close button escaped to the page header instead of sitting on the
+     card. mobile's showModal() promotes it to the top layer regardless of this CSS. */
+  position: relative;
+  /* <dialog>'s UA stylesheet also sets `width: fit-content`, sized to whatever's inside it — the
+     grid's default stretch (justify-self: auto → stretch) only kicks in for a width that resolves
+     to auto, so this fit-content default silently opts the card out of stretching to fill its grid
+     column, leaving it noticeably narrower than the plain, unwrapped <form> it replaced. */
+  width: auto;
   border: none;
   border-radius: 14px;
   padding: 0;
