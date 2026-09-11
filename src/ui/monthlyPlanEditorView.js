@@ -11,7 +11,7 @@ import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../dat
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
-import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, lockBodyScroll, unlockBodyScroll } from './formPopup.js';
+import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, wireFabDrag, lockBodyScroll, unlockBodyScroll } from './formPopup.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 import { downloadBlob } from '../export/downloadBlob.js';
 
@@ -207,7 +207,11 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     if (fab) fab.hidden = !selected;
   }
 
-  container.querySelector('[data-action="open-panel-popup"]')?.addEventListener('click', () => openPanelPopup());
+  const panelFab = container.querySelector('[data-action="open-panel-popup"]');
+  if (panelFab) {
+    wireFabDrag(panelFab);
+    panelFab.addEventListener('click', () => openPanelPopup());
+  }
 
   // Native `dblclick` is unreliable for a double-tap gesture on real mobile browsers (its timing
   // window is tighter and less consistent than what a finger tap actually produces), so double-tap

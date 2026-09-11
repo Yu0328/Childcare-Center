@@ -837,17 +837,20 @@ button {
     justify-content: center;
     border: none;
     border-radius: 50%;
-    /* Same flat brand color as .btn--primary (not a gradient), so the FAB reads as the same
-       button family as the rest of the app instead of a one-off visual treatment. */
-    background: var(--brand);
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(15, 23, 20, 0.35), 0 1px 3px rgba(15, 23, 20, 0.25);
+    /* Same soft tint as .btn--ghost/.btn--header (not the solid .btn--primary blue) — lighter so
+       the floating FAB reads as a gentle affordance sitting over content, not a loud solid block. */
+    background: var(--brand-tint);
+    color: var(--brand-dark);
+    box-shadow: 0 4px 14px rgba(15, 23, 20, 0.2), 0 1px 3px rgba(15, 23, 20, 0.15);
     cursor: pointer;
     z-index: 10;
+    /* Without this, a touch-drag on the FAB (see wireFabDrag in formPopup.js) fights the
+       browser's own touch-scroll gesture on the same swipe instead of just moving the button. */
+    touch-action: none;
     transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
   .fab:hover {
-    background: var(--brand-dark);
+    background: #cadff8;
   }
   .fab__icon {
     width: 38px;
@@ -909,7 +912,11 @@ fieldset.panel-form__field legend {
 .panel-form input,
 .panel-form select,
 .panel-form textarea {
-  font: inherit;
+  /* font-family only, not the old font: inherit — .panel-form__field's 0.9rem context (14.4px)
+     is below the ~16px threshold that makes mobile Safari/Chrome auto-zoom the page on focus,
+     and the zoom never resets afterward (same fix as .entry-form's fields below). */
+  font-family: inherit;
+  font-size: 1rem;
   padding: 0.55em 0.75em;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1426,7 +1433,12 @@ fieldset.panel-form__field.import-preview__child legend {
 .entry-form input:not([type="radio"]):not([type="checkbox"]),
 .entry-form select,
 .entry-form textarea {
-  font: inherit;
+  /* font-family only, not the old font: inherit — .entry-form__field's 0.85rem context (13.6px)
+     is below the ~16px threshold that makes mobile Safari/Chrome auto-zoom the page on focus,
+     and the zoom never resets afterward. Fixing font-size at 1rem keeps every text-entry field
+     at the body's 16px regardless of the smaller label text around it. */
+  font-family: inherit;
+  font-size: 1rem;
   padding: 0.55em 0.75em;
   border: 1px solid var(--border);
   border-radius: 10px;

@@ -24,6 +24,106 @@ export const fabIconHtml = () => `
   </svg>
 `;
 
+const FAB_POS_KEY = 'c-form-fab-pos';
+const FAB_DRAG_THRESHOLD = 6; // px of pointer movement before a press-and-hold counts as a drag, not a tap
+
+function clampFabPosition(fab, left, top) {
+  const margin = 4;
+  // offsetWidth/Height read 0 while the FAB is [hidden] (monthlyPlanEditorView's day-cell one
+  // starts that way) — fall back to its actual rendered size so a saved position isn't clamped
+  // as if the button were a single point.
+  const width = fab.offsetWidth || 64;
+  const height = fab.offsetHeight || 64;
+  const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - height - margin);
+  return {
+    left: Math.min(Math.max(left, margin), maxLeft),
+    top: Math.min(Math.max(top, margin), maxTop),
+  };
+}
+
+function applyFabPosition(fab, left, top) {
+  fab.style.left = `${left}px`;
+  fab.style.top = `${top}px`;
+  fab.style.right = 'auto';
+  fab.style.bottom = 'auto';
+}
+
+// Lets the user press-and-hold the "+" FAB and drag it wherever's most comfortable to reach
+// one-handed, instead of it being stuck at a fixed spot. Saved as a fraction of the viewport
+// (not raw px) so the same spot still makes sense after a device rotation or on a different
+// screen size, and shared by every FAB via one localStorage key so dragging it once on any
+// screen carries over to the rest.
+export function wireFabDrag(fab) {
+  const saved = localStorage.getItem(FAB_POS_KEY);
+  if (saved) {
+    try {
+      const { xFrac, yFrac } = JSON.parse(saved);
+      const { left, top } = clampFabPosition(fab, xFrac * window.innerWidth, yFrac * window.innerHeight);
+      applyFabPosition(fab, left, top);
+    } catch {
+      // malformed/legacy saved value — keep the CSS default position
+    }
+  }
+
+  let pointerId = null;
+  let dragging = false;
+  let justDragged = false;
+  let startX = 0;
+  let startY = 0;
+  let originLeft = 0;
+  let originTop = 0;
+
+  fab.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointerId = event.pointerId;
+    dragging = false;
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = fab.getBoundingClientRect();
+    originLeft = rect.left;
+    originTop = rect.top;
+  });
+
+  fab.addEventListener('pointermove', event => {
+    if (event.pointerId !== pointerId) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (!dragging) {
+      if (Math.hypot(dx, dy) < FAB_DRAG_THRESHOLD) return;
+      dragging = true;
+      fab.setPointerCapture(pointerId);
+    }
+    const { left, top } = clampFabPosition(fab, originLeft + dx, originTop + dy);
+    applyFabPosition(fab, left, top);
+  });
+
+  fab.addEventListener('pointerup', event => {
+    if (event.pointerId !== pointerId) return;
+    if (dragging) {
+      justDragged = true;
+      const rect = fab.getBoundingClientRect();
+      localStorage.setItem(FAB_POS_KEY, JSON.stringify({
+        xFrac: rect.left / window.innerWidth,
+        yFrac: rect.top / window.innerHeight,
+      }));
+    }
+    pointerId = null;
+    dragging = false;
+  });
+
+  // A drag ends with the same pointerup a tap would send, and the browser fires a click right
+  // after it regardless — swallow that one click so releasing a drag doesn't also open the popup.
+  // Registered before the open-popup click listener below so it always runs first.
+  fab.addEventListener('click', event => {
+    if (justDragged) {
+      justDragged = false;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+    }
+  });
+}
+
 export function formPopupMarkup({ formHtml, fabLabel }) {
   const mobile = isMobile();
   return `
@@ -41,10 +141,14 @@ export function wireFormPopup(container) {
   // replaced (e.g. a successful submit re-renders the whole container instead of closing the
   // dialog first) — clear any lock left over from that so scrolling doesn't stay stuck off.
   unlockBodyScroll();
-  container.querySelector('[data-action="open-form-popup"]')?.addEventListener('click', () => {
-    dialog.showModal();
-    lockBodyScroll();
-  });
+  const fab = container.querySelector('[data-action="open-form-popup"]');
+  if (fab) {
+    wireFabDrag(fab);
+    fab.addEventListener('click', () => {
+      dialog.showModal();
+      lockBodyScroll();
+    });
+  }
   container.querySelector('[data-action="close-form-popup"]')?.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => {
     if (event.target === dialog) dialog.close();
