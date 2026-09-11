@@ -774,11 +774,16 @@ button {
    how tall it grows before its own content scrolls, so a long form doesn't just get taller than
    the viewport. */
 .form-popup {
+  /* The UA stylesheet gives every <dialog>, even a plain open-attribute one (not shown via
+     showModal()), `position: absolute`, which pulls it out of the two-column .tab-layout grid it
+     sits in on desktop and floats it centered over the whole grid — overlapping the list column
+     instead of sitting in its own cell. Forcing it back to a normal in-flow box fixes desktop;
+     mobile's showModal() promotes it to the top layer regardless of this CSS. */
+  position: static;
   border: none;
   border-radius: 14px;
   padding: 0;
   background: transparent;
-  width: min(90vw, 420px);
   max-height: 85vh;
   overflow: auto;
 }
@@ -806,6 +811,13 @@ button {
 }
 
 @media (max-width: 640px) {
+  /* Only constrained to a centered popup width on mobile, where showModal() promotes the dialog
+     to the top layer as a floating overlay. On desktop .form-popup is a plain in-flow grid item
+     (see base rule above) and must stay unconstrained so it can stretch to fill its grid column. */
+  .form-popup {
+    width: min(90vw, 420px);
+  }
+
   .fab {
     position: fixed;
     right: 1rem;
@@ -1093,7 +1105,8 @@ fieldset.panel-form__field.import-preview__child legend {
   align-items: start;
 }
 
-.tab-layout > .panel-form {
+.tab-layout > .panel-form,
+.tab-layout > .form-popup {
   margin: 0;
   order: 2;
 }
@@ -1806,9 +1819,12 @@ fieldset.panel-form__field.import-preview__child legend {
    .panel-form__checkbox is used as a <label> wrapping a checkbox + name; previously unstyled, it
    fell back to bare browser flow (no spacing/border), which read as broken/unpolished next to the
    rest of this app's cards-and-pills visual language. */
+/* Grid, not flex-wrap: flex-wrap packs each pill to its own content width and left-aligns the
+   row, so shorter names leave a ragged strip of empty space on the right instead of filling it.
+   Grid columns stretch every pill to the same column width, filling the row evenly. */
 .panel-form__checkbox-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.5rem;
   padding: 0.15rem;
 }
@@ -1823,6 +1839,8 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--surface);
   font-size: 0.9rem;
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
