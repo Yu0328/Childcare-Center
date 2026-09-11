@@ -768,13 +768,24 @@ button {
 
 /* ---------- Mobile add-form popup (FAB + dialog) ---------- */
 
+/* No padding/background/border of its own — the .panel-form or .entry-form it wraps already
+   draws its own card (background/border/radius/padding), so this stays an invisible sizing/
+   scroll/backdrop shell instead of double-boxing it inside a second white card. max-height caps
+   how tall it grows before its own content scrolls, so a long form doesn't just get taller than
+   the viewport. */
 .form-popup {
   border: none;
   border-radius: 14px;
-  padding: 1.5rem;
+  padding: 0;
+  background: transparent;
   width: min(90vw, 420px);
   max-height: 85vh;
   overflow: auto;
+}
+
+.form-popup > .panel-form,
+.form-popup > .entry-form {
+  margin: 0;
 }
 .form-popup::backdrop {
   background: rgba(0, 0, 0, 0.4);

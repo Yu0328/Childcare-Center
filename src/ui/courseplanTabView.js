@@ -4,7 +4,7 @@ import {
   addCourseOccurrence, listCourseOccurrencesForEntry, deleteCourseOccurrence, updateCourseOccurrence,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
-import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 
 // Which domain <details> cards are open persists across renders keyed by report.id, since
 // renderCoursePlanTab's own `container` is a brand-new, empty element on every call — its parent
@@ -112,28 +112,30 @@ function entryCard(entry, indicator, occurrences, tier) {
       </div>
       <ul class="entry-list">${occurrences.map(occurrenceRow).join('')}</ul>
       <button type="button" class="btn btn--outline btn--small" data-add-occurrence-for="${escapeHtml(entry.id)}">＋ 新增實施紀錄</button>
-      <div class="entry-form" data-occurrence-form-for="${escapeHtml(entry.id)}" hidden>
-        <label class="entry-form__field">日期 <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
-        <div class="entry-form__radio-group">
-          <label class="entry-form__radio">
-            <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> 已發展○
+      ${nestedEntryFormDialog(`
+        <div class="entry-form" data-occurrence-form-for="${escapeHtml(entry.id)}">
+          <label class="entry-form__field">日期 <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
+          <div class="entry-form__radio-group">
+            <label class="entry-form__radio">
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> 已發展○
+            </label>
+            <label class="entry-form__radio">
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> 發展中△
+            </label>
+          </div>
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-occurrence-field="absent" data-entry-id="${escapeHtml(entry.id)}"> 請假／未執行（劃掉日期與說明）
           </label>
-          <label class="entry-form__radio">
-            <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> 發展中△
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
           </label>
+          <input type="text" class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="說明">
+          <div class="entry-form__actions">
+            <button type="button" class="btn btn--primary btn--small" data-occurrence-save-for="${escapeHtml(entry.id)}">儲存</button>
+          </div>
+          <p class="field-error" data-error></p>
         </div>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-occurrence-field="absent" data-entry-id="${escapeHtml(entry.id)}"> 請假／未執行（劃掉日期與說明）
-        </label>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
-        </label>
-        <input type="text" class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="說明">
-        <div class="entry-form__actions">
-          <button type="button" class="btn btn--primary btn--small" data-occurrence-save-for="${escapeHtml(entry.id)}">儲存</button>
-        </div>
-        <p class="field-error" data-error></p>
-      </div>
+      `)}
     </div>
   `;
 }
@@ -340,10 +342,10 @@ export async function renderCoursePlanTab(
       }
     });
 
-    container.querySelector(`[data-add-occurrence-for="${entry.id}"]`).addEventListener('click', () => {
-      const form = container.querySelector(`[data-occurrence-form-for="${entry.id}"]`);
-      form.hidden = !form.hidden;
-    });
+    wireNestedEntryForm(
+      container.querySelector(`[data-add-occurrence-for="${entry.id}"]`),
+      container.querySelector(`[data-occurrence-form-for="${entry.id}"]`)
+    );
 
     wireAbsentCourseChangedExclusion(
       container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`),
