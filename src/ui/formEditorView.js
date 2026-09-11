@@ -74,7 +74,7 @@ function indicatorBlock(indicator, entries) {
     <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}">
       <label class="entry-form__field">日期 <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
       ${statusRadios(indicator.code, { fieldAttr: 'entry-field', idAttr: 'indicator-code', checkedStatus: 'developed' })}
-      <input type="text" class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="觀察敘述">
+      <textarea class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="觀察敘述"></textarea>
       <div class="entry-form__actions">
         <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">儲存</button>
       </div>

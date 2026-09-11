@@ -129,7 +129,7 @@ function entryCard(entry, indicator, occurrences, tier) {
           <label class="entry-form__checkbox">
             <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
           </label>
-          <input type="text" class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="說明">
+          <textarea class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="說明"></textarea>
           <div class="entry-form__actions">
             <button type="button" class="btn btn--primary btn--small" data-occurrence-save-for="${escapeHtml(entry.id)}">儲存</button>
           </div>

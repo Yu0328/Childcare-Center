@@ -1390,7 +1390,15 @@ fieldset.panel-form__field.import-preview__child legend {
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
 }
 
-.entry-form textarea {
+/* Grows downward to fit whatever's typed instead of scrolling inside a fixed-size box — the
+   .form-popup dialog wrapping these on mobile already caps overall height at 85vh with its own
+   scroll (see .form-popup above), so a long note expands the popup first and only scrolls once
+   that cap is hit. resize:vertical stays as a manual fallback for browsers without field-sizing
+   support (Safari, as of this writing) — harmless no-op once field-sizing takes over sizing. */
+.entry-form textarea,
+.panel-form textarea {
+  field-sizing: content;
+  max-height: none;
   resize: vertical;
 }
 
