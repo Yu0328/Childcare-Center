@@ -36,7 +36,7 @@ export async function renderParentReportListView(
                   <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="刪除${escapeHtml(report.tier)} ${escapeHtml(report.period)}">×</button>
                 </li>`
             )
-            .join('') || '<li class="card-list__empty">目前還沒有適性紀錄，請在右側新增</li>'}
+            .join('') || '<li class="card-list__empty">目前還沒有適性紀錄，請在「新增適性紀錄」表單新增</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>

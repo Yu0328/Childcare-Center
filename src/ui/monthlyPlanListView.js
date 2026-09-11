@@ -45,7 +45,7 @@ export async function renderMonthlyPlanListView(
                   <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="刪除${escapeHtml(plan.period)}的課程月計畫">×</button>
                 </li>`
             )
-            .join('') || '<li class="card-list__empty">目前還沒有課程月計畫，請在右側新增</li>'}
+            .join('') || '<li class="card-list__empty">目前還沒有課程月計畫，請在「新增課程月計畫」表單新增</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
