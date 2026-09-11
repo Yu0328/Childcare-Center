@@ -764,6 +764,116 @@ button {
   transform: scale(0.9);
 }
 
+/* Expands the tappable area to ~44px (the usual mobile touch-target minimum) without growing the
+   visible circle itself — a ::before on this already-positioned (absolute) button is a valid
+   offset parent, so it can hang outside the button's own box and still count as part of it for
+   click purposes. Desktop leaves the button at its plain 26px hit area since mouse pointers don't
+   need the extra margin. */
+@media (max-width: 640px) {
+  .card-list__delete::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+    border-radius: 50%;
+  }
+}
+
+/* ---------- Mobile add-form popup (FAB + dialog) ---------- */
+
+/* No padding/background/border of its own — the .panel-form or .entry-form it wraps already
+   draws its own card (background/border/radius/padding), so this stays an invisible sizing/
+   scroll/backdrop shell instead of double-boxing it inside a second white card. max-height caps
+   how tall it grows before its own content scrolls, so a long form doesn't just get taller than
+   the viewport. */
+.form-popup {
+  /* The UA stylesheet gives every <dialog>, even a plain open-attribute one (not shown via
+     showModal()), `position: absolute`, which pulls it out of the two-column .tab-layout grid it
+     sits in on desktop and floats it centered over the whole grid — overlapping the list column
+     instead of sitting in its own cell. `relative` overrides that back to a normal in-flow box
+     (fixing desktop) while still anchoring .form-popup__close's `position: absolute` to this card
+     instead of the next positioned ancestor up the page — with `static` here (no positioning
+     context of its own) the close button escaped to the page header instead of sitting on the
+     card. mobile's showModal() promotes it to the top layer regardless of this CSS. */
+  position: relative;
+  /* <dialog>'s UA stylesheet also sets `width: fit-content`, sized to whatever's inside it — the
+     grid's default stretch (justify-self: auto → stretch) only kicks in for a width that resolves
+     to auto, so this fit-content default silently opts the card out of stretching to fill its grid
+     column, leaving it noticeably narrower than the plain, unwrapped <form> it replaced. */
+  width: auto;
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  background: transparent;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.form-popup > .panel-form,
+.form-popup > .entry-form {
+  margin: 0;
+}
+.form-popup::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.form-popup__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  /* Only constrained to a centered popup width on mobile, where showModal() promotes the dialog
+     to the top layer as a floating overlay. On desktop .form-popup is a plain in-flow grid item
+     (see base rule above) and must stay unconstrained so it can stretch to fill its grid column. */
+  .form-popup {
+    width: min(90vw, 420px);
+  }
+
+  .fab {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    /* Same flat brand color as .btn--primary (not a gradient), so the FAB reads as the same
+       button family as the rest of the app instead of a one-off visual treatment. */
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(15, 23, 20, 0.35), 0 1px 3px rgba(15, 23, 20, 0.25);
+    cursor: pointer;
+    z-index: 10;
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .fab:hover {
+    background: var(--brand-dark);
+  }
+  .fab__icon {
+    width: 38px;
+    height: 38px;
+  }
+  .fab:active {
+    transform: scale(0.94);
+    box-shadow: 0 2px 8px rgba(15, 23, 20, 0.3);
+  }
+  .fab[hidden] {
+    display: none;
+  }
+}
+
 /* ---------- Forms (add-child / add-form / entry-form) ---------- */
 
 .panel-form {
@@ -1015,7 +1125,8 @@ fieldset.panel-form__field.import-preview__child legend {
   align-items: start;
 }
 
-.tab-layout > .panel-form {
+.tab-layout > .panel-form,
+.tab-layout > .form-popup {
   margin: 0;
   order: 2;
 }
@@ -1327,7 +1438,15 @@ fieldset.panel-form__field.import-preview__child legend {
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
 }
 
-.entry-form textarea {
+/* Grows downward to fit whatever's typed instead of scrolling inside a fixed-size box — the
+   .form-popup dialog wrapping these on mobile already caps overall height at 85vh with its own
+   scroll (see .form-popup above), so a long note expands the popup first and only scrolls once
+   that cap is hit. resize:vertical stays as a manual fallback for browsers without field-sizing
+   support (Safari, as of this writing) — harmless no-op once field-sizing takes over sizing. */
+.entry-form textarea,
+.panel-form textarea {
+  field-sizing: content;
+  max-height: none;
   resize: vertical;
 }
 
@@ -1706,18 +1825,31 @@ fieldset.panel-form__field.import-preview__child legend {
     order: -1;
     flex-basis: 100%;
   }
+
+  /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
+     viewport's bottom edge. #app's default 4rem (64px) bottom padding leaves the last calendar
+     row's bottom 16px sitting under it once scrolled to the end; bump the reserved space here so
+     the FAB never sits on top of a real day cell. */
+  #app:has(.monthly-calendar-list) {
+    padding-bottom: 6rem;
+  }
 }
 
 /* ---------- Checkbox lists (課程月計畫's child-selection: create form + 管理小朋友) ----------
    .panel-form__checkbox is used as a <label> wrapping a checkbox + name; previously unstyled, it
    fell back to bare browser flow (no spacing/border), which read as broken/unpolished next to the
    rest of this app's cards-and-pills visual language. */
+/* Grid, not flex-wrap: flex-wrap packs each pill to its own content width and left-aligns the
+   row, so shorter names leave a ragged strip of empty space on the right instead of filling it.
+   Grid columns stretch every pill to the same column width, filling the row evenly.
+   120px (not e.g. 140px): the narrowest place this list appears is the 新增課程月計畫 popup,
+   capped at .tab-layout's generic 340px column — a 140px minimum left just ~2px too little
+   room for a second column there, silently collapsing it to one. 120px fits two columns
+   comfortably in that same width without touching the popup's own size. */
 .panel-form__checkbox-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 0.5rem;
-  max-height: 260px;
-  overflow-y: auto;
   padding: 0.15rem;
 }
 
@@ -1731,6 +1863,8 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--surface);
   font-size: 0.9rem;
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
@@ -1823,6 +1957,18 @@ fieldset.panel-form__field.import-preview__child legend {
   gap: 1rem;
 }
 
+/* .panel-form's own margin:0 auto (sized for a standalone centered page) is the actual cause of the
+   old shift bug: auto margins on a flex item opt it out of the sidebar's default stretch behavior,
+   so it shrink-wraps to its own content's max-content width and re-centers within the column —
+   visibly resizing/shifting sideways as content changes (e.g. the empty "點選左側的日期格子" panel
+   vs. a cell's full edit form). Dropping the auto margin restores stretch, so the card always fills
+   the column's actual width instead of its own content width; max-width still caps how wide that can
+   get, matching the original standalone-page sizing, without reintroducing the resize/shift bug. */
+.monthly-plan-side > .panel-form {
+  max-width: 420px;
+  margin: 0;
+}
+
 .monthly-calendar-list {
   display: flex;
   flex-direction: column;
@@ -1873,6 +2019,9 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--page-bg);
   cursor: pointer;
   min-height: 3.5rem;
+  /* Without this, mobile Safari/Chrome treat a second tap within the double-tap window as a
+     zoom gesture instead of firing dblclick, since the viewport meta doesn't disable zoom. */
+  touch-action: manipulation;
   /* Grid items default to min-width: auto, which lets long unbroken indicator text push the
      cell wider than its track instead of wrapping — this is what caused the crushed/overflowing
      layout. min-width: 0 lets the wrap rules below actually take effect. */
@@ -6058,7 +6207,9 @@ var CFormApp = (() => {
   }
 
   // src/ui/keepScroll.js
+  var isMobile = () => typeof matchMedia === "function" && matchMedia("(max-width: 640px)").matches;
   function keepScroll(rerender) {
+    if (isMobile()) document.activeElement?.blur();
     const y = window.scrollY;
     return Promise.resolve(rerender()).then((result) => {
       window.scrollTo(0, y);
@@ -6104,6 +6255,57 @@ var CFormApp = (() => {
     if (typeof ResizeObserver !== "undefined") new ResizeObserver(update).observe(el);
   }
 
+  // src/ui/formPopup.js
+  var MOBILE_QUERY = "(max-width: 640px)";
+  var isMobile2 = () => typeof matchMedia === "function" && matchMedia(MOBILE_QUERY).matches;
+  var fabIconHtml = () => `
+  <svg class="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" focusable="false">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+`;
+  function formPopupMarkup({ formHtml, fabLabel }) {
+    const mobile = isMobile2();
+    return `
+    <dialog class="form-popup" ${mobile ? "" : "open"}>
+      <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="\u95DC\u9589">\xD7</button>
+      ${formHtml}
+    </dialog>
+    ${mobile ? `<button type="button" class="fab" data-action="open-form-popup" aria-label="${fabLabel}">${fabIconHtml()}</button>` : ""}
+  `;
+  }
+  function wireFormPopup(container) {
+    const dialog = container.querySelector(".form-popup");
+    container.querySelector('[data-action="open-form-popup"]')?.addEventListener("click", () => dialog.showModal());
+    container.querySelector('[data-action="close-form-popup"]')?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+  function wireNestedEntryForm(trigger, entryForm) {
+    const dialog = entryForm.closest("dialog.form-popup");
+    if (!dialog) {
+      entryForm.hidden = true;
+      trigger.addEventListener("click", () => {
+        entryForm.hidden = !entryForm.hidden;
+      });
+      return;
+    }
+    trigger.addEventListener("click", () => dialog.showModal());
+    dialog.querySelector('[data-action="close-form-popup"]').addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+  function nestedEntryFormDialog(entryFormHtml) {
+    if (!isMobile2()) return entryFormHtml;
+    return `
+    <dialog class="form-popup">
+      <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="\u95DC\u9589">\xD7</button>
+      ${entryFormHtml}
+    </dialog>
+  `;
+  }
+
   // src/ui/childListView.js
   async function renderChildListView(container, { onSelectChild, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false, onBack, reportType }) {
     const children = (await listChildren()).sort(
@@ -6140,22 +6342,28 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="\u522A\u9664${escapeHtml(child.name)}">\xD7</button>
                 </li>`;
-    }).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u5E7C\u5152\u8CC7\u6599\uFF0C\u8ACB\u5728\u53F3\u5074\u300C\u65B0\u589E\u5E7C\u5152\u300D\u65B0\u589E</li>'}
+    }).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u5E7C\u5152\u8CC7\u6599\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u5E7C\u5152\u300D\u8868\u55AE\u65B0\u589E</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-child">
-        <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
-        <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
-        <label class="panel-form__field">
-          \u51FA\u751F\u65E5\u671F
-          ${birthDateSelectsHtml({ yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" })}
-        </label>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-      </form>
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-child">
+            <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
+            <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
+            <label class="panel-form__field">
+              \u51FA\u751F\u65E5\u671F
+              ${birthDateSelectsHtml({ yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" })}
+            </label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u5E7C\u5152"
+    })}
     </div>
   `;
     wireScrollShade(container.querySelector(".card-list--rows"));
+    wireFormPopup(container);
     if (onBack) {
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     }
@@ -6259,44 +6467,50 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="\u522A\u9664${escapeHtml(form.tier)} ${escapeHtml(form.period)}">\xD7</button>
                 </li>`
-    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7E3D\u8868\uFF0C\u8ACB\u5728\u53F3\u5074\u65B0\u589E\uFF0C\u6216\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</li>'}
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7E3D\u8868\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u9069\u6027\u7E3D\u8868\u300D\u8868\u55AE\u65B0\u589E\uFF0C\u6216\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-form">
-        <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7E3D\u8868</h3>
-        <label class="panel-form__field">
-          \u6708\u9F61\u968E\u6BB5
-          <select data-field="tier">
-            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-          </select>
-        </label>
-        <label class="panel-form__field">
-          \u7D00\u9304\u5E74\u6708
-          ${periodSelectsHtml({
-      yearFieldName: "period-year",
-      monthFieldName: "period-month",
-      selectedYear: defaultYear,
-      selectedMonth: defaultMonth
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-form">
+            <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7E3D\u8868</h3>
+            <label class="panel-form__field">
+              \u6708\u9F61\u968E\u6BB5
+              <select data-field="tier">
+                ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+              </select>
+            </label>
+            <label class="panel-form__field">
+              \u7D00\u9304\u5E74\u6708
+              ${periodSelectsHtml({
+        yearFieldName: "period-year",
+        monthFieldName: "period-month",
+        selectedYear: defaultYear,
+        selectedMonth: defaultMonth
+      })}
+            </label>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
+            </label>
+            <label class="panel-form__field" data-field-group="period-end" hidden>
+              \u81F3
+              ${periodSelectsHtml({
+        yearFieldName: "period-end-year",
+        monthFieldName: "period-end-month",
+        selectedYear: defaultYear,
+        selectedMonth: defaultMonth
+      })}
+            </label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u9069\u6027\u7E3D\u8868"
     })}
-        </label>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
-        </label>
-        <label class="panel-form__field" data-field-group="period-end" hidden>
-          \u81F3
-          ${periodSelectsHtml({
-      yearFieldName: "period-end-year",
-      monthFieldName: "period-end-month",
-      selectedYear: defaultYear,
-      selectedMonth: defaultMonth
-    })}
-        </label>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-      </form>
     </div>
   `;
     wireScrollShade(container.querySelector(".card-list--rows"));
+    wireFormPopup(container);
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     container.querySelector('[data-action="aggregate"]').addEventListener("click", onAggregate);
     container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
@@ -6331,7 +6545,7 @@ var CFormApp = (() => {
       }
       try {
         await addForm({ childId: child.id, tier, period });
-        await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
+        await keepScroll(() => renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete }));
       } catch (err) {
         const form = container.querySelector('[data-action="add-form"]');
         let errorEl = form.querySelector("[data-error]");
@@ -25832,20 +26046,23 @@ var CFormApp = (() => {
   `;
   }
   function indicatorBlock(indicator, entries) {
+    const addEntryFormHtml = `
+    <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}">
+      <label class="entry-form__field">\u65E5\u671F <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
+      ${statusRadios(indicator.code, { fieldAttr: "entry-field", idAttr: "indicator-code", checkedStatus: "developed" })}
+      <textarea class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="\u89C0\u5BDF\u6558\u8FF0"></textarea>
+      <div class="entry-form__actions">
+        <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">\u5132\u5B58</button>
+      </div>
+      <p class="field-error" data-error></p>
+    </div>
+  `;
     return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(indicator.code)}">
       <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(indicator.code)}</span>${escapeHtml(indicator.description)}</h4>
       <ul class="entry-list">${entries.map(entryRow2).join("")}</ul>
       <button type="button" class="btn btn--outline btn--small" data-add-entry-for="${escapeHtml(indicator.code)}">\uFF0B \u65B0\u589E\u89C0\u5BDF\u7D00\u9304</button>
-      <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}" hidden>
-        <label class="entry-form__field">\u65E5\u671F <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
-        ${statusRadios(indicator.code, { fieldAttr: "entry-field", idAttr: "indicator-code", checkedStatus: "developed" })}
-        <input type="text" class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="\u89C0\u5BDF\u6558\u8FF0">
-        <div class="entry-form__actions">
-          <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">\u5132\u5B58</button>
-        </div>
-        <p class="field-error" data-error></p>
-      </div>
+      ${nestedEntryFormDialog(addEntryFormHtml)}
     </div>
   `;
   }
@@ -26022,10 +26239,10 @@ var CFormApp = (() => {
       });
     }
     for (const indicator of indicators) {
-      container.querySelector(`[data-add-entry-for="${indicator.code}"]`).addEventListener("click", () => {
-        const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
-        entryForm.hidden = !entryForm.hidden;
-      });
+      wireNestedEntryForm(
+        container.querySelector(`[data-add-entry-for="${indicator.code}"]`),
+        container.querySelector(`[data-entry-form-for="${indicator.code}"]`)
+      );
       container.querySelector(`[data-entry-save-for="${indicator.code}"]`).addEventListener("click", async () => {
         const date = container.querySelector(`[data-entry-field="date"][data-indicator-code="${indicator.code}"]`).value;
         const radios = container.querySelectorAll(`input[name="status-${escapeHtml(indicator.code)}"]`);
@@ -26656,32 +26873,38 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-report="${escapeHtml(report.id)}" aria-label="\u522A\u9664${escapeHtml(report.tier)} ${escapeHtml(report.period)}">\xD7</button>
                 </li>`
-    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7D00\u9304\uFF0C\u8ACB\u5728\u53F3\u5074\u65B0\u589E</li>'}
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7D00\u9304\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u9069\u6027\u7D00\u9304\u300D\u8868\u55AE\u65B0\u589E</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-report">
-        <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7D00\u9304</h3>
-        <label class="panel-form__field">
-          \u6708\u9F61\u968E\u6BB5
-          <select data-field="tier">
-            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-          </select>
-        </label>
-        <label class="panel-form__field">
-          \u7D00\u9304\u5E74\u6708
-          ${periodSelectsHtml({
-      yearFieldName: "period-year",
-      monthFieldName: "period-month",
-      selectedYear: defaultYear,
-      selectedMonth: defaultMonth
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-report">
+            <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7D00\u9304</h3>
+            <label class="panel-form__field">
+              \u6708\u9F61\u968E\u6BB5
+              <select data-field="tier">
+                ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+              </select>
+            </label>
+            <label class="panel-form__field">
+              \u7D00\u9304\u5E74\u6708
+              ${periodSelectsHtml({
+        yearFieldName: "period-year",
+        monthFieldName: "period-month",
+        selectedYear: defaultYear,
+        selectedMonth: defaultMonth
+      })}
+            </label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u9069\u6027\u7D00\u9304"
     })}
-        </label>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-      </form>
     </div>
   `;
     wireScrollShade(container.querySelector(".card-list--rows"));
+    wireFormPopup(container);
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     for (const report of reports) {
       container.querySelector(`[data-report-id="${report.id}"]`).addEventListener("click", () => onSelectReport(report));
@@ -26705,7 +26928,7 @@ var CFormApp = (() => {
       const period = `${year}\u5E74${month}\u6708`;
       try {
         await addParentReport({ childId: child.id, tier, period });
-        await renderParentReportListView(container, { child, onSelectReport, onBack, confirmDelete });
+        await keepScroll(() => renderParentReportListView(container, { child, onSelectReport, onBack, confirmDelete }));
       } catch (err) {
         const form = container.querySelector('[data-action="add-report"]');
         let errorEl = form.querySelector("[data-error]");
@@ -27216,28 +27439,30 @@ var CFormApp = (() => {
       </div>
       <ul class="entry-list">${occurrences.map(occurrenceRow).join("")}</ul>
       <button type="button" class="btn btn--outline btn--small" data-add-occurrence-for="${escapeHtml(entry.id)}">\uFF0B \u65B0\u589E\u5BE6\u65BD\u7D00\u9304</button>
-      <div class="entry-form" data-occurrence-form-for="${escapeHtml(entry.id)}" hidden>
-        <label class="entry-form__field">\u65E5\u671F <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
-        <div class="entry-form__radio-group">
-          <label class="entry-form__radio">
-            <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> \u5DF2\u767C\u5C55\u25CB
+      ${nestedEntryFormDialog(`
+        <div class="entry-form" data-occurrence-form-for="${escapeHtml(entry.id)}">
+          <label class="entry-form__field">\u65E5\u671F <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
+          <div class="entry-form__radio-group">
+            <label class="entry-form__radio">
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> \u5DF2\u767C\u5C55\u25CB
+            </label>
+            <label class="entry-form__radio">
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> \u767C\u5C55\u4E2D\u25B3
+            </label>
+          </div>
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-occurrence-field="absent" data-entry-id="${escapeHtml(entry.id)}"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
           </label>
-          <label class="entry-form__radio">
-            <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> \u767C\u5C55\u4E2D\u25B3
+          <label class="entry-form__checkbox">
+            <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
           </label>
+          <textarea class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="\u8AAA\u660E"></textarea>
+          <div class="entry-form__actions">
+            <button type="button" class="btn btn--primary btn--small" data-occurrence-save-for="${escapeHtml(entry.id)}">\u5132\u5B58</button>
+          </div>
+          <p class="field-error" data-error></p>
         </div>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-occurrence-field="absent" data-entry-id="${escapeHtml(entry.id)}"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
-        </label>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-occurrence-field="courseChanged" data-entry-id="${escapeHtml(entry.id)}"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
-        </label>
-        <input type="text" class="entry-form__note" data-occurrence-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="\u8AAA\u660E">
-        <div class="entry-form__actions">
-          <button type="button" class="btn btn--primary btn--small" data-occurrence-save-for="${escapeHtml(entry.id)}">\u5132\u5B58</button>
-        </div>
-        <p class="field-error" data-error></p>
-      </div>
+      `)}
     </div>
   `;
   }
@@ -27281,34 +27506,39 @@ var CFormApp = (() => {
     const defaultIndicator = getIndicatorsForTier(report.tier)[0] || null;
     container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form panel-form--wide" data-action="add-entry">
-        <h3 class="panel-form__title">\u65B0\u589E\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE</h3>
-        <label class="panel-form__field">
-          \u6307\u6A19
-          <select data-field="indicatorCode">${indicatorOptionsHtml(report.tier)}</select>
-        </label>
-        <label class="panel-form__field">\u6D3B\u52D5\u540D\u7A31 <input data-field="activityName" required value="${escapeHtml(defaultIndicator ? defaultIndicator.activityName : "")}"></label>
-        <label class="panel-form__field">\u80FD\u529B\u6307\u6A19\u5167\u5BB9 <textarea data-field="indicatorText" rows="3">${escapeHtml(defaultIndicator ? defaultIndicator.description : "")}</textarea></label>
-        <div class="panel-form__row">
-          <label class="panel-form__field">\u65E5\u671F <input type="date" data-field="occurrenceDate"></label>
-          <div class="panel-form__field">
-            \u72C0\u614B
-            <div class="entry-form__radio-group">
-              <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> \u5DF2\u767C\u5C55\u25CB</label>
-              <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> \u767C\u5C55\u4E2D\u25B3</label>
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form panel-form--wide" data-action="add-entry">
+            <h3 class="panel-form__title">\u65B0\u589E\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE</h3>
+            <label class="panel-form__field">
+              \u6307\u6A19
+              <select data-field="indicatorCode">${indicatorOptionsHtml(report.tier)}</select>
+            </label>
+            <label class="panel-form__field">\u6D3B\u52D5\u540D\u7A31 <input data-field="activityName" required value="${escapeHtml(defaultIndicator ? defaultIndicator.activityName : "")}"></label>
+            <label class="panel-form__field">\u80FD\u529B\u6307\u6A19\u5167\u5BB9 <textarea data-field="indicatorText" rows="3">${escapeHtml(defaultIndicator ? defaultIndicator.description : "")}</textarea></label>
+            <div class="panel-form__row">
+              <label class="panel-form__field">\u65E5\u671F <input type="date" data-field="occurrenceDate"></label>
+              <div class="panel-form__field">
+                \u72C0\u614B
+                <div class="entry-form__radio-group">
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> \u5DF2\u767C\u5C55\u25CB</label>
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> \u767C\u5C55\u4E2D\u25B3</label>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-field="occurrenceAbsent"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
-        </label>
-        <label class="entry-form__checkbox">
-          <input type="checkbox" data-field="occurrenceCourseChanged"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
-        </label>
-        <label class="panel-form__field">\u8AAA\u660E\u5167\u5BB9 <input type="text" data-field="occurrenceNote"></label>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-        <p class="field-error" data-error></p>
-      </form>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="occurrenceAbsent"> \u8ACB\u5047\uFF0F\u672A\u57F7\u884C\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF09
+            </label>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="occurrenceCourseChanged"> \u66F4\u63DB\u8AB2\u7A0B\uFF08\u5283\u6389\u65E5\u671F\u8207\u8AAA\u660E\uFF0C\u8ACB\u65BC\u4E0B\u65B9\u8AAA\u660E\u6B04\u63CF\u8FF0\u66F4\u63DB\u5F8C\u7684\u6D3B\u52D5\u5167\u5BB9\uFF09
+            </label>
+            <label class="panel-form__field">\u8AAA\u660E\u5167\u5BB9 <input type="text" data-field="occurrenceNote"></label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE"
+    })}
       <div class="domain-grid">
         ${domainGroups.map(([domainId, domainName, group], index) => {
       const isOpen = isFirstRenderForReport ? index === 0 : openDomains.has(String(domainId));
@@ -27324,6 +27554,7 @@ var CFormApp = (() => {
       </div>
     </div>
   `;
+    wireFormPopup(container);
     container.querySelector('[data-field="indicatorCode"]').addEventListener("change", (event) => {
       const indicator = getIndicator(event.target.value);
       if (!indicator) return;
@@ -27393,10 +27624,10 @@ var CFormApp = (() => {
           container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`).textContent = "\u66F4\u65B0\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
         }
       });
-      container.querySelector(`[data-add-occurrence-for="${entry.id}"]`).addEventListener("click", () => {
-        const form = container.querySelector(`[data-occurrence-form-for="${entry.id}"]`);
-        form.hidden = !form.hidden;
-      });
+      wireNestedEntryForm(
+        container.querySelector(`[data-add-occurrence-for="${entry.id}"]`),
+        container.querySelector(`[data-occurrence-form-for="${entry.id}"]`)
+      );
       wireAbsentCourseChangedExclusion(
         container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`),
         container.querySelector(`[data-occurrence-field="courseChanged"][data-entry-id="${entry.id}"]`),
@@ -27551,7 +27782,9 @@ var CFormApp = (() => {
     const hadPreviousRender = previousDomainCards.length > 0;
     container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form panel-form--wide" data-action="add-record">
+      ${formPopupMarkup({
+      formHtml: `
+        <form class="panel-form panel-form--wide" data-action="add-record">
         <h3 class="panel-form__title">\u65B0\u589E\u6BB5\u843D</h3>
         <label class="panel-form__field">
           \u9818\u57DF
@@ -27566,7 +27799,10 @@ var CFormApp = (() => {
         <label class="panel-form__field">\u6558\u8FF0 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
         <p class="field-error" data-error></p>
-      </form>
+        </form>
+        `,
+      fabLabel: "\u65B0\u589E\u6BB5\u843D"
+    })}
       <div class="domain-grid domain-grid--single">
         ${DOMAINS.filter((d) => byDomain.has(d.id)).map((domain, index) => {
       const isOpen = hadPreviousRender ? previousOpenDomains.has(String(domain.id)) : index === 0;
@@ -27591,6 +27827,7 @@ var CFormApp = (() => {
       </div>
     </div>
   `;
+    wireFormPopup(container);
     container.querySelector('[data-field="domain"]').addEventListener("change", (event) => {
       renderDevelopmentRecordTab(container, {
         report,
@@ -27695,16 +27932,22 @@ var CFormApp = (() => {
     const observations = await listBehaviorObservationsForReport(report.id);
     container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form" data-action="add-observation">
-        <h3 class="panel-form__title">\u65B0\u589E\u884C\u70BA\u89C0\u5BDF</h3>
-        <label class="panel-form__field">\u6A19\u984C <input data-field="title"></label>
-        <label class="panel-form__field">\u6558\u8FF0 <textarea data-field="narrative" required></textarea></label>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-        <p class="field-error" data-error></p>
-      </form>
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-observation">
+            <h3 class="panel-form__title">\u65B0\u589E\u884C\u70BA\u89C0\u5BDF</h3>
+            <label class="panel-form__field">\u6A19\u984C <input data-field="title"></label>
+            <label class="panel-form__field">\u6558\u8FF0 <textarea data-field="narrative" required></textarea></label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u884C\u70BA\u89C0\u5BDF"
+    })}
       <div class="entry-list-wrap">${observations.map(observationCard).join("")}</div>
     </div>
   `;
+    wireFormPopup(container);
     container.querySelector('[data-action="add-observation"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const title = container.querySelector('[data-field="title"]').value;
@@ -27810,26 +28053,32 @@ var CFormApp = (() => {
     const pendingPhotos = [null, null, null];
     container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form" data-action="add-highlight">
-        <h3 class="panel-form__title">\u65B0\u589E\u9EDE\u6EF4\u5206\u4EAB</h3>
-        <div class="highlight-upload-grid">
-          ${[0, 1, 2].map(
-      (i) => `
-                <label class="highlight-upload-slot" data-drop-slot="${i}">
-                  <span class="highlight-upload-slot__label">\u7167\u7247 ${i + 1}</span>
-                  <input type="file" accept="image/*" multiple class="highlight-upload-slot__input" data-photo-slot="${i}">
-                  <span class="highlight-upload-slot__preview" data-preview-slot="${i}"></span>
-                </label>
-              `
-    ).join("")}
-        </div>
-        <label class="panel-form__field">\u63CF\u8FF0 <textarea class="highlight-caption" data-field="caption" required></textarea></label>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-        <p class="field-error" data-error></p>
-      </form>
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-highlight">
+            <h3 class="panel-form__title">\u65B0\u589E\u9EDE\u6EF4\u5206\u4EAB</h3>
+            <div class="highlight-upload-grid">
+              ${[0, 1, 2].map(
+        (i) => `
+                    <label class="highlight-upload-slot" data-drop-slot="${i}">
+                      <span class="highlight-upload-slot__label">\u7167\u7247 ${i + 1}</span>
+                      <input type="file" accept="image/*" multiple class="highlight-upload-slot__input" data-photo-slot="${i}">
+                      <span class="highlight-upload-slot__preview" data-preview-slot="${i}"></span>
+                    </label>
+                  `
+      ).join("")}
+            </div>
+            <label class="panel-form__field">\u63CF\u8FF0 <textarea class="highlight-caption" data-field="caption" required></textarea></label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u9EDE\u6EF4\u5206\u4EAB"
+    })}
       <div class="entry-list-wrap">${entries.map(existingEntryCard).join("")}</div>
     </div>
   `;
+    wireFormPopup(container);
     function clearPendingSlot(i) {
       pendingPhotos[i] = null;
       const previewEl = container.querySelector(`[data-preview-slot="${i}"]`);
@@ -28356,37 +28605,43 @@ var CFormApp = (() => {
                   </button>
                   <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="\u522A\u9664${escapeHtml(plan.period)}\u7684\u8AB2\u7A0B\u6708\u8A08\u756B">\xD7</button>
                 </li>`
-    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u8AB2\u7A0B\u6708\u8A08\u756B\uFF0C\u8ACB\u5728\u53F3\u5074\u65B0\u589E</li>'}
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u8AB2\u7A0B\u6708\u8A08\u756B\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u8AB2\u7A0B\u6708\u8A08\u756B\u300D\u8868\u55AE\u65B0\u589E</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-plan">
-        <h3 class="panel-form__title">\u65B0\u589E\u8AB2\u7A0B\u6708\u8A08\u756B</h3>
-        <label class="panel-form__field">
-          \u5E74\u6708
-          ${periodSelectsHtml({
-      yearFieldName: "period-year",
-      monthFieldName: "period-month",
-      selectedYear: defaultYear,
-      selectedMonth: defaultMonth
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-plan">
+            <h3 class="panel-form__title">\u65B0\u589E\u8AB2\u7A0B\u6708\u8A08\u756B</h3>
+            <label class="panel-form__field">
+              \u5E74\u6708
+              ${periodSelectsHtml({
+        yearFieldName: "period-year",
+        monthFieldName: "period-month",
+        selectedYear: defaultYear,
+        selectedMonth: defaultMonth
+      })}
+            </label>
+            <fieldset class="panel-form__field">
+              <legend>\u5E7C\u5152</legend>
+              <div class="panel-form__checkbox-list">
+                ${children.map(
+        (child) => `<label class="panel-form__checkbox">
+                        <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
+                      </label>`
+      ).join("")}
+              </div>
+            </fieldset>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u8AB2\u7A0B\u6708\u8A08\u756B"
     })}
-        </label>
-        <fieldset class="panel-form__field">
-          <legend>\u5E7C\u5152</legend>
-          <div class="panel-form__checkbox-list">
-            ${children.map(
-      (child) => `<label class="panel-form__checkbox">
-                    <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
-                  </label>`
-    ).join("")}
-          </div>
-        </fieldset>
-        <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-        <p class="field-error" data-error></p>
-      </form>
     </div>
   `;
     wireScrollShade(container.querySelector(".card-list--rows"));
+    wireFormPopup(container);
     if (onBack) {
       container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     }
@@ -28426,7 +28681,7 @@ var CFormApp = (() => {
         const weeks = buildMonthlyCalendar(gYear + 1911, gMonth);
         const tiers = [...new Set(Object.values(childTiers))];
         await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
-        onSelectPlan(plan);
+        await keepScroll(() => onSelectPlan(plan));
       } catch (err) {
         errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
       }
@@ -28762,7 +29017,8 @@ var CFormApp = (() => {
         ${data.children.map((child) => childCalendarHtml(child, plan.childTiers[child.id], data)).join("")}
       </div>
       <div class="monthly-plan-side">
-        <form class="panel-form" data-manage-children-form hidden>
+        ${nestedEntryFormDialog(`
+        <form class="panel-form" data-manage-children-form>
           <h3 class="panel-form__title">\u9078\u64C7\u672C\u6708\u8A08\u756B\u6DB5\u84CB\u7684\u5E7C\u5152</h3>
           <fieldset class="panel-form__field">
             <legend>\u5E7C\u5152</legend>
@@ -28780,21 +29036,53 @@ var CFormApp = (() => {
           </div>
           <p class="field-error" data-error="manage-children"></p>
         </form>
+        `)}
+        ${nestedEntryFormDialog(`
         <div class="panel-form" data-panel>
           <h3 class="panel-form__title" data-panel-header>\u9EDE\u9078\u5DE6\u5074\u7684\u65E5\u671F\u683C\u5B50\u958B\u59CB\u898F\u5283</h3>
           <div data-panel-items></div>
         </div>
+        `)}
       </div>
     </div>
+    ${isMobile2() ? `<button type="button" class="fab" data-action="open-panel-popup" hidden aria-label="\u7DE8\u8F2F\u9019\u5929\u7684\u8A08\u756B">${fabIconHtml()}</button>` : ""}
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     const manageChildrenForm = container.querySelector("[data-manage-children-form]");
-    container.querySelector('[data-action="manage-children"]').addEventListener("click", () => {
-      manageChildrenForm.hidden = !manageChildrenForm.hidden;
-    });
+    wireNestedEntryForm(container.querySelector('[data-action="manage-children"]'), manageChildrenForm);
     container.querySelector('[data-action="cancel-manage-children"]').addEventListener("click", () => {
-      manageChildrenForm.hidden = true;
+      const dialog = manageChildrenForm.closest("dialog.form-popup");
+      if (dialog) dialog.close();
+      else manageChildrenForm.hidden = true;
     });
+    const panelDialog = container.querySelector("[data-panel]").closest("dialog.form-popup");
+    if (panelDialog) {
+      panelDialog.querySelector('[data-action="close-form-popup"]').addEventListener("click", () => panelDialog.close());
+      panelDialog.addEventListener("click", (event) => {
+        if (event.target === panelDialog) panelDialog.close();
+      });
+    }
+    function openPanelPopup() {
+      panelDialog?.showModal();
+    }
+    function updateFabVisibility() {
+      const fab = container.querySelector('[data-action="open-panel-popup"]');
+      if (fab) fab.hidden = !selected;
+    }
+    container.querySelector('[data-action="open-panel-popup"]')?.addEventListener("click", () => openPanelPopup());
+    const DOUBLE_TAP_WINDOW_MS = 500;
+    let lastTapKey = null;
+    let lastTapTime = 0;
+    function handleCellTap(child, tier, week, day) {
+      const key = `${child.id}:${week.weekIndex}:${day.weekday}`;
+      const now = Date.now();
+      const isDoubleTap = key === lastTapKey && now - lastTapTime < DOUBLE_TAP_WINDOW_MS;
+      lastTapKey = isDoubleTap ? null : key;
+      lastTapTime = now;
+      selectCell(child, tier, week, day).then(() => {
+        if (isDoubleTap) openPanelPopup();
+      });
+    }
     container.querySelector('[data-action="export-docx"]').addEventListener("click", async () => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
@@ -28840,13 +29128,15 @@ var CFormApp = (() => {
       }
     });
     async function selectCell(child, tier, week, day) {
+      const sameAsSelected = selected && selected.child.id === child.id && selected.tier === tier && selected.week.weekIndex === week.weekIndex && selected.day.weekday === day.weekday;
       selected = { child, tier, week, day };
       container.querySelectorAll(".monthly-calendar__day--selected").forEach((el) => el.classList.remove("monthly-calendar__day--selected"));
       container.querySelector(
         `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
       ).classList.add("monthly-calendar__day--selected");
       container.querySelector("[data-panel-header]").textContent = `${child.name}\u3000\u7B2C${weekIndexLabel(week.weekIndex)}\u9031\u3000${day.dateLabel}`;
-      await renderPanelItems();
+      if (!sameAsSelected) await renderPanelItems();
+      updateFabVisibility();
     }
     function indicatorOptionsHtml2(tier) {
       const indicators = getIndicatorsForTier(tier);
@@ -29026,7 +29316,10 @@ var CFormApp = (() => {
           `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
         );
         cell.outerHTML = dayCellHtml(child, tier, week, day, data);
-        container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`).addEventListener("click", () => selectCell(child, tier, week, day));
+        const freshCell = container.querySelector(
+          `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+        );
+        freshCell.addEventListener("click", () => handleCellTap(child, tier, week, day));
       }
       await renderPanelItems();
     }
@@ -29036,7 +29329,7 @@ var CFormApp = (() => {
           const cell = container.querySelector(
             `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
           );
-          cell.addEventListener("click", () => selectCell(child, plan.childTiers[child.id], week, day));
+          cell.addEventListener("click", () => handleCellTap(child, plan.childTiers[child.id], week, day));
         }
       }
     }
