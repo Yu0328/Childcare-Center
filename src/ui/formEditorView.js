@@ -4,6 +4,7 @@ import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { keepScroll } from './keepScroll.js';
+import { nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 
 function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
   return `
@@ -69,20 +70,23 @@ function entryRow(entry) {
 }
 
 function indicatorBlock(indicator, entries) {
+  const addEntryFormHtml = `
+    <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}">
+      <label class="entry-form__field">日期 <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
+      ${statusRadios(indicator.code, { fieldAttr: 'entry-field', idAttr: 'indicator-code', checkedStatus: 'developed' })}
+      <textarea class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="觀察敘述"></textarea>
+      <div class="entry-form__actions">
+        <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">儲存</button>
+      </div>
+      <p class="field-error" data-error></p>
+    </div>
+  `;
   return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(indicator.code)}">
       <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(indicator.code)}</span>${escapeHtml(indicator.description)}</h4>
       <ul class="entry-list">${entries.map(entryRow).join('')}</ul>
       <button type="button" class="btn btn--outline btn--small" data-add-entry-for="${escapeHtml(indicator.code)}">＋ 新增觀察紀錄</button>
-      <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}" hidden>
-        <label class="entry-form__field">日期 <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
-        ${statusRadios(indicator.code, { fieldAttr: 'entry-field', idAttr: 'indicator-code', checkedStatus: 'developed' })}
-        <input type="text" class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="觀察敘述">
-        <div class="entry-form__actions">
-          <button type="button" class="btn btn--primary btn--small" data-entry-save-for="${escapeHtml(indicator.code)}">儲存</button>
-        </div>
-        <p class="field-error" data-error></p>
-      </div>
+      ${nestedEntryFormDialog(addEntryFormHtml)}
     </div>
   `;
 }
@@ -316,10 +320,10 @@ export async function renderFormEditorView(
   }
 
   for (const indicator of indicators) {
-    container.querySelector(`[data-add-entry-for="${indicator.code}"]`).addEventListener('click', () => {
-      const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
-      entryForm.hidden = !entryForm.hidden;
-    });
+    wireNestedEntryForm(
+      container.querySelector(`[data-add-entry-for="${indicator.code}"]`),
+      container.querySelector(`[data-entry-form-for="${indicator.code}"]`)
+    );
 
     container.querySelector(`[data-entry-save-for="${indicator.code}"]`).addEventListener('click', async () => {
       const date = container.querySelector(`[data-entry-field="date"][data-indicator-code="${indicator.code}"]`).value;

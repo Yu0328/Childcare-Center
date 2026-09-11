@@ -11,6 +11,7 @@ import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../dat
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
+import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 import { downloadBlob } from '../export/downloadBlob.js';
 
@@ -137,7 +138,8 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data)).join('')}
       </div>
       <div class="monthly-plan-side">
-        <form class="panel-form" data-manage-children-form hidden>
+        ${nestedEntryFormDialog(`
+        <form class="panel-form" data-manage-children-form>
           <h3 class="panel-form__title">選擇本月計畫涵蓋的幼兒</h3>
           <fieldset class="panel-form__field">
             <legend>幼兒</legend>
@@ -158,25 +160,69 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
           </div>
           <p class="field-error" data-error="manage-children"></p>
         </form>
+        `)}
+        ${nestedEntryFormDialog(`
         <div class="panel-form" data-panel>
           <h3 class="panel-form__title" data-panel-header>點選左側的日期格子開始規劃</h3>
           <div data-panel-items></div>
         </div>
+        `)}
       </div>
     </div>
+    ${isMobile() ? `<button type="button" class="fab" data-action="open-panel-popup" hidden aria-label="編輯這天的計畫">${fabIconHtml()}</button>` : ''}
   `;
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
   const manageChildrenForm = container.querySelector('[data-manage-children-form]');
 
-  container.querySelector('[data-action="manage-children"]').addEventListener('click', () => {
-    manageChildrenForm.hidden = !manageChildrenForm.hidden;
-  });
+  wireNestedEntryForm(container.querySelector('[data-action="manage-children"]'), manageChildrenForm);
 
   container.querySelector('[data-action="cancel-manage-children"]').addEventListener('click', () => {
-    manageChildrenForm.hidden = true;
+    const dialog = manageChildrenForm.closest('dialog.form-popup');
+    if (dialog) dialog.close();
+    else manageChildrenForm.hidden = true;
   });
+
+  // The always-visible desktop panel must never be hidden by default (unlike a nested add-form),
+  // so this is wired by hand instead of via wireNestedEntryForm — its desktop fallback assumes
+  // hide-until-clicked, which is wrong here.
+  const panelDialog = container.querySelector('[data-panel]').closest('dialog.form-popup');
+  if (panelDialog) {
+    panelDialog.querySelector('[data-action="close-form-popup"]').addEventListener('click', () => panelDialog.close());
+    panelDialog.addEventListener('click', event => {
+      if (event.target === panelDialog) panelDialog.close();
+    });
+  }
+
+  function openPanelPopup() {
+    panelDialog?.showModal();
+  }
+
+  function updateFabVisibility() {
+    const fab = container.querySelector('[data-action="open-panel-popup"]');
+    if (fab) fab.hidden = !selected;
+  }
+
+  container.querySelector('[data-action="open-panel-popup"]')?.addEventListener('click', () => openPanelPopup());
+
+  // Native `dblclick` is unreliable for a double-tap gesture on real mobile browsers (its timing
+  // window is tighter and less consistent than what a finger tap actually produces), so double-tap
+  // is detected by hand here: two clicks on the same cell within DOUBLE_TAP_WINDOW_MS count as one.
+  const DOUBLE_TAP_WINDOW_MS = 500;
+  let lastTapKey = null;
+  let lastTapTime = 0;
+
+  function handleCellTap(child, tier, week, day) {
+    const key = `${child.id}:${week.weekIndex}:${day.weekday}`;
+    const now = Date.now();
+    const isDoubleTap = key === lastTapKey && now - lastTapTime < DOUBLE_TAP_WINDOW_MS;
+    lastTapKey = isDoubleTap ? null : key;
+    lastTapTime = now;
+    selectCell(child, tier, week, day).then(() => {
+      if (isDoubleTap) openPanelPopup();
+    });
+  }
 
   container.querySelector('[data-action="export-docx"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-error="export"]');
@@ -226,14 +272,21 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     }
   });
 
+  // Reselecting the cell already open (via the FAB reopening it, or a repeated double-tap) skips
+  // the panel re-render, so any unsaved typed input in the add-item form survives — only a genuine
+  // change of cell should wipe it.
   async function selectCell(child, tier, week, day) {
+    const sameAsSelected =
+      selected && selected.child.id === child.id && selected.tier === tier &&
+      selected.week.weekIndex === week.weekIndex && selected.day.weekday === day.weekday;
     selected = { child, tier, week, day };
     container.querySelectorAll('.monthly-calendar__day--selected').forEach(el => el.classList.remove('monthly-calendar__day--selected'));
     container.querySelector(
       `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
     ).classList.add('monthly-calendar__day--selected');
     container.querySelector('[data-panel-header]').textContent = `${child.name}　第${weekIndexLabel(week.weekIndex)}週　${day.dateLabel}`;
-    await renderPanelItems();
+    if (!sameAsSelected) await renderPanelItems();
+    updateFabVisibility();
   }
 
   function indicatorOptionsHtml(tier) {
@@ -460,9 +513,10 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
       );
       cell.outerHTML = dayCellHtml(child, tier, week, day, data);
-      container
-        .querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`)
-        .addEventListener('click', () => selectCell(child, tier, week, day));
+      const freshCell = container.querySelector(
+        `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
+      );
+      freshCell.addEventListener('click', () => handleCellTap(child, tier, week, day));
     }
     await renderPanelItems();
   }
@@ -473,7 +527,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         const cell = container.querySelector(
           `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
         );
-        cell.addEventListener('click', () => selectCell(child, plan.childTiers[child.id], week, day));
+        cell.addEventListener('click', () => handleCellTap(child, plan.childTiers[child.id], week, day));
       }
     }
   }

@@ -3,6 +3,7 @@ import {
   addHighlightEntry, listHighlightEntriesForReport, deleteHighlightEntry, updateHighlightEntry,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 function savedThumbHtml(photo, i, entryId) {
   if (!photo) return '<span class="highlight-thumb highlight-thumb--empty"></span>';
@@ -45,28 +46,35 @@ export async function renderHighlightsTab(
 
   container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form" data-action="add-highlight">
-        <h3 class="panel-form__title">新增點滴分享</h3>
-        <div class="highlight-upload-grid">
-          ${[0, 1, 2]
-            .map(
-              i => `
-                <label class="highlight-upload-slot" data-drop-slot="${i}">
-                  <span class="highlight-upload-slot__label">照片 ${i + 1}</span>
-                  <input type="file" accept="image/*" multiple class="highlight-upload-slot__input" data-photo-slot="${i}">
-                  <span class="highlight-upload-slot__preview" data-preview-slot="${i}"></span>
-                </label>
-              `
-            )
-            .join('')}
-        </div>
-        <label class="panel-form__field">描述 <textarea class="highlight-caption" data-field="caption" required></textarea></label>
-        <button type="submit" class="btn btn--primary">新增</button>
-        <p class="field-error" data-error></p>
-      </form>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form" data-action="add-highlight">
+            <h3 class="panel-form__title">新增點滴分享</h3>
+            <div class="highlight-upload-grid">
+              ${[0, 1, 2]
+                .map(
+                  i => `
+                    <label class="highlight-upload-slot" data-drop-slot="${i}">
+                      <span class="highlight-upload-slot__label">照片 ${i + 1}</span>
+                      <input type="file" accept="image/*" multiple class="highlight-upload-slot__input" data-photo-slot="${i}">
+                      <span class="highlight-upload-slot__preview" data-preview-slot="${i}"></span>
+                    </label>
+                  `
+                )
+                .join('')}
+            </div>
+            <label class="panel-form__field">描述 <textarea class="highlight-caption" data-field="caption" required></textarea></label>
+            <button type="submit" class="btn btn--primary">新增</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+        fabLabel: '新增點滴分享',
+      })}
       <div class="entry-list-wrap">${entries.map(existingEntryCard).join('')}</div>
     </div>
   `;
+
+  wireFormPopup(container);
 
   function clearPendingSlot(i) {
     pendingPhotos[i] = null;

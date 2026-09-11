@@ -752,6 +752,116 @@ button {
   transform: scale(0.9);
 }
 
+/* Expands the tappable area to ~44px (the usual mobile touch-target minimum) without growing the
+   visible circle itself — a ::before on this already-positioned (absolute) button is a valid
+   offset parent, so it can hang outside the button's own box and still count as part of it for
+   click purposes. Desktop leaves the button at its plain 26px hit area since mouse pointers don't
+   need the extra margin. */
+@media (max-width: 640px) {
+  .card-list__delete::before {
+    content: '';
+    position: absolute;
+    inset: -9px;
+    border-radius: 50%;
+  }
+}
+
+/* ---------- Mobile add-form popup (FAB + dialog) ---------- */
+
+/* No padding/background/border of its own — the .panel-form or .entry-form it wraps already
+   draws its own card (background/border/radius/padding), so this stays an invisible sizing/
+   scroll/backdrop shell instead of double-boxing it inside a second white card. max-height caps
+   how tall it grows before its own content scrolls, so a long form doesn't just get taller than
+   the viewport. */
+.form-popup {
+  /* The UA stylesheet gives every <dialog>, even a plain open-attribute one (not shown via
+     showModal()), `position: absolute`, which pulls it out of the two-column .tab-layout grid it
+     sits in on desktop and floats it centered over the whole grid — overlapping the list column
+     instead of sitting in its own cell. `relative` overrides that back to a normal in-flow box
+     (fixing desktop) while still anchoring .form-popup__close's `position: absolute` to this card
+     instead of the next positioned ancestor up the page — with `static` here (no positioning
+     context of its own) the close button escaped to the page header instead of sitting on the
+     card. mobile's showModal() promotes it to the top layer regardless of this CSS. */
+  position: relative;
+  /* <dialog>'s UA stylesheet also sets `width: fit-content`, sized to whatever's inside it — the
+     grid's default stretch (justify-self: auto → stretch) only kicks in for a width that resolves
+     to auto, so this fit-content default silently opts the card out of stretching to fill its grid
+     column, leaving it noticeably narrower than the plain, unwrapped <form> it replaced. */
+  width: auto;
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  background: transparent;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.form-popup > .panel-form,
+.form-popup > .entry-form {
+  margin: 0;
+}
+.form-popup::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.form-popup__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  /* Only constrained to a centered popup width on mobile, where showModal() promotes the dialog
+     to the top layer as a floating overlay. On desktop .form-popup is a plain in-flow grid item
+     (see base rule above) and must stay unconstrained so it can stretch to fill its grid column. */
+  .form-popup {
+    width: min(90vw, 420px);
+  }
+
+  .fab {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    /* Same flat brand color as .btn--primary (not a gradient), so the FAB reads as the same
+       button family as the rest of the app instead of a one-off visual treatment. */
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(15, 23, 20, 0.35), 0 1px 3px rgba(15, 23, 20, 0.25);
+    cursor: pointer;
+    z-index: 10;
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .fab:hover {
+    background: var(--brand-dark);
+  }
+  .fab__icon {
+    width: 38px;
+    height: 38px;
+  }
+  .fab:active {
+    transform: scale(0.94);
+    box-shadow: 0 2px 8px rgba(15, 23, 20, 0.3);
+  }
+  .fab[hidden] {
+    display: none;
+  }
+}
+
 /* ---------- Forms (add-child / add-form / entry-form) ---------- */
 
 .panel-form {
@@ -1003,7 +1113,8 @@ fieldset.panel-form__field.import-preview__child legend {
   align-items: start;
 }
 
-.tab-layout > .panel-form {
+.tab-layout > .panel-form,
+.tab-layout > .form-popup {
   margin: 0;
   order: 2;
 }
@@ -1315,7 +1426,15 @@ fieldset.panel-form__field.import-preview__child legend {
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
 }
 
-.entry-form textarea {
+/* Grows downward to fit whatever's typed instead of scrolling inside a fixed-size box — the
+   .form-popup dialog wrapping these on mobile already caps overall height at 85vh with its own
+   scroll (see .form-popup above), so a long note expands the popup first and only scrolls once
+   that cap is hit. resize:vertical stays as a manual fallback for browsers without field-sizing
+   support (Safari, as of this writing) — harmless no-op once field-sizing takes over sizing. */
+.entry-form textarea,
+.panel-form textarea {
+  field-sizing: content;
+  max-height: none;
   resize: vertical;
 }
 
@@ -1694,18 +1813,31 @@ fieldset.panel-form__field.import-preview__child legend {
     order: -1;
     flex-basis: 100%;
   }
+
+  /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
+     viewport's bottom edge. #app's default 4rem (64px) bottom padding leaves the last calendar
+     row's bottom 16px sitting under it once scrolled to the end; bump the reserved space here so
+     the FAB never sits on top of a real day cell. */
+  #app:has(.monthly-calendar-list) {
+    padding-bottom: 6rem;
+  }
 }
 
 /* ---------- Checkbox lists (課程月計畫's child-selection: create form + 管理小朋友) ----------
    .panel-form__checkbox is used as a <label> wrapping a checkbox + name; previously unstyled, it
    fell back to bare browser flow (no spacing/border), which read as broken/unpolished next to the
    rest of this app's cards-and-pills visual language. */
+/* Grid, not flex-wrap: flex-wrap packs each pill to its own content width and left-aligns the
+   row, so shorter names leave a ragged strip of empty space on the right instead of filling it.
+   Grid columns stretch every pill to the same column width, filling the row evenly.
+   120px (not e.g. 140px): the narrowest place this list appears is the 新增課程月計畫 popup,
+   capped at .tab-layout's generic 340px column — a 140px minimum left just ~2px too little
+   room for a second column there, silently collapsing it to one. 120px fits two columns
+   comfortably in that same width without touching the popup's own size. */
 .panel-form__checkbox-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 0.5rem;
-  max-height: 260px;
-  overflow-y: auto;
   padding: 0.15rem;
 }
 
@@ -1719,6 +1851,8 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--surface);
   font-size: 0.9rem;
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
@@ -1811,6 +1945,18 @@ fieldset.panel-form__field.import-preview__child legend {
   gap: 1rem;
 }
 
+/* .panel-form's own margin:0 auto (sized for a standalone centered page) is the actual cause of the
+   old shift bug: auto margins on a flex item opt it out of the sidebar's default stretch behavior,
+   so it shrink-wraps to its own content's max-content width and re-centers within the column —
+   visibly resizing/shifting sideways as content changes (e.g. the empty "點選左側的日期格子" panel
+   vs. a cell's full edit form). Dropping the auto margin restores stretch, so the card always fills
+   the column's actual width instead of its own content width; max-width still caps how wide that can
+   get, matching the original standalone-page sizing, without reintroducing the resize/shift bug. */
+.monthly-plan-side > .panel-form {
+  max-width: 420px;
+  margin: 0;
+}
+
 .monthly-calendar-list {
   display: flex;
   flex-direction: column;
@@ -1861,6 +2007,9 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--page-bg);
   cursor: pointer;
   min-height: 3.5rem;
+  /* Without this, mobile Safari/Chrome treat a second tap within the double-tap window as a
+     zoom gesture instead of firing dblclick, since the viewport meta doesn't disable zoom. */
+  touch-action: manipulation;
   /* Grid items default to min-width: auto, which lets long unbroken indicator text push the
      cell wider than its track instead of wrapping — this is what caused the crushed/overflowing
      layout. min-width: 0 lets the wrap rules below actually take effect. */

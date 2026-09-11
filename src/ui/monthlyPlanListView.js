@@ -10,6 +10,8 @@ import { processImportQueue } from './importQueue.js';
 import { parseMonthlyPlanDocxImport } from '../import/monthlyPlanDocxImport.js';
 import { renderMonthlyPlanImportPreviewView } from './monthlyPlanImportPreviewView.js';
 import { wireScrollShade } from './scrollShade.js';
+import { keepScroll } from './keepScroll.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 export async function renderMonthlyPlanListView(
   container,
@@ -45,41 +47,47 @@ export async function renderMonthlyPlanListView(
                   <button type="button" class="card-list__delete" data-delete-plan="${escapeHtml(plan.id)}" aria-label="刪除${escapeHtml(plan.period)}的課程月計畫">×</button>
                 </li>`
             )
-            .join('') || '<li class="card-list__empty">目前還沒有課程月計畫，請在右側新增</li>'}
+            .join('') || '<li class="card-list__empty">目前還沒有課程月計畫，請在「新增課程月計畫」表單新增</li>'}
         </ul>
         <p class="field-error" data-error="delete"></p>
       </div>
-      <form class="panel-form" data-action="add-plan">
-        <h3 class="panel-form__title">新增課程月計畫</h3>
-        <label class="panel-form__field">
-          年月
-          ${periodSelectsHtml({
-            yearFieldName: 'period-year',
-            monthFieldName: 'period-month',
-            selectedYear: defaultYear,
-            selectedMonth: defaultMonth,
-          })}
-        </label>
-        <fieldset class="panel-form__field">
-          <legend>幼兒</legend>
-          <div class="panel-form__checkbox-list">
-            ${children
-              .map(
-                child =>
-                  `<label class="panel-form__checkbox">
-                    <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
-                  </label>`
-              )
-              .join('')}
-          </div>
-        </fieldset>
-        <button type="submit" class="btn btn--primary">新增</button>
-        <p class="field-error" data-error></p>
-      </form>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form" data-action="add-plan">
+            <h3 class="panel-form__title">新增課程月計畫</h3>
+            <label class="panel-form__field">
+              年月
+              ${periodSelectsHtml({
+                yearFieldName: 'period-year',
+                monthFieldName: 'period-month',
+                selectedYear: defaultYear,
+                selectedMonth: defaultMonth,
+              })}
+            </label>
+            <fieldset class="panel-form__field">
+              <legend>幼兒</legend>
+              <div class="panel-form__checkbox-list">
+                ${children
+                  .map(
+                    child =>
+                      `<label class="panel-form__checkbox">
+                        <input type="checkbox" data-child-checkbox="${escapeHtml(child.id)}"> ${escapeHtml(child.name)}
+                      </label>`
+                  )
+                  .join('')}
+              </div>
+            </fieldset>
+            <button type="submit" class="btn btn--primary">新增</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+        fabLabel: '新增課程月計畫',
+      })}
     </div>
   `;
 
   wireScrollShade(container.querySelector('.card-list--rows'));
+  wireFormPopup(container);
 
   if (onBack) {
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);
@@ -131,7 +139,7 @@ export async function renderMonthlyPlanListView(
       const tiers = [...new Set(Object.values(childTiers))];
       await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
 
-      onSelectPlan(plan);
+      await keepScroll(() => onSelectPlan(plan));
     } catch (err) {
       errorEl.textContent = '新增失敗，請再試一次';
     }

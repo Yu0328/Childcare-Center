@@ -2,6 +2,7 @@ import {
   addBehaviorObservation, listBehaviorObservationsForReport, deleteBehaviorObservation, updateBehaviorObservation,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
+import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
 function observationHeading(observation) {
   return observation.title ? `行為觀察－${observation.title}` : '行為觀察';
@@ -40,16 +41,23 @@ export async function renderBehaviorObservationTab(
 
   container.innerHTML = `
     <div class="tab-layout">
-      <form class="panel-form" data-action="add-observation">
-        <h3 class="panel-form__title">新增行為觀察</h3>
-        <label class="panel-form__field">標題 <input data-field="title"></label>
-        <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
-        <button type="submit" class="btn btn--primary">新增</button>
-        <p class="field-error" data-error></p>
-      </form>
+      ${formPopupMarkup({
+        formHtml: `
+          <form class="panel-form" data-action="add-observation">
+            <h3 class="panel-form__title">新增行為觀察</h3>
+            <label class="panel-form__field">標題 <input data-field="title"></label>
+            <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
+            <button type="submit" class="btn btn--primary">新增</button>
+            <p class="field-error" data-error></p>
+          </form>
+        `,
+        fabLabel: '新增行為觀察',
+      })}
       <div class="entry-list-wrap">${observations.map(observationCard).join('')}</div>
     </div>
   `;
+
+  wireFormPopup(container);
 
   container.querySelector('[data-action="add-observation"]').addEventListener('submit', async event => {
     event.preventDefault();
