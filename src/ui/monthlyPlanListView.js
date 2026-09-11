@@ -10,6 +10,7 @@ import { processImportQueue } from './importQueue.js';
 import { parseMonthlyPlanDocxImport } from '../import/monthlyPlanDocxImport.js';
 import { renderMonthlyPlanImportPreviewView } from './monthlyPlanImportPreviewView.js';
 import { wireScrollShade } from './scrollShade.js';
+import { keepScroll } from './keepScroll.js';
 
 export async function renderMonthlyPlanListView(
   container,
@@ -131,7 +132,7 @@ export async function renderMonthlyPlanListView(
       const tiers = [...new Set(Object.values(childTiers))];
       await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
 
-      onSelectPlan(plan);
+      await keepScroll(() => onSelectPlan(plan));
     } catch (err) {
       errorEl.textContent = '新增失敗，請再試一次';
     }

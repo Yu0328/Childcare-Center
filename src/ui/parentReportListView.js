@@ -5,6 +5,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { currentRocYear, periodSelectsHtml } from './periodFields.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { wireScrollShade } from './scrollShade.js';
+import { keepScroll } from './keepScroll.js';
 
 export async function renderParentReportListView(
   container,
@@ -90,7 +91,7 @@ export async function renderParentReportListView(
     const period = `${year}年${month}月`;
     try {
       await addParentReport({ childId: child.id, tier, period });
-      await renderParentReportListView(container, { child, onSelectReport, onBack, confirmDelete });
+      await keepScroll(() => renderParentReportListView(container, { child, onSelectReport, onBack, confirmDelete }));
     } catch (err) {
       const form = container.querySelector('[data-action="add-report"]');
       let errorEl = form.querySelector('[data-error]');

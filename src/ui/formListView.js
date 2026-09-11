@@ -5,6 +5,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, combinedPeriod } from './periodFields.js';
 import { wireScrollShade } from './scrollShade.js';
+import { keepScroll } from './keepScroll.js';
 
 export async function renderFormListView(
   container,
@@ -115,7 +116,7 @@ export async function renderFormListView(
     }
     try {
       await addForm({ childId: child.id, tier, period });
-      await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
+      await keepScroll(() => renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete }));
     } catch (err) {
       const form = container.querySelector('[data-action="add-form"]');
       let errorEl = form.querySelector('[data-error]');
