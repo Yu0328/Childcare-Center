@@ -839,9 +839,9 @@ button {
   .fab {
     position: fixed;
     right: 1rem;
-    /* Left thumb-reach-friendly and clear of one-handed grip at the very bottom edge — roughly
-       2/5 of the viewport height up from the bottom. */
-    bottom: 40vh;
+    /* Left thumb-reach-friendly and clear of one-handed grip at the very bottom edge — 1/4 of
+       the viewport height up from the bottom. */
+    bottom: 25vh;
     width: 64px;
     height: 64px;
     display: flex;
@@ -6268,6 +6268,12 @@ var CFormApp = (() => {
   // src/ui/formPopup.js
   var MOBILE_QUERY = "(max-width: 640px)";
   var isMobile2 = () => typeof matchMedia === "function" && matchMedia(MOBILE_QUERY).matches;
+  var lockBodyScroll = () => {
+    document.body.style.overflow = "hidden";
+  };
+  var unlockBodyScroll = () => {
+    document.body.style.overflow = "";
+  };
   var fabIconHtml = () => `
   <svg class="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" focusable="false">
     <path d="M12 5v14M5 12h14"/>
@@ -6285,11 +6291,16 @@ var CFormApp = (() => {
   }
   function wireFormPopup(container) {
     const dialog = container.querySelector(".form-popup");
-    container.querySelector('[data-action="open-form-popup"]')?.addEventListener("click", () => dialog.showModal());
+    unlockBodyScroll();
+    container.querySelector('[data-action="open-form-popup"]')?.addEventListener("click", () => {
+      dialog.showModal();
+      lockBodyScroll();
+    });
     container.querySelector('[data-action="close-form-popup"]')?.addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
+    dialog.addEventListener("close", unlockBodyScroll);
   }
   function wireNestedEntryForm(trigger, entryForm) {
     const dialog = entryForm.closest("dialog.form-popup");
@@ -6300,11 +6311,16 @@ var CFormApp = (() => {
       });
       return;
     }
-    trigger.addEventListener("click", () => dialog.showModal());
+    unlockBodyScroll();
+    trigger.addEventListener("click", () => {
+      dialog.showModal();
+      lockBodyScroll();
+    });
     dialog.querySelector('[data-action="close-form-popup"]').addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
+    dialog.addEventListener("close", unlockBodyScroll);
   }
   function nestedEntryFormDialog(entryFormHtml) {
     if (!isMobile2()) return entryFormHtml;
@@ -29067,13 +29083,16 @@ var CFormApp = (() => {
     });
     const panelDialog = container.querySelector("[data-panel]").closest("dialog.form-popup");
     if (panelDialog) {
+      unlockBodyScroll();
       panelDialog.querySelector('[data-action="close-form-popup"]').addEventListener("click", () => panelDialog.close());
       panelDialog.addEventListener("click", (event) => {
         if (event.target === panelDialog) panelDialog.close();
       });
+      panelDialog.addEventListener("close", unlockBodyScroll);
     }
     function openPanelPopup() {
       panelDialog?.showModal();
+      if (panelDialog) lockBodyScroll();
     }
     function updateFabVisibility() {
       const fab = container.querySelector('[data-action="open-panel-popup"]');
