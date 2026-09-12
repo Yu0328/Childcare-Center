@@ -9,7 +9,12 @@ export function calculateTargetDimensions(width, height, maxEdge) {
 // Draws `file` onto an offscreen canvas at a reduced size/quality and returns the compressed
 // result plus its final pixel dimensions (needed later to size the image correctly in the docx
 // export, since photos arrive in whatever aspect ratio the phone camera used).
-export async function compressImage(file, { maxEdge = 1600, quality = 0.8 } = {}) {
+//
+// maxEdge is 960 because that is already wider than anywhere a photo is ever shown:
+// parentReportDocxExport.js lays 點滴分享 photos out at most ~717px wide in the Word file. Storing
+// 1600px cost ~3x the bytes for resolution nothing displays — which now also means 3x the upload
+// on every sync. Photos already saved under the old setting are left alone.
+export async function compressImage(file, { maxEdge = 960, quality = 0.8 } = {}) {
   const objectUrl = URL.createObjectURL(file);
   try {
     const image = await new Promise((resolve, reject) => {
