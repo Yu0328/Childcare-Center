@@ -65,6 +65,14 @@
   --filled-accent: #2f8f4e;
   --filled-border: #b9dfbb;
 
+  /* Neutral gray for the 訪客 (guest) sign-in choice card — deliberately colorless next to the
+     Google card's brand blue, so "guest" reads as the plain/no-commitment option rather than
+     competing for attention. Accent reuses --text-secondary's hue (4.5:1+ on the tint below,
+     verified by computed contrast) instead of inventing a new gray. */
+  --neutral-tint: #e6e7e3;
+  --neutral-accent: #55605c;
+  --neutral-border: #d3d5cf;
+
   /* Domain identity colors — one per 發展領域, ordered for adjacent-pair
      colorblind-safe contrast (see dataviz palette reference). Tints are deliberately a shade
      deeper than a barely-there pastel so each card reads as colored against the page, not white. */
@@ -220,6 +228,91 @@ button {
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+}
+
+/* Wraps 匯出備份/匯入備份 so they can collapse into a "⋯" menu on mobile without changing their
+   ids or app.js's wiring. A checkbox + label drives the toggle with no JS (tried <details>/
+   <summary> first, but browsers hide non-summary content whenever it isn't [open] as a built-in
+   behavior that a plain `display: contents` on the host can't override — so desktop, which wants
+   the menu permanently "open" and unwrapped, ended up with the buttons gone entirely). */
+.header-overflow {
+  display: contents;
+}
+.header-overflow__checkbox {
+  display: none;
+}
+/* Chained selector (not just .header-overflow__trigger) so this beats .btn's own `display:
+   inline-flex` at equal specificity — .btn is defined later in this file and would otherwise win
+   the cascade and leave the "⋯" trigger visible on desktop. */
+.header-overflow .header-overflow__trigger {
+  display: none;
+}
+.header-overflow__menu {
+  display: contents;
+}
+
+@media (max-width: 640px) {
+  /* Two-row header: title on its own row, then the sync/backup controls below. Without this the
+     title, greeting, status text and four buttons all fight for one row and everything shrinks —
+     the original bug report ("同步和用戶名差那欄會讓匯出/匯入備份的按鈕大小跑掉"). */
+  .app-header {
+    justify-content: flex-start;
+    padding: 0.7rem 1rem;
+  }
+  .app-header__brand {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+  .app-header__actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    margin-left: 0;
+    gap: 0.5rem;
+  }
+  /* Unwraps sync-header's own box so its greeting/status/buttons become direct flex items of
+     .app-header__actions — needed so the row-break rule below can apply across both groups. */
+  .sync-header {
+    display: contents;
+  }
+  .sync-header__greeting {
+    white-space: normal;
+  }
+
+  .header-overflow {
+    display: block;
+    position: relative;
+  }
+  .header-overflow .header-overflow__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5em 0.8em;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .header-overflow__menu {
+    display: none;
+    flex-direction: column;
+    gap: 0.4rem;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.5rem;
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
+    z-index: 20;
+    min-width: 9rem;
+  }
+  .header-overflow__checkbox:checked ~ .header-overflow__menu {
+    display: flex;
+  }
+  .header-overflow__menu .btn--header {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 #app {
@@ -485,6 +578,11 @@ button {
 .type-select__option:active {
   transform: translateY(0) scale(0.99);
 }
+.type-select__option:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
 
 .type-select__icon {
   flex-shrink: 0;
@@ -580,6 +678,22 @@ button {
 }
 .type-select__option--filled:hover .type-select__go {
   color: var(--filled-accent);
+}
+
+.type-select__option--neutral {
+  background: var(--neutral-tint);
+  border-color: var(--neutral-tint);
+}
+.type-select__option--neutral .type-select__icon {
+  background: var(--surface);
+  color: var(--neutral-accent);
+}
+.type-select__option--neutral:hover {
+  border-color: var(--neutral-border);
+  box-shadow: 0 12px 26px rgba(85, 96, 92, 0.18);
+}
+.type-select__option--neutral:hover .type-select__go {
+  color: var(--neutral-accent);
 }
 
 /* 管理幼兒 / 匯入檔案 — same option-card style as the five form choices, in a soft rose (a 4th
@@ -2173,19 +2287,14 @@ fieldset.panel-form__field.import-preview__child legend {
   }
 }
 
-.sign-in-choice {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 26rem;
-  margin: 3rem auto;
-  text-align: center;
-}
-
+/* Sits between .type-select-home__title and its divider — same wrapper the choice screen now
+   reuses from the form-select screen (see signInChoiceView.js). */
 .sign-in-choice__hint {
-  color: #555;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.6;
+  text-align: center;
+  margin: -0.3rem 0 0;
 }
 
 .sync-header__greeting {
@@ -2277,8 +2386,14 @@ fieldset.panel-form__field.import-preview__child legend {
   <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
     <div class="sync-header" id="sync-slot"></div>
-    <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
-    <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
+    <div class="header-overflow">
+      <input type="checkbox" id="header-overflow-toggle" class="header-overflow__checkbox">
+      <label for="header-overflow-toggle" class="btn btn--header header-overflow__trigger" aria-label="更多操作">⋯</label>
+      <div class="header-overflow__menu">
+        <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
+        <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
+      </div>
+    </div>
   </div>
 </header>
 <main id="app"></main>
@@ -2321,9 +2436,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // ../../../node_modules/jszip/dist/jszip.min.js
+  // node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -4862,11 +4977,28 @@ var CFormApp = (() => {
     }
     await deleteRecord("parentReports", id);
   }
-  async function addCoursePlanEntry({ reportId, indicatorCode, activityName, indicatorText = "", uid, updatedAt }) {
-    return addRecord("coursePlanEntries", { reportId, indicatorCode, activityName, indicatorText, uid, updatedAt });
+  async function addCoursePlanEntry({
+    reportId,
+    indicatorCode,
+    activityName,
+    indicatorText = "",
+    uid,
+    updatedAt,
+    createdAt
+  }) {
+    return addRecord("coursePlanEntries", {
+      reportId,
+      indicatorCode,
+      activityName,
+      indicatorText,
+      uid,
+      updatedAt,
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   async function listCoursePlanEntriesForReport(reportId) {
-    return runRequest("coursePlanEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    const entries = await runRequest("coursePlanEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    return entries.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   }
   async function updateCoursePlanEntry(id, changes) {
     const existing = await runRequest("coursePlanEntries", "readonly", (store) => store.get(id));
@@ -4880,11 +5012,32 @@ var CFormApp = (() => {
     }
     await deleteRecord("coursePlanEntries", id);
   }
-  async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note, uid, updatedAt }) {
-    return addRecord("courseOccurrences", { entryId, date, status, absent, courseChanged, note, uid, updatedAt });
+  async function addCourseOccurrence({
+    entryId,
+    date,
+    status,
+    absent,
+    courseChanged = false,
+    note,
+    uid,
+    updatedAt,
+    createdAt
+  }) {
+    return addRecord("courseOccurrences", {
+      entryId,
+      date,
+      status,
+      absent,
+      courseChanged,
+      note,
+      uid,
+      updatedAt,
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   async function listCourseOccurrencesForEntry(entryId) {
-    return runRequest("courseOccurrences", "readonly", (store) => store.index("by_entryId").getAll(entryId));
+    const occurrences = await runRequest("courseOccurrences", "readonly", (store) => store.index("by_entryId").getAll(entryId));
+    return occurrences.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   }
   async function updateCourseOccurrence(id, changes) {
     const existing = await runRequest("courseOccurrences", "readonly", (store) => store.get(id));
@@ -4894,11 +5047,28 @@ var CFormApp = (() => {
   async function deleteCourseOccurrence(id) {
     await deleteRecord("courseOccurrences", id);
   }
-  async function addDevelopmentRecordEntry({ reportId, domain, courseEntryIds, narrative, uid, updatedAt }) {
-    return addRecord("developmentRecordEntries", { reportId, domain, courseEntryIds, narrative, uid, updatedAt });
+  async function addDevelopmentRecordEntry({
+    reportId,
+    domain,
+    courseEntryIds,
+    narrative,
+    uid,
+    updatedAt,
+    createdAt
+  }) {
+    return addRecord("developmentRecordEntries", {
+      reportId,
+      domain,
+      courseEntryIds,
+      narrative,
+      uid,
+      updatedAt,
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   async function listDevelopmentRecordEntriesForReport(reportId) {
-    return runRequest("developmentRecordEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    const entries = await runRequest("developmentRecordEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    return entries.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   }
   async function updateDevelopmentRecordEntry(id, changes) {
     const existing = await runRequest("developmentRecordEntries", "readonly", (store) => store.get(id));
@@ -4908,11 +5078,19 @@ var CFormApp = (() => {
   async function deleteDevelopmentRecordEntry(id) {
     await deleteRecord("developmentRecordEntries", id);
   }
-  async function addBehaviorObservation({ reportId, title, narrative, uid, updatedAt }) {
-    return addRecord("behaviorObservations", { reportId, title, narrative, uid, updatedAt });
+  async function addBehaviorObservation({ reportId, title, narrative, uid, updatedAt, createdAt }) {
+    return addRecord("behaviorObservations", {
+      reportId,
+      title,
+      narrative,
+      uid,
+      updatedAt,
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   async function listBehaviorObservationsForReport(reportId) {
-    return runRequest("behaviorObservations", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    const observations = await runRequest("behaviorObservations", "readonly", (store) => store.index("by_reportId").getAll(reportId));
+    return observations.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   }
   async function updateBehaviorObservation(id, changes) {
     const existing = await runRequest("behaviorObservations", "readonly", (store) => store.get(id));
@@ -5144,8 +5322,18 @@ var CFormApp = (() => {
     }
     await deleteRecord("forms", id);
   }
-  async function addEntry({ formId, indicatorCode, date, status, note, activityName, uid, updatedAt }) {
-    return addRecord("entries", { formId, indicatorCode, date, status, note, activityName, uid, updatedAt });
+  async function addEntry({ formId, indicatorCode, date, status, note, activityName, uid, updatedAt, createdAt }) {
+    return addRecord("entries", {
+      formId,
+      indicatorCode,
+      date,
+      status,
+      note,
+      activityName,
+      uid,
+      updatedAt,
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   async function updateEntry(id, changes) {
     const existing = await runRequest("entries", "readonly", (store) => store.get(id));
@@ -5159,7 +5347,7 @@ var CFormApp = (() => {
   }
   async function listEntriesForForm(formId) {
     const entries = await runRequest("entries", "readonly", (store) => store.index("by_formId").getAll(formId));
-    return entries.map((entry) => entry.status ? entry : { ...entry, status: entry.achieved ? "developed" : "developing" });
+    return entries.map((entry) => entry.status ? entry : { ...entry, status: entry.achieved ? "developed" : "developing" }).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
   }
 
   // src/ui/escapeHtml.js
@@ -6842,7 +7030,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // ../../../node_modules/docx/dist/index.mjs
+  // node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -27068,7 +27256,7 @@ var CFormApp = (() => {
     "import-any-docx": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>'
   };
   async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
-    const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+    const CHEVRON2 = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
     container.innerHTML = `
     <div class="type-select-home">
       <h2 class="type-select-home__title">\u8ACB\u9078\u64C7\u8981\u586B\u5BEB\u7684\u8868\u55AE</h2>
@@ -27094,7 +27282,7 @@ var CFormApp = (() => {
                 <span class="type-select__title">${title}</span>
                 <span class="type-select__desc">${desc}</span>
               </span>
-              <span class="type-select__go" aria-hidden="true">${CHEVRON}</span>
+              <span class="type-select__go" aria-hidden="true">${CHEVRON2}</span>
             </button>
           `
     ).join("")}
@@ -29774,7 +29962,8 @@ var CFormApp = (() => {
         status: entry.status ?? (entry.achieved ? "developed" : "developing"),
         note: entry.note,
         uid: entry.uid,
-        updatedAt: entry.updatedAt
+        updatedAt: entry.updatedAt,
+        createdAt: entry.createdAt
       });
     }
     return childIdMap;
@@ -29799,7 +29988,8 @@ var CFormApp = (() => {
         activityName: entry.activityName,
         indicatorText: entry.indicatorText,
         uid: entry.uid,
-        updatedAt: entry.updatedAt
+        updatedAt: entry.updatedAt,
+        createdAt: entry.createdAt
       });
       entryIdMap.set(entry.id, created.id);
     }
@@ -29812,7 +30002,8 @@ var CFormApp = (() => {
         courseChanged: occurrence.courseChanged,
         note: occurrence.note,
         uid: occurrence.uid,
-        updatedAt: occurrence.updatedAt
+        updatedAt: occurrence.updatedAt,
+        createdAt: occurrence.createdAt
       });
     }
     for (const record of data.developmentRecordEntries ?? []) {
@@ -29822,7 +30013,8 @@ var CFormApp = (() => {
         courseEntryIds: record.courseEntryIds.map((id) => entryIdMap.get(id)),
         narrative: record.narrative,
         uid: record.uid,
-        updatedAt: record.updatedAt
+        updatedAt: record.updatedAt,
+        createdAt: record.createdAt
       });
     }
     for (const observation of data.behaviorObservations ?? []) {
@@ -29831,7 +30023,8 @@ var CFormApp = (() => {
         title: observation.title,
         narrative: observation.narrative,
         uid: observation.uid,
-        updatedAt: observation.updatedAt
+        updatedAt: observation.updatedAt,
+        createdAt: observation.createdAt
       });
     }
     for (const highlight of data.highlightEntries ?? []) {
@@ -30148,6 +30341,10 @@ var CFormApp = (() => {
     exportButton,
     importInput,
     messageContainer = exportButton.closest("header") || exportButton.parentNode,
+    // On mobile, 匯出備份 can sit inside a collapsed "⋯" menu (see .header-overflow in
+    // styles.css) — the progress bar needs a container that's visible even while that menu is
+    // closed, so it targets the header's actions row rather than exportButton's immediate parent.
+    progressContainer = exportButton.closest(".app-header__actions") || exportButton.parentNode,
     confirmImport = (message) => typeof confirm === "function" ? confirm(message) : false,
     reload = () => window.location.reload()
   }) {
@@ -30172,20 +30369,19 @@ var CFormApp = (() => {
       errorEl.textContent = text;
     }
     function showProgress(done, total) {
-      const container = exportButton.parentNode;
-      let bar = container.querySelector('[data-progress="backup"]');
+      let bar = progressContainer.querySelector('[data-progress="backup"]');
       if (!bar) {
         bar = document.createElement("div");
         bar.dataset.progress = "backup";
         bar.className = "backup-progress";
         bar.innerHTML = '<div class="backup-progress__fill"></div>';
-        container.insertBefore(bar, exportButton);
+        progressContainer.insertBefore(bar, progressContainer.firstChild);
       }
       const percent = total > 0 ? done / total * 100 : 100;
       bar.firstElementChild.style.width = `${percent}%`;
     }
     function hideProgress() {
-      exportButton.parentNode.querySelector('[data-progress="backup"]')?.remove();
+      progressContainer.querySelector('[data-progress="backup"]')?.remove();
     }
     exportButton.addEventListener("click", async () => {
       if (!isUnlocked()) return;
@@ -30475,7 +30671,7 @@ Content-Type: ${contentType}\r
       const fresh = await requestToken({});
       if (!fresh) throw new Error("SIGN_IN_CANCELLED");
       const profile = await fetchUserInfo(fresh);
-      const name = profile && profile.name || "";
+      const name = profile && (profile.given_name || profile.name) || "";
       writeSyncMode("google");
       localStorage.setItem(SYNC_NAME_KEY, name);
       return { name };
@@ -30678,6 +30874,14 @@ Content-Type: ${contentType}\r
   }
 
   // src/sync/localSnapshot.js
+  var ORDERED_STORES = /* @__PURE__ */ new Set([
+    "entries",
+    "coursePlanEntries",
+    "courseOccurrences",
+    "developmentRecordEntries",
+    "behaviorObservations",
+    "highlightEntries"
+  ]);
   function refKey(store, value) {
     return `${store}:${value}`;
   }
@@ -30696,6 +30900,10 @@ Content-Type: ${contentType}\r
         if (!row.uid || !row.updatedAt) {
           row.uid = row.uid || newUid();
           row.updatedAt = row.updatedAt || row.createdAt || (/* @__PURE__ */ new Date(0)).toISOString();
+          await rawPut(store, row);
+        }
+        if (ORDERED_STORES.has(store) && !row.createdAt) {
+          row.createdAt = row.updatedAt;
           await rawPut(store, row);
         }
         if (store === PHOTO_STORE && (row.photos || []).some((photo) => photo && !photo.photoUid)) {
@@ -31210,14 +31418,41 @@ Content-Type: ${contentType}\r
   function needsSignInChoice() {
     return readSyncMode() === null;
   }
+  var GOOGLE_ICON = `
+  <svg viewBox="0 0 48 48" width="26" height="26" aria-hidden="true">
+    <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+    <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+    <path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34A21.93 21.93 0 0 0 2 24c0 3.55.85 6.91 2.34 9.88l7.35-5.7z"/>
+    <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/>
+  </svg>
+`;
+  var GUEST_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>';
+  var CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
   function renderSignInChoiceView(container, { onGoogle, onGuest }) {
     container.innerHTML = `
-    <div class="sign-in-choice">
-      <h2 class="sign-in-choice__title">\u8981\u8B93\u8CC7\u6599\u5728\u88DD\u7F6E\u4E4B\u9593\u81EA\u52D5\u540C\u6B65\u55CE\uFF1F</h2>
+    <div class="type-select-home">
+      <h2 class="type-select-home__title">\u8981\u8B93\u8CC7\u6599\u5728\u88DD\u7F6E\u4E4B\u9593\u81EA\u52D5\u540C\u6B65\u55CE\uFF1F</h2>
       <p class="sign-in-choice__hint">\u767B\u5165 Google \u5E33\u865F\u5F8C\uFF0C\u9019\u53F0\u88DD\u7F6E\u7684\u8CC7\u6599\u6703\u81EA\u52D5\u8DDF\u4F60\u5176\u4ED6\u88DD\u7F6E\u540C\u6B65\uFF0C\u4E0D\u7528\u518D\u624B\u52D5\u532F\u51FA\u532F\u5165\u3002</p>
-      <button type="button" class="btn btn--primary" data-action="sign-in-google">\u4F7F\u7528 Google \u767B\u5165</button>
-      <button type="button" class="btn btn--outline" data-action="continue-guest">\u4EE5\u8A2A\u5BA2\u8EAB\u4EFD\u7E7C\u7E8C</button>
-      <p class="field-error" data-error></p>
+      <hr class="type-select-home__divider">
+      <div class="type-select">
+        <button type="button" class="type-select__option type-select__option--brand" data-action="sign-in-google">
+          <span class="type-select__icon">${GOOGLE_ICON}</span>
+          <span class="type-select__text">
+            <span class="type-select__title">\u4F7F\u7528 Google \u767B\u5165</span>
+            <span class="type-select__desc">\u8DE8\u88DD\u7F6E\u81EA\u52D5\u540C\u6B65\u8CC7\u6599</span>
+          </span>
+          <span class="type-select__go" aria-hidden="true">${CHEVRON}</span>
+        </button>
+        <button type="button" class="type-select__option type-select__option--neutral" data-action="continue-guest">
+          <span class="type-select__icon">${GUEST_ICON}</span>
+          <span class="type-select__text">
+            <span class="type-select__title">\u4EE5\u8A2A\u5BA2\u8EAB\u4EFD\u7E7C\u7E8C</span>
+            <span class="type-select__desc">\u50C5\u5B58\u5728\u672C\u6A5F\uFF0C\u53EF\u624B\u52D5\u532F\u51FA\u5099\u4EFD</span>
+          </span>
+          <span class="type-select__go" aria-hidden="true">${CHEVRON}</span>
+        </button>
+      </div>
+      <p class="field-error field-error--center" data-error></p>
     </div>
   `;
     const googleButton = container.querySelector('[data-action="sign-in-google"]');
@@ -31259,10 +31494,10 @@ Content-Type: ${contentType}\r
     if (status.error === "AUTH_EXPIRED") return "\u767B\u5165\u5DF2\u5931\u6548\uFF0C\u8ACB\u91CD\u65B0\u767B\u5165";
     if (status.error === "FORMAT") return "\u96F2\u7AEF\u8CC7\u6599\u593E\u7570\u5E38\uFF0C\u5DF2\u505C\u6B62\u540C\u6B65";
     if (status.phase === "syncing") {
-      return status.textSyncedAt ? "\u540C\u6B65\u4E2D\u2026" : "\u9996\u6B21\u540C\u6B65\u4E2D\uFF0C\u8CC7\u6599\u91CF\u8F03\u591A\u6642\u53EF\u80FD\u9700\u8981\u5E7E\u5206\u9418\uFF0C\u8ACB\u4E0D\u8981\u95DC\u9589\u8996\u7A97\u2026";
+      return status.textSyncedAt ? "\u540C\u6B65\u4E2D\u2026" : "\u9996\u6B21\u540C\u6B65\u4E2D\uFF0C\u53EF\u80FD\u9700\u8981\u5E7E\u5206\u9418\uFF0C\u8ACB\u7A0D\u5019\u2026";
     }
     if (status.photoPending > 0) {
-      return `\u6587\u5B57\u8CC7\u6599\uFF1A${clockTime(status.textSyncedAt)}\u3000\u7167\u7247\uFF1A\u540C\u6B65\u5931\u6557\uFF0C\u9084\u6709 ${status.photoPending} \u5F35\u672A\u4E0A\u50B3`;
+      return `\u7167\u7247\u540C\u6B65\u5931\u6557\uFF08\u5269 ${status.photoPending} \u5F35\uFF09`;
     }
     if (status.error === "NETWORK") return "\u540C\u6B65\u5931\u6557\uFF0C\u7A0D\u5F8C\u6703\u81EA\u52D5\u91CD\u8A66";
     if (status.textSyncedAt) return `\u4E0A\u6B21\u540C\u6B65\uFF1A${clockTime(status.textSyncedAt)}`;
