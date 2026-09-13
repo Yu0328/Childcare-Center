@@ -1,4 +1,5 @@
 import { compressImage } from '../media/imagePreprocess.js';
+import { newUid } from '../storage/dbCore.js';
 import {
   addHighlightEntry, listHighlightEntriesForReport, deleteHighlightEntry, updateHighlightEntry,
 } from '../storage/parentReportDb.js';
@@ -100,7 +101,10 @@ export async function renderHighlightsTab(
     const previewEl = container.querySelector(`[data-preview-slot="${i}"]`);
     try {
       const compressed = await compressImage(file);
-      pendingPhotos[i] = compressed;
+      // Every sync-layer lookup (upload, download, merge-by-union) keys a photo by photoUid; with
+      // none assigned here, a new photo was invisible to sync from the moment it was added — it
+      // never left toUpload's filter in photoSync.js's collectLocalPhotos().
+      pendingPhotos[i] = { ...compressed, photoUid: newUid() };
       previewEl.innerHTML = `
         <img class="highlight-thumb" src="${URL.createObjectURL(compressed.blob)}" alt="">
         <button type="button" class="highlight-thumb-remove" data-remove-pending-slot="${i}" aria-label="移除照片 ${i + 1}">×</button>

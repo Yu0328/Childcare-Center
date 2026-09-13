@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
 import { clearAllData, addChild } from '../src/storage/db.js';
+import { addRecord } from '../src/storage/dbCore.js';
 
 // jsdom's Blob polyfill isn't recognized by Node's native structuredClone (used internally by
 // fake-indexeddb to clone stored values), so a Blob round-tripped through IndexedDB in this
@@ -214,6 +215,29 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
 
     await deleteHighlightEntry(highlight.id);
     expect(await listHighlightEntriesForReport(report.id)).toEqual([]);
+  });
+
+  it('依 createdAt 排序，不受本機 id 順序影響（模擬從雲端同步進來、id 順序被打亂的情況）', async () => {
+    const photo = { blob: new Blob(['x'], { type: 'image/jpeg' }), width: 10, height: 10 };
+    // id 順序刻意與 createdAt 順序相反：後建立的先寫進本機（例如同步下載順序不是創建順序）。
+    const newer = await addHighlightEntry({
+      reportId: report.id, photos: [photo], caption: '後建立', createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const older = await addHighlightEntry({
+      reportId: report.id, photos: [photo], caption: '先建立', createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const entries = await listHighlightEntriesForReport(report.id);
+    expect(entries.map(e => e.id)).toEqual([older.id, newer.id]);
+  });
+
+  it('沒有 createdAt 的舊資料（這次修正之前建立的）排在最前面，不會噴錯', async () => {
+    const photo = { blob: new Blob(['x'], { type: 'image/jpeg' }), width: 10, height: 10 };
+    const legacy = await addRecord('highlightEntries', { reportId: report.id, photos: [photo], caption: '舊資料', uid: 'legacy-uid' });
+    const fresh = await addHighlightEntry({ reportId: report.id, photos: [photo], caption: '新資料' });
+
+    const entries = await listHighlightEntriesForReport(report.id);
+    expect(entries.map(e => e.id)).toEqual([legacy.id, fresh.id]);
   });
 
   it('drops a photo whose blob fails to read instead of throwing and losing the rest', async () => {

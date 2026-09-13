@@ -33,6 +33,17 @@ export async function readLocalSnapshot() {
         row.updatedAt = row.updatedAt || row.createdAt || new Date(0).toISOString();
         await rawPut(store, row);
       }
+      // 點滴分享 photos added before this backfill existed never got a photoUid at all (the UI
+      // never assigned one) — every sync lookup keys on it, so such a photo was invisible to
+      // upload/download forever. Each device mints its own fresh id here, so a photo already
+      // broken on more than one device becomes two separate Drive files rather than merging into
+      // one; that's a one-time cost of healing already-broken history, not an ongoing issue.
+      if (store === PHOTO_STORE && (row.photos || []).some(photo => photo && !photo.photoUid)) {
+        row.photos = row.photos.map(photo =>
+          photo && !photo.photoUid ? { ...photo, photoUid: newUid() } : photo
+        );
+        await rawPut(store, row);
+      }
       uidById.set(refKey(store, row.id), row.uid);
       idByUid.set(refKey(store, row.uid), row.id);
     }

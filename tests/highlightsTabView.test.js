@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
 import { clearAllData, addChild } from '../src/storage/db.js';
-import { addParentReport, addHighlightEntry } from '../src/storage/parentReportDb.js';
+import { addParentReport, addHighlightEntry, listHighlightEntriesForReport } from '../src/storage/parentReportDb.js';
 import { renderHighlightsTab } from '../src/ui/highlightsTabView.js';
 import { waitFor } from './helpers.js';
 
@@ -164,6 +164,25 @@ describe('renderHighlightsTab', () => {
     container.querySelector('[data-action="add-highlight"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => changed);
+  });
+
+  it('每張新加入的照片都會拿到 photoUid，不然同步會完全看不到這張照片', async () => {
+    const imagePreprocess = await import('../src/media/imagePreprocess.js');
+    vi.spyOn(imagePreprocess, 'compressImage').mockResolvedValue({ blob: new Blob(['x']), width: 100, height: 80 });
+
+    const container = document.createElement('div');
+    await renderHighlightsTab(container, { report, onChange: () => {} });
+
+    selectFile(container.querySelector('[data-photo-slot="0"]'), new File(['x'], 'a.jpg', { type: 'image/jpeg' }));
+    await waitFor(() => container.querySelector('[data-preview-slot="0"] img') !== null);
+
+    container.querySelector('[data-field="caption"]').value = '新照片';
+    container.querySelector('[data-action="add-highlight"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(async () => (await listHighlightEntriesForReport(report.id)).length > 0);
+    const [entry] = await listHighlightEntriesForReport(report.id);
+    expect(entry.photos[0].photoUid).toEqual(expect.any(String));
+    expect(entry.photos[0].photoUid.length).toBeGreaterThan(0);
   });
 
   it('clicking a pending photo\'s remove button does not also open the native file picker', async () => {

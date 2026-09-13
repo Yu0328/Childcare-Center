@@ -33,6 +33,19 @@ describe('readLocalSnapshot', () => {
     expect(snapshot.records.has(stored.uid)).toBe(true);
     expect(stored.updatedAt).toBe('2023-05-05T00:00:00.000Z');
   });
+
+  it('替升級前就存在、照片沒有 photoUid 的點滴分享補上，不然同步永遠看不到這張照片', async () => {
+    const id = await runRequest('highlightEntries', 'readwrite', store => store.add({
+      reportId: 1, caption: '舊資料', uid: 'legacy-highlight',
+      photos: [{ blob: new Blob(['x']), width: 10, height: 10 }],
+    }));
+
+    await readLocalSnapshot();
+
+    const stored = await runRequest('highlightEntries', 'readonly', store => store.get(id));
+    expect(stored.photos[0].photoUid).toBeTypeOf('string');
+    expect(stored.photos[0].photoUid.length).toBeGreaterThan(0);
+  });
 });
 
 describe('applyRemoteRecord', () => {

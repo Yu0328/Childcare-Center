@@ -273,7 +273,7 @@ async function importParentReports(data, childIdMap) {
     }));
     await addHighlightEntry({
       reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption,
-      uid: highlight.uid, updatedAt: highlight.updatedAt,
+      uid: highlight.uid, updatedAt: highlight.updatedAt, createdAt: highlight.createdAt,
     });
   }
 }

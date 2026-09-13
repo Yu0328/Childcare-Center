@@ -118,8 +118,14 @@ export async function deleteBehaviorObservation(id) {
   await deleteRecord('behaviorObservations', id);
 }
 
-export async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt }) {
-  return addRecord('highlightEntries', { reportId, photos, caption, uid, updatedAt });
+export async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt, createdAt }) {
+  // A dedicated, never-touched-again field: updatedAt moves every time the caption is edited, so
+  // it can't double as "which one was added first" — but sync order isn't the point here either.
+  // The point is that this value travels with the record to every device via the normal sync
+  // payload, so every device sorts by the same number and lands on the same order.
+  return addRecord('highlightEntries', {
+    reportId, photos, caption, uid, updatedAt, createdAt: createdAt || new Date().toISOString(),
+  });
 }
 
 // Safari has a known bug where a Blob just read out of IndexedDB can throw "NotFoundError: The
@@ -140,6 +146,11 @@ export async function listHighlightEntriesForReport(reportId) {
   } catch (err) {
     throw new Error(`IndexedDB 查詢失敗：${err?.message || err}`, { cause: err });
   }
+  // By creation order, not local id: id is a per-device autoIncrement counter, so an entry synced
+  // in from another device can land at a different id than it had there, silently reordering the
+  // list. createdAt travels with the record through sync, so every device sorts by the same value.
+  // An entry from before this field existed has none — sorts first (oldest), stable among ties.
+  entries = entries.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   return Promise.all(
     entries.map(async entry => ({
       ...entry,
