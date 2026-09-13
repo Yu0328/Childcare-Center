@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createSyncEngine } from '../src/sync/syncEngine.js';
 import { readSyncState } from '../src/storage/syncStateDb.js';
-import { addChild, listChildren, deleteChild, clearAllData } from '../src/storage/db.js';
+import { addChild, addForm, addEntry, listChildren, listEntriesForForm, deleteChild, clearAllData } from '../src/storage/db.js';
 import { runRequest, putRecord } from '../src/storage/dbCore.js';
-import { AuthExpiredError, DriveFormatError } from '../src/sync/driveClient.js';
+import { AuthExpiredError, DriveFormatError, createDriveClient } from '../src/sync/driveClient.js';
+import { createGoogleAuth, writeSyncMode, clearSyncMode } from '../src/sync/googleAuth.js';
 
 const CLOUD_NOW = 'Sat, 13 Sep 2026 06:32:00 GMT';
 
@@ -35,6 +36,7 @@ async function reset() {
   await clearAllData();
   await runRequest('syncState', 'readwrite', store => store.clear());
   await runRequest('tombstones', 'readwrite', store => store.clear());
+  localStorage.clear();
 }
 
 describe('runSync', () => {
@@ -190,6 +192,67 @@ describe('runSync', () => {
 
     expect(status.phase).toBe('auth');
     expect(status.error).toBe('AUTH_EXPIRED');
+  });
+
+  it('靜默續用失敗時回報 AUTH_EXPIRED，而不是 NETWORK', async () => {
+    await addChild({ name: '測試童', birthDate: '2024-01-01' });
+    writeSyncMode('google');
+
+    // A real googleAuth + driveClient pair, wired the way wireSyncControls does it, so the actual
+    // failure path (getAccessToken throwing on a failed silent resume) runs end to end instead of
+    // a fake drive throwing AuthExpiredError directly.
+    let gisCallback = null;
+    const auth = createGoogleAuth({
+      clientId: 'test-client',
+      loadGis: async () => ({
+        accounts: {
+          oauth2: {
+            initTokenClient: config => {
+              gisCallback = config.callback;
+              return { requestAccessToken: () => gisCallback({ error: 'access_denied' }) };
+            },
+          },
+        },
+      }),
+    });
+    const fetchImpl = vi.fn();
+    const drive = createDriveClient({ auth, fetchImpl });
+    const engine = createSyncEngine({ drive, resolveConflicts: async () => [] });
+
+    const status = await engine.runSync();
+
+    expect(status.phase).toBe('auth');
+    expect(status.error).toBe('AUTH_EXPIRED');
+    expect(fetchImpl).not.toHaveBeenCalled();
+    clearSyncMode();
+  });
+
+  it('合併時若外鍵解不開會延後，不會用未合併的本機內容覆蓋雲端剛改過的欄位', async () => {
+    const child = await addChild({ name: '測試童', birthDate: '2024-01-01' });
+    const form = await addForm({ childId: child.id, tier: 'Ⅱ', period: '2026-01' });
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'X1', date: '2026-01-01', status: 'developed' });
+    const drive = fakeDrive();
+    const engine = createSyncEngine({
+      drive,
+      resolveConflicts: async () => { throw new Error('不該問使用者'); },
+    });
+    await engine.runSync();
+
+    // 雲端把這筆 entry 的 formId 改成指向一筆本機沒有的表單（外鍵解不開）；本機同時改了備註 ——
+    // 兩邊改的是不同欄位，所以會走自動合併，而不是衝突畫面。
+    const [entryFileId, entryFile] = [...drive.files].find(([, f]) => f.store === 'entries');
+    drive.files.set(entryFileId, {
+      ...entryFile, hash: 'changed',
+      payload: { ...entryFile.payload, formId: 'missing-form-uid', updatedAt: '2026-09-13T07:00:00.000Z' },
+    });
+    await putRecord('entries', { ...entry, note: '本機改的' });
+
+    await engine.runSync();
+
+    // 本機沒有寫入被延後的合併結果，備註仍是本機自己改的那個值。
+    expect((await listEntriesForForm(form.id))[0].note).toBe('本機改的');
+    // 雲端那筆也沒被本機未合併的舊 payload 蓋掉 —— 延後的 uid 不能被當成「已解決」而重新上傳。
+    expect(drive.files.get(entryFileId).payload.formId).toBe('missing-form-uid');
   });
 
   it('雲端資料夾格式壞掉時整個停止，不寫入任何東西', async () => {

@@ -2,6 +2,8 @@
 // Drive plus a display name for the greeting. The token lives in memory only and is never
 // persisted — the password gate is a soft deterrent, so anything on disk is readable by whoever
 // has the device, and a Drive-scoped token is worth far more than the local copy of the data.
+import { AuthExpiredError } from './driveClient.js';
+
 export const SCOPES = 'openid profile https://www.googleapis.com/auth/drive.file';
 export const SYNC_MODE_KEY = 'c-form-sync-mode';
 export const SYNC_NAME_KEY = 'c-form-sync-name';
@@ -54,6 +56,7 @@ export function createGoogleAuth({
   let expiresAtMs = 0;
   let tokenClient = null;
   let pending = null;
+  let inFlight = null;
 
   async function ensureClient() {
     if (tokenClient) return tokenClient;
@@ -80,11 +83,17 @@ export function createGoogleAuth({
     return tokenClient;
   }
 
+  // driveClient runs up to MAX_CONCURRENCY requests in parallel, and each one awaits
+  // getAccessToken() independently. Without caching the in-flight refresh, a token expiring
+  // mid-batch would have every concurrent caller overwrite `pending` in turn, so only the last
+  // one's promise would ever resolve and the rest would hang forever.
   function requestToken(options) {
-    return new Promise(resolve => {
+    if (inFlight) return inFlight;
+    inFlight = new Promise(resolve => {
       pending = resolve;
       tokenClient.requestAccessToken(options);
-    });
+    }).finally(() => { inFlight = null; });
+    return inFlight;
   }
 
   async function signIn() {
@@ -115,7 +124,10 @@ export function createGoogleAuth({
   async function getAccessToken() {
     if (token && Date.now() < expiresAtMs) return token;
     const refreshed = await resume();
-    if (!refreshed || !token) throw new Error('AUTH_REQUIRED');
+    // Thrown as AuthExpiredError (not a generic Error) so syncEngine's catch recognizes a failed
+    // silent resume the same way it recognizes a 401/403 from Drive, and surfaces the persistent
+    // "登入已失效，請重新登入" warning instead of a generic network-failure message.
+    if (!refreshed || !token) throw new AuthExpiredError('AUTH_REQUIRED');
     return token;
   }
 

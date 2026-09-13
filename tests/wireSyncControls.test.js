@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { wireSyncControls } from '../src/sync/wireSyncControls.js';
 import { writeSyncMode } from '../src/sync/googleAuth.js';
+import { addChild, listChildren, clearAllData } from '../src/storage/db.js';
 
 const idleStatus = {
   phase: 'idle', textSyncedAt: null, photoSyncedAt: null, photoPending: 0, needsReview: 0, error: null,
@@ -28,8 +29,9 @@ describe('wireSyncControls', () => {
   let container;
   let syncSlot;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
+    await clearAllData();
     container = document.createElement('div');
     syncSlot = document.createElement('div');
     document.body.append(container, syncSlot);
@@ -95,9 +97,10 @@ describe('wireSyncControls', () => {
     expect(statusEl.dataset.persistent).toBe('true');
   });
 
-  it('登出後標題列回到訪客模式，本機資料不動', async () => {
+  it('登出後標題列回到訪客模式，IndexedDB 裡的資料還在', async () => {
     writeSyncMode('google');
     localStorage.setItem('c-form-sync-name', '小美');
+    await addChild({ name: '測試童', birthDate: '2024-01-01' });
     const signOut = vi.fn();
     const controls = wireSyncControls({
       clientId: 'test', syncSlot,
@@ -110,5 +113,26 @@ describe('wireSyncControls', () => {
 
     expect(signOut).toHaveBeenCalled();
     expect(syncSlot.querySelector('[data-action="sync-sign-in"]')).toBeTruthy();
+    expect((await listChildren()).map(c => c.name)).toEqual(['測試童']);
+  });
+
+  it('登出後 visibilitychange／online 事件不會再觸發同步', async () => {
+    writeSyncMode('google');
+    localStorage.setItem('c-form-sync-name', '小美');
+    const scheduleSync = vi.fn();
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: fakeAuthFactory(),
+      createDrive: () => ({}), createEngine: () => fakeEngine({ scheduleSync }),
+    });
+
+    await controls.gate(container, { onDone: () => {} });
+    syncSlot.querySelector('[data-action="sync-sign-out"]').click();
+    scheduleSync.mockClear();
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new Event('online'));
+
+    expect(scheduleSync).not.toHaveBeenCalled();
   });
 });

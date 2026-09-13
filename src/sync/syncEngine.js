@@ -147,8 +147,14 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
       }
     }
 
+    // A deferred write (the merged/cloud payload's foreign key isn't resolvable locally yet) must
+    // not be treated as settled — finalizing it here would let the upload pass below push the
+    // local, unmerged payload and silently overwrite the concurrent cloud edit it was supposed to
+    // merge with. Skipping it leaves both the record and its uid untouched for a later sync.
+    const deferredUids = new Set();
     for (const item of autoMerged.sort(byDependencyOrder)) {
-      await applyRemoteRecord({ store: item.store, uid: item.uid, payload: item.merged }, snapshot);
+      const outcome = await applyRemoteRecord({ store: item.store, uid: item.uid, payload: item.merged }, snapshot);
+      if (outcome === 'deferred') deferredUids.add(item.uid);
     }
 
     if (conflicts.length > 0) {
@@ -159,9 +165,10 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
       for (const conflict of conflicts.sort(byDependencyOrder)) {
         const choice = choices.get(conflict.uid) || 'local';
         if (choice === 'cloud') {
-          await applyRemoteRecord(
+          const outcome = await applyRemoteRecord(
             { store: conflict.store, uid: conflict.uid, payload: conflict.cloudPayload }, snapshot
           );
+          if (outcome === 'deferred') deferredUids.add(conflict.uid);
         } else if (choice === 'both') {
           await keepBoth(conflict.uid, conflict.store, conflict.cloudPayload, snapshot);
         }
@@ -171,7 +178,9 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     }
 
     // --- uploads (local-only, local-newer, and everything a merge/conflict just settled) ---
-    const settledUids = [...autoMerged, ...conflicts].map(item => item.uid);
+    const settledUids = [...autoMerged, ...conflicts]
+      .map(item => item.uid)
+      .filter(uid => !deferredUids.has(uid));
     const uploadUids = new Set([...plan.creates, ...plan.uploads, ...settledUids]);
     // 都保留 minted brand-new uids; they are in neither the plan nor the state, so pick them up
     // by scanning for records the cloud has never seen.

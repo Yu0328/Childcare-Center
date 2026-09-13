@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createGoogleAuth, readSyncMode, writeSyncMode, clearSyncMode, readDisplayName, SCOPES,
 } from '../src/sync/googleAuth.js';
+import { AuthExpiredError } from '../src/sync/driveClient.js';
 
 // A stand-in for the real GIS token client: captures the callback and lets the test decide what
 // Google would have answered.
@@ -100,6 +101,40 @@ describe('createGoogleAuth', () => {
 
     expect(await pending).toBe(null);
     expect(auth.isSignedIn()).toBe(false);
+  });
+
+  it('token 過期時多個併發 getAccessToken 共用同一次 refresh，全部都會拿到結果', async () => {
+    const gis = fakeGis();
+    const auth = createGoogleAuth({
+      clientId: 'test-client',
+      loadGis: gis.loadGis,
+      fetchUserInfo: async () => ({ name: '小美' }),
+    });
+    const first = auth.signIn();
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
+    gis.respond({ access_token: 'tok-1', expires_in: -1 }); // already-expired token
+    await first;
+
+    // Five concurrent callers (driveClient's MAX_CONCURRENCY) all see an expired token and all
+    // trigger a refresh at once; only one GIS request should go out, and every caller must resolve.
+    const calls = Array.from({ length: 5 }, () => auth.getAccessToken());
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(2));
+    expect(gis.calls).toHaveLength(2); // one for signIn, exactly one shared refresh — not five
+    gis.respond({ access_token: 'tok-2', expires_in: 3600 });
+
+    await expect(Promise.all(calls)).resolves.toEqual(['tok-2', 'tok-2', 'tok-2', 'tok-2', 'tok-2']);
+  });
+
+  it('靜默續用失敗時丟出的是 AuthExpiredError，而不是一般 Error', async () => {
+    const gis = fakeGis();
+    writeSyncMode('google');
+    const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
+
+    const pending = auth.getAccessToken();
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
+    gis.respond({ error: 'access_denied' });
+
+    await expect(pending).rejects.toBeInstanceOf(AuthExpiredError);
   });
 
   it('登出只清掉 token 與登入模式', async () => {

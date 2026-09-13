@@ -19,6 +19,8 @@ export function wireSyncControls({
   let header = null;
   let appContainer = null;
   let resumeApp = null;
+  let syncing = false;
+  let listenersWired = false;
 
   // The conflict screen takes over the app area, then hands it back. It is the only part of sync
   // allowed to interrupt the teacher, and only for genuine same-field disagreements.
@@ -50,20 +52,35 @@ export function wireSyncControls({
       },
       onSignOut: () => {
         auth.signOut();
+        syncing = false;
         setWriteListener(null);
         paintHeader('guest');
       },
     });
   }
 
+  // Registered once and left in place for the page's lifetime; the `syncing` guard (not
+  // add/removeEventListener) is what stops them after sign-out. Re-adding a fresh pair on every
+  // sign-in would both accumulate listeners on a shared device and — the actual bug this guards
+  // against — keep firing scheduleSync() for a tab that has since signed out, which fails with
+  // AUTH_REQUIRED and paints "同步失敗" over what is now the guest header.
+  function wireListenersOnce() {
+    if (listenersWired) return;
+    listenersWired = true;
+    document.addEventListener('visibilitychange', () => {
+      if (syncing && !document.hidden) engine.scheduleSync();
+    });
+    window.addEventListener('online', () => {
+      if (syncing) engine.scheduleSync();
+    });
+  }
+
   function startSyncing() {
     paintHeader('google');
+    syncing = true;
     // The design's two triggers: after a save (debounced) and on open / back to foreground.
     setWriteListener(() => engine.scheduleSync());
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) engine.scheduleSync();
-    });
-    window.addEventListener('online', () => engine.scheduleSync());
+    wireListenersOnce();
     engine.runSync();
   }
 
@@ -91,8 +108,9 @@ export function wireSyncControls({
         // Starting offline is normal, not an error: the app is local-first and will sync when the
         // network comes back (the 'online' listener above).
         paintHeader('google');
+        syncing = true;
         setWriteListener(() => engine.scheduleSync());
-        window.addEventListener('online', () => engine.scheduleSync());
+        wireListenersOnce();
         onDone();
         return;
       }
