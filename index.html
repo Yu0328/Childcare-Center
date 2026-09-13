@@ -30380,7 +30380,7 @@ Content-Type: ${contentType}\r
   var SCOPES = "openid profile https://www.googleapis.com/auth/drive.file";
   var SYNC_MODE_KEY = "c-form-sync-mode";
   var SYNC_NAME_KEY = "c-form-sync-name";
-  var RESUME_TIMEOUT_MS = 8e3;
+  var RESUME_TIMEOUT_MS = 3e3;
   var GIS_SRC = "https://accounts.google.com/gsi/client";
   var USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
   function readSyncMode() {
@@ -31242,14 +31242,16 @@ Content-Type: ${contentType}\r
     return "";
   }
   var PERSISTENT_ERRORS = /* @__PURE__ */ new Set(["AUTH_EXPIRED", "FORMAT"]);
-  function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, now = () => /* @__PURE__ */ new Date() }) {
+  function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, onSyncNow, now = () => /* @__PURE__ */ new Date() }) {
     if (mode === "google") {
       slot.innerHTML = `
       <span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}\uFF0C${name}`)}</span>
       <span class="sync-header__status" data-sync-status></span>
+      <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="\u6AA2\u67E5\u53E6\u4E00\u53F0\u88DD\u7F6E\u662F\u5426\u6709\u65B0\u8CC7\u6599">\u7ACB\u5373\u540C\u6B65</button>
       <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">\u767B\u51FA</button>
     `;
       slot.querySelector('[data-action="sync-sign-out"]').addEventListener("click", onSignOut);
+      slot.querySelector('[data-action="sync-now"]').addEventListener("click", () => onSyncNow && onSyncNow());
     } else {
       slot.innerHTML = `
       <button type="button" class="btn btn--header" data-action="sync-sign-in">\u4F7F\u7528 Google \u767B\u5165</button>
@@ -31386,6 +31388,7 @@ Content-Type: ${contentType}\r
     let resumeApp = null;
     let syncing = false;
     let listenersWired = false;
+    const POLL_INTERVAL_MS = 12e4;
     async function resolveConflicts(conflicts) {
       if (!appContainer) return conflicts.map((conflict) => ({ uid: conflict.uid, choice: "local" }));
       const choices = await renderConflictResolveView(appContainer, { conflicts });
@@ -31415,7 +31418,8 @@ Content-Type: ${contentType}\r
           syncing = false;
           setWriteListener(null);
           paintHeader("guest");
-        }
+        },
+        onSyncNow: () => engine.runSync()
       });
     }
     function wireListenersOnce() {
@@ -31427,6 +31431,9 @@ Content-Type: ${contentType}\r
       window.addEventListener("online", () => {
         if (syncing) engine.scheduleSync();
       });
+      setInterval(() => {
+        if (syncing && !document.hidden) engine.scheduleSync();
+      }, POLL_INTERVAL_MS);
     }
     function startSyncing() {
       paintHeader("google");
