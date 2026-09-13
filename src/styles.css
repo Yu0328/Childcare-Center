@@ -203,6 +203,13 @@ button {
   margin-left: auto;
 }
 
+.sync-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 #app {
   /* Narrow default so a list/form page's header and body share one comfortable column instead
      of spreading across the old 960px with the content clustered in the middle. Wide editor

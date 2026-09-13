@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#2a78d6">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'none';">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -213,6 +213,13 @@ button {
   display: flex;
   gap: 0.6rem;
   margin-left: auto;
+}
+
+.sync-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 #app {
@@ -2166,12 +2173,89 @@ fieldset.panel-form__field.import-preview__child legend {
   }
 }
 
+.sign-in-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 26rem;
+  margin: 3rem auto;
+  text-align: center;
+}
+
+.sign-in-choice__hint {
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.sync-header__greeting {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.sync-header__status {
+  font-size: 0.8rem;
+  color: #eaf2fb;
+}
+
+.sync-header__status[data-persistent='true'] {
+  background: #ffe8e6;
+  color: #a32015;
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  font-weight: 600;
+}
+
+.conflict-view__hint {
+  color: #555;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.conflict-card {
+  border: 1px solid #d8d8d2;
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.conflict-card__field {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.conflict-card__field-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.conflict-card__side {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.conflict-card__side strong {
+  flex: 0 0 5rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.conflict-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 </style>
 </head>
 <body>
 <header class="app-header">
   <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
+    <div class="sync-header" id="sync-slot"></div>
     <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
     <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
   </div>
@@ -2216,9 +2300,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/jszip/dist/jszip.min.js
+  // ../../../node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -4582,16 +4666,17 @@ var CFormApp = (() => {
     }
   });
 
-  // src/app.js
-  var app_exports = {};
-  __export(app_exports, {
+  // src/webEntry.js
+  var webEntry_exports = {};
+  __export(webEntry_exports, {
     mountApp: () => mountApp,
-    wireBackupControls: () => wireBackupControls
+    wireBackupControls: () => wireBackupControls,
+    wireSyncControls: () => wireSyncControls
   });
 
   // src/storage/dbCore.js
   var DB_NAME = "c-form-db";
-  var DB_VERSION = 3;
+  var DB_VERSION = 4;
   function openDatabase() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -4647,6 +4732,12 @@ var CFormApp = (() => {
           const childItemOverrides = db.createObjectStore("childItemOverrides", { keyPath: "id", autoIncrement: true });
           childItemOverrides.createIndex("by_planId", "planId");
         }
+        if (!db.objectStoreNames.contains("tombstones")) {
+          db.createObjectStore("tombstones", { keyPath: "uid" });
+        }
+        if (!db.objectStoreNames.contains("syncState")) {
+          db.createObjectStore("syncState", { keyPath: "uid" });
+        }
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -4672,12 +4763,53 @@ var CFormApp = (() => {
       })
     );
   }
+  function newUid() {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    return Array.from(
+      crypto.getRandomValues(new Uint8Array(16)),
+      (byte) => byte.toString(16).padStart(2, "0")
+    ).join("");
+  }
+  var writeListener = null;
+  function setWriteListener(fn) {
+    writeListener = fn;
+  }
+  function notifyWrite() {
+    if (writeListener) writeListener();
+  }
+  async function addRecord(storeName, record) {
+    const stamped = {
+      ...record,
+      uid: record.uid || newUid(),
+      updatedAt: record.updatedAt || (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const id = await runRequest(storeName, "readwrite", (store) => store.add(stamped));
+    notifyWrite();
+    return { ...stamped, id };
+  }
+  async function putRecord(storeName, record) {
+    const stamped = { ...record, uid: record.uid || newUid(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    await runRequest(storeName, "readwrite", (store) => store.put(stamped));
+    notifyWrite();
+    return stamped;
+  }
+  async function deleteRecord(storeName, id) {
+    const existing = await runRequest(storeName, "readonly", (store) => store.get(id));
+    await runRequest(storeName, "readwrite", (store) => store.delete(id));
+    if (existing && existing.uid) {
+      await runRequest(
+        "tombstones",
+        "readwrite",
+        (store) => store.put({ uid: existing.uid, store: storeName, deletedAt: (/* @__PURE__ */ new Date()).toISOString() })
+      );
+    }
+    notifyWrite();
+  }
 
   // src/storage/parentReportDb.js
-  async function addParentReport({ childId, tier, period, isNew = false }) {
+  async function addParentReport({ childId, tier, period, isNew = false, uid, updatedAt }) {
     const createdAt = (/* @__PURE__ */ new Date()).toISOString();
-    const id = await runRequest("parentReports", "readwrite", (store) => store.add({ childId, tier, period, createdAt, isNew }));
-    return { id, childId, tier, period, createdAt, isNew };
+    return addRecord("parentReports", { childId, tier, period, createdAt, isNew, uid, updatedAt });
   }
   async function listParentReportsForChild(childId) {
     return runRequest("parentReports", "readonly", (store) => store.index("by_childId").getAll(childId));
@@ -4688,9 +4820,7 @@ var CFormApp = (() => {
   async function updateParentReport(id, changes) {
     const existing = await runRequest("parentReports", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`ParentReport ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("parentReports", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("parentReports", { ...existing, ...changes, id });
   }
   async function deleteParentReport(id) {
     const coursePlanEntries = await listCoursePlanEntriesForReport(id);
@@ -4709,11 +4839,10 @@ var CFormApp = (() => {
     for (const highlight of highlightEntries) {
       await deleteHighlightEntry(highlight.id);
     }
-    await runRequest("parentReports", "readwrite", (store) => store.delete(id));
+    await deleteRecord("parentReports", id);
   }
-  async function addCoursePlanEntry({ reportId, indicatorCode, activityName, indicatorText = "" }) {
-    const id = await runRequest("coursePlanEntries", "readwrite", (store) => store.add({ reportId, indicatorCode, activityName, indicatorText }));
-    return { id, reportId, indicatorCode, activityName, indicatorText };
+  async function addCoursePlanEntry({ reportId, indicatorCode, activityName, indicatorText = "", uid, updatedAt }) {
+    return addRecord("coursePlanEntries", { reportId, indicatorCode, activityName, indicatorText, uid, updatedAt });
   }
   async function listCoursePlanEntriesForReport(reportId) {
     return runRequest("coursePlanEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
@@ -4721,24 +4850,17 @@ var CFormApp = (() => {
   async function updateCoursePlanEntry(id, changes) {
     const existing = await runRequest("coursePlanEntries", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`CoursePlanEntry ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("coursePlanEntries", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("coursePlanEntries", { ...existing, ...changes, id });
   }
   async function deleteCoursePlanEntry(id) {
     const occurrences = await listCourseOccurrencesForEntry(id);
     for (const occurrence of occurrences) {
       await deleteCourseOccurrence(occurrence.id);
     }
-    await runRequest("coursePlanEntries", "readwrite", (store) => store.delete(id));
+    await deleteRecord("coursePlanEntries", id);
   }
-  async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note }) {
-    const id = await runRequest(
-      "courseOccurrences",
-      "readwrite",
-      (store) => store.add({ entryId, date, status, absent, courseChanged, note })
-    );
-    return { id, entryId, date, status, absent, courseChanged, note };
+  async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note, uid, updatedAt }) {
+    return addRecord("courseOccurrences", { entryId, date, status, absent, courseChanged, note, uid, updatedAt });
   }
   async function listCourseOccurrencesForEntry(entryId) {
     return runRequest("courseOccurrences", "readonly", (store) => store.index("by_entryId").getAll(entryId));
@@ -4746,20 +4868,13 @@ var CFormApp = (() => {
   async function updateCourseOccurrence(id, changes) {
     const existing = await runRequest("courseOccurrences", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`CourseOccurrence ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("courseOccurrences", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("courseOccurrences", { ...existing, ...changes, id });
   }
   async function deleteCourseOccurrence(id) {
-    await runRequest("courseOccurrences", "readwrite", (store) => store.delete(id));
+    await deleteRecord("courseOccurrences", id);
   }
-  async function addDevelopmentRecordEntry({ reportId, domain, courseEntryIds, narrative }) {
-    const id = await runRequest(
-      "developmentRecordEntries",
-      "readwrite",
-      (store) => store.add({ reportId, domain, courseEntryIds, narrative })
-    );
-    return { id, reportId, domain, courseEntryIds, narrative };
+  async function addDevelopmentRecordEntry({ reportId, domain, courseEntryIds, narrative, uid, updatedAt }) {
+    return addRecord("developmentRecordEntries", { reportId, domain, courseEntryIds, narrative, uid, updatedAt });
   }
   async function listDevelopmentRecordEntriesForReport(reportId) {
     return runRequest("developmentRecordEntries", "readonly", (store) => store.index("by_reportId").getAll(reportId));
@@ -4767,16 +4882,13 @@ var CFormApp = (() => {
   async function updateDevelopmentRecordEntry(id, changes) {
     const existing = await runRequest("developmentRecordEntries", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`DevelopmentRecordEntry ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("developmentRecordEntries", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("developmentRecordEntries", { ...existing, ...changes, id });
   }
   async function deleteDevelopmentRecordEntry(id) {
-    await runRequest("developmentRecordEntries", "readwrite", (store) => store.delete(id));
+    await deleteRecord("developmentRecordEntries", id);
   }
-  async function addBehaviorObservation({ reportId, title, narrative }) {
-    const id = await runRequest("behaviorObservations", "readwrite", (store) => store.add({ reportId, title, narrative }));
-    return { id, reportId, title, narrative };
+  async function addBehaviorObservation({ reportId, title, narrative, uid, updatedAt }) {
+    return addRecord("behaviorObservations", { reportId, title, narrative, uid, updatedAt });
   }
   async function listBehaviorObservationsForReport(reportId) {
     return runRequest("behaviorObservations", "readonly", (store) => store.index("by_reportId").getAll(reportId));
@@ -4784,16 +4896,13 @@ var CFormApp = (() => {
   async function updateBehaviorObservation(id, changes) {
     const existing = await runRequest("behaviorObservations", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`BehaviorObservation ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("behaviorObservations", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("behaviorObservations", { ...existing, ...changes, id });
   }
   async function deleteBehaviorObservation(id) {
-    await runRequest("behaviorObservations", "readwrite", (store) => store.delete(id));
+    await deleteRecord("behaviorObservations", id);
   }
-  async function addHighlightEntry({ reportId, photos, caption }) {
-    const id = await runRequest("highlightEntries", "readwrite", (store) => store.add({ reportId, photos, caption }));
-    return { id, reportId, photos, caption };
+  async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt }) {
+    return addRecord("highlightEntries", { reportId, photos, caption, uid, updatedAt });
   }
   async function listHighlightEntriesForReport(reportId) {
     let entries;
@@ -4821,12 +4930,10 @@ var CFormApp = (() => {
   async function updateHighlightEntry(id, changes) {
     const existing = await runRequest("highlightEntries", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`HighlightEntry ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("highlightEntries", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("highlightEntries", { ...existing, ...changes, id });
   }
   async function deleteHighlightEntry(id) {
-    await runRequest("highlightEntries", "readwrite", (store) => store.delete(id));
+    await deleteRecord("highlightEntries", id);
   }
 
   // src/storage/monthlyPlanDb.js
@@ -4838,10 +4945,9 @@ var CFormApp = (() => {
     writeQueues.set(key, next);
     return next;
   }
-  async function addMonthlyCoursePlan({ period, childIds, childTiers, isNew = false }) {
+  async function addMonthlyCoursePlan({ period, childIds, childTiers, isNew = false, uid, updatedAt }) {
     const createdAt = (/* @__PURE__ */ new Date()).toISOString();
-    const id = await runRequest("monthlyCoursePlans", "readwrite", (store) => store.add({ period, childIds, childTiers, createdAt, isNew }));
-    return { id, period, childIds, childTiers, createdAt, isNew };
+    return addRecord("monthlyCoursePlans", { period, childIds, childTiers, createdAt, isNew, uid, updatedAt });
   }
   async function listMonthlyCoursePlans() {
     return runRequest("monthlyCoursePlans", "readonly", (store) => store.getAll());
@@ -4849,9 +4955,7 @@ var CFormApp = (() => {
   async function updateMonthlyCoursePlan(id, changes) {
     const existing = await runRequest("monthlyCoursePlans", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`MonthlyCoursePlan ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("monthlyCoursePlans", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("monthlyCoursePlans", { ...existing, ...changes, id });
   }
   async function deleteMonthlyCoursePlan(id) {
     const slots = await listPlanSlotsForPlan(id);
@@ -4860,44 +4964,40 @@ var CFormApp = (() => {
     }
     const overrides = await listChildItemOverridesForPlan(id);
     for (const override of overrides) {
-      await runRequest("childItemOverrides", "readwrite", (store) => store.delete(override.id));
+      await deleteRecord("childItemOverrides", override.id);
     }
-    await runRequest("monthlyCoursePlans", "readwrite", (store) => store.delete(id));
+    await deleteRecord("monthlyCoursePlans", id);
   }
   async function listPlanSlotsForPlan(planId) {
     return runRequest("planSlots", "readonly", (store) => store.index("by_planId").getAll(planId));
   }
-  async function getOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+  async function getOrCreatePlanSlot({ planId, tier, weekIndex, weekday, uid, updatedAt }) {
     const key = `slot:${planId}:${tier}:${weekIndex}:${weekday}`;
-    return serializeByKey(key, () => writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }));
+    return serializeByKey(key, () => writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday, uid, updatedAt }));
   }
-  async function writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+  async function writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday, uid, updatedAt }) {
     const slots = await listPlanSlotsForPlan(planId);
     const existing = slots.find((s) => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
     if (existing) return existing;
-    const id = await runRequest("planSlots", "readwrite", (store) => store.add({ planId, tier, weekIndex, weekday }));
-    return { id, planId, tier, weekIndex, weekday };
+    return addRecord("planSlots", { planId, tier, weekIndex, weekday, uid, updatedAt });
   }
   async function deletePlanSlot(id) {
     const items = await listPlanSlotItems(id);
     for (const item of items) {
       await deletePlanSlotItem(item.id);
     }
-    await runRequest("planSlots", "readwrite", (store) => store.delete(id));
+    await deleteRecord("planSlots", id);
   }
   async function listPlanSlotItems(slotId) {
     return runRequest("planSlotItems", "readonly", (store) => store.index("by_slotId").getAll(slotId));
   }
-  async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = "" }) {
-    const id = await runRequest("planSlotItems", "readwrite", (store) => store.add({ slotId, indicatorCode, activityName, indicatorText }));
-    return { id, slotId, indicatorCode, activityName, indicatorText };
+  async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = "", uid, updatedAt }) {
+    return addRecord("planSlotItems", { slotId, indicatorCode, activityName, indicatorText, uid, updatedAt });
   }
   async function updatePlanSlotItem(id, changes) {
     const existing = await runRequest("planSlotItems", "readonly", (store) => store.get(id));
     if (!existing) throw new Error(`PlanSlotItem ${id} not found`);
-    const updated = { ...existing, ...changes, id };
-    await runRequest("planSlotItems", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("planSlotItems", { ...existing, ...changes, id });
   }
   async function deletePlanSlotItem(id) {
     const item = await runRequest("planSlotItems", "readonly", (store) => store.get(id));
@@ -4907,54 +5007,55 @@ var CFormApp = (() => {
         const overrides = await listChildItemOverridesForPlan(slot.planId);
         for (const override of overrides) {
           if (override.itemId === id) {
-            await runRequest("childItemOverrides", "readwrite", (store) => store.delete(override.id));
+            await deleteRecord("childItemOverrides", override.id);
           }
         }
       }
     }
-    await runRequest("planSlotItems", "readwrite", (store) => store.delete(id));
+    await deleteRecord("planSlotItems", id);
   }
   async function listChildItemOverridesForPlan(planId) {
     return runRequest("childItemOverrides", "readonly", (store) => store.index("by_planId").getAll(planId));
   }
-  async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = "" }) {
+  async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = "", uid, updatedAt }) {
     const key = `override:${planId}:${childId}:${itemId}`;
     return serializeByKey(
       key,
-      () => writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText })
+      () => writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt })
     );
   }
-  async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText }) {
+  async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt }) {
     const existing = (await listChildItemOverridesForPlan(planId)).find((o) => o.childId === childId && o.itemId === itemId);
     if (!notAchieved && !replaced) {
-      if (existing) await runRequest("childItemOverrides", "readwrite", (store) => store.delete(existing.id));
+      if (existing) await deleteRecord("childItemOverrides", existing.id);
       return null;
     }
     if (existing) {
-      const updated = { ...existing, notAchieved, replaced, replacementText };
-      await runRequest("childItemOverrides", "readwrite", (store) => store.put(updated));
-      return updated;
+      return putRecord("childItemOverrides", { ...existing, notAchieved, replaced, replacementText });
     }
-    const id = await runRequest(
-      "childItemOverrides",
-      "readwrite",
-      (store) => store.add({ planId, childId, itemId, notAchieved, replaced, replacementText })
-    );
-    return { id, planId, childId, itemId, notAchieved, replaced, replacementText };
+    return addRecord("childItemOverrides", {
+      planId,
+      childId,
+      itemId,
+      notAchieved,
+      replaced,
+      replacementText,
+      uid,
+      updatedAt
+    });
   }
   async function deleteChildItemOverridesForChild(planId, childId) {
     const overrides = await listChildItemOverridesForPlan(planId);
     for (const override of overrides) {
       if (override.childId === childId) {
-        await runRequest("childItemOverrides", "readwrite", (store) => store.delete(override.id));
+        await deleteRecord("childItemOverrides", override.id);
       }
     }
   }
 
   // src/storage/db.js
-  async function addChild({ name, birthDate }) {
-    const id = await runRequest("children", "readwrite", (store) => store.add({ name, birthDate }));
-    return { id, name, birthDate };
+  async function addChild({ name, birthDate, uid, updatedAt }) {
+    return addRecord("children", { name, birthDate, uid, updatedAt });
   }
   async function listChildren() {
     return runRequest("children", "readonly", (store) => store.getAll());
@@ -4980,7 +5081,7 @@ var CFormApp = (() => {
       await updateMonthlyCoursePlan(plan.id, { childIds, childTiers });
       await deleteChildItemOverridesForChild(plan.id, id);
     }
-    await runRequest("children", "readwrite", (store) => store.delete(id));
+    await deleteRecord("children", id);
   }
   async function clearAllData() {
     await new Promise((resolve, reject) => {
@@ -4990,10 +5091,9 @@ var CFormApp = (() => {
       request.onblocked = () => resolve();
     });
   }
-  async function addForm({ childId, tier, period, isNew = false }) {
+  async function addForm({ childId, tier, period, isNew = false, uid, updatedAt }) {
     const createdAt = (/* @__PURE__ */ new Date()).toISOString();
-    const id = await runRequest("forms", "readwrite", (store) => store.add({ childId, tier, period, createdAt, isNew }));
-    return { id, childId, tier, period, createdAt, isNew };
+    return addRecord("forms", { childId, tier, period, createdAt, isNew, uid, updatedAt });
   }
   async function listFormsForChild(childId) {
     return runRequest("forms", "readonly", (store) => store.index("by_childId").getAll(childId));
@@ -5006,36 +5106,27 @@ var CFormApp = (() => {
     if (!existing) {
       throw new Error(`Form ${id} not found`);
     }
-    const updated = { ...existing, ...changes, id };
-    await runRequest("forms", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("forms", { ...existing, ...changes, id });
   }
   async function deleteForm(id) {
     const entries = await listEntriesForForm(id);
     for (const entry of entries) {
       await deleteEntry(entry.id);
     }
-    await runRequest("forms", "readwrite", (store) => store.delete(id));
+    await deleteRecord("forms", id);
   }
-  async function addEntry({ formId, indicatorCode, date, status, note, activityName }) {
-    const id = await runRequest(
-      "entries",
-      "readwrite",
-      (store) => store.add({ formId, indicatorCode, date, status, note, activityName })
-    );
-    return { id, formId, indicatorCode, date, status, note, activityName };
+  async function addEntry({ formId, indicatorCode, date, status, note, activityName, uid, updatedAt }) {
+    return addRecord("entries", { formId, indicatorCode, date, status, note, activityName, uid, updatedAt });
   }
   async function updateEntry(id, changes) {
     const existing = await runRequest("entries", "readonly", (store) => store.get(id));
     if (!existing) {
       throw new Error(`Entry ${id} not found`);
     }
-    const updated = { ...existing, ...changes, id };
-    await runRequest("entries", "readwrite", (store) => store.put(updated));
-    return updated;
+    return putRecord("entries", { ...existing, ...changes, id });
   }
   async function deleteEntry(id) {
-    await runRequest("entries", "readwrite", (store) => store.delete(id));
+    await deleteRecord("entries", id);
   }
   async function listEntriesForForm(formId) {
     const entries = await runRequest("entries", "readonly", (store) => store.index("by_formId").getAll(formId));
@@ -6722,7 +6813,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // node_modules/docx/dist/index.mjs
+  // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -28143,7 +28234,7 @@ var CFormApp = (() => {
     const scale = maxEdge / longerEdge;
     return { width: Math.round(width * scale), height: Math.round(height * scale) };
   }
-  async function compressImage(file, { maxEdge = 1600, quality = 0.8 } = {}) {
+  async function compressImage(file, { maxEdge = 960, quality = 0.8 } = {}) {
     const objectUrl = URL.createObjectURL(file);
     try {
       const image = await new Promise((resolve, reject) => {
@@ -29627,12 +29718,23 @@ var CFormApp = (() => {
   async function importV1Or2Children(data) {
     const childIdMap = /* @__PURE__ */ new Map();
     for (const child of data.children) {
-      const created = await addChild({ name: child.name, birthDate: child.birthDate });
+      const created = await addChild({
+        name: child.name,
+        birthDate: child.birthDate,
+        uid: child.uid,
+        updatedAt: child.updatedAt
+      });
       childIdMap.set(child.id, created.id);
     }
     const formIdMap = /* @__PURE__ */ new Map();
     for (const form of data.forms) {
-      const created = await addForm({ childId: childIdMap.get(form.childId), tier: form.tier, period: form.period });
+      const created = await addForm({
+        childId: childIdMap.get(form.childId),
+        tier: form.tier,
+        period: form.period,
+        uid: form.uid,
+        updatedAt: form.updatedAt
+      });
       formIdMap.set(form.id, created.id);
     }
     for (const entry of data.entries) {
@@ -29641,7 +29743,9 @@ var CFormApp = (() => {
         indicatorCode: entry.indicatorCode,
         date: entry.date,
         status: entry.status ?? (entry.achieved ? "developed" : "developing"),
-        note: entry.note
+        note: entry.note,
+        uid: entry.uid,
+        updatedAt: entry.updatedAt
       });
     }
     return childIdMap;
@@ -29649,7 +29753,13 @@ var CFormApp = (() => {
   async function importParentReports(data, childIdMap) {
     const reportIdMap = /* @__PURE__ */ new Map();
     for (const report of data.parentReports ?? []) {
-      const created = await addParentReport({ childId: childIdMap.get(report.childId), tier: report.tier, period: report.period });
+      const created = await addParentReport({
+        childId: childIdMap.get(report.childId),
+        tier: report.tier,
+        period: report.period,
+        uid: report.uid,
+        updatedAt: report.updatedAt
+      });
       reportIdMap.set(report.id, created.id);
     }
     const entryIdMap = /* @__PURE__ */ new Map();
@@ -29658,7 +29768,9 @@ var CFormApp = (() => {
         reportId: reportIdMap.get(entry.reportId),
         indicatorCode: entry.indicatorCode,
         activityName: entry.activityName,
-        indicatorText: entry.indicatorText
+        indicatorText: entry.indicatorText,
+        uid: entry.uid,
+        updatedAt: entry.updatedAt
       });
       entryIdMap.set(entry.id, created.id);
     }
@@ -29669,7 +29781,9 @@ var CFormApp = (() => {
         status: occurrence.status,
         absent: occurrence.absent,
         courseChanged: occurrence.courseChanged,
-        note: occurrence.note
+        note: occurrence.note,
+        uid: occurrence.uid,
+        updatedAt: occurrence.updatedAt
       });
     }
     for (const record of data.developmentRecordEntries ?? []) {
@@ -29677,14 +29791,18 @@ var CFormApp = (() => {
         reportId: reportIdMap.get(record.reportId),
         domain: record.domain,
         courseEntryIds: record.courseEntryIds.map((id) => entryIdMap.get(id)),
-        narrative: record.narrative
+        narrative: record.narrative,
+        uid: record.uid,
+        updatedAt: record.updatedAt
       });
     }
     for (const observation of data.behaviorObservations ?? []) {
       await addBehaviorObservation({
         reportId: reportIdMap.get(observation.reportId),
         title: observation.title,
-        narrative: observation.narrative
+        narrative: observation.narrative,
+        uid: observation.uid,
+        updatedAt: observation.updatedAt
       });
     }
     for (const highlight of data.highlightEntries ?? []) {
@@ -29693,7 +29811,13 @@ var CFormApp = (() => {
         width: photo.width,
         height: photo.height
       }));
-      await addHighlightEntry({ reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption });
+      await addHighlightEntry({
+        reportId: reportIdMap.get(highlight.reportId),
+        photos,
+        caption: highlight.caption,
+        uid: highlight.uid,
+        updatedAt: highlight.updatedAt
+      });
     }
   }
   async function importMonthlyCoursePlans(data, childIdMap) {
@@ -29703,7 +29827,13 @@ var CFormApp = (() => {
       const childTiers = Object.fromEntries(
         Object.entries(plan.childTiers).map(([oldChildId, tier]) => [childIdMap.get(Number(oldChildId)), tier]).filter(([newChildId]) => newChildId !== void 0)
       );
-      const created = await addMonthlyCoursePlan({ period: plan.period, childIds, childTiers });
+      const created = await addMonthlyCoursePlan({
+        period: plan.period,
+        childIds,
+        childTiers,
+        uid: plan.uid,
+        updatedAt: plan.updatedAt
+      });
       planIdMap.set(plan.id, created.id);
     }
     const slotIdMap = /* @__PURE__ */ new Map();
@@ -29712,7 +29842,9 @@ var CFormApp = (() => {
         planId: planIdMap.get(slot.planId),
         tier: slot.tier,
         weekIndex: slot.weekIndex,
-        weekday: slot.weekday
+        weekday: slot.weekday,
+        uid: slot.uid,
+        updatedAt: slot.updatedAt
       });
       slotIdMap.set(slot.id, created.id);
     }
@@ -29722,7 +29854,9 @@ var CFormApp = (() => {
         slotId: slotIdMap.get(item.slotId),
         indicatorCode: item.indicatorCode,
         activityName: item.activityName,
-        indicatorText: item.indicatorText
+        indicatorText: item.indicatorText,
+        uid: item.uid,
+        updatedAt: item.updatedAt
       });
       itemIdMap.set(item.id, created.id);
     }
@@ -29735,7 +29869,9 @@ var CFormApp = (() => {
         itemId: itemIdMap.get(override.itemId),
         notAchieved: override.notAchieved,
         replaced: override.replaced,
-        replacementText: override.replacementText
+        replacementText: override.replacementText,
+        uid: override.uid,
+        updatedAt: override.updatedAt
       });
     }
   }
@@ -29882,7 +30018,7 @@ var CFormApp = (() => {
   var EXPORT_FAILED_MESSAGE = "\u532F\u51FA\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
   var IMPORT_FAILED_MESSAGE = "\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
   var IMPORT_CONFIRM_MESSAGE = "\u532F\u5165\u5099\u4EFD\u6703\u6E05\u9664\u76EE\u524D\u6240\u6709\u8CC7\u6599\uFF0C\u78BA\u5B9A\u8981\u7E7C\u7E8C\u55CE\uFF1F";
-  function mountApp(container, { onUnlock } = {}) {
+  function mountApp(container, { onUnlock, gate } = {}) {
     function showRenderError(err) {
       container.textContent = "";
       const message = document.createElement("p");
@@ -29961,12 +30097,19 @@ var CFormApp = (() => {
     }
     const homeButton = document.getElementById("home-button");
     if (homeButton) homeButton.addEventListener("click", showReportTypeSelect);
-    function handleUnlock() {
+    function start() {
+      if (gate) {
+        gate(container, { onDone: showReportTypeSelect });
+        return;
+      }
       showReportTypeSelect();
+    }
+    function handleUnlock() {
+      start();
       if (onUnlock) onUnlock();
     }
     if (isUnlocked()) {
-      showReportTypeSelect();
+      start();
     } else {
       renderPasswordGate(container, { onUnlock: handleUnlock });
     }
@@ -30055,7 +30198,1229 @@ var CFormApp = (() => {
     });
     return { updateLockState };
   }
-  return __toCommonJS(app_exports);
+
+  // src/sync/googleAuth.js
+  var SCOPES = "openid profile https://www.googleapis.com/auth/drive.file";
+  var SYNC_MODE_KEY = "c-form-sync-mode";
+  var SYNC_NAME_KEY = "c-form-sync-name";
+  var GIS_SRC = "https://accounts.google.com/gsi/client";
+  var USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
+  function readSyncMode() {
+    return localStorage.getItem(SYNC_MODE_KEY);
+  }
+  function writeSyncMode(mode) {
+    localStorage.setItem(SYNC_MODE_KEY, mode);
+  }
+  function clearSyncMode() {
+    localStorage.removeItem(SYNC_MODE_KEY);
+  }
+  function readDisplayName() {
+    return localStorage.getItem(SYNC_NAME_KEY) || "";
+  }
+  function isOffline() {
+    return navigator.onLine === false;
+  }
+  function defaultLoadGis() {
+    if (window.google && window.google.accounts) return Promise.resolve(window.google);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = GIS_SRC;
+      script.async = true;
+      script.onload = () => resolve(window.google);
+      script.onerror = () => reject(new Error("GIS_LOAD_FAILED"));
+      document.head.appendChild(script);
+    });
+  }
+  async function defaultFetchUserInfo(token) {
+    const response = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error("USERINFO_FAILED");
+    return response.json();
+  }
+  function createGoogleAuth({
+    clientId,
+    loadGis = defaultLoadGis,
+    fetchUserInfo = defaultFetchUserInfo
+  }) {
+    let token = null;
+    let expiresAtMs = 0;
+    let tokenClient = null;
+    let pending = null;
+    async function ensureClient() {
+      if (tokenClient) return tokenClient;
+      const google = await loadGis();
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: SCOPES,
+        callback: (response) => {
+          const resolve = pending;
+          pending = null;
+          if (!resolve) return;
+          if (response && response.access_token) {
+            token = response.access_token;
+            expiresAtMs = Date.now() + (Number(response.expires_in) || 3600) * 1e3 - 6e4;
+            resolve(response.access_token);
+          } else {
+            token = null;
+            expiresAtMs = 0;
+            resolve(null);
+          }
+        }
+      });
+      return tokenClient;
+    }
+    function requestToken(options) {
+      return new Promise((resolve) => {
+        pending = resolve;
+        tokenClient.requestAccessToken(options);
+      });
+    }
+    async function signIn() {
+      if (isOffline()) throw new Error("OFFLINE");
+      await ensureClient();
+      const fresh = await requestToken({});
+      if (!fresh) throw new Error("SIGN_IN_CANCELLED");
+      const profile = await fetchUserInfo(fresh);
+      const name = profile && profile.name || "";
+      writeSyncMode("google");
+      localStorage.setItem(SYNC_NAME_KEY, name);
+      return { name };
+    }
+    async function resume() {
+      if (readSyncMode() !== "google") return null;
+      if (isOffline()) return null;
+      await ensureClient();
+      const fresh = await requestToken({ prompt: "" });
+      if (!fresh) return null;
+      return { name: readDisplayName() };
+    }
+    async function getAccessToken() {
+      if (token && Date.now() < expiresAtMs) return token;
+      const refreshed = await resume();
+      if (!refreshed || !token) throw new Error("AUTH_REQUIRED");
+      return token;
+    }
+    function signOut() {
+      token = null;
+      expiresAtMs = 0;
+      clearSyncMode();
+    }
+    return { signIn, resume, getAccessToken, signOut, isSignedIn: () => Boolean(token) };
+  }
+
+  // src/sync/driveClient.js
+  var FOLDER_NAME = "\u80B2\u82F1\u516C\u6258\u586B\u8868\u7CFB\u7D71";
+  var MANIFEST_NAME = "sync-manifest.json";
+  var FORMAT_VERSION = 1;
+  var MAX_CONCURRENCY = 5;
+  var FILES_URL = "https://www.googleapis.com/drive/v3/files";
+  var UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
+  var FOLDER_MIME = "application/vnd.google-apps.folder";
+  var DriveFormatError = class extends Error {
+  };
+  var AuthExpiredError = class extends Error {
+  };
+  async function mapWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let next = 0;
+    async function run() {
+      while (next < items.length) {
+        const index = next++;
+        try {
+          results[index] = { item: items[index], ok: true, value: await worker(items[index]), error: null };
+        } catch (error) {
+          results[index] = { item: items[index], ok: false, value: null, error };
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+    return results;
+  }
+  function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args) }) {
+    async function request(url, options = {}) {
+      const token = await auth.getAccessToken();
+      const response = await fetchImpl(url, {
+        ...options,
+        headers: { Authorization: `Bearer ${token}`, ...options.headers || {} }
+      });
+      if (response.status === 401 || response.status === 403) throw new AuthExpiredError("AUTH_EXPIRED");
+      if (!response.ok) throw new Error(`DRIVE_${response.status}`);
+      return response;
+    }
+    async function listQuery(query) {
+      const url = `${FILES_URL}?q=${encodeURIComponent(query)}&fields=${encodeURIComponent("files(id,name,appProperties)")}&spaces=drive&pageSize=1000`;
+      const response = await request(url);
+      return (await response.json()).files || [];
+    }
+    async function multipartUpload({ metadata, body, contentType, fileId }) {
+      const boundary = "cform-boundary-7f3a";
+      const head = `--${boundary}\r
+Content-Type: application/json; charset=UTF-8\r
+\r
+${JSON.stringify(metadata)}\r
+--${boundary}\r
+Content-Type: ${contentType}\r
+\r
+`;
+      const blob = new Blob([head, body, `\r
+--${boundary}--`], {
+        type: `multipart/related; boundary=${boundary}`
+      });
+      const url = fileId ? `${UPLOAD_URL}/${fileId}?uploadType=multipart&fields=id` : `${UPLOAD_URL}?uploadType=multipart&fields=id`;
+      const response = await request(url, {
+        method: fileId ? "PATCH" : "POST",
+        body: blob,
+        headers: { "Content-Type": `multipart/related; boundary=${boundary}` }
+      });
+      return (await response.json()).id;
+    }
+    async function ensureFolder() {
+      const found = await listQuery(
+        `name='${FOLDER_NAME}' and mimeType='${FOLDER_MIME}' and trashed=false`
+      );
+      if (found.length === 0) {
+        const created = await request(`${FILES_URL}?fields=id`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME })
+        });
+        const folderId2 = (await created.json()).id;
+        await multipartUpload({
+          metadata: { name: MANIFEST_NAME, parents: [folderId2] },
+          body: JSON.stringify({ formatVersion: FORMAT_VERSION }),
+          contentType: "application/json"
+        });
+        return folderId2;
+      }
+      const folderId = found[0].id;
+      const manifests = await listQuery(
+        `name='${MANIFEST_NAME}' and '${folderId}' in parents and trashed=false`
+      );
+      if (manifests.length === 0) throw new DriveFormatError("MANIFEST_MISSING");
+      const manifest = await (await request(`${FILES_URL}/${manifests[0].id}?alt=media`)).json();
+      if (!manifest || manifest.formatVersion !== FORMAT_VERSION) throw new DriveFormatError("MANIFEST_VERSION");
+      return folderId;
+    }
+    async function listCloud(folderId) {
+      const records = /* @__PURE__ */ new Map();
+      const photos = /* @__PURE__ */ new Map();
+      let pageToken = "";
+      let cloudNow = null;
+      do {
+        const query = `'${folderId}' in parents and trashed=false`;
+        const url = `${FILES_URL}?q=${encodeURIComponent(query)}&fields=${encodeURIComponent("nextPageToken,files(id,name,appProperties)")}&spaces=drive&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ""}`;
+        const response = await request(url);
+        cloudNow = cloudNow || response.headers.get("Date");
+        const body = await response.json();
+        for (const file of body.files || []) {
+          const props = file.appProperties || {};
+          if (props.cformPhotoUid) {
+            photos.set(props.cformPhotoUid, { fileId: file.id });
+          } else if (props.cformUid) {
+            records.set(props.cformUid, { store: props.cformStore, hash: props.cformHash, fileId: file.id });
+          }
+        }
+        pageToken = body.nextPageToken || "";
+      } while (pageToken);
+      return { records, photos, cloudNow: cloudNow || (/* @__PURE__ */ new Date()).toISOString() };
+    }
+    async function uploadRecord(folderId, { uid, store, hash, payload, fileId }) {
+      const metadata = fileId ? { appProperties: { cformUid: uid, cformStore: store, cformHash: hash } } : {
+        name: `rec-${uid}.json`,
+        parents: [folderId],
+        appProperties: { cformUid: uid, cformStore: store, cformHash: hash }
+      };
+      const id = await multipartUpload({
+        metadata,
+        body: JSON.stringify(payload),
+        contentType: "application/json",
+        fileId
+      });
+      return { fileId: id };
+    }
+    async function downloadRecord(fileId) {
+      return (await request(`${FILES_URL}/${fileId}?alt=media`)).json();
+    }
+    async function uploadPhoto(folderId, { photoUid, blob, fileId }) {
+      const metadata = fileId ? { appProperties: { cformPhotoUid: photoUid } } : { name: `photo-${photoUid}.jpg`, parents: [folderId], appProperties: { cformPhotoUid: photoUid } };
+      const id = await multipartUpload({
+        metadata,
+        body: blob,
+        contentType: blob.type || "image/jpeg",
+        fileId
+      });
+      return { fileId: id };
+    }
+    async function downloadPhoto(fileId) {
+      return (await request(`${FILES_URL}/${fileId}?alt=media`)).blob();
+    }
+    async function trashFile(fileId) {
+      await request(`${FILES_URL}/${fileId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trashed: true })
+      });
+    }
+    return { ensureFolder, listCloud, uploadRecord, downloadRecord, uploadPhoto, downloadPhoto, trashFile };
+  }
+
+  // src/storage/syncStateDb.js
+  var TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
+  async function readSyncState() {
+    const rows = await runRequest("syncState", "readonly", (store) => store.getAll());
+    return new Map(rows.map((row) => [row.uid, row]));
+  }
+  async function writeSyncState(entry) {
+    await runRequest("syncState", "readwrite", (store) => store.put(entry));
+  }
+  async function deleteSyncState(uid) {
+    await runRequest("syncState", "readwrite", (store) => store.delete(uid));
+  }
+  async function listTombstones() {
+    return runRequest("tombstones", "readonly", (store) => store.getAll());
+  }
+  async function deleteTombstone(uid) {
+    await runRequest("tombstones", "readwrite", (store) => store.delete(uid));
+  }
+  async function purgeExpiredTombstones(nowMs) {
+    let purged = 0;
+    for (const tombstone of await listTombstones()) {
+      if (nowMs - Date.parse(tombstone.deletedAt) > TOMBSTONE_TTL_MS) {
+        await deleteTombstone(tombstone.uid);
+        purged += 1;
+      }
+    }
+    return purged;
+  }
+
+  // src/sync/syncStores.js
+  var CHILD_REF = { store: "children", kind: "id" };
+  var REPORT_REF = { store: "parentReports", kind: "id" };
+  var SYNC_STORES = [
+    { store: "children", refs: {}, naturalKey: (r) => `${r.name}|${r.birthDate}` },
+    { store: "forms", refs: { childId: CHILD_REF }, naturalKey: (r) => `${r.childId}|${r.tier}|${r.period}` },
+    {
+      store: "entries",
+      refs: { formId: { store: "forms", kind: "id" } },
+      naturalKey: (r) => `${r.formId}|${r.indicatorCode}|${r.date}`
+    },
+    { store: "parentReports", refs: { childId: CHILD_REF }, naturalKey: (r) => `${r.childId}|${r.tier}|${r.period}` },
+    {
+      store: "coursePlanEntries",
+      refs: { reportId: REPORT_REF },
+      naturalKey: (r) => `${r.reportId}|${r.indicatorCode}|${r.activityName}`
+    },
+    {
+      store: "courseOccurrences",
+      refs: { entryId: { store: "coursePlanEntries", kind: "id" } },
+      naturalKey: (r) => `${r.entryId}|${r.date}`
+    },
+    {
+      store: "developmentRecordEntries",
+      refs: { reportId: REPORT_REF, courseEntryIds: { store: "coursePlanEntries", kind: "idArray" } },
+      naturalKey: (r) => `${r.reportId}|${r.domain}`
+    },
+    { store: "behaviorObservations", refs: { reportId: REPORT_REF }, naturalKey: (r) => `${r.reportId}|${r.title}` },
+    { store: "highlightEntries", refs: { reportId: REPORT_REF }, naturalKey: (r) => `${r.reportId}|${r.caption}` },
+    {
+      store: "monthlyCoursePlans",
+      refs: {
+        childIds: { store: "children", kind: "idArray" },
+        childTiers: { store: "children", kind: "idKeyObject" }
+      },
+      naturalKey: (r) => r.period
+    },
+    {
+      store: "planSlots",
+      refs: { planId: { store: "monthlyCoursePlans", kind: "id" } },
+      naturalKey: (r) => `${r.planId}|${r.tier}|${r.weekIndex}|${r.weekday}`
+    },
+    {
+      store: "planSlotItems",
+      refs: { slotId: { store: "planSlots", kind: "id" } },
+      naturalKey: (r) => `${r.slotId}|${r.activityName}`
+    },
+    {
+      store: "childItemOverrides",
+      refs: {
+        planId: { store: "monthlyCoursePlans", kind: "id" },
+        childId: CHILD_REF,
+        itemId: { store: "planSlotItems", kind: "id" }
+      },
+      naturalKey: (r) => `${r.planId}|${r.childId}|${r.itemId}`
+    }
+  ];
+  var PHOTO_STORE = "highlightEntries";
+  var STORE_SPECS = new Map(SYNC_STORES.map((spec) => [spec.store, spec]));
+  function storeSpec(storeName) {
+    const spec = STORE_SPECS.get(storeName);
+    if (!spec) throw new Error(`Unknown sync store: ${storeName}`);
+    return spec;
+  }
+  function canonicalJson(value) {
+    if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+    const keys = Object.keys(value).filter((key) => value[key] !== void 0).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  async function hashPayload(payload) {
+    const bytes = new TextEncoder().encode(canonicalJson(payload));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  function serializeRecord(storeName, record, uidOf) {
+    const { refs } = storeSpec(storeName);
+    const payload = {};
+    for (const [key, value] of Object.entries(record)) {
+      if (key === "id") continue;
+      const ref = refs[key];
+      if (!ref) {
+        payload[key] = value;
+        continue;
+      }
+      if (ref.kind === "id") {
+        payload[key] = uidOf(ref.store, value);
+      } else if (ref.kind === "idArray") {
+        payload[key] = (value || []).map((id) => uidOf(ref.store, id)).filter((uid) => uid !== void 0);
+      } else {
+        payload[key] = Object.fromEntries(
+          Object.entries(value || {}).map(([id, inner]) => [uidOf(ref.store, Number(id)), inner]).filter(([uid]) => uid !== void 0)
+        );
+      }
+    }
+    if (storeName === PHOTO_STORE) {
+      payload.photos = (record.photos || []).map((photo) => ({
+        photoUid: photo.photoUid,
+        width: photo.width,
+        height: photo.height,
+        type: photo.type || photo.blob && photo.blob.type || "image/jpeg"
+      }));
+    }
+    return payload;
+  }
+  function deserializeRecord(storeName, payload, idOf, existingPhotos) {
+    const { refs } = storeSpec(storeName);
+    const record = {};
+    for (const [key, value] of Object.entries(payload)) {
+      const ref = refs[key];
+      if (!ref) {
+        record[key] = value;
+        continue;
+      }
+      if (ref.kind === "id") {
+        const id = idOf(ref.store, value);
+        if (id === void 0) return null;
+        record[key] = id;
+      } else if (ref.kind === "idArray") {
+        record[key] = (value || []).map((uid) => idOf(ref.store, uid)).filter((id) => id !== void 0);
+      } else {
+        record[key] = Object.fromEntries(
+          Object.entries(value || {}).map(([uid, inner]) => [idOf(ref.store, uid), inner]).filter(([id]) => id !== void 0)
+        );
+      }
+    }
+    if (storeName === PHOTO_STORE) {
+      const byUid = new Map((existingPhotos || []).map((photo) => [photo.photoUid, photo]));
+      record.photos = (payload.photos || []).map((descriptor) => {
+        const local = byUid.get(descriptor.photoUid);
+        return { ...descriptor, blob: local && local.blob };
+      });
+    }
+    return record;
+  }
+
+  // src/sync/localSnapshot.js
+  function refKey(store, value) {
+    return `${store}:${value}`;
+  }
+  function rawPut(storeName, record) {
+    return runRequest(storeName, "readwrite", (store) => store.put(record));
+  }
+  async function readLocalSnapshot() {
+    const records = /* @__PURE__ */ new Map();
+    const uidById = /* @__PURE__ */ new Map();
+    const idByUid = /* @__PURE__ */ new Map();
+    const rows = /* @__PURE__ */ new Map();
+    for (const { store } of SYNC_STORES) {
+      const all = await runRequest(store, "readonly", (objectStore) => objectStore.getAll());
+      rows.set(store, all);
+      for (const row of all) {
+        if (!row.uid || !row.updatedAt) {
+          row.uid = row.uid || newUid();
+          row.updatedAt = row.updatedAt || row.createdAt || (/* @__PURE__ */ new Date(0)).toISOString();
+          await rawPut(store, row);
+        }
+        uidById.set(refKey(store, row.id), row.uid);
+        idByUid.set(refKey(store, row.uid), row.id);
+      }
+    }
+    const uidOf = (store, id) => uidById.get(refKey(store, id));
+    for (const { store } of SYNC_STORES) {
+      for (const row of rows.get(store)) {
+        const payload = serializeRecord(store, row, uidOf);
+        records.set(row.uid, { store, id: row.id, payload, hash: await hashPayload(payload), record: row });
+      }
+    }
+    return { records, uidById, idByUid };
+  }
+  async function applyRemoteRecord({ store, uid, payload }, snapshot) {
+    const idOf = (refStore, refUid) => snapshot.idByUid.get(refKey(refStore, refUid));
+    const existingId = snapshot.idByUid.get(refKey(store, uid));
+    const existing = existingId === void 0 ? void 0 : await runRequest(store, "readonly", (objectStore) => objectStore.get(existingId));
+    const record = deserializeRecord(store, payload, idOf, existing && existing.photos);
+    if (record === null) return "deferred";
+    record.uid = uid;
+    let finalId = existingId;
+    if (existingId === void 0) {
+      finalId = await runRequest(store, "readwrite", (objectStore) => objectStore.add(record));
+    } else {
+      await rawPut(store, { ...existing, ...record, id: existingId });
+    }
+    snapshot.uidById.set(refKey(store, finalId), uid);
+    snapshot.idByUid.set(refKey(store, uid), finalId);
+    snapshot.records.set(uid, {
+      store,
+      id: finalId,
+      payload,
+      hash: await hashPayload(payload),
+      record: { ...record, id: finalId }
+    });
+    return "written";
+  }
+  async function deleteLocalByUid(store, uid, snapshot) {
+    const id = snapshot.idByUid.get(refKey(store, uid));
+    if (id === void 0) return;
+    await runRequest(store, "readwrite", (objectStore) => objectStore.delete(id));
+    snapshot.idByUid.delete(refKey(store, uid));
+    snapshot.uidById.delete(refKey(store, id));
+    snapshot.records.delete(uid);
+  }
+  async function adoptUid(store, id, cloudUid, snapshot) {
+    const existing = await runRequest(store, "readonly", (objectStore) => objectStore.get(id));
+    if (!existing) return;
+    const oldUid = existing.uid;
+    await rawPut(store, { ...existing, uid: cloudUid });
+    const entry = snapshot.records.get(oldUid);
+    snapshot.records.delete(oldUid);
+    snapshot.idByUid.delete(refKey(store, oldUid));
+    if (entry) {
+      entry.payload = { ...entry.payload, uid: cloudUid };
+      entry.hash = await hashPayload(entry.payload);
+      entry.record = { ...entry.record, uid: cloudUid };
+      snapshot.records.set(cloudUid, entry);
+    }
+    snapshot.uidById.set(refKey(store, id), cloudUid);
+    snapshot.idByUid.set(refKey(store, cloudUid), id);
+  }
+
+  // src/sync/diff.js
+  function planSync({ local, cloud, state, tombstones }) {
+    const creates = [];
+    const uploads = [];
+    const downloads = [];
+    const merges = [];
+    const trashes = [];
+    const localDeletes = [];
+    const upToDate = [];
+    const deleted = new Set(tombstones.map((tombstone) => tombstone.uid));
+    for (const uid of /* @__PURE__ */ new Set([...local.keys(), ...cloud.keys(), ...deleted])) {
+      const localEntry = local.get(uid);
+      const cloudEntry = cloud.get(uid);
+      if (deleted.has(uid)) {
+        if (cloudEntry) trashes.push({ uid, fileId: cloudEntry.fileId });
+        continue;
+      }
+      const base = state.get(uid);
+      if (localEntry && !cloudEntry) {
+        if (base) localDeletes.push(uid);
+        else creates.push(uid);
+        continue;
+      }
+      if (!localEntry && cloudEntry) {
+        if (base) trashes.push({ uid, fileId: cloudEntry.fileId });
+        else downloads.push(uid);
+        continue;
+      }
+      if (!localEntry && !cloudEntry) continue;
+      if (localEntry.hash === cloudEntry.hash) {
+        upToDate.push(uid);
+      } else if (base && localEntry.hash === base.hash) {
+        downloads.push(uid);
+      } else if (base && cloudEntry.hash === base.hash) {
+        uploads.push(uid);
+      } else {
+        merges.push(uid);
+      }
+    }
+    return { creates, uploads, downloads, merges, trashes, localDeletes, upToDate };
+  }
+
+  // src/sync/fieldMerge.js
+  function same(a, b) {
+    return JSON.stringify(a === void 0 ? null : a) === JSON.stringify(b === void 0 ? null : b);
+  }
+  function unionByPhotoUid(localList, cloudList) {
+    const merged = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const item of [...localList || [], ...cloudList || []]) {
+      const key = item && item.photoUid ? item.photoUid : JSON.stringify(item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  }
+  function mergeFields(base, localPayload, cloudPayload, { unionArrayFields = [] } = {}) {
+    const merged = {};
+    const conflicts = [];
+    const unionFields = new Set(unionArrayFields);
+    for (const field of /* @__PURE__ */ new Set([...Object.keys(localPayload), ...Object.keys(cloudPayload)])) {
+      const localValue = localPayload[field];
+      const cloudValue = cloudPayload[field];
+      if (unionFields.has(field)) {
+        merged[field] = unionByPhotoUid(localValue, cloudValue);
+        continue;
+      }
+      if (same(localValue, cloudValue)) {
+        merged[field] = localValue === void 0 ? cloudValue : localValue;
+        continue;
+      }
+      if (base && same(localValue, base[field])) {
+        merged[field] = cloudValue;
+        continue;
+      }
+      if (base && same(cloudValue, base[field])) {
+        merged[field] = localValue;
+        continue;
+      }
+      conflicts.push({ field, local: localValue, cloud: cloudValue });
+      merged[field] = localValue;
+    }
+    return { merged, conflicts };
+  }
+
+  // src/sync/reconcile.js
+  var IGNORED_FIELDS = /* @__PURE__ */ new Set(["uid", "updatedAt", "isNew", "createdAt"]);
+  function comparable(payload) {
+    return canonicalJson(
+      Object.fromEntries(Object.entries(payload).filter(([key]) => !IGNORED_FIELDS.has(key)))
+    );
+  }
+  function remapRefs(storeName, payload, adopt) {
+    const { refs } = storeSpec(storeName);
+    const remapped = { ...payload };
+    for (const [field, ref] of Object.entries(refs)) {
+      const value = payload[field];
+      if (ref.kind === "id") {
+        remapped[field] = adopt.get(value) || value;
+      } else if (ref.kind === "idArray") {
+        remapped[field] = (value || []).map((uid) => adopt.get(uid) || uid);
+      } else {
+        remapped[field] = Object.fromEntries(
+          Object.entries(value || {}).map(([uid, inner]) => [adopt.get(uid) || uid, inner])
+        );
+      }
+    }
+    return remapped;
+  }
+  function reconcileByNaturalKey({ localRecords, cloudRecords }) {
+    const adopt = /* @__PURE__ */ new Map();
+    const differing = [];
+    for (const { store, naturalKey } of SYNC_STORES) {
+      const cloudByKey = /* @__PURE__ */ new Map();
+      for (const [uid, entry] of cloudRecords) {
+        if (entry.store !== store) continue;
+        cloudByKey.set(naturalKey(entry.payload), uid);
+      }
+      for (const [uid, entry] of localRecords) {
+        if (entry.store !== store) continue;
+        const localPayload = remapRefs(store, entry.payload, adopt);
+        const cloudUid = cloudByKey.get(naturalKey(localPayload));
+        if (!cloudUid || cloudUid === uid) continue;
+        adopt.set(uid, cloudUid);
+        if (comparable(localPayload) !== comparable(cloudRecords.get(cloudUid).payload)) {
+          differing.push({ localUid: uid, cloudUid, store });
+        }
+      }
+    }
+    return { adopt, differing };
+  }
+
+  // src/sync/photoSync.js
+  function collectLocalPhotos(snapshot) {
+    const descriptors = /* @__PURE__ */ new Map();
+    for (const entry of snapshot.records.values()) {
+      if (entry.store !== PHOTO_STORE) continue;
+      for (const photo of entry.record.photos || []) {
+        if (photo && photo.photoUid) descriptors.set(photo.photoUid, { entry, photo });
+      }
+    }
+    return descriptors;
+  }
+  async function attachDownloadedPhoto(entry, photoUid, blob) {
+    const stored = await runRequest(entry.store, "readonly", (store) => store.get(entry.id));
+    if (!stored) return;
+    const photos = (stored.photos || []).map(
+      (photo) => photo.photoUid === photoUid ? { ...photo, blob } : photo
+    );
+    await runRequest(entry.store, "readwrite", (store) => store.put({ ...stored, photos, id: entry.id }));
+    entry.record.photos = photos;
+  }
+  async function syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow }) {
+    const localPhotos = collectLocalPhotos(snapshot);
+    const toUpload = [];
+    const toDownload = [];
+    for (const [photoUid, { entry, photo }] of localPhotos) {
+      if (photo.blob && !state.has(photoUid)) {
+        toUpload.push({ photoUid, blob: photo.blob });
+      } else if (!photo.blob && cloudPhotos.has(photoUid)) {
+        toDownload.push({ photoUid, entry, fileId: cloudPhotos.get(photoUid).fileId });
+      }
+    }
+    const toTrash = [];
+    for (const [photoUid, cloudPhoto] of cloudPhotos) {
+      if (!localPhotos.has(photoUid) && state.has(photoUid)) {
+        toTrash.push({ photoUid, fileId: cloudPhoto.fileId });
+      }
+    }
+    const uploads = await mapWithConcurrency(toUpload, MAX_CONCURRENCY, async ({ photoUid, blob }) => {
+      const { fileId } = await drive.uploadPhoto(folderId, { photoUid, blob });
+      await writeSyncState({ uid: photoUid, store: "photo", hash: null, fileId, syncedAt: cloudNow });
+    });
+    const downloads = await mapWithConcurrency(toDownload, MAX_CONCURRENCY, async ({ photoUid, entry, fileId }) => {
+      const blob = await drive.downloadPhoto(fileId);
+      await attachDownloadedPhoto(entry, photoUid, blob);
+      await writeSyncState({ uid: photoUid, store: "photo", hash: null, fileId, syncedAt: cloudNow });
+    });
+    const trashes = await mapWithConcurrency(toTrash, MAX_CONCURRENCY, async ({ photoUid, fileId }) => {
+      await drive.trashFile(fileId);
+      await deleteSyncState(photoUid);
+    });
+    const all = [...uploads, ...downloads, ...trashes];
+    return {
+      uploaded: uploads.filter((r) => r.ok).length,
+      downloaded: downloads.filter((r) => r.ok).length,
+      trashed: trashes.filter((r) => r.ok).length,
+      failed: all.filter((r) => !r.ok).length
+    };
+  }
+
+  // src/sync/syncEngine.js
+  var STORE_ORDER = new Map(SYNC_STORES.map((spec, index) => [spec.store, index]));
+  function byDependencyOrder(a, b) {
+    return STORE_ORDER.get(a.store) - STORE_ORDER.get(b.store);
+  }
+  function createSyncEngine({ drive, resolveConflicts, onStatus = () => {
+  }, debounceMs = 2e3 }) {
+    let status = {
+      phase: "idle",
+      textSyncedAt: null,
+      photoSyncedAt: null,
+      photoPending: 0,
+      needsReview: 0,
+      error: null
+    };
+    let running = null;
+    let debounceTimer = null;
+    function setStatus(changes) {
+      status = { ...status, ...changes };
+      onStatus(status);
+      return status;
+    }
+    async function persistBase(uid, store, payload, fileId, cloudNow) {
+      await writeSyncState({
+        uid,
+        store,
+        hash: await hashPayload(payload),
+        base: payload,
+        fileId,
+        syncedAt: cloudNow
+      });
+    }
+    async function keepBoth(uid, store, cloudPayload, snapshot) {
+      const localEntry = snapshot.records.get(uid);
+      if (localEntry) {
+        const stored = await runRequest(store, "readonly", (objectStore) => objectStore.get(localEntry.id));
+        if (stored) await putRecord(store, { ...stored, needsReview: true });
+      }
+      const freshUid = newUid();
+      await applyRemoteRecord(
+        { store, uid: freshUid, payload: { ...cloudPayload, uid: freshUid, needsReview: true } },
+        snapshot
+      );
+    }
+    async function runOnce() {
+      setStatus({ phase: "syncing", error: null });
+      const folderId = await drive.ensureFolder();
+      await purgeExpiredTombstones(Date.now());
+      let snapshot = await readLocalSnapshot();
+      let state = await readSyncState();
+      const { records: cloudRecords, photos: cloudPhotos, cloudNow } = await drive.listCloud(folderId);
+      const recordState = new Map([...state].filter(([, row]) => row.store !== "photo"));
+      if (recordState.size === 0 && snapshot.records.size > 0 && cloudRecords.size > 0) {
+        const cloudPayloads = /* @__PURE__ */ new Map();
+        await mapWithConcurrency([...cloudRecords], MAX_CONCURRENCY, async ([uid, cloudEntry]) => {
+          cloudPayloads.set(uid, {
+            store: cloudEntry.store,
+            payload: await drive.downloadRecord(cloudEntry.fileId)
+          });
+        });
+        const { adopt } = reconcileByNaturalKey({
+          localRecords: new Map([...snapshot.records].map(([uid, e]) => [uid, { store: e.store, payload: e.payload }])),
+          cloudRecords: cloudPayloads
+        });
+        for (const [localUid, cloudUid] of adopt) {
+          const entry = snapshot.records.get(localUid);
+          if (entry) await adoptUid(entry.store, entry.id, cloudUid, snapshot);
+        }
+        if (adopt.size > 0) snapshot = await readLocalSnapshot();
+      }
+      const plan = planSync({
+        local: snapshot.records,
+        cloud: cloudRecords,
+        state,
+        tombstones: await listTombstones()
+      });
+      const downloadTargets = plan.downloads.map((uid) => ({ uid, ...cloudRecords.get(uid) }));
+      const fetched = await mapWithConcurrency(downloadTargets, MAX_CONCURRENCY, async (target) => ({
+        ...target,
+        payload: await drive.downloadRecord(target.fileId)
+      }));
+      let pendingApply = fetched.filter((r) => r.ok).map((r) => r.value).sort(byDependencyOrder);
+      for (let pass = 0; pass < 2 && pendingApply.length > 0; pass += 1) {
+        const deferred = [];
+        for (const item of pendingApply) {
+          const outcome = await applyRemoteRecord(
+            { store: item.store, uid: item.uid, payload: item.payload },
+            snapshot
+          );
+          if (outcome === "deferred") deferred.push(item);
+          else await persistBase(item.uid, item.store, item.payload, item.fileId, cloudNow);
+        }
+        pendingApply = deferred;
+      }
+      const mergeTargets = plan.merges.map((uid) => ({ uid, ...cloudRecords.get(uid) }));
+      const mergeFetched = await mapWithConcurrency(mergeTargets, MAX_CONCURRENCY, async (target) => ({
+        ...target,
+        payload: await drive.downloadRecord(target.fileId)
+      }));
+      const IGNORED_MERGE_FIELDS = /* @__PURE__ */ new Set(["uid", "updatedAt", "isNew", "createdAt"]);
+      const omitIgnored = (payload) => Object.fromEntries(Object.entries(payload).filter(([key]) => !IGNORED_MERGE_FIELDS.has(key)));
+      const conflicts = [];
+      const autoMerged = [];
+      for (const result of mergeFetched) {
+        if (!result.ok) continue;
+        const { uid, store, fileId, payload: cloudPayload } = result.value;
+        const localEntry = snapshot.records.get(uid);
+        if (!localEntry) continue;
+        const stateRow = state.get(uid);
+        const base = stateRow ? stateRow.base || null : null;
+        const { merged, conflicts: clashes } = mergeFields(
+          base && omitIgnored(base),
+          omitIgnored(localEntry.payload),
+          omitIgnored(cloudPayload),
+          { unionArrayFields: store === PHOTO_STORE ? ["photos"] : [] }
+        );
+        if (clashes.length === 0) {
+          autoMerged.push({ uid, store, fileId, merged: { ...localEntry.payload, ...merged } });
+        } else {
+          conflicts.push({
+            uid,
+            store,
+            fileId,
+            fields: clashes,
+            localPayload: localEntry.payload,
+            cloudPayload
+          });
+        }
+      }
+      for (const item of autoMerged.sort(byDependencyOrder)) {
+        await applyRemoteRecord({ store: item.store, uid: item.uid, payload: item.merged }, snapshot);
+      }
+      if (conflicts.length > 0) {
+        const answers = await resolveConflicts(conflicts.map((c) => ({
+          uid: c.uid,
+          store: c.store,
+          fields: c.fields,
+          localPayload: c.localPayload,
+          cloudPayload: c.cloudPayload
+        })));
+        const choices = new Map(answers.map((answer) => [answer.uid, answer.choice]));
+        for (const conflict of conflicts.sort(byDependencyOrder)) {
+          const choice = choices.get(conflict.uid) || "local";
+          if (choice === "cloud") {
+            await applyRemoteRecord(
+              { store: conflict.store, uid: conflict.uid, payload: conflict.cloudPayload },
+              snapshot
+            );
+          } else if (choice === "both") {
+            await keepBoth(conflict.uid, conflict.store, conflict.cloudPayload, snapshot);
+          }
+        }
+        snapshot = await readLocalSnapshot();
+      }
+      const settledUids = [...autoMerged, ...conflicts].map((item) => item.uid);
+      const uploadUids = /* @__PURE__ */ new Set([...plan.creates, ...plan.uploads, ...settledUids]);
+      for (const [uid] of snapshot.records) {
+        if (!state.has(uid) && !cloudRecords.has(uid)) uploadUids.add(uid);
+      }
+      const uploadTargets = [...uploadUids].map((uid) => {
+        const entry = snapshot.records.get(uid);
+        if (!entry) return null;
+        const known = state.get(uid) || cloudRecords.get(uid);
+        return { uid, store: entry.store, payload: entry.payload, fileId: known && known.fileId };
+      }).filter(Boolean);
+      const uploaded = await mapWithConcurrency(uploadTargets, MAX_CONCURRENCY, async (target) => {
+        const hash = await hashPayload(target.payload);
+        const { fileId } = await drive.uploadRecord(folderId, {
+          uid: target.uid,
+          store: target.store,
+          hash,
+          payload: target.payload,
+          fileId: target.fileId
+        });
+        await persistBase(target.uid, target.store, target.payload, fileId, cloudNow);
+      });
+      await mapWithConcurrency(plan.trashes, MAX_CONCURRENCY, async ({ uid, fileId }) => {
+        await drive.trashFile(fileId);
+        await deleteSyncState(uid);
+        await deleteTombstone(uid);
+      });
+      for (const tombstone of await listTombstones()) {
+        if (!cloudRecords.has(tombstone.uid)) await deleteTombstone(tombstone.uid);
+      }
+      for (const uid of plan.localDeletes) {
+        const entry = snapshot.records.get(uid);
+        if (entry) await deleteLocalByUid(entry.store, uid, snapshot);
+        await deleteSyncState(uid);
+      }
+      for (const uid of plan.upToDate) {
+        const stateRow = state.get(uid);
+        if (stateRow && stateRow.base) continue;
+        const entry = snapshot.records.get(uid);
+        const cloudEntry = cloudRecords.get(uid);
+        if (entry && cloudEntry) await persistBase(uid, entry.store, entry.payload, cloudEntry.fileId, cloudNow);
+      }
+      state = await readSyncState();
+      snapshot = await readLocalSnapshot();
+      const photoResult = await syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow });
+      const needsReview = [...snapshot.records.values()].filter((entry) => entry.record.needsReview).length;
+      const textFailed = [...fetched, ...mergeFetched, ...uploaded].some((result) => !result.ok);
+      return setStatus({
+        phase: "done",
+        textSyncedAt: textFailed ? status.textSyncedAt : cloudNow,
+        photoSyncedAt: photoResult.failed > 0 ? status.photoSyncedAt : cloudNow,
+        photoPending: photoResult.failed,
+        needsReview,
+        error: textFailed ? "NETWORK" : null
+      });
+    }
+    async function runSync() {
+      if (running) return running;
+      running = (async () => {
+        try {
+          return await runOnce();
+        } catch (err) {
+          if (err instanceof AuthExpiredError) return setStatus({ phase: "auth", error: "AUTH_EXPIRED" });
+          if (err instanceof DriveFormatError) return setStatus({ phase: "format", error: "FORMAT" });
+          return setStatus({ phase: "error", error: "NETWORK" });
+        } finally {
+          running = null;
+        }
+      })();
+      return running;
+    }
+    function scheduleSync() {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        runSync();
+      }, debounceMs);
+    }
+    return { runSync, scheduleSync, getStatus: () => status };
+  }
+
+  // src/ui/signInChoiceView.js
+  function needsSignInChoice() {
+    return readSyncMode() === null;
+  }
+  function renderSignInChoiceView(container, { onGoogle, onGuest }) {
+    container.innerHTML = `
+    <div class="sign-in-choice">
+      <h2 class="sign-in-choice__title">\u8981\u8B93\u8CC7\u6599\u5728\u88DD\u7F6E\u4E4B\u9593\u81EA\u52D5\u540C\u6B65\u55CE\uFF1F</h2>
+      <p class="sign-in-choice__hint">\u767B\u5165 Google \u5E33\u865F\u5F8C\uFF0C\u9019\u53F0\u88DD\u7F6E\u7684\u8CC7\u6599\u6703\u81EA\u52D5\u8DDF\u4F60\u5176\u4ED6\u88DD\u7F6E\u540C\u6B65\uFF0C\u4E0D\u7528\u518D\u624B\u52D5\u532F\u51FA\u532F\u5165\u3002</p>
+      <button type="button" class="btn btn--primary" data-action="sign-in-google">\u4F7F\u7528 Google \u767B\u5165</button>
+      <button type="button" class="btn btn--outline" data-action="continue-guest">\u4EE5\u8A2A\u5BA2\u8EAB\u4EFD\u7E7C\u7E8C</button>
+      <p class="field-error" data-error></p>
+    </div>
+  `;
+    const googleButton = container.querySelector('[data-action="sign-in-google"]');
+    const errorEl = container.querySelector("[data-error]");
+    googleButton.addEventListener("click", async () => {
+      if (isOffline()) {
+        errorEl.textContent = "\u76EE\u524D\u96E2\u7DDA\uFF0C\u66AB\u6642\u7121\u6CD5\u767B\u5165";
+        return;
+      }
+      errorEl.textContent = "";
+      googleButton.disabled = true;
+      try {
+        await onGoogle();
+      } catch (err) {
+        errorEl.textContent = "\u767B\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      } finally {
+        googleButton.disabled = false;
+      }
+    });
+    container.querySelector('[data-action="continue-guest"]').addEventListener("click", () => {
+      writeSyncMode("guest");
+      onGuest();
+    });
+  }
+
+  // src/ui/syncHeader.js
+  function greetingFor(date) {
+    const hour = date.getHours();
+    if (hour >= 5 && hour < 12) return "\u65E9\u5B89";
+    if (hour >= 12 && hour < 18) return "\u5348\u5B89";
+    return "\u665A\u5B89";
+  }
+  function clockTime(iso) {
+    if (!iso) return "";
+    const date = new Date(iso);
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  }
+  function formatSyncStatus(status) {
+    if (status.error === "AUTH_EXPIRED") return "\u767B\u5165\u5DF2\u5931\u6548\uFF0C\u8ACB\u91CD\u65B0\u767B\u5165";
+    if (status.error === "FORMAT") return "\u96F2\u7AEF\u8CC7\u6599\u593E\u7570\u5E38\uFF0C\u5DF2\u505C\u6B62\u540C\u6B65";
+    if (status.phase === "syncing") return "\u540C\u6B65\u4E2D\u2026";
+    if (status.photoPending > 0) {
+      return `\u6587\u5B57\u8CC7\u6599\uFF1A${clockTime(status.textSyncedAt)}\u3000\u7167\u7247\uFF1A\u540C\u6B65\u5931\u6557\uFF0C\u9084\u6709 ${status.photoPending} \u5F35\u672A\u4E0A\u50B3`;
+    }
+    if (status.error === "NETWORK") return "\u540C\u6B65\u5931\u6557\uFF0C\u7A0D\u5F8C\u6703\u81EA\u52D5\u91CD\u8A66";
+    if (status.textSyncedAt) return `\u4E0A\u6B21\u540C\u6B65\uFF1A${clockTime(status.textSyncedAt)}`;
+    return "";
+  }
+  var PERSISTENT_ERRORS = /* @__PURE__ */ new Set(["AUTH_EXPIRED", "FORMAT"]);
+  function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, now = () => /* @__PURE__ */ new Date() }) {
+    if (mode === "google") {
+      slot.innerHTML = `
+      <span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}\uFF0C${name}`)}</span>
+      <span class="sync-header__status" data-sync-status></span>
+      <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">\u767B\u51FA</button>
+    `;
+      slot.querySelector('[data-action="sync-sign-out"]').addEventListener("click", onSignOut);
+    } else {
+      slot.innerHTML = `
+      <button type="button" class="btn btn--header" data-action="sync-sign-in">\u4F7F\u7528 Google \u767B\u5165</button>
+      <span class="sync-header__status" data-sync-status></span>
+    `;
+      slot.querySelector('[data-action="sync-sign-in"]').addEventListener("click", async () => {
+        const el = slot.querySelector("[data-sync-status]");
+        if (isOffline()) {
+          el.textContent = "\u76EE\u524D\u96E2\u7DDA\uFF0C\u66AB\u6642\u7121\u6CD5\u767B\u5165";
+          return;
+        }
+        el.textContent = "";
+        await onSignIn();
+      });
+    }
+    const statusEl = slot.querySelector("[data-sync-status]");
+    function update(nextStatus) {
+      statusEl.textContent = formatSyncStatus(nextStatus);
+      if (PERSISTENT_ERRORS.has(nextStatus.error)) statusEl.dataset.persistent = "true";
+      else delete statusEl.dataset.persistent;
+    }
+    update(status);
+    return { update };
+  }
+
+  // src/ui/conflictResolveView.js
+  var STORE_LABELS = {
+    children: "\u5E7C\u5152\u57FA\u672C\u8CC7\u6599",
+    forms: "\u9069\u6027\u7E3D\u8868",
+    entries: "\u89C0\u5BDF\u7D00\u9304",
+    parentReports: "\u9069\u6027\u7D00\u9304\uFF08\u5BB6\u9577\u7248\uFF09",
+    coursePlanEntries: "\u8AB2\u7A0B\u8A08\u756B",
+    courseOccurrences: "\u8AB2\u7A0B\u51FA\u5E2D\u7D00\u9304",
+    developmentRecordEntries: "\u9069\u6027\u767C\u5C55\u7D00\u9304",
+    behaviorObservations: "\u884C\u70BA\u89C0\u5BDF",
+    highlightEntries: "\u9EDE\u6EF4\u5206\u4EAB",
+    monthlyCoursePlans: "\u6708\u8A08\u756B",
+    planSlots: "\u6708\u8A08\u756B\u6642\u6BB5",
+    planSlotItems: "\u6708\u8A08\u756B\u6D3B\u52D5",
+    childItemOverrides: "\u6708\u8A08\u756B\u500B\u5225\u8ABF\u6574"
+  };
+  var FIELD_LABELS = {
+    name: "\u59D3\u540D",
+    birthDate: "\u51FA\u751F\u65E5\u671F",
+    tier: "\u6708\u9F61\u968E\u6BB5",
+    period: "\u7D00\u9304\u5E74\u6708",
+    indicatorCode: "\u6307\u6A19\u4EE3\u78BC",
+    activityName: "\u6D3B\u52D5\u540D\u7A31",
+    indicatorText: "\u6307\u6A19\u5167\u5BB9",
+    date: "\u65E5\u671F",
+    status: "\u72C0\u614B",
+    note: "\u5099\u8A3B",
+    narrative: "\u6587\u5B57\u7D00\u9304",
+    domain: "\u9818\u57DF",
+    title: "\u6A19\u984C",
+    caption: "\u63CF\u8FF0",
+    photos: "\u7167\u7247",
+    replacementText: "\u66FF\u4EE3\u6D3B\u52D5"
+  };
+  function valueText(value) {
+    if (value === void 0 || value === null || value === "") return "\uFF08\u7A7A\u767D\uFF09";
+    if (Array.isArray(value)) return `${value.length} \u9805`;
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  }
+  function conflictCard(conflict) {
+    const rows = conflict.fields.map(
+      (field) => `
+        <div class="conflict-card__field">
+          <span class="conflict-card__field-name">${escapeHtml(FIELD_LABELS[field.field] || field.field)}</span>
+          <div class="conflict-card__side"><strong>\u9019\u53F0\u88DD\u7F6E</strong><span>${escapeHtml(valueText(field.local))}</span></div>
+          <div class="conflict-card__side"><strong>\u96F2\u7AEF</strong><span>${escapeHtml(valueText(field.cloud))}</span></div>
+        </div>
+      `
+    ).join("");
+    const uid = escapeHtml(conflict.uid);
+    return `
+    <div class="conflict-card" data-conflict="${uid}">
+      <h3 class="conflict-card__title">${escapeHtml(STORE_LABELS[conflict.store] || conflict.store)}</h3>
+      ${rows}
+      <div class="conflict-card__actions">
+        <button type="button" class="btn btn--outline btn--small" data-choice="local" data-uid="${uid}">\u4FDD\u7559\u9019\u53F0\u88DD\u7F6E\u7684</button>
+        <button type="button" class="btn btn--outline btn--small" data-choice="cloud" data-uid="${uid}">\u4FDD\u7559\u96F2\u7AEF\u7684</button>
+        <button type="button" class="btn btn--outline btn--small" data-choice="both" data-uid="${uid}">\u90FD\u4FDD\u7559</button>
+      </div>
+    </div>
+  `;
+  }
+  function renderConflictResolveView(container, { conflicts }) {
+    container.innerHTML = `
+    <div class="conflict-view">
+      <div class="page-header">
+        <h2 class="page-header__title">\u6709 ${conflicts.length} \u7B46\u8CC7\u6599\u5169\u908A\u90FD\u6539\u904E</h2>
+      </div>
+      <p class="conflict-view__hint">\u8ACB\u9078\u64C7\u6BCF\u4E00\u7B46\u8981\u4FDD\u7559\u54EA\u4E00\u4EFD\u3002\u9078\u300C\u90FD\u4FDD\u7559\u300D\u6703\u8B8A\u6210\u5169\u7B46\u8A18\u9304\u4E26\u6A19\u4E0A\u300C\u5F85\u78BA\u8A8D\u300D\uFF0C\u8B93\u4F60\u4E4B\u5F8C\u81EA\u5DF1\u6574\u7406\u3002</p>
+      ${conflicts.map(conflictCard).join("")}
+      <button type="button" class="btn btn--primary" data-action="conflicts-done" disabled>\u5B8C\u6210</button>
+    </div>
+  `;
+    const choices = /* @__PURE__ */ new Map();
+    const doneButton = container.querySelector('[data-action="conflicts-done"]');
+    for (const button of container.querySelectorAll("[data-choice]")) {
+      button.addEventListener("click", () => {
+        const { uid, choice } = button.dataset;
+        choices.set(uid, choice);
+        for (const sibling of container.querySelectorAll(`[data-uid="${uid}"]`)) {
+          sibling.classList.toggle("btn--primary", sibling === button);
+          sibling.classList.toggle("btn--outline", sibling !== button);
+        }
+        doneButton.disabled = choices.size !== conflicts.length;
+      });
+    }
+    return new Promise((resolve) => {
+      doneButton.addEventListener("click", () => {
+        resolve(conflicts.map((conflict) => ({ uid: conflict.uid, choice: choices.get(conflict.uid) || "local" })));
+      });
+    });
+  }
+
+  // src/sync/wireSyncControls.js
+  function wireSyncControls({
+    clientId,
+    syncSlot,
+    createAuth = (config) => createGoogleAuth(config),
+    createDrive = (config) => createDriveClient(config),
+    createEngine = (config) => createSyncEngine(config)
+  }) {
+    const auth = createAuth({ clientId });
+    const drive = createDrive({ auth });
+    let header = null;
+    let appContainer = null;
+    let resumeApp = null;
+    async function resolveConflicts(conflicts) {
+      if (!appContainer) return conflicts.map((conflict) => ({ uid: conflict.uid, choice: "local" }));
+      const choices = await renderConflictResolveView(appContainer, { conflicts });
+      if (resumeApp) resumeApp();
+      return choices;
+    }
+    const engine = createEngine({
+      drive,
+      resolveConflicts,
+      onStatus: (status) => header && header.update(status)
+    });
+    function paintHeader(mode) {
+      header = renderSyncHeader(syncSlot, {
+        mode,
+        name: readDisplayName(),
+        status: engine.getStatus(),
+        onSignIn: async () => {
+          try {
+            await auth.signIn();
+            startSyncing();
+          } catch (err) {
+            if (err.message !== "OFFLINE") header.update({ ...engine.getStatus(), error: "NETWORK" });
+          }
+        },
+        onSignOut: () => {
+          auth.signOut();
+          setWriteListener(null);
+          paintHeader("guest");
+        }
+      });
+    }
+    function startSyncing() {
+      paintHeader("google");
+      setWriteListener(() => engine.scheduleSync());
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) engine.scheduleSync();
+      });
+      window.addEventListener("online", () => engine.scheduleSync());
+      engine.runSync();
+    }
+    async function gate(container, { onDone }) {
+      appContainer = container;
+      resumeApp = onDone;
+      if (needsSignInChoice()) {
+        renderSignInChoiceView(container, {
+          onGoogle: async () => {
+            await auth.signIn();
+            startSyncing();
+            onDone();
+          },
+          onGuest: () => {
+            paintHeader("guest");
+            onDone();
+          }
+        });
+        return;
+      }
+      if (readSyncMode() === "google") {
+        if (isOffline()) {
+          paintHeader("google");
+          setWriteListener(() => engine.scheduleSync());
+          window.addEventListener("online", () => engine.scheduleSync());
+          onDone();
+          return;
+        }
+        const resumed = await auth.resume();
+        if (resumed) {
+          startSyncing();
+        } else {
+          paintHeader("google");
+          header.update({ ...engine.getStatus(), phase: "auth", error: "AUTH_EXPIRED" });
+        }
+        onDone();
+        return;
+      }
+      paintHeader("guest");
+      onDone();
+    }
+    return { gate };
+  }
+  return __toCommonJS(webEntry_exports);
 })();
 /*! Bundled license information:
 
@@ -30101,7 +31466,14 @@ document.addEventListener('DOMContentLoaded', () => {
     exportButton: document.getElementById('export-backup'),
     importInput: document.getElementById('import-backup'),
   });
-  CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
+  const syncControls = CFormApp.wireSyncControls({
+    clientId: '841383586205-ohr1uhsrii1tg3oevtcacimc4sviekcr.apps.googleusercontent.com',
+    syncSlot: document.getElementById('sync-slot'),
+  });
+  CFormApp.mountApp(document.getElementById('app'), {
+    onUnlock: backupControls.updateLockState,
+    gate: syncControls.gate,
+  });
 });
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {

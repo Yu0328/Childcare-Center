@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 mkdirSync('site/icons', { recursive: true });
 
 const result = await esbuild.build({
-  entryPoints: ['src/app.js'],
+  entryPoints: ['src/webEntry.js'],
   bundle: true,
   format: 'iife',
   globalName: 'CFormApp',
@@ -26,13 +26,17 @@ const css = readFileSync('src/styles.css', 'utf-8');
 const buildHash = createHash('sha256').update(js).digest('hex').slice(0, 12);
 const cacheName = `c-form-cache-${buildHash}`;
 
+// Public by design — an OAuth Client ID is not a secret (the client secret is, and this app
+// doesn't use one: GIS's token flow doesn't need it).
+const GOOGLE_CLIENT_ID = '841383586205-ohr1uhsrii1tg3oevtcacimc4sviekcr.apps.googleusercontent.com';
+
 const html = `<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#2a78d6">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'none';">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -45,6 +49,7 @@ ${css}
 <header class="app-header">
   <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
+    <div class="sync-header" id="sync-slot"></div>
     <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
     <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
   </div>
@@ -57,7 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
     exportButton: document.getElementById('export-backup'),
     importInput: document.getElementById('import-backup'),
   });
-  CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
+  const syncControls = CFormApp.wireSyncControls({
+    clientId: '${GOOGLE_CLIENT_ID}',
+    syncSlot: document.getElementById('sync-slot'),
+  });
+  CFormApp.mountApp(document.getElementById('app'), {
+    onUnlock: backupControls.updateLockState,
+    gate: syncControls.gate,
+  });
 });
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -102,6 +114,13 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Only same-origin GETs are cacheable. The old handler tried to cache.put() every request,
+  // which throws on a POST and on an opaque cross-origin response — and on failure fell back to
+  // caches.match(), resolving with undefined and breaking every Drive API call while offline.
+  // Anything else goes straight to the network so the sync layer sees real errors.
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
