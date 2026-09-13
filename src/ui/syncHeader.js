@@ -36,6 +36,15 @@ export function formatSyncStatus(status) {
 
 const PERSISTENT_ERRORS = new Set(['AUTH_EXPIRED', 'FORMAT']);
 
+// Drives the status light and text color: orange while syncing, red on any failure (including
+// partial photo failure), green once a sync has actually succeeded, or no light before the first sync.
+function syncLightState(status) {
+  if (status.phase === 'syncing') return 'syncing';
+  if (status.error || status.photoPending > 0) return 'error';
+  if (status.textSyncedAt) return 'ok';
+  return null;
+}
+
 export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, onSyncNow, now = () => new Date() }) {
   if (mode === 'google') {
     slot.innerHTML = `
@@ -66,9 +75,11 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
 
   function update(nextStatus) {
     statusEl.textContent = formatSyncStatus(nextStatus);
-    // Drives the CSS spinner — the only visible sign a multi-minute first sync is alive, not stuck.
-    if (nextStatus.phase === 'syncing') statusEl.dataset.syncing = 'true';
-    else delete statusEl.dataset.syncing;
+    // Drives the blinking status light and matching text color (green/orange/red) instead of a
+    // spinner — a steadier signal than an animated spin that some browsers render as frozen.
+    const light = syncLightState(nextStatus);
+    if (light) statusEl.dataset.syncLight = light;
+    else delete statusEl.dataset.syncLight;
     // Marked so styles.css can render it as a standing warning rather than something that fades;
     // an expired login is only fixable by the teacher and must not disappear on its own.
     if (PERSISTENT_ERRORS.has(nextStatus.error)) statusEl.dataset.persistent = 'true';
