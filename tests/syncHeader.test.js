@@ -87,6 +87,26 @@ describe('renderSyncHeader', () => {
     expect(slot.querySelector('[data-action="sync-sign-in"]').textContent).toContain('使用 Google 登入');
   });
 
+  it('訪客模式的問候語顯示「訪客」，且顯示匯出/匯入備份按鈕', () => {
+    renderSyncHeader(slot, {
+      mode: 'guest', name: '', status: idle, onSignIn: () => {}, onSignOut: () => {},
+      now: () => at('2026-09-13T09:00:00'),
+    });
+    expect(slot.querySelector('[data-sync-greeting]').textContent).toBe('早安，訪客');
+    expect(slot.querySelector('#export-backup')).toBeTruthy();
+    expect(slot.querySelector('#import-backup')).toBeTruthy();
+  });
+
+  it('登入 google 模式不顯示匯出/匯入備份按鈕', () => {
+    renderSyncHeader(slot, {
+      mode: 'google', name: '小美', status: idle,
+      onSignIn: () => {}, onSignOut: () => {},
+      now: () => at('2026-09-13T09:00:00'),
+    });
+    expect(slot.querySelector('#export-backup')).toBe(null);
+    expect(slot.querySelector('#import-backup')).toBe(null);
+  });
+
   it('訪客模式離線點登入顯示提示', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     const onSignIn = vi.fn();

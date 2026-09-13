@@ -13,6 +13,12 @@ export function wireSyncControls({
   createAuth = config => createGoogleAuth(config),
   createDrive = config => createDriveClient(config),
   createEngine = config => createSyncEngine(config),
+  // Guest mode's export/import backup buttons live inside syncHeader's own template (see
+  // renderSyncHeader) rather than the static page markup, since google mode doesn't need them at
+  // all — wireBackupControls has to be re-run against the freshly-created elements every time
+  // paintHeader('guest') replaces them. Optional so tests that don't care about backup wiring
+  // don't need to pass a no-op.
+  wireBackup,
 }) {
   const auth = createAuth({ clientId });
   const drive = createDrive({ auth });
@@ -63,6 +69,9 @@ export function wireSyncControls({
       },
       onSyncNow: () => engine.runSync(),
     });
+    if (mode === 'guest' && wireBackup) {
+      wireBackup(syncSlot.querySelector('#export-backup'), syncSlot.querySelector('#import-backup'));
+    }
   }
 
   // Registered once and left in place for the page's lifetime; the `syncing` guard (not

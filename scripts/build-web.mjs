@@ -50,30 +50,21 @@ ${css}
   <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
   <div class="app-header__actions">
     <div class="sync-header" id="sync-slot"></div>
-    <div class="header-overflow">
-      <input type="checkbox" id="header-overflow-toggle" class="header-overflow__checkbox">
-      <label for="header-overflow-toggle" class="btn btn--header header-overflow__trigger" aria-label="更多操作">⋯</label>
-      <div class="header-overflow__menu">
-        <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
-        <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
-      </div>
-    </div>
   </div>
 </header>
 <main id="app"></main>
 <script>
 ${js}
 document.addEventListener('DOMContentLoaded', () => {
-  const backupControls = CFormApp.wireBackupControls({
-    exportButton: document.getElementById('export-backup'),
-    importInput: document.getElementById('import-backup'),
-  });
   const syncControls = CFormApp.wireSyncControls({
     clientId: '${GOOGLE_CLIENT_ID}',
     syncSlot: document.getElementById('sync-slot'),
+    // Guest mode is the only mode with backup buttons (see renderSyncHeader) — they're created
+    // fresh every time the header repaints as guest, so this has to (re-)wire them each time
+    // rather than once at load like the offline build does.
+    wireBackup: (exportButton, importInput) => CFormApp.wireBackupControls({ exportButton, importInput }),
   });
   CFormApp.mountApp(document.getElementById('app'), {
-    onUnlock: backupControls.updateLockState,
     gate: syncControls.gate,
   });
 });

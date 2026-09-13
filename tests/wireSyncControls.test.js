@@ -159,6 +159,41 @@ describe('wireSyncControls', () => {
     }
   });
 
+  it('訪客模式會用剛畫出來的匯出/匯入備份按鈕呼叫 wireBackup', async () => {
+    const wireBackup = vi.fn();
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: fakeAuthFactory(), createDrive: () => ({}), createEngine: () => fakeEngine(),
+      wireBackup,
+    });
+
+    await controls.gate(container, { onDone: () => {} });
+    container.querySelector('[data-action="continue-guest"]').click();
+    await vi.waitFor(() => expect(wireBackup).toHaveBeenCalled());
+
+    const [exportButton, importInput] = wireBackup.mock.calls[0];
+    expect(exportButton).toBe(syncSlot.querySelector('#export-backup'));
+    expect(importInput).toBe(syncSlot.querySelector('#import-backup'));
+  });
+
+  it('登出回到訪客模式時，也會用新畫出來的按鈕重新呼叫 wireBackup', async () => {
+    writeSyncMode('google');
+    localStorage.setItem('c-form-sync-name', '小美');
+    const wireBackup = vi.fn();
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: fakeAuthFactory(), createDrive: () => ({}), createEngine: () => fakeEngine(),
+      wireBackup,
+    });
+
+    await controls.gate(container, { onDone: () => {} });
+    await clickSignIn(container, syncSlot);
+    expect(wireBackup).not.toHaveBeenCalled();
+
+    syncSlot.querySelector('[data-action="sync-sign-out"]').click();
+    expect(wireBackup).toHaveBeenCalledTimes(1);
+  });
+
   it('登出後 visibilitychange／online 事件不會再觸發同步', async () => {
     writeSyncMode('google');
     localStorage.setItem('c-form-sync-name', '小美');

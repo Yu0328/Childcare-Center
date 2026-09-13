@@ -45,20 +45,41 @@ function syncLightState(status) {
   return null;
 }
 
+// The greeting sits on its own row above the status/action row (rather than sharing it) so a
+// long status message or extra action button on mobile never crowds it — see
+// docs/superpowers/specs et al. for the original "同步和用戶名差那欄會讓按鈕跑掉" report. Google
+// mode greets by the account's given name; guest mode still gets the same row with a generic
+// "訪客" placeholder rather than skipping it, so the header keeps the same two-row shape either way.
 export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, onSyncNow, now = () => new Date() }) {
+  const greeting = `<span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}，${mode === 'google' ? name : '訪客'}`)}</span>`;
+
   if (mode === 'google') {
     slot.innerHTML = `
-      <span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}，${name}`)}</span>
-      <span class="sync-header__status" data-sync-status></span>
-      <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="檢查另一台裝置是否有新資料">立即同步</button>
-      <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">登出</button>
+      <div class="sync-header__greeting-row">${greeting}</div>
+      <div class="sync-header__status-row">
+        <span class="sync-header__status" data-sync-status></span>
+        <div class="sync-header__actions">
+          <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="檢查另一台裝置是否有新資料">立即同步</button>
+          <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">登出</button>
+        </div>
+      </div>
     `;
     slot.querySelector('[data-action="sync-sign-out"]').addEventListener('click', onSignOut);
     slot.querySelector('[data-action="sync-now"]').addEventListener('click', () => onSyncNow && onSyncNow());
   } else {
+    // Guest mode has no cloud copy of its own, so the local export/import backup buttons — pointless
+    // once Google sync covers that — live here instead, right next to the sign-in button, rather than
+    // in google mode's action group.
     slot.innerHTML = `
-      <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
-      <span class="sync-header__status" data-sync-status></span>
+      <div class="sync-header__greeting-row">${greeting}</div>
+      <div class="sync-header__status-row">
+        <span class="sync-header__status" data-sync-status></span>
+        <div class="sync-header__actions">
+          <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
+          <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
+          <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
+        </div>
+      </div>
     `;
     slot.querySelector('[data-action="sync-sign-in"]').addEventListener('click', async () => {
       const el = slot.querySelector('[data-sync-status]');

@@ -145,9 +145,10 @@ export function wireBackupControls({
   exportButton,
   importInput,
   messageContainer = exportButton.closest('header') || exportButton.parentNode,
-  // On mobile, 匯出備份 can sit inside a collapsed "⋯" menu (see .header-overflow in
-  // styles.css) — the progress bar needs a container that's visible even while that menu is
-  // closed, so it targets the header's actions row rather than exportButton's immediate parent.
+  // In the hosted build, exportButton sits nested inside the guest-mode sync header rather than
+  // directly under the actions row — target the header's actions row itself (always visible)
+  // rather than exportButton's immediate parent, which the progress bar would otherwise be too
+  // cramped/hidden inside.
   progressContainer = exportButton.closest('.app-header__actions') || exportButton.parentNode,
   confirmImport = message => (typeof confirm === 'function' ? confirm(message) : false),
   reload = () => window.location.reload(),
