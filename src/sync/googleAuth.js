@@ -98,6 +98,15 @@ export function createGoogleAuth({
     return tokenClient;
   }
 
+  // Warms the GIS script + token client as soon as this module is live, not lazily on first
+  // click. Loading an external script (a real network fetch) takes real async time; if that
+  // happens only after a click, some mobile browsers (Safari in particular) no longer consider
+  // the eventual requestAccessToken() call part of that click's user gesture by the time it
+  // actually runs — the popup is then silently dropped, with no error and no visible sign
+  // anything happened. Warming here means a real click almost always finds tokenClient already
+  // set, so requestAccessToken() fires with barely any async gap after the click.
+  ensureClient().catch(() => {});
+
   // driveClient runs up to MAX_CONCURRENCY requests in parallel, and each one awaits
   // getAccessToken() independently. Without caching the in-flight refresh, a token expiring
   // mid-batch would have every concurrent caller overwrite `pending` in turn, so only the last

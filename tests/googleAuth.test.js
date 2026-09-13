@@ -41,6 +41,18 @@ describe('登入方式記憶', () => {
 describe('createGoogleAuth', () => {
   beforeEach(() => localStorage.clear());
 
+  it('建立時就先預熱 GIS，不等到第一次點擊才載入', async () => {
+    // 點擊後才第一次載入 GIS script（一次真正的網路請求）會讓點擊到彈出視窗之間隔了太久的非同步時
+    // 間，手機瀏覽器（尤其 Safari）可能因此不認得這個彈出視窗還算在同一個使用者手勢裡，直接悄悄擋掉、
+    // 完全沒有任何提示。預先載入是為了讓點擊當下 tokenClient 幾乎都已經準備好了。
+    const loadGis = vi.fn(async () => ({
+      accounts: { oauth2: { initTokenClient: () => ({ requestAccessToken: () => {} }) } },
+    }));
+    createGoogleAuth({ clientId: 'test-client', loadGis });
+
+    await vi.waitFor(() => expect(loadGis).toHaveBeenCalledTimes(1));
+  });
+
   it('離線時 signIn 直接失敗，不去打 Google', async () => {
     const gis = fakeGis();
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
