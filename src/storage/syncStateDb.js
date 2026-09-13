@@ -1,0 +1,45 @@
+import { runRequest } from './dbCore.js';
+
+// One syncState row per synced thing, keyed by uid: { uid, store, hash, fileId, syncedAt }.
+// `hash` is the content hash of the version both sides agreed on at the last successful sync —
+// the *base* of a three-way merge. Without it, "both sides differ" is indistinguishable from
+// "one side changed", which is the difference between a correct merge and a silent overwrite.
+// A photo's row has store: 'photo' and hash: null (photos are never edited, only added or
+// replaced, so there is nothing to three-way merge).
+
+export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function readSyncState() {
+  const rows = await runRequest('syncState', 'readonly', store => store.getAll());
+  return new Map(rows.map(row => [row.uid, row]));
+}
+
+export async function writeSyncState(entry) {
+  await runRequest('syncState', 'readwrite', store => store.put(entry));
+}
+
+export async function deleteSyncState(uid) {
+  await runRequest('syncState', 'readwrite', store => store.delete(uid));
+}
+
+export async function listTombstones() {
+  return runRequest('tombstones', 'readonly', store => store.getAll());
+}
+
+export async function deleteTombstone(uid) {
+  await runRequest('tombstones', 'readwrite', store => store.delete(uid));
+}
+
+// A tombstone has to outlive every device's sync interval, or a phone left in a drawer for a
+// week would re-upload records this device deleted. 30 days matches how long Google Drive keeps
+// trashed files and file version history, so both safety nets expire together.
+export async function purgeExpiredTombstones(nowMs) {
+  let purged = 0;
+  for (const tombstone of await listTombstones()) {
+    if (nowMs - Date.parse(tombstone.deletedAt) > TOMBSTONE_TTL_MS) {
+      await deleteTombstone(tombstone.uid);
+      purged += 1;
+    }
+  }
+  return purged;
+}
