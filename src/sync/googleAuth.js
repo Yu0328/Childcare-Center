@@ -12,9 +12,16 @@ export const SYNC_NAME_KEY = 'c-form-sync-name';
 // can fail to ever invoke its callback, and gate() awaits that promise forever — a permanently
 // blank header with no sign-in button, on the very reload that should show one. This bounds the
 // wait so a swallowed silent attempt falls back to the existing "登入已失效，請重新登入" state,
-// which does offer a button — one a real click can open a popup from. Kept short: a genuinely
-// silent success is near-instant (no UI shown), so this mostly bounds the failure case.
-export const RESUME_TIMEOUT_MS = 3000;
+// which does offer a button — one a real click can open a popup from.
+//
+// NOT kept short: "prompt: ''" is a request for silence, not a guarantee of it — when Google
+// can't confirm the session invisibly, it can still open a real, visible popup asking the person
+// to pick/confirm an account, same as an explicit sign-in. A too-short timeout cancels that popup
+// out from under a person who is genuinely in the middle of using it (confirmed in practice: a
+// real popup appeared, but wasn't finished within the old 3s value, and the attempt was killed).
+// Long enough for a person to actually see and use a popup; still finite so a truly swallowed,
+// silently-blocked attempt eventually recovers instead of hanging forever.
+export const RESUME_TIMEOUT_MS = 60000;
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
