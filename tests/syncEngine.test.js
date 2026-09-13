@@ -3,7 +3,9 @@ import { createSyncEngine } from '../src/sync/syncEngine.js';
 import { readSyncState } from '../src/storage/syncStateDb.js';
 import { addChild, addForm, addEntry, listChildren, listEntriesForForm, deleteChild, clearAllData } from '../src/storage/db.js';
 import { runRequest, putRecord } from '../src/storage/dbCore.js';
-import { AuthExpiredError, DriveFormatError, createDriveClient } from '../src/sync/driveClient.js';
+import {
+  AuthExpiredError, DriveFormatError, createDriveClient, MAX_CONCURRENCY, FIRST_SYNC_CONCURRENCY,
+} from '../src/sync/driveClient.js';
 import { createGoogleAuth, writeSyncMode, clearSyncMode } from '../src/sync/googleAuth.js';
 
 const CLOUD_NOW = 'Sat, 13 Sep 2026 06:32:00 GMT';
@@ -278,5 +280,52 @@ describe('runSync', () => {
     engine.scheduleSync();
     engine.scheduleSync();
     await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1), { timeout: 500 });
+  });
+
+  it('這台裝置的第一次同步用比較高的並行數，一次搬完既有的大量資料', async () => {
+    const drive = fakeDrive();
+    let inFlight = 0;
+    let peak = 0;
+    const realUpload = drive.uploadRecord;
+    drive.uploadRecord = async (...args) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise(r => setTimeout(r, 1));
+      inFlight -= 1;
+      return realUpload(...args);
+    };
+    for (let i = 0; i < 20; i += 1) {
+      await addChild({ name: `測試童${i}`, birthDate: '2024-01-01' });
+    }
+
+    const engine = createSyncEngine({ drive, resolveConflicts: async () => [] });
+    await engine.runSync();
+
+    expect(peak).toBeGreaterThan(MAX_CONCURRENCY);
+    expect(peak).toBeLessThanOrEqual(FIRST_SYNC_CONCURRENCY);
+  });
+
+  it('第一次同步過後，之後每天的同步就用平常的並行上限，不再衝高', async () => {
+    const drive = fakeDrive();
+    const engine = createSyncEngine({ drive, resolveConflicts: async () => [] });
+    await addChild({ name: '測試童', birthDate: '2024-01-01' });
+    await engine.runSync(); // 完成一次同步後 syncState 就不再是空的
+
+    let inFlight = 0;
+    let peak = 0;
+    const realUpload = drive.uploadRecord;
+    drive.uploadRecord = async (...args) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise(r => setTimeout(r, 1));
+      inFlight -= 1;
+      return realUpload(...args);
+    };
+    for (let i = 0; i < 20; i += 1) {
+      await addChild({ name: `測試童${i}`, birthDate: '2024-01-01' });
+    }
+    await engine.runSync();
+
+    expect(peak).toBeLessThanOrEqual(MAX_CONCURRENCY);
   });
 });

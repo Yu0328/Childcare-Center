@@ -30,7 +30,9 @@ async function attachDownloadedPhoto(entry, photoUid, blob) {
   entry.record.photos = photos;
 }
 
-export async function syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow }) {
+export async function syncPhotos({
+  drive, folderId, snapshot, cloudPhotos, state, cloudNow, concurrency = MAX_CONCURRENCY,
+}) {
   const localPhotos = collectLocalPhotos(snapshot);
 
   const toUpload = [];
@@ -55,18 +57,18 @@ export async function syncPhotos({ drive, folderId, snapshot, cloudPhotos, state
     }
   }
 
-  const uploads = await mapWithConcurrency(toUpload, MAX_CONCURRENCY, async ({ photoUid, blob }) => {
+  const uploads = await mapWithConcurrency(toUpload, concurrency, async ({ photoUid, blob }) => {
     const { fileId } = await drive.uploadPhoto(folderId, { photoUid, blob });
     await writeSyncState({ uid: photoUid, store: 'photo', hash: null, fileId, syncedAt: cloudNow });
   });
 
-  const downloads = await mapWithConcurrency(toDownload, MAX_CONCURRENCY, async ({ photoUid, entry, fileId }) => {
+  const downloads = await mapWithConcurrency(toDownload, concurrency, async ({ photoUid, entry, fileId }) => {
     const blob = await drive.downloadPhoto(fileId);
     await attachDownloadedPhoto(entry, photoUid, blob);
     await writeSyncState({ uid: photoUid, store: 'photo', hash: null, fileId, syncedAt: cloudNow });
   });
 
-  const trashes = await mapWithConcurrency(toTrash, MAX_CONCURRENCY, async ({ photoUid, fileId }) => {
+  const trashes = await mapWithConcurrency(toTrash, concurrency, async ({ photoUid, fileId }) => {
     await drive.trashFile(fileId);
     await deleteSyncState(photoUid);
   });

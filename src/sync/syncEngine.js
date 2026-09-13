@@ -8,7 +8,9 @@ import { SYNC_STORES, hashPayload, PHOTO_STORE } from './syncStores.js';
 import { planSync } from './diff.js';
 import { mergeFields } from './fieldMerge.js';
 import { reconcileByNaturalKey } from './reconcile.js';
-import { mapWithConcurrency, MAX_CONCURRENCY, AuthExpiredError, DriveFormatError } from './driveClient.js';
+import {
+  mapWithConcurrency, MAX_CONCURRENCY, FIRST_SYNC_CONCURRENCY, AuthExpiredError, DriveFormatError,
+} from './driveClient.js';
 import { syncPhotos } from './photoSync.js';
 
 const STORE_ORDER = new Map(SYNC_STORES.map((spec, index) => [spec.store, index]));
@@ -61,6 +63,11 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
 
     let snapshot = await readLocalSnapshot();
     let state = await readSyncState();
+    // state is empty only before this device's very first successful sync — the one time there
+    // can be a large existing dataset to move in a single pass. An everyday sync only touches a
+    // handful of changed records, where the extra rate-limit exposure of the higher value buys
+    // nothing, so it's used only for this one pass and not carried into any later sync.
+    const concurrency = state.size === 0 ? FIRST_SYNC_CONCURRENCY : MAX_CONCURRENCY;
     const { records: cloudRecords, photos: cloudPhotos, cloudNow } = await drive.listCloud(folderId);
 
     // First sign-in on this device: no base for anything, so uids invented independently on each
@@ -68,7 +75,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     const recordState = new Map([...state].filter(([, row]) => row.store !== 'photo'));
     if (recordState.size === 0 && snapshot.records.size > 0 && cloudRecords.size > 0) {
       const cloudPayloads = new Map();
-      await mapWithConcurrency([...cloudRecords], MAX_CONCURRENCY, async ([uid, cloudEntry]) => {
+      await mapWithConcurrency([...cloudRecords], concurrency, async ([uid, cloudEntry]) => {
         cloudPayloads.set(uid, {
           store: cloudEntry.store, payload: await drive.downloadRecord(cloudEntry.fileId),
         });
@@ -92,7 +99,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
 
     // --- downloads (cloud-only or cloud-newer) ---
     const downloadTargets = plan.downloads.map(uid => ({ uid, ...cloudRecords.get(uid) }));
-    const fetched = await mapWithConcurrency(downloadTargets, MAX_CONCURRENCY, async target => ({
+    const fetched = await mapWithConcurrency(downloadTargets, concurrency, async target => ({
       ...target, payload: await drive.downloadRecord(target.fileId),
     }));
 
@@ -113,7 +120,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
 
     // --- merges (both sides changed since the last agreed base) ---
     const mergeTargets = plan.merges.map(uid => ({ uid, ...cloudRecords.get(uid) }));
-    const mergeFetched = await mapWithConcurrency(mergeTargets, MAX_CONCURRENCY, async target => ({
+    const mergeFetched = await mapWithConcurrency(mergeTargets, concurrency, async target => ({
       ...target, payload: await drive.downloadRecord(target.fileId),
     }));
 
@@ -197,7 +204,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
       })
       .filter(Boolean);
 
-    const uploaded = await mapWithConcurrency(uploadTargets, MAX_CONCURRENCY, async target => {
+    const uploaded = await mapWithConcurrency(uploadTargets, concurrency, async target => {
       const hash = await hashPayload(target.payload);
       const { fileId } = await drive.uploadRecord(folderId, {
         uid: target.uid, store: target.store, hash, payload: target.payload, fileId: target.fileId,
@@ -206,7 +213,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     });
 
     // --- deletes both ways ---
-    await mapWithConcurrency(plan.trashes, MAX_CONCURRENCY, async ({ uid, fileId }) => {
+    await mapWithConcurrency(plan.trashes, concurrency, async ({ uid, fileId }) => {
       await drive.trashFile(fileId);
       await deleteSyncState(uid);
       await deleteTombstone(uid);
@@ -235,7 +242,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     // --- photos ---
     state = await readSyncState();
     snapshot = await readLocalSnapshot();
-    const photoResult = await syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow });
+    const photoResult = await syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow, concurrency });
 
     const needsReview = [...snapshot.records.values()].filter(entry => entry.record.needsReview).length;
     const textFailed = [...fetched, ...mergeFetched, ...uploaded].some(result => !result.ok);

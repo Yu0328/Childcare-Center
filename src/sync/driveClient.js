@@ -7,7 +7,14 @@ export const FORMAT_VERSION = 1;
 // Google's per-user Drive API quota has plenty of headroom above this; concurrency is bounded by
 // what a slow/flaky connection can retry cleanly, not by the API. 8 roughly halves a large first
 // sync's wall-clock time versus 5 without meaningfully raising 403/429 risk for this app's scale.
+// Kept as the steady-state value: the everyday sync after the first one only has a handful of
+// changed records, so there's little to gain from more parallelism and no reason to carry the
+// extra rate-limit exposure of FIRST_SYNC_CONCURRENCY once the big one-time catch-up is over.
 export const MAX_CONCURRENCY = 8;
+// Used only for a device's very first sync (see syncEngine.js's `state.size === 0` check) — the
+// one time there can be a large existing dataset to move in one pass. Higher than the steady-state
+// value on purpose, since a one-time burst has more headroom to spend than an everyday sync does.
+export const FIRST_SYNC_CONCURRENCY = 16;
 
 const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
