@@ -86,8 +86,14 @@ export async function deleteForm(id) {
 // for a remark entry whose code doesn't resolve to any indicator at all (see
 // aggregateCoursePlan.js), so the original activity label the child's record was under isn't lost
 // just because the code couldn't be matched — 發展活動 falls back to it on export.
-export async function addEntry({ formId, indicatorCode, date, status, note, activityName, uid, updatedAt }) {
-  return addRecord('entries', { formId, indicatorCode, date, status, note, activityName, uid, updatedAt });
+export async function addEntry({ formId, indicatorCode, date, status, note, activityName, uid, updatedAt, createdAt }) {
+  // A dedicated, never-touched-again field so list order stays the same across devices after
+  // sync — id is a per-device autoIncrement, and updatedAt moves on every edit, so neither can
+  // double as "which order these were added in" (same fix as highlightEntries' createdAt).
+  return addRecord('entries', {
+    formId, indicatorCode, date, status, note, activityName, uid, updatedAt,
+    createdAt: createdAt || new Date().toISOString(),
+  });
 }
 
 export async function updateEntry(id, changes) {
@@ -107,5 +113,7 @@ export async function deleteEntry(id) {
 // through, instead of teaching every caller to understand both shapes.
 export async function listEntriesForForm(formId) {
   const entries = await runRequest('entries', 'readonly', store => store.index('by_formId').getAll(formId));
-  return entries.map(entry => (entry.status ? entry : { ...entry, status: entry.achieved ? 'developed' : 'developing' }));
+  return entries
+    .map(entry => (entry.status ? entry : { ...entry, status: entry.achieved ? 'developed' : 'developing' }))
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 }

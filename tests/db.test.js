@@ -165,6 +165,22 @@ describe('forms and entries storage', () => {
     expect(entries).toEqual([]);
   });
 
+  it('依 createdAt 排序，不受本機 id 順序影響（模擬從雲端同步進來、id 順序被打亂的情況）', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+    // id 順序刻意與 createdAt 順序相反。
+    const newer = await addEntry({
+      formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '後建立',
+      createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const older = await addEntry({
+      formId: form.id, indicatorCode: 'Ⅳ-1-2', date: '2026-01-08', status: 'developed', note: '先建立',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect((await listEntriesForForm(form.id)).map(e => e.id)).toEqual([older.id, newer.id]);
+  });
+
   it('throws when updating a non-existent entry', async () => {
     await expect(updateEntry(999, { note: 'x' })).rejects.toThrow('Entry 999 not found');
   });

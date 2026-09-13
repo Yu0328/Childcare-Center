@@ -166,6 +166,27 @@ describe('parentReportDb: CoursePlanEntry and CourseOccurrence', () => {
     expect(await listCourseOccurrencesForEntry(entry.id)).toEqual([]);
     expect(await listCourseOccurrencesForEntry(otherEntry.id)).toEqual([otherOccurrence]);
   });
+
+  it('課程計畫項目跟每次出現的紀錄都依 createdAt 排序，不受本機 id 順序影響', async () => {
+    const newerEntry = await addCoursePlanEntry({
+      reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '後建立', createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const olderEntry = await addCoursePlanEntry({
+      reportId: report.id, indicatorCode: 'Ⅴ-4-2', activityName: '先建立', createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect((await listCoursePlanEntriesForReport(report.id)).map(e => e.id)).toEqual([olderEntry.id, newerEntry.id]);
+
+    const newerOccurrence = await addCourseOccurrence({
+      entryId: olderEntry.id, date: '2026-06-11', status: 'developed', absent: false, note: '後建立',
+      createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const olderOccurrence = await addCourseOccurrence({
+      entryId: olderEntry.id, date: '2026-06-12', status: 'developed', absent: false, note: '先建立',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect((await listCourseOccurrencesForEntry(olderEntry.id)).map(o => o.id))
+      .toEqual([olderOccurrence.id, newerOccurrence.id]);
+  });
 });
 
 describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, HighlightEntry', () => {
@@ -194,6 +215,18 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
     expect(await listDevelopmentRecordEntriesForReport(report.id)).toEqual([]);
   });
 
+  it('發展紀錄依 createdAt 排序，不受本機 id 順序影響', async () => {
+    const newer = await addDevelopmentRecordEntry({
+      reportId: report.id, domain: 1, courseEntryIds: [entry.id], narrative: '後建立',
+      createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const older = await addDevelopmentRecordEntry({
+      reportId: report.id, domain: 2, courseEntryIds: [entry.id], narrative: '先建立',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect((await listDevelopmentRecordEntriesForReport(report.id)).map(r => r.id)).toEqual([older.id, newer.id]);
+  });
+
   it('adds, lists, updates and deletes a behavior observation', async () => {
     const observation = await addBehaviorObservation({ reportId: report.id, title: '我會好好說！', narrative: '本月觀察發現...' });
     expect(await listBehaviorObservationsForReport(report.id)).toEqual([observation]);
@@ -203,6 +236,16 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
 
     await deleteBehaviorObservation(observation.id);
     expect(await listBehaviorObservationsForReport(report.id)).toEqual([]);
+  });
+
+  it('行為觀察依 createdAt 排序，不受本機 id 順序影響', async () => {
+    const newer = await addBehaviorObservation({
+      reportId: report.id, title: '後建立', narrative: 'x', createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const older = await addBehaviorObservation({
+      reportId: report.id, title: '先建立', narrative: 'x', createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect((await listBehaviorObservationsForReport(report.id)).map(o => o.id)).toEqual([older.id, newer.id]);
   });
 
   it('adds, lists, updates and deletes a highlight entry', async () => {

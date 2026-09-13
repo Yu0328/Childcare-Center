@@ -202,6 +202,7 @@ async function importV1Or2Children(data) {
       note: entry.note,
       uid: entry.uid,
       updatedAt: entry.updatedAt,
+      createdAt: entry.createdAt,
     });
   }
 
@@ -227,6 +228,7 @@ async function importParentReports(data, childIdMap) {
       indicatorText: entry.indicatorText,
       uid: entry.uid,
       updatedAt: entry.updatedAt,
+      createdAt: entry.createdAt,
     });
     entryIdMap.set(entry.id, created.id);
   }
@@ -241,6 +243,7 @@ async function importParentReports(data, childIdMap) {
       note: occurrence.note,
       uid: occurrence.uid,
       updatedAt: occurrence.updatedAt,
+      createdAt: occurrence.createdAt,
     });
   }
 
@@ -252,6 +255,7 @@ async function importParentReports(data, childIdMap) {
       narrative: record.narrative,
       uid: record.uid,
       updatedAt: record.updatedAt,
+      createdAt: record.createdAt,
     });
   }
 
@@ -262,6 +266,7 @@ async function importParentReports(data, childIdMap) {
       narrative: observation.narrative,
       uid: observation.uid,
       updatedAt: observation.updatedAt,
+      createdAt: observation.createdAt,
     });
   }
 

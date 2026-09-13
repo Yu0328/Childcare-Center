@@ -46,6 +46,18 @@ describe('readLocalSnapshot', () => {
     expect(stored.photos[0].photoUid).toBeTypeOf('string');
     expect(stored.photos[0].photoUid.length).toBeGreaterThan(0);
   });
+
+  it('替升級前就存在、沒有 createdAt 的觀察紀錄補上，用 updatedAt 當替代值（兩邊補出來的值才會一致）', async () => {
+    const id = await runRequest('entries', 'readwrite', store => store.add({
+      formId: 1, indicatorCode: 'Ⅳ-1-1', date: '2023-05-05', status: 'developed', note: '舊資料',
+      uid: 'legacy-entry', updatedAt: '2023-05-05T00:00:00.000Z',
+    }));
+
+    await readLocalSnapshot();
+
+    const stored = await runRequest('entries', 'readonly', store => store.get(id));
+    expect(stored.createdAt).toBe('2023-05-05T00:00:00.000Z');
+  });
 });
 
 describe('applyRemoteRecord', () => {

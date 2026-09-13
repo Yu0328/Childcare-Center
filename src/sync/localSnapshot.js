@@ -1,6 +1,15 @@
 import { runRequest, newUid } from '../storage/dbCore.js';
 import { SYNC_STORES, serializeRecord, deserializeRecord, hashPayload, PHOTO_STORE } from './syncStores.js';
 
+// Stores whose list views sort by createdAt (added after these stores already existed) rather
+// than local id — id is a per-device autoIncrement, so it drifts out of creation order the moment
+// a record arrives via sync instead of local entry. A record from before createdAt existed needs
+// one backfilled, or it never sorts consistently with anything else.
+const ORDERED_STORES = new Set([
+  'entries', 'coursePlanEntries', 'courseOccurrences', 'developmentRecordEntries',
+  'behaviorObservations', 'highlightEntries',
+]);
+
 function refKey(store, value) {
   return `${store}:${value}`;
 }
@@ -31,6 +40,13 @@ export async function readLocalSnapshot() {
       if (!row.uid || !row.updatedAt) {
         row.uid = row.uid || newUid();
         row.updatedAt = row.updatedAt || row.createdAt || new Date(0).toISOString();
+        await rawPut(store, row);
+      }
+      // updatedAt is guaranteed set by the block above, and — since it already travels through
+      // sync and gets backfilled identically on every device when missing — is a safe, cross-
+      // device-consistent stand-in for a creation time nobody recorded at the time.
+      if (ORDERED_STORES.has(store) && !row.createdAt) {
+        row.createdAt = row.updatedAt;
         await rawPut(store, row);
       }
       // 點滴分享 photos added before this backfill existed never got a photoUid at all (the UI

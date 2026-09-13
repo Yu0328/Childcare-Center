@@ -41,12 +41,18 @@ export async function deleteParentReport(id) {
   await deleteRecord('parentReports', id);
 }
 
-export async function addCoursePlanEntry({ reportId, indicatorCode, activityName, indicatorText = '', uid, updatedAt }) {
-  return addRecord('coursePlanEntries', { reportId, indicatorCode, activityName, indicatorText, uid, updatedAt });
+export async function addCoursePlanEntry({
+  reportId, indicatorCode, activityName, indicatorText = '', uid, updatedAt, createdAt,
+}) {
+  return addRecord('coursePlanEntries', {
+    reportId, indicatorCode, activityName, indicatorText, uid, updatedAt,
+    createdAt: createdAt || new Date().toISOString(),
+  });
 }
 
 export async function listCoursePlanEntriesForReport(reportId) {
-  return runRequest('coursePlanEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  const entries = await runRequest('coursePlanEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  return entries.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 }
 
 export async function updateCoursePlanEntry(id, changes) {
@@ -64,12 +70,18 @@ export async function deleteCoursePlanEntry(id) {
   await deleteRecord('coursePlanEntries', id);
 }
 
-export async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note, uid, updatedAt }) {
-  return addRecord('courseOccurrences', { entryId, date, status, absent, courseChanged, note, uid, updatedAt });
+export async function addCourseOccurrence({
+  entryId, date, status, absent, courseChanged = false, note, uid, updatedAt, createdAt,
+}) {
+  return addRecord('courseOccurrences', {
+    entryId, date, status, absent, courseChanged, note, uid, updatedAt,
+    createdAt: createdAt || new Date().toISOString(),
+  });
 }
 
 export async function listCourseOccurrencesForEntry(entryId) {
-  return runRequest('courseOccurrences', 'readonly', store => store.index('by_entryId').getAll(entryId));
+  const occurrences = await runRequest('courseOccurrences', 'readonly', store => store.index('by_entryId').getAll(entryId));
+  return occurrences.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 }
 
 export async function updateCourseOccurrence(id, changes) {
@@ -82,12 +94,19 @@ export async function deleteCourseOccurrence(id) {
   await deleteRecord('courseOccurrences', id);
 }
 
-export async function addDevelopmentRecordEntry({ reportId, domain, courseEntryIds, narrative, uid, updatedAt }) {
-  return addRecord('developmentRecordEntries', { reportId, domain, courseEntryIds, narrative, uid, updatedAt });
+export async function addDevelopmentRecordEntry({
+  reportId, domain, courseEntryIds, narrative, uid, updatedAt, createdAt,
+}) {
+  return addRecord('developmentRecordEntries', {
+    reportId, domain, courseEntryIds, narrative, uid, updatedAt,
+    createdAt: createdAt || new Date().toISOString(),
+  });
 }
 
 export async function listDevelopmentRecordEntriesForReport(reportId) {
-  return runRequest('developmentRecordEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  const entries =
+    await runRequest('developmentRecordEntries', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  return entries.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 }
 
 export async function updateDevelopmentRecordEntry(id, changes) {
@@ -100,12 +119,16 @@ export async function deleteDevelopmentRecordEntry(id) {
   await deleteRecord('developmentRecordEntries', id);
 }
 
-export async function addBehaviorObservation({ reportId, title, narrative, uid, updatedAt }) {
-  return addRecord('behaviorObservations', { reportId, title, narrative, uid, updatedAt });
+export async function addBehaviorObservation({ reportId, title, narrative, uid, updatedAt, createdAt }) {
+  return addRecord('behaviorObservations', {
+    reportId, title, narrative, uid, updatedAt, createdAt: createdAt || new Date().toISOString(),
+  });
 }
 
 export async function listBehaviorObservationsForReport(reportId) {
-  return runRequest('behaviorObservations', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  const observations =
+    await runRequest('behaviorObservations', 'readonly', store => store.index('by_reportId').getAll(reportId));
+  return observations.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
 }
 
 export async function updateBehaviorObservation(id, changes) {
