@@ -30457,6 +30457,8 @@ Content-Type: ${contentType}\r
       });
       return tokenClient;
     }
+    ensureClient().catch(() => {
+    });
     function requestToken(options) {
       if (inFlight) return inFlight;
       inFlight = new Promise((resolve) => {

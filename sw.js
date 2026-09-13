@@ -1,4 +1,4 @@
-const CACHE_NAME = 'c-form-cache-f42abfaf643d';
+const CACHE_NAME = 'c-form-cache-0a4fe95df87d';
 const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', event => {
