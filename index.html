@@ -267,6 +267,15 @@ button {
   gap: 0.5rem;
 }
 
+/* Guest mode only: 匯出/匯入備份 get their own row below the status row instead of sharing it
+   with the sign-in button, so they never crowd the status text next to them. */
+.sync-header__backup-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 @media (max-width: 640px) {
   /* Two-row header: title on its own row, then the sync controls below. Without this the title
      and the sync-header column fight for one row and everything shrinks. */
@@ -31510,9 +31519,11 @@ Content-Type: ${contentType}\r
         <span class="sync-header__status" data-sync-status></span>
         <div class="sync-header__actions">
           <button type="button" class="btn btn--header" data-action="sync-sign-in">\u4F7F\u7528 Google \u767B\u5165</button>
-          <button type="button" class="btn btn--header" id="export-backup" title="\u6B64\u5099\u4EFD\u6A94\u70BA\u672A\u52A0\u5BC6\u7684\u5B8C\u6574\u8CC7\u6599\uFF08\u542B\u5E7C\u5152\u59D3\u540D\u3001\u51FA\u751F\u65E5\u671F\u7B49\u500B\u8CC7\uFF09\uFF0C\u8ACB\u52FF\u653E\u5728\u5171\u7528\u96F2\u7AEF\u8CC7\u6599\u593E">\u532F\u51FA\u5099\u4EFD</button>
-          <label class="btn btn--header btn--header-file">\u532F\u5165\u5099\u4EFD <input type="file" id="import-backup" accept="application/json"></label>
         </div>
+      </div>
+      <div class="sync-header__backup-row">
+        <button type="button" class="btn btn--header" id="export-backup" title="\u6B64\u5099\u4EFD\u6A94\u70BA\u672A\u52A0\u5BC6\u7684\u5B8C\u6574\u8CC7\u6599\uFF08\u542B\u5E7C\u5152\u59D3\u540D\u3001\u51FA\u751F\u65E5\u671F\u7B49\u500B\u8CC7\uFF09\uFF0C\u8ACB\u52FF\u653E\u5728\u5171\u7528\u96F2\u7AEF\u8CC7\u6599\u593E">\u532F\u51FA\u5099\u4EFD</button>
+        <label class="btn btn--header btn--header-file">\u532F\u5165\u5099\u4EFD <input type="file" id="import-backup" accept="application/json"></label>
       </div>
     `;
       slot.querySelector('[data-action="sync-sign-in"]').addEventListener("click", async () => {
