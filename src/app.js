@@ -16,7 +16,7 @@ const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
 const IMPORT_FAILED_MESSAGE = '匯入失敗，請再試一次';
 const IMPORT_CONFIRM_MESSAGE = '匯入備份會清除目前所有資料，確定要繼續嗎？';
 
-export function mountApp(container, { onUnlock } = {}) {
+export function mountApp(container, { onUnlock, gate } = {}) {
   function showRenderError(err) {
     container.textContent = '';
     const message = document.createElement('p');
@@ -118,13 +118,24 @@ export function mountApp(container, { onUnlock } = {}) {
   const homeButton = document.getElementById('home-button');
   if (homeButton) homeButton.addEventListener('click', showReportTypeSelect);
 
-  function handleUnlock() {
+  // The hosted build passes a `gate` so the sign-in choice screen can run between the password
+  // gate and the app. Kept as an injected hook rather than an import so the offline build's
+  // bundle contains no login or sync code at all.
+  function start() {
+    if (gate) {
+      gate(container, { onDone: showReportTypeSelect });
+      return;
+    }
     showReportTypeSelect();
+  }
+
+  function handleUnlock() {
+    start();
     if (onUnlock) onUnlock();
   }
 
   if (isUnlocked()) {
-    showReportTypeSelect();
+    start();
   } else {
     renderPasswordGate(container, { onUnlock: handleUnlock });
   }

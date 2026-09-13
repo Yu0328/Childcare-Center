@@ -271,3 +271,32 @@ describe('wireBackupControls', () => {
     expect(importSpy).toHaveBeenCalledWith('{"version":1,"children":[],"forms":[],"entries":[]}');
   });
 });
+
+describe('mountApp 的 gate hook', () => {
+  it('密碼過關後先跑 gate，gate 完成才進主畫面', async () => {
+    await unlock('0975248749');
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    let release;
+    const gate = vi.fn((gateContainer, { onDone }) => {
+      gateContainer.textContent = 'gate';
+      release = onDone;
+    });
+
+    mountApp(container, { gate });
+    await vi.waitFor(() => expect(gate).toHaveBeenCalled());
+    expect(container.textContent).toBe('gate');
+
+    release();
+    await vi.waitFor(() => expect(container.textContent).not.toBe('gate'));
+  });
+
+  it('沒給 gate 時行為不變（離線版走這條路）', async () => {
+    await unlock('0975248749');
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    mountApp(container);
+    await vi.waitFor(() => expect(container.textContent).not.toBe(''));
+  });
+});
