@@ -116,6 +116,44 @@ describe('wireSyncControls', () => {
     expect((await listChildren()).map(c => c.name)).toEqual(['測試童']);
   });
 
+  it('點「立即同步」會直接觸發一次同步，不用等 debounce', async () => {
+    writeSyncMode('google');
+    localStorage.setItem('c-form-sync-name', '小美');
+    const runSync = vi.fn().mockResolvedValue(idleStatus);
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: fakeAuthFactory(), createDrive: () => ({}),
+      createEngine: () => fakeEngine({ runSync }),
+    });
+
+    await controls.gate(container, { onDone: () => {} });
+    await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(1)); // 開啟時自動同步的那一次
+
+    syncSlot.querySelector('[data-action="sync-now"]').click();
+    expect(runSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('分頁一直開著、沒有切換或重整時，過一段時間仍會自動再檢查一次', async () => {
+    vi.useFakeTimers();
+    try {
+      writeSyncMode('google');
+      localStorage.setItem('c-form-sync-name', '小美');
+      const scheduleSync = vi.fn();
+      const controls = wireSyncControls({
+        clientId: 'test', syncSlot,
+        createAuth: fakeAuthFactory(), createDrive: () => ({}),
+        createEngine: () => fakeEngine({ scheduleSync }),
+      });
+
+      await controls.gate(container, { onDone: () => {} });
+      await vi.advanceTimersByTimeAsync(120000);
+
+      expect(scheduleSync).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('登出後 visibilitychange／online 事件不會再觸發同步', async () => {
     writeSyncMode('google');
     localStorage.setItem('c-form-sync-name', '小美');

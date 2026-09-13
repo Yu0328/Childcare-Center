@@ -21,6 +21,11 @@ export function wireSyncControls({
   let resumeApp = null;
   let syncing = false;
   let listenersWired = false;
+  // The only triggers otherwise are a local write, a tab regaining foreground, and coming back
+  // online — a tab left open and focused the whole time (exactly how a desk computer tends to
+  // sit) never notices another device's changes on its own. This bounds that gap without needing
+  // a real push channel.
+  const POLL_INTERVAL_MS = 120000;
 
   // The conflict screen takes over the app area, then hands it back. It is the only part of sync
   // allowed to interrupt the teacher, and only for genuine same-field disagreements.
@@ -56,6 +61,7 @@ export function wireSyncControls({
         setWriteListener(null);
         paintHeader('guest');
       },
+      onSyncNow: () => engine.runSync(),
     });
   }
 
@@ -73,6 +79,9 @@ export function wireSyncControls({
     window.addEventListener('online', () => {
       if (syncing) engine.scheduleSync();
     });
+    setInterval(() => {
+      if (syncing && !document.hidden) engine.scheduleSync();
+    }, POLL_INTERVAL_MS);
   }
 
   function startSyncing() {

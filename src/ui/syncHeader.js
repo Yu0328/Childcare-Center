@@ -36,14 +36,16 @@ export function formatSyncStatus(status) {
 
 const PERSISTENT_ERRORS = new Set(['AUTH_EXPIRED', 'FORMAT']);
 
-export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, now = () => new Date() }) {
+export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, onSyncNow, now = () => new Date() }) {
   if (mode === 'google') {
     slot.innerHTML = `
       <span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}，${name}`)}</span>
       <span class="sync-header__status" data-sync-status></span>
+      <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="檢查另一台裝置是否有新資料">立即同步</button>
       <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">登出</button>
     `;
     slot.querySelector('[data-action="sync-sign-out"]').addEventListener('click', onSignOut);
+    slot.querySelector('[data-action="sync-now"]').addEventListener('click', () => onSyncNow && onSyncNow());
   } else {
     slot.innerHTML = `
       <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>

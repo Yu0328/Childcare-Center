@@ -12,8 +12,9 @@ export const SYNC_NAME_KEY = 'c-form-sync-name';
 // can fail to ever invoke its callback, and gate() awaits that promise forever — a permanently
 // blank header with no sign-in button, on the very reload that should show one. This bounds the
 // wait so a swallowed silent attempt falls back to the existing "登入已失效，請重新登入" state,
-// which does offer a button — one a real click can open a popup from.
-export const RESUME_TIMEOUT_MS = 8000;
+// which does offer a button — one a real click can open a popup from. Kept short: a genuinely
+// silent success is near-instant (no UI shown), so this mostly bounds the failure case.
+export const RESUME_TIMEOUT_MS = 3000;
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
