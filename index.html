@@ -2194,8 +2194,29 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 .sync-header__status {
-  font-size: 0.8rem;
-  color: #eaf2fb;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.sync-header__status[data-syncing='true'] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sync-header__status[data-syncing='true']::before {
+  content: '';
+  width: 0.75em;
+  height: 0.75em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: sync-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sync-spin {
+  to { transform: rotate(360deg); }
 }
 
 .sync-header__status[data-persistent='true'] {
@@ -30203,7 +30224,7 @@ var CFormApp = (() => {
   var FOLDER_NAME = "\u80B2\u82F1\u516C\u6258\u586B\u8868\u7CFB\u7D71";
   var MANIFEST_NAME = "sync-manifest.json";
   var FORMAT_VERSION = 1;
-  var MAX_CONCURRENCY = 5;
+  var MAX_CONCURRENCY = 8;
   var FILES_URL = "https://www.googleapis.com/drive/v3/files";
   var UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
   var FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -31199,7 +31220,9 @@ Content-Type: ${contentType}\r
   function formatSyncStatus(status) {
     if (status.error === "AUTH_EXPIRED") return "\u767B\u5165\u5DF2\u5931\u6548\uFF0C\u8ACB\u91CD\u65B0\u767B\u5165";
     if (status.error === "FORMAT") return "\u96F2\u7AEF\u8CC7\u6599\u593E\u7570\u5E38\uFF0C\u5DF2\u505C\u6B62\u540C\u6B65";
-    if (status.phase === "syncing") return "\u540C\u6B65\u4E2D\u2026";
+    if (status.phase === "syncing") {
+      return status.textSyncedAt ? "\u540C\u6B65\u4E2D\u2026" : "\u9996\u6B21\u540C\u6B65\u4E2D\uFF0C\u8CC7\u6599\u91CF\u8F03\u591A\u6642\u53EF\u80FD\u9700\u8981\u5E7E\u5206\u9418\uFF0C\u8ACB\u4E0D\u8981\u95DC\u9589\u8996\u7A97\u2026";
+    }
     if (status.photoPending > 0) {
       return `\u6587\u5B57\u8CC7\u6599\uFF1A${clockTime(status.textSyncedAt)}\u3000\u7167\u7247\uFF1A\u540C\u6B65\u5931\u6557\uFF0C\u9084\u6709 ${status.photoPending} \u5F35\u672A\u4E0A\u50B3`;
     }
@@ -31234,6 +31257,8 @@ Content-Type: ${contentType}\r
     const statusEl = slot.querySelector("[data-sync-status]");
     function update(nextStatus) {
       statusEl.textContent = formatSyncStatus(nextStatus);
+      if (nextStatus.phase === "syncing") statusEl.dataset.syncing = "true";
+      else delete statusEl.dataset.syncing;
       if (PERSISTENT_ERRORS.has(nextStatus.error)) statusEl.dataset.persistent = "true";
       else delete statusEl.dataset.persistent;
     }
