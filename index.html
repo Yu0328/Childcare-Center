@@ -30234,6 +30234,7 @@ var CFormApp = (() => {
   var MANIFEST_NAME = "sync-manifest.json";
   var FORMAT_VERSION = 1;
   var MAX_CONCURRENCY = 8;
+  var FIRST_SYNC_CONCURRENCY = 16;
   var FILES_URL = "https://www.googleapis.com/drive/v3/files";
   var UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
   var FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -30917,7 +30918,15 @@ Content-Type: ${contentType}\r
     await runRequest(entry.store, "readwrite", (store) => store.put({ ...stored, photos, id: entry.id }));
     entry.record.photos = photos;
   }
-  async function syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow }) {
+  async function syncPhotos({
+    drive,
+    folderId,
+    snapshot,
+    cloudPhotos,
+    state,
+    cloudNow,
+    concurrency = MAX_CONCURRENCY
+  }) {
     const localPhotos = collectLocalPhotos(snapshot);
     const toUpload = [];
     const toDownload = [];
@@ -30934,16 +30943,16 @@ Content-Type: ${contentType}\r
         toTrash.push({ photoUid, fileId: cloudPhoto.fileId });
       }
     }
-    const uploads = await mapWithConcurrency(toUpload, MAX_CONCURRENCY, async ({ photoUid, blob }) => {
+    const uploads = await mapWithConcurrency(toUpload, concurrency, async ({ photoUid, blob }) => {
       const { fileId } = await drive.uploadPhoto(folderId, { photoUid, blob });
       await writeSyncState({ uid: photoUid, store: "photo", hash: null, fileId, syncedAt: cloudNow });
     });
-    const downloads = await mapWithConcurrency(toDownload, MAX_CONCURRENCY, async ({ photoUid, entry, fileId }) => {
+    const downloads = await mapWithConcurrency(toDownload, concurrency, async ({ photoUid, entry, fileId }) => {
       const blob = await drive.downloadPhoto(fileId);
       await attachDownloadedPhoto(entry, photoUid, blob);
       await writeSyncState({ uid: photoUid, store: "photo", hash: null, fileId, syncedAt: cloudNow });
     });
-    const trashes = await mapWithConcurrency(toTrash, MAX_CONCURRENCY, async ({ photoUid, fileId }) => {
+    const trashes = await mapWithConcurrency(toTrash, concurrency, async ({ photoUid, fileId }) => {
       await drive.trashFile(fileId);
       await deleteSyncState(photoUid);
     });
@@ -31006,11 +31015,12 @@ Content-Type: ${contentType}\r
       await purgeExpiredTombstones(Date.now());
       let snapshot = await readLocalSnapshot();
       let state = await readSyncState();
+      const concurrency = state.size === 0 ? FIRST_SYNC_CONCURRENCY : MAX_CONCURRENCY;
       const { records: cloudRecords, photos: cloudPhotos, cloudNow } = await drive.listCloud(folderId);
       const recordState = new Map([...state].filter(([, row]) => row.store !== "photo"));
       if (recordState.size === 0 && snapshot.records.size > 0 && cloudRecords.size > 0) {
         const cloudPayloads = /* @__PURE__ */ new Map();
-        await mapWithConcurrency([...cloudRecords], MAX_CONCURRENCY, async ([uid, cloudEntry]) => {
+        await mapWithConcurrency([...cloudRecords], concurrency, async ([uid, cloudEntry]) => {
           cloudPayloads.set(uid, {
             store: cloudEntry.store,
             payload: await drive.downloadRecord(cloudEntry.fileId)
@@ -31033,7 +31043,7 @@ Content-Type: ${contentType}\r
         tombstones: await listTombstones()
       });
       const downloadTargets = plan.downloads.map((uid) => ({ uid, ...cloudRecords.get(uid) }));
-      const fetched = await mapWithConcurrency(downloadTargets, MAX_CONCURRENCY, async (target) => ({
+      const fetched = await mapWithConcurrency(downloadTargets, concurrency, async (target) => ({
         ...target,
         payload: await drive.downloadRecord(target.fileId)
       }));
@@ -31051,7 +31061,7 @@ Content-Type: ${contentType}\r
         pendingApply = deferred;
       }
       const mergeTargets = plan.merges.map((uid) => ({ uid, ...cloudRecords.get(uid) }));
-      const mergeFetched = await mapWithConcurrency(mergeTargets, MAX_CONCURRENCY, async (target) => ({
+      const mergeFetched = await mapWithConcurrency(mergeTargets, concurrency, async (target) => ({
         ...target,
         payload: await drive.downloadRecord(target.fileId)
       }));
@@ -31124,7 +31134,7 @@ Content-Type: ${contentType}\r
         const known = state.get(uid) || cloudRecords.get(uid);
         return { uid, store: entry.store, payload: entry.payload, fileId: known && known.fileId };
       }).filter(Boolean);
-      const uploaded = await mapWithConcurrency(uploadTargets, MAX_CONCURRENCY, async (target) => {
+      const uploaded = await mapWithConcurrency(uploadTargets, concurrency, async (target) => {
         const hash = await hashPayload(target.payload);
         const { fileId } = await drive.uploadRecord(folderId, {
           uid: target.uid,
@@ -31135,7 +31145,7 @@ Content-Type: ${contentType}\r
         });
         await persistBase(target.uid, target.store, target.payload, fileId, cloudNow);
       });
-      await mapWithConcurrency(plan.trashes, MAX_CONCURRENCY, async ({ uid, fileId }) => {
+      await mapWithConcurrency(plan.trashes, concurrency, async ({ uid, fileId }) => {
         await drive.trashFile(fileId);
         await deleteSyncState(uid);
         await deleteTombstone(uid);
@@ -31157,7 +31167,7 @@ Content-Type: ${contentType}\r
       }
       state = await readSyncState();
       snapshot = await readLocalSnapshot();
-      const photoResult = await syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow });
+      const photoResult = await syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow, concurrency });
       const needsReview = [...snapshot.records.values()].filter((entry) => entry.record.needsReview).length;
       const textFailed = [...fetched, ...mergeFetched, ...uploaded].some((result) => !result.ok);
       return setStatus({
