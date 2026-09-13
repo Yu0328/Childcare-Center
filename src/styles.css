@@ -255,6 +255,15 @@ button {
   gap: 0.5rem;
 }
 
+/* Guest mode only: 匯出/匯入備份 get their own row below the status row instead of sharing it
+   with the sign-in button, so they never crowd the status text next to them. */
+.sync-header__backup-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 @media (max-width: 640px) {
   /* Two-row header: title on its own row, then the sync controls below. Without this the title
      and the sync-header column fight for one row and everything shrinks. */
