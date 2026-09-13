@@ -31457,21 +31457,24 @@ Content-Type: ${contentType}\r
       wireListenersOnce();
       engine.runSync();
     }
+    function renderChoice(container, onDone) {
+      renderSignInChoiceView(container, {
+        onGoogle: async () => {
+          await auth.signIn();
+          startSyncing();
+          onDone();
+        },
+        onGuest: () => {
+          paintHeader("guest");
+          onDone();
+        }
+      });
+    }
     async function gate(container, { onDone }) {
       appContainer = container;
       resumeApp = onDone;
       if (needsSignInChoice()) {
-        renderSignInChoiceView(container, {
-          onGoogle: async () => {
-            await auth.signIn();
-            startSyncing();
-            onDone();
-          },
-          onGuest: () => {
-            paintHeader("guest");
-            onDone();
-          }
-        });
+        renderChoice(container, onDone);
         return;
       }
       if (readSyncMode() === "google") {
@@ -31483,8 +31486,7 @@ Content-Type: ${contentType}\r
           onDone();
           return;
         }
-        paintHeader("guest");
-        onDone();
+        renderChoice(container, onDone);
         return;
       }
       paintHeader("guest");
