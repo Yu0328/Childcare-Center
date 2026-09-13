@@ -1,9 +1,8 @@
-import { runRequest } from './dbCore.js';
+import { runRequest, addRecord, putRecord, deleteRecord } from './dbCore.js';
 
-export async function addParentReport({ childId, tier, period, isNew = false }) {
+export async function addParentReport({ childId, tier, period, isNew = false, uid, updatedAt }) {
   const createdAt = new Date().toISOString();
-  const id = await runRequest('parentReports', 'readwrite', store => store.add({ childId, tier, period, createdAt, isNew }));
-  return { id, childId, tier, period, createdAt, isNew };
+  return addRecord('parentReports', { childId, tier, period, createdAt, isNew, uid, updatedAt });
 }
 
 export async function listParentReportsForChild(childId) {
@@ -17,9 +16,7 @@ export async function getParentReport(id) {
 export async function updateParentReport(id, changes) {
   const existing = await runRequest('parentReports', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`ParentReport ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('parentReports', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('parentReports', { ...existing, ...changes, id });
 }
 
 // Cascades: deleting a report also deletes every CoursePlanEntry (+ its CourseOccurrences),
@@ -41,12 +38,11 @@ export async function deleteParentReport(id) {
   for (const highlight of highlightEntries) {
     await deleteHighlightEntry(highlight.id);
   }
-  await runRequest('parentReports', 'readwrite', store => store.delete(id));
+  await deleteRecord('parentReports', id);
 }
 
-export async function addCoursePlanEntry({ reportId, indicatorCode, activityName, indicatorText = '' }) {
-  const id = await runRequest('coursePlanEntries', 'readwrite', store => store.add({ reportId, indicatorCode, activityName, indicatorText }));
-  return { id, reportId, indicatorCode, activityName, indicatorText };
+export async function addCoursePlanEntry({ reportId, indicatorCode, activityName, indicatorText = '', uid, updatedAt }) {
+  return addRecord('coursePlanEntries', { reportId, indicatorCode, activityName, indicatorText, uid, updatedAt });
 }
 
 export async function listCoursePlanEntriesForReport(reportId) {
@@ -56,9 +52,7 @@ export async function listCoursePlanEntriesForReport(reportId) {
 export async function updateCoursePlanEntry(id, changes) {
   const existing = await runRequest('coursePlanEntries', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`CoursePlanEntry ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('coursePlanEntries', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('coursePlanEntries', { ...existing, ...changes, id });
 }
 
 // Cascades: deleting an entry also deletes every CourseOccurrence under it.
@@ -67,14 +61,11 @@ export async function deleteCoursePlanEntry(id) {
   for (const occurrence of occurrences) {
     await deleteCourseOccurrence(occurrence.id);
   }
-  await runRequest('coursePlanEntries', 'readwrite', store => store.delete(id));
+  await deleteRecord('coursePlanEntries', id);
 }
 
-export async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note }) {
-  const id = await runRequest('courseOccurrences', 'readwrite', store =>
-    store.add({ entryId, date, status, absent, courseChanged, note })
-  );
-  return { id, entryId, date, status, absent, courseChanged, note };
+export async function addCourseOccurrence({ entryId, date, status, absent, courseChanged = false, note, uid, updatedAt }) {
+  return addRecord('courseOccurrences', { entryId, date, status, absent, courseChanged, note, uid, updatedAt });
 }
 
 export async function listCourseOccurrencesForEntry(entryId) {
@@ -84,20 +75,15 @@ export async function listCourseOccurrencesForEntry(entryId) {
 export async function updateCourseOccurrence(id, changes) {
   const existing = await runRequest('courseOccurrences', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`CourseOccurrence ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('courseOccurrences', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('courseOccurrences', { ...existing, ...changes, id });
 }
 
 export async function deleteCourseOccurrence(id) {
-  await runRequest('courseOccurrences', 'readwrite', store => store.delete(id));
+  await deleteRecord('courseOccurrences', id);
 }
 
-export async function addDevelopmentRecordEntry({ reportId, domain, courseEntryIds, narrative }) {
-  const id = await runRequest('developmentRecordEntries', 'readwrite', store =>
-    store.add({ reportId, domain, courseEntryIds, narrative })
-  );
-  return { id, reportId, domain, courseEntryIds, narrative };
+export async function addDevelopmentRecordEntry({ reportId, domain, courseEntryIds, narrative, uid, updatedAt }) {
+  return addRecord('developmentRecordEntries', { reportId, domain, courseEntryIds, narrative, uid, updatedAt });
 }
 
 export async function listDevelopmentRecordEntriesForReport(reportId) {
@@ -107,18 +93,15 @@ export async function listDevelopmentRecordEntriesForReport(reportId) {
 export async function updateDevelopmentRecordEntry(id, changes) {
   const existing = await runRequest('developmentRecordEntries', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`DevelopmentRecordEntry ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('developmentRecordEntries', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('developmentRecordEntries', { ...existing, ...changes, id });
 }
 
 export async function deleteDevelopmentRecordEntry(id) {
-  await runRequest('developmentRecordEntries', 'readwrite', store => store.delete(id));
+  await deleteRecord('developmentRecordEntries', id);
 }
 
-export async function addBehaviorObservation({ reportId, title, narrative }) {
-  const id = await runRequest('behaviorObservations', 'readwrite', store => store.add({ reportId, title, narrative }));
-  return { id, reportId, title, narrative };
+export async function addBehaviorObservation({ reportId, title, narrative, uid, updatedAt }) {
+  return addRecord('behaviorObservations', { reportId, title, narrative, uid, updatedAt });
 }
 
 export async function listBehaviorObservationsForReport(reportId) {
@@ -128,18 +111,15 @@ export async function listBehaviorObservationsForReport(reportId) {
 export async function updateBehaviorObservation(id, changes) {
   const existing = await runRequest('behaviorObservations', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`BehaviorObservation ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('behaviorObservations', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('behaviorObservations', { ...existing, ...changes, id });
 }
 
 export async function deleteBehaviorObservation(id) {
-  await runRequest('behaviorObservations', 'readwrite', store => store.delete(id));
+  await deleteRecord('behaviorObservations', id);
 }
 
-export async function addHighlightEntry({ reportId, photos, caption }) {
-  const id = await runRequest('highlightEntries', 'readwrite', store => store.add({ reportId, photos, caption }));
-  return { id, reportId, photos, caption };
+export async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt }) {
+  return addRecord('highlightEntries', { reportId, photos, caption, uid, updatedAt });
 }
 
 // Safari has a known bug where a Blob just read out of IndexedDB can throw "NotFoundError: The
@@ -182,11 +162,9 @@ export async function listHighlightEntriesForReport(reportId) {
 export async function updateHighlightEntry(id, changes) {
   const existing = await runRequest('highlightEntries', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`HighlightEntry ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('highlightEntries', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('highlightEntries', { ...existing, ...changes, id });
 }
 
 export async function deleteHighlightEntry(id) {
-  await runRequest('highlightEntries', 'readwrite', store => store.delete(id));
+  await deleteRecord('highlightEntries', id);
 }

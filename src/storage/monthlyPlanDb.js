@@ -1,4 +1,4 @@
-import { runRequest } from './dbCore.js';
+import { runRequest, addRecord, putRecord, deleteRecord } from './dbCore.js';
 
 // Serializes concurrent async calls that share the same key, so each call's read only ever starts
 // after the previous call's write for that key has fully committed. Needed anywhere the UI can
@@ -16,10 +16,9 @@ function serializeByKey(key, fn) {
   return next;
 }
 
-export async function addMonthlyCoursePlan({ period, childIds, childTiers, isNew = false }) {
+export async function addMonthlyCoursePlan({ period, childIds, childTiers, isNew = false, uid, updatedAt }) {
   const createdAt = new Date().toISOString();
-  const id = await runRequest('monthlyCoursePlans', 'readwrite', store => store.add({ period, childIds, childTiers, createdAt, isNew }));
-  return { id, period, childIds, childTiers, createdAt, isNew };
+  return addRecord('monthlyCoursePlans', { period, childIds, childTiers, createdAt, isNew, uid, updatedAt });
 }
 
 export async function listMonthlyCoursePlans() {
@@ -33,9 +32,7 @@ export async function getMonthlyCoursePlan(id) {
 export async function updateMonthlyCoursePlan(id, changes) {
   const existing = await runRequest('monthlyCoursePlans', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`MonthlyCoursePlan ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('monthlyCoursePlans', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('monthlyCoursePlans', { ...existing, ...changes, id });
 }
 
 // Cascades: deleting a plan also deletes every PlanSlot (+ its PlanSlotItems, + any
@@ -47,9 +44,9 @@ export async function deleteMonthlyCoursePlan(id) {
   }
   const overrides = await listChildItemOverridesForPlan(id);
   for (const override of overrides) {
-    await runRequest('childItemOverrides', 'readwrite', store => store.delete(override.id));
+    await deleteRecord('childItemOverrides', override.id);
   }
-  await runRequest('monthlyCoursePlans', 'readwrite', store => store.delete(id));
+  await deleteRecord('monthlyCoursePlans', id);
 }
 
 export async function listPlanSlotsForPlan(planId) {
@@ -61,17 +58,16 @@ export async function listPlanSlotsForPlan(planId) {
 // weekday) in quick succession (e.g. selecting two different same-tier children's cells for the
 // same week/weekday before the first call resolves), and both would see "no existing slot" and
 // both `add()`, producing duplicate slot rows for one key — see serializeByKey.
-export async function getOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+export async function getOrCreatePlanSlot({ planId, tier, weekIndex, weekday, uid, updatedAt }) {
   const key = `slot:${planId}:${tier}:${weekIndex}:${weekday}`;
-  return serializeByKey(key, () => writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }));
+  return serializeByKey(key, () => writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday, uid, updatedAt }));
 }
 
-async function writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday }) {
+async function writeOrCreatePlanSlot({ planId, tier, weekIndex, weekday, uid, updatedAt }) {
   const slots = await listPlanSlotsForPlan(planId);
   const existing = slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
   if (existing) return existing;
-  const id = await runRequest('planSlots', 'readwrite', store => store.add({ planId, tier, weekIndex, weekday }));
-  return { id, planId, tier, weekIndex, weekday };
+  return addRecord('planSlots', { planId, tier, weekIndex, weekday, uid, updatedAt });
 }
 
 // Cascades: deleting a slot also deletes every PlanSlotItem under it (and, via deletePlanSlotItem,
@@ -81,24 +77,21 @@ export async function deletePlanSlot(id) {
   for (const item of items) {
     await deletePlanSlotItem(item.id);
   }
-  await runRequest('planSlots', 'readwrite', store => store.delete(id));
+  await deleteRecord('planSlots', id);
 }
 
 export async function listPlanSlotItems(slotId) {
   return runRequest('planSlotItems', 'readonly', store => store.index('by_slotId').getAll(slotId));
 }
 
-export async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = '' }) {
-  const id = await runRequest('planSlotItems', 'readwrite', store => store.add({ slotId, indicatorCode, activityName, indicatorText }));
-  return { id, slotId, indicatorCode, activityName, indicatorText };
+export async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = '', uid, updatedAt }) {
+  return addRecord('planSlotItems', { slotId, indicatorCode, activityName, indicatorText, uid, updatedAt });
 }
 
 export async function updatePlanSlotItem(id, changes) {
   const existing = await runRequest('planSlotItems', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`PlanSlotItem ${id} not found`);
-  const updated = { ...existing, ...changes, id };
-  await runRequest('planSlotItems', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('planSlotItems', { ...existing, ...changes, id });
 }
 
 // Cascades: deleting an item also deletes every ChildItemOverride referencing it. Overrides are
@@ -111,12 +104,12 @@ export async function deletePlanSlotItem(id) {
       const overrides = await listChildItemOverridesForPlan(slot.planId);
       for (const override of overrides) {
         if (override.itemId === id) {
-          await runRequest('childItemOverrides', 'readwrite', store => store.delete(override.id));
+          await deleteRecord('childItemOverrides', override.id);
         }
       }
     }
   }
-  await runRequest('planSlotItems', 'readwrite', store => store.delete(id));
+  await deleteRecord('planSlotItems', id);
 }
 
 export async function listChildItemOverridesForPlan(planId) {
@@ -126,38 +119,35 @@ export async function listChildItemOverridesForPlan(planId) {
 // Upserts a child's mark on one item. Once both flags are false there is nothing left to
 // remember, so the row is deleted instead of kept around as a no-op default — every other
 // consumer can then treat "no matching row" as the single source of truth for "no override".
-export async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = '' }) {
+export async function setChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText = '', uid, updatedAt }) {
   const key = `override:${planId}:${childId}:${itemId}`;
   return serializeByKey(key, () =>
-    writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText })
+    writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt })
   );
 }
 
-async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText }) {
+async function writeChildItemOverride({ planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt }) {
   const existing = (await listChildItemOverridesForPlan(planId)).find(o => o.childId === childId && o.itemId === itemId);
 
   if (!notAchieved && !replaced) {
-    if (existing) await runRequest('childItemOverrides', 'readwrite', store => store.delete(existing.id));
+    if (existing) await deleteRecord('childItemOverrides', existing.id);
     return null;
   }
 
   if (existing) {
-    const updated = { ...existing, notAchieved, replaced, replacementText };
-    await runRequest('childItemOverrides', 'readwrite', store => store.put(updated));
-    return updated;
+    return putRecord('childItemOverrides', { ...existing, notAchieved, replaced, replacementText });
   }
 
-  const id = await runRequest('childItemOverrides', 'readwrite', store =>
-    store.add({ planId, childId, itemId, notAchieved, replaced, replacementText })
-  );
-  return { id, planId, childId, itemId, notAchieved, replaced, replacementText };
+  return addRecord('childItemOverrides', {
+    planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt,
+  });
 }
 
 export async function deleteChildItemOverridesForChild(planId, childId) {
   const overrides = await listChildItemOverridesForPlan(planId);
   for (const override of overrides) {
     if (override.childId === childId) {
-      await runRequest('childItemOverrides', 'readwrite', store => store.delete(override.id));
+      await deleteRecord('childItemOverrides', override.id);
     }
   }
 }

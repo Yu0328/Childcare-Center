@@ -13,6 +13,9 @@ import {
   addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride,
 } from './monthlyPlanDb.js';
 
+// Still 3: a v3 backup exported before sync existed simply has no uid/updatedAt on its records,
+// and addRecord stamps fresh ones in that case — there is no incompatible shape to gate behind
+// a new version number.
 const BACKUP_VERSION = 3;
 
 // Re-throws with a label identifying which part of the export was in flight, so a generic
@@ -175,13 +178,18 @@ export async function exportBackup(onProgress) {
 async function importV1Or2Children(data) {
   const childIdMap = new Map();
   for (const child of data.children) {
-    const created = await addChild({ name: child.name, birthDate: child.birthDate });
+    const created = await addChild({
+      name: child.name, birthDate: child.birthDate, uid: child.uid, updatedAt: child.updatedAt,
+    });
     childIdMap.set(child.id, created.id);
   }
 
   const formIdMap = new Map();
   for (const form of data.forms) {
-    const created = await addForm({ childId: childIdMap.get(form.childId), tier: form.tier, period: form.period });
+    const created = await addForm({
+      childId: childIdMap.get(form.childId), tier: form.tier, period: form.period,
+      uid: form.uid, updatedAt: form.updatedAt,
+    });
     formIdMap.set(form.id, created.id);
   }
 
@@ -192,6 +200,8 @@ async function importV1Or2Children(data) {
       date: entry.date,
       status: entry.status ?? (entry.achieved ? 'developed' : 'developing'),
       note: entry.note,
+      uid: entry.uid,
+      updatedAt: entry.updatedAt,
     });
   }
 
@@ -201,7 +211,10 @@ async function importV1Or2Children(data) {
 async function importParentReports(data, childIdMap) {
   const reportIdMap = new Map();
   for (const report of data.parentReports ?? []) {
-    const created = await addParentReport({ childId: childIdMap.get(report.childId), tier: report.tier, period: report.period });
+    const created = await addParentReport({
+      childId: childIdMap.get(report.childId), tier: report.tier, period: report.period,
+      uid: report.uid, updatedAt: report.updatedAt,
+    });
     reportIdMap.set(report.id, created.id);
   }
 
@@ -212,6 +225,8 @@ async function importParentReports(data, childIdMap) {
       indicatorCode: entry.indicatorCode,
       activityName: entry.activityName,
       indicatorText: entry.indicatorText,
+      uid: entry.uid,
+      updatedAt: entry.updatedAt,
     });
     entryIdMap.set(entry.id, created.id);
   }
@@ -224,6 +239,8 @@ async function importParentReports(data, childIdMap) {
       absent: occurrence.absent,
       courseChanged: occurrence.courseChanged,
       note: occurrence.note,
+      uid: occurrence.uid,
+      updatedAt: occurrence.updatedAt,
     });
   }
 
@@ -233,6 +250,8 @@ async function importParentReports(data, childIdMap) {
       domain: record.domain,
       courseEntryIds: record.courseEntryIds.map(id => entryIdMap.get(id)),
       narrative: record.narrative,
+      uid: record.uid,
+      updatedAt: record.updatedAt,
     });
   }
 
@@ -241,6 +260,8 @@ async function importParentReports(data, childIdMap) {
       reportId: reportIdMap.get(observation.reportId),
       title: observation.title,
       narrative: observation.narrative,
+      uid: observation.uid,
+      updatedAt: observation.updatedAt,
     });
   }
 
@@ -250,7 +271,10 @@ async function importParentReports(data, childIdMap) {
       width: photo.width,
       height: photo.height,
     }));
-    await addHighlightEntry({ reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption });
+    await addHighlightEntry({
+      reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption,
+      uid: highlight.uid, updatedAt: highlight.updatedAt,
+    });
   }
 }
 
@@ -267,7 +291,9 @@ async function importMonthlyCoursePlans(data, childIdMap) {
         .map(([oldChildId, tier]) => [childIdMap.get(Number(oldChildId)), tier])
         .filter(([newChildId]) => newChildId !== undefined)
     );
-    const created = await addMonthlyCoursePlan({ period: plan.period, childIds, childTiers });
+    const created = await addMonthlyCoursePlan({
+      period: plan.period, childIds, childTiers, uid: plan.uid, updatedAt: plan.updatedAt,
+    });
     planIdMap.set(plan.id, created.id);
   }
 
@@ -275,6 +301,7 @@ async function importMonthlyCoursePlans(data, childIdMap) {
   for (const slot of data.planSlots ?? []) {
     const created = await getOrCreatePlanSlot({
       planId: planIdMap.get(slot.planId), tier: slot.tier, weekIndex: slot.weekIndex, weekday: slot.weekday,
+      uid: slot.uid, updatedAt: slot.updatedAt,
     });
     slotIdMap.set(slot.id, created.id);
   }
@@ -283,6 +310,7 @@ async function importMonthlyCoursePlans(data, childIdMap) {
   for (const item of data.planSlotItems ?? []) {
     const created = await addPlanSlotItem({
       slotId: slotIdMap.get(item.slotId), indicatorCode: item.indicatorCode, activityName: item.activityName, indicatorText: item.indicatorText,
+      uid: item.uid, updatedAt: item.updatedAt,
     });
     itemIdMap.set(item.id, created.id);
   }
@@ -297,6 +325,8 @@ async function importMonthlyCoursePlans(data, childIdMap) {
       notAchieved: override.notAchieved,
       replaced: override.replaced,
       replacementText: override.replacementText,
+      uid: override.uid,
+      updatedAt: override.updatedAt,
     });
   }
 }

@@ -1,10 +1,9 @@
-import { DB_NAME, runRequest } from './dbCore.js';
+import { DB_NAME, runRequest, addRecord, putRecord, deleteRecord } from './dbCore.js';
 import { deleteParentReport, listParentReportsForChild } from './parentReportDb.js';
 import { listMonthlyCoursePlans, updateMonthlyCoursePlan, deleteChildItemOverridesForChild } from './monthlyPlanDb.js';
 
-export async function addChild({ name, birthDate }) {
-  const id = await runRequest('children', 'readwrite', store => store.add({ name, birthDate }));
-  return { id, name, birthDate };
+export async function addChild({ name, birthDate, uid, updatedAt }) {
+  return addRecord('children', { name, birthDate, uid, updatedAt });
 }
 
 export async function listChildren() {
@@ -40,7 +39,7 @@ export async function deleteChild(id) {
     await updateMonthlyCoursePlan(plan.id, { childIds, childTiers });
     await deleteChildItemOverridesForChild(plan.id, id);
   }
-  await runRequest('children', 'readwrite', store => store.delete(id));
+  await deleteRecord('children', id);
 }
 
 export async function clearAllData() {
@@ -52,10 +51,9 @@ export async function clearAllData() {
   });
 }
 
-export async function addForm({ childId, tier, period, isNew = false }) {
+export async function addForm({ childId, tier, period, isNew = false, uid, updatedAt }) {
   const createdAt = new Date().toISOString();
-  const id = await runRequest('forms', 'readwrite', store => store.add({ childId, tier, period, createdAt, isNew }));
-  return { id, childId, tier, period, createdAt, isNew };
+  return addRecord('forms', { childId, tier, period, createdAt, isNew, uid, updatedAt });
 }
 
 export async function listFormsForChild(childId) {
@@ -71,9 +69,7 @@ export async function updateForm(id, changes) {
   if (!existing) {
     throw new Error(`Form ${id} not found`);
   }
-  const updated = { ...existing, ...changes, id };
-  await runRequest('forms', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('forms', { ...existing, ...changes, id });
 }
 
 // Cascades: deleting a form also deletes all of its entries.
@@ -82,7 +78,7 @@ export async function deleteForm(id) {
   for (const entry of entries) {
     await deleteEntry(entry.id);
   }
-  await runRequest('forms', 'readwrite', store => store.delete(id));
+  await deleteRecord('forms', id);
 }
 
 // activityName is optional — normal entries (against one of this form's own tier's indicators)
@@ -90,11 +86,8 @@ export async function deleteForm(id) {
 // for a remark entry whose code doesn't resolve to any indicator at all (see
 // aggregateCoursePlan.js), so the original activity label the child's record was under isn't lost
 // just because the code couldn't be matched — 發展活動 falls back to it on export.
-export async function addEntry({ formId, indicatorCode, date, status, note, activityName }) {
-  const id = await runRequest('entries', 'readwrite', store =>
-    store.add({ formId, indicatorCode, date, status, note, activityName })
-  );
-  return { id, formId, indicatorCode, date, status, note, activityName };
+export async function addEntry({ formId, indicatorCode, date, status, note, activityName, uid, updatedAt }) {
+  return addRecord('entries', { formId, indicatorCode, date, status, note, activityName, uid, updatedAt });
 }
 
 export async function updateEntry(id, changes) {
@@ -102,13 +95,11 @@ export async function updateEntry(id, changes) {
   if (!existing) {
     throw new Error(`Entry ${id} not found`);
   }
-  const updated = { ...existing, ...changes, id };
-  await runRequest('entries', 'readwrite', store => store.put(updated));
-  return updated;
+  return putRecord('entries', { ...existing, ...changes, id });
 }
 
 export async function deleteEntry(id) {
-  await runRequest('entries', 'readwrite', store => store.delete(id));
+  await deleteRecord('entries', id);
 }
 
 // Legacy records written before `status` existed only have a boolean `achieved` flag.
