@@ -7,6 +7,13 @@ import { AuthExpiredError } from './driveClient.js';
 export const SCOPES = 'openid profile https://www.googleapis.com/auth/drive.file';
 export const SYNC_MODE_KEY = 'c-form-sync-mode';
 export const SYNC_NAME_KEY = 'c-form-sync-name';
+// A silent resume (prompt: '') runs automatically on page load, with no click behind it. If the
+// browser's popup blocker (or a missing third-party-cookie session) swallows GIS's attempt, GIS
+// can fail to ever invoke its callback, and gate() awaits that promise forever — a permanently
+// blank header with no sign-in button, on the very reload that should show one. This bounds the
+// wait so a swallowed silent attempt falls back to the existing "登入已失效，請重新登入" state,
+// which does offer a button — one a real click can open a popup from.
+export const RESUME_TIMEOUT_MS = 8000;
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
@@ -111,12 +118,26 @@ export function createGoogleAuth({
   }
 
   // prompt: '' asks for a token without showing anything, which works while Google still has a
-  // live session and consent on file. A null return is the "登入已失效，請重新登入" case.
+  // live session and consent on file. A null return is the "登入已失效，請重新登入" case — the
+  // same case a swallowed/blocked silent attempt is forced into once RESUME_TIMEOUT_MS passes.
   async function resume() {
     if (readSyncMode() !== 'google') return null;
     if (isOffline()) return null;
     await ensureClient();
-    const fresh = await requestToken({ prompt: '' });
+    const attempt = requestToken({ prompt: '' });
+    const timedOut = await Promise.race([
+      attempt.then(() => false),
+      new Promise(resolve => setTimeout(() => resolve(true), RESUME_TIMEOUT_MS)),
+    ]);
+    if (timedOut) {
+      // The GIS call itself may be permanently stuck (its popup blocked, no callback ever
+      // coming). Forget it so the next request — in particular a real, click-driven signIn() —
+      // opens a fresh popup instead of awaiting this one forever too.
+      inFlight = null;
+      pending = null;
+      return null;
+    }
+    const fresh = await attempt;
     if (!fresh) return null;
     return { name: readDisplayName() };
   }

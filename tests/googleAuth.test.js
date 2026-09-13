@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createGoogleAuth, readSyncMode, writeSyncMode, clearSyncMode, readDisplayName, SCOPES,
+  RESUME_TIMEOUT_MS,
 } from '../src/sync/googleAuth.js';
 import { AuthExpiredError } from '../src/sync/driveClient.js';
 
@@ -101,6 +102,47 @@ describe('createGoogleAuth', () => {
 
     expect(await pending).toBe(null);
     expect(auth.isSignedIn()).toBe(false);
+  });
+
+  it('靜默續用的回呼被瀏覽器擋掉、永遠不會來時，逾時後視為續用失敗，不會卡住呼叫者', async () => {
+    vi.useFakeTimers();
+    try {
+      const gis = fakeGis();
+      writeSyncMode('google');
+      const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
+
+      const pending = auth.resume(); // gis.respond(...) 故意不呼叫，模擬彈出視窗被擋、回呼永遠不會來
+      await vi.advanceTimersByTimeAsync(RESUME_TIMEOUT_MS + 100);
+
+      expect(await pending).toBe(null);
+      expect(gis.calls).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('續用逾時後，接下來真的點登入仍會開一個新的請求，不會卡在被擋掉的舊請求上', async () => {
+    vi.useFakeTimers();
+    try {
+      const gis = fakeGis();
+      writeSyncMode('google');
+      const auth = createGoogleAuth({
+        clientId: 'test-client', loadGis: gis.loadGis, fetchUserInfo: async () => ({ name: '小美' }),
+      });
+
+      const resumePending = auth.resume();
+      await vi.advanceTimersByTimeAsync(RESUME_TIMEOUT_MS + 100);
+      expect(await resumePending).toBe(null);
+      expect(gis.calls).toHaveLength(1);
+
+      const signInPending = auth.signIn();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(gis.calls).toHaveLength(2); // 新的請求，不是沿用卡住的那個
+      gis.respond({ access_token: 'tok-1', expires_in: 3600 });
+      expect(await signInPending).toEqual({ name: '小美' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('token 過期時多個併發 getAccessToken 共用同一次 refresh，全部都會拿到結果', async () => {
