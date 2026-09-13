@@ -31483,13 +31483,7 @@ Content-Type: ${contentType}\r
           onDone();
           return;
         }
-        const resumed = await auth.resume();
-        if (resumed) {
-          startSyncing();
-        } else {
-          paintHeader("google");
-          header.update({ ...engine.getStatus(), phase: "auth", error: "AUTH_EXPIRED" });
-        }
+        paintHeader("guest");
         onDone();
         return;
       }
