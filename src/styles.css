@@ -146,6 +146,15 @@ button {
   ::view-transition-new(*) {
     animation: none !important;
   }
+
+  /* Exempted from the blanket animation kill above: the sync light isn't decorative motion, it's
+     the only visual signal of live status (syncing/success/failure), so it needs to keep blinking
+     even with reduced motion on. Higher specificity than the `*` rule wins despite both using
+     !important. */
+  .sync-header__status[data-sync-light]::before {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 /* Screen-to-screen transition (see app.js runView): the old screen fades out where it is, the
