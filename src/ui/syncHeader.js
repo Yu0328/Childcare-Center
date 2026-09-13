@@ -22,12 +22,12 @@ export function formatSyncStatus(status) {
   // A first sync on a device with existing data can mean many round-trips to Drive; the plain
   // "同步中…" that's accurate for a normal quick sync reads as stuck when it runs for minutes.
   if (status.phase === 'syncing') {
-    return status.textSyncedAt ? '同步中…' : '首次同步中，資料量較多時可能需要幾分鐘，請不要關閉視窗…';
+    return status.textSyncedAt ? '同步中…' : '首次同步中，可能需要幾分鐘，請稍候…';
   }
-  // A single rolled-up time would claim the photos made it too. Splitting them is the difference
-  // between an honest status and one that quietly loses a teacher's photos.
+  // A single rolled-up time would claim the photos made it too. Kept short for the mobile header
+  // row — the honest "still missing photos" fact matters more here than the exact text-sync time.
   if (status.photoPending > 0) {
-    return `文字資料：${clockTime(status.textSyncedAt)}　照片：同步失敗，還有 ${status.photoPending} 張未上傳`;
+    return `照片同步失敗（剩 ${status.photoPending} 張）`;
   }
   if (status.error === 'NETWORK') return '同步失敗，稍後會自動重試';
   if (status.textSyncedAt) return `上次同步：${clockTime(status.textSyncedAt)}`;

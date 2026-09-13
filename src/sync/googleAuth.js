@@ -128,7 +128,10 @@ export function createGoogleAuth({
     const fresh = await requestToken({});
     if (!fresh) throw new Error('SIGN_IN_CANCELLED');
     const profile = await fetchUserInfo(fresh);
-    const name = (profile && profile.name) || '';
+    // given_name (first name only, no surname) for the header greeting — more reliable than
+    // slicing the full name ourselves (a 複姓/compound surname like 歐陽 would slice wrong).
+    // Falls back to the full name on the rare account that doesn't populate it.
+    const name = (profile && (profile.given_name || profile.name)) || '';
     writeSyncMode('google');
     localStorage.setItem(SYNC_NAME_KEY, name);
     return { name };

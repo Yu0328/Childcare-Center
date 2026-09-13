@@ -82,6 +82,22 @@ describe('createGoogleAuth', () => {
     expect(readDisplayName()).toBe('小美');
   });
 
+  it('有 given_name 時優先用它當顯示名稱（不含姓，複姓也不會猜錯）', async () => {
+    const gis = fakeGis();
+    const auth = createGoogleAuth({
+      clientId: 'test-client',
+      loadGis: gis.loadGis,
+      fetchUserInfo: async () => ({ name: '歐陽小美', given_name: '小美' }),
+    });
+
+    const pending = auth.signIn();
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
+    gis.respond({ access_token: 'tok-1', expires_in: 3600 });
+
+    expect(await pending).toEqual({ name: '小美' });
+    expect(readDisplayName()).toBe('小美');
+  });
+
   it('要求的 scope 含 drive.file 與 profile', () => {
     expect(SCOPES).toContain('https://www.googleapis.com/auth/drive.file');
     expect(SCOPES).toContain('profile');

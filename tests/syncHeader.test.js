@@ -34,10 +34,9 @@ describe('formatSyncStatus', () => {
     expect(formatSyncStatus(base)).toMatch(/^上次同步：\d{2}:\d{2}$/);
   });
 
-  it('照片同步失敗時拆開顯示，不用一個時間誤導使用者', () => {
+  it('照片同步失敗時單獨顯示，不用一個籠統時間誤導使用者', () => {
     const text = formatSyncStatus({ ...base, photoPending: 3, photoSyncedAt: null });
-    expect(text).toContain('文字資料：');
-    expect(text).toContain('照片：同步失敗，還有 3 張未上傳');
+    expect(text).toBe('照片同步失敗（剩 3 張）');
   });
 
   it('同步中', () => {

@@ -145,6 +145,10 @@ export function wireBackupControls({
   exportButton,
   importInput,
   messageContainer = exportButton.closest('header') || exportButton.parentNode,
+  // On mobile, 匯出備份 can sit inside a collapsed "⋯" menu (see .header-overflow in
+  // styles.css) — the progress bar needs a container that's visible even while that menu is
+  // closed, so it targets the header's actions row rather than exportButton's immediate parent.
+  progressContainer = exportButton.closest('.app-header__actions') || exportButton.parentNode,
   confirmImport = message => (typeof confirm === 'function' ? confirm(message) : false),
   reload = () => window.location.reload(),
 }) {
@@ -186,20 +190,19 @@ export function wireBackupControls({
   // native <progress> — <progress>'s fill can't be given a smooth CSS transition consistently
   // across browsers, and per-child steps without one look like a jumpy snap rather than a glide.
   function showProgress(done, total) {
-    const container = exportButton.parentNode;
-    let bar = container.querySelector('[data-progress="backup"]');
+    let bar = progressContainer.querySelector('[data-progress="backup"]');
     if (!bar) {
       bar = document.createElement('div');
       bar.dataset.progress = 'backup';
       bar.className = 'backup-progress';
       bar.innerHTML = '<div class="backup-progress__fill"></div>';
-      container.insertBefore(bar, exportButton);
+      progressContainer.insertBefore(bar, progressContainer.firstChild);
     }
     const percent = total > 0 ? (done / total) * 100 : 100;
     bar.firstElementChild.style.width = `${percent}%`;
   }
   function hideProgress() {
-    exportButton.parentNode.querySelector('[data-progress="backup"]')?.remove();
+    progressContainer.querySelector('[data-progress="backup"]')?.remove();
   }
 
   exportButton.addEventListener('click', async () => {

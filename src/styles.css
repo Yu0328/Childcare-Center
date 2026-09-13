@@ -53,6 +53,14 @@
   --filled-accent: #2f8f4e;
   --filled-border: #b9dfbb;
 
+  /* Neutral gray for the 訪客 (guest) sign-in choice card — deliberately colorless next to the
+     Google card's brand blue, so "guest" reads as the plain/no-commitment option rather than
+     competing for attention. Accent reuses --text-secondary's hue (4.5:1+ on the tint below,
+     verified by computed contrast) instead of inventing a new gray. */
+  --neutral-tint: #e6e7e3;
+  --neutral-accent: #55605c;
+  --neutral-border: #d3d5cf;
+
   /* Domain identity colors — one per 發展領域, ordered for adjacent-pair
      colorblind-safe contrast (see dataviz palette reference). Tints are deliberately a shade
      deeper than a barely-there pastel so each card reads as colored against the page, not white. */
@@ -208,6 +216,91 @@ button {
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+}
+
+/* Wraps 匯出備份/匯入備份 so they can collapse into a "⋯" menu on mobile without changing their
+   ids or app.js's wiring. A checkbox + label drives the toggle with no JS (tried <details>/
+   <summary> first, but browsers hide non-summary content whenever it isn't [open] as a built-in
+   behavior that a plain `display: contents` on the host can't override — so desktop, which wants
+   the menu permanently "open" and unwrapped, ended up with the buttons gone entirely). */
+.header-overflow {
+  display: contents;
+}
+.header-overflow__checkbox {
+  display: none;
+}
+/* Chained selector (not just .header-overflow__trigger) so this beats .btn's own `display:
+   inline-flex` at equal specificity — .btn is defined later in this file and would otherwise win
+   the cascade and leave the "⋯" trigger visible on desktop. */
+.header-overflow .header-overflow__trigger {
+  display: none;
+}
+.header-overflow__menu {
+  display: contents;
+}
+
+@media (max-width: 640px) {
+  /* Two-row header: title on its own row, then the sync/backup controls below. Without this the
+     title, greeting, status text and four buttons all fight for one row and everything shrinks —
+     the original bug report ("同步和用戶名差那欄會讓匯出/匯入備份的按鈕大小跑掉"). */
+  .app-header {
+    justify-content: flex-start;
+    padding: 0.7rem 1rem;
+  }
+  .app-header__brand {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+  .app-header__actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    margin-left: 0;
+    gap: 0.5rem;
+  }
+  /* Unwraps sync-header's own box so its greeting/status/buttons become direct flex items of
+     .app-header__actions — needed so the row-break rule below can apply across both groups. */
+  .sync-header {
+    display: contents;
+  }
+  .sync-header__greeting {
+    white-space: normal;
+  }
+
+  .header-overflow {
+    display: block;
+    position: relative;
+  }
+  .header-overflow .header-overflow__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5em 0.8em;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .header-overflow__menu {
+    display: none;
+    flex-direction: column;
+    gap: 0.4rem;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.5rem;
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
+    z-index: 20;
+    min-width: 9rem;
+  }
+  .header-overflow__checkbox:checked ~ .header-overflow__menu {
+    display: flex;
+  }
+  .header-overflow__menu .btn--header {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 #app {
@@ -473,6 +566,11 @@ button {
 .type-select__option:active {
   transform: translateY(0) scale(0.99);
 }
+.type-select__option:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
 
 .type-select__icon {
   flex-shrink: 0;
@@ -568,6 +666,22 @@ button {
 }
 .type-select__option--filled:hover .type-select__go {
   color: var(--filled-accent);
+}
+
+.type-select__option--neutral {
+  background: var(--neutral-tint);
+  border-color: var(--neutral-tint);
+}
+.type-select__option--neutral .type-select__icon {
+  background: var(--surface);
+  color: var(--neutral-accent);
+}
+.type-select__option--neutral:hover {
+  border-color: var(--neutral-border);
+  box-shadow: 0 12px 26px rgba(85, 96, 92, 0.18);
+}
+.type-select__option--neutral:hover .type-select__go {
+  color: var(--neutral-accent);
 }
 
 /* 管理幼兒 / 匯入檔案 — same option-card style as the five form choices, in a soft rose (a 4th
@@ -2161,19 +2275,14 @@ fieldset.panel-form__field.import-preview__child legend {
   }
 }
 
-.sign-in-choice {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 26rem;
-  margin: 3rem auto;
-  text-align: center;
-}
-
+/* Sits between .type-select-home__title and its divider — same wrapper the choice screen now
+   reuses from the form-select screen (see signInChoiceView.js). */
 .sign-in-choice__hint {
-  color: #555;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.6;
+  text-align: center;
+  margin: -0.3rem 0 0;
 }
 
 .sync-header__greeting {
