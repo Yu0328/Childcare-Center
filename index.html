@@ -30199,114 +30199,6 @@ var CFormApp = (() => {
     return { updateLockState };
   }
 
-  // src/sync/googleAuth.js
-  var SCOPES = "openid profile https://www.googleapis.com/auth/drive.file";
-  var SYNC_MODE_KEY = "c-form-sync-mode";
-  var SYNC_NAME_KEY = "c-form-sync-name";
-  var GIS_SRC = "https://accounts.google.com/gsi/client";
-  var USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
-  function readSyncMode() {
-    return localStorage.getItem(SYNC_MODE_KEY);
-  }
-  function writeSyncMode(mode) {
-    localStorage.setItem(SYNC_MODE_KEY, mode);
-  }
-  function clearSyncMode() {
-    localStorage.removeItem(SYNC_MODE_KEY);
-  }
-  function readDisplayName() {
-    return localStorage.getItem(SYNC_NAME_KEY) || "";
-  }
-  function isOffline() {
-    return navigator.onLine === false;
-  }
-  function defaultLoadGis() {
-    if (window.google && window.google.accounts) return Promise.resolve(window.google);
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = GIS_SRC;
-      script.async = true;
-      script.onload = () => resolve(window.google);
-      script.onerror = () => reject(new Error("GIS_LOAD_FAILED"));
-      document.head.appendChild(script);
-    });
-  }
-  async function defaultFetchUserInfo(token) {
-    const response = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new Error("USERINFO_FAILED");
-    return response.json();
-  }
-  function createGoogleAuth({
-    clientId,
-    loadGis = defaultLoadGis,
-    fetchUserInfo = defaultFetchUserInfo
-  }) {
-    let token = null;
-    let expiresAtMs = 0;
-    let tokenClient = null;
-    let pending = null;
-    async function ensureClient() {
-      if (tokenClient) return tokenClient;
-      const google = await loadGis();
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: SCOPES,
-        callback: (response) => {
-          const resolve = pending;
-          pending = null;
-          if (!resolve) return;
-          if (response && response.access_token) {
-            token = response.access_token;
-            expiresAtMs = Date.now() + (Number(response.expires_in) || 3600) * 1e3 - 6e4;
-            resolve(response.access_token);
-          } else {
-            token = null;
-            expiresAtMs = 0;
-            resolve(null);
-          }
-        }
-      });
-      return tokenClient;
-    }
-    function requestToken(options) {
-      return new Promise((resolve) => {
-        pending = resolve;
-        tokenClient.requestAccessToken(options);
-      });
-    }
-    async function signIn() {
-      if (isOffline()) throw new Error("OFFLINE");
-      await ensureClient();
-      const fresh = await requestToken({});
-      if (!fresh) throw new Error("SIGN_IN_CANCELLED");
-      const profile = await fetchUserInfo(fresh);
-      const name = profile && profile.name || "";
-      writeSyncMode("google");
-      localStorage.setItem(SYNC_NAME_KEY, name);
-      return { name };
-    }
-    async function resume() {
-      if (readSyncMode() !== "google") return null;
-      if (isOffline()) return null;
-      await ensureClient();
-      const fresh = await requestToken({ prompt: "" });
-      if (!fresh) return null;
-      return { name: readDisplayName() };
-    }
-    async function getAccessToken() {
-      if (token && Date.now() < expiresAtMs) return token;
-      const refreshed = await resume();
-      if (!refreshed || !token) throw new Error("AUTH_REQUIRED");
-      return token;
-    }
-    function signOut() {
-      token = null;
-      expiresAtMs = 0;
-      clearSyncMode();
-    }
-    return { signIn, resume, getAccessToken, signOut, isSignedIn: () => Boolean(token) };
-  }
-
   // src/sync/driveClient.js
   var FOLDER_NAME = "\u80B2\u82F1\u516C\u6258\u586B\u8868\u7CFB\u7D71";
   var MANIFEST_NAME = "sync-manifest.json";
@@ -30461,6 +30353,119 @@ Content-Type: ${contentType}\r
       });
     }
     return { ensureFolder, listCloud, uploadRecord, downloadRecord, uploadPhoto, downloadPhoto, trashFile };
+  }
+
+  // src/sync/googleAuth.js
+  var SCOPES = "openid profile https://www.googleapis.com/auth/drive.file";
+  var SYNC_MODE_KEY = "c-form-sync-mode";
+  var SYNC_NAME_KEY = "c-form-sync-name";
+  var GIS_SRC = "https://accounts.google.com/gsi/client";
+  var USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
+  function readSyncMode() {
+    return localStorage.getItem(SYNC_MODE_KEY);
+  }
+  function writeSyncMode(mode) {
+    localStorage.setItem(SYNC_MODE_KEY, mode);
+  }
+  function clearSyncMode() {
+    localStorage.removeItem(SYNC_MODE_KEY);
+  }
+  function readDisplayName() {
+    return localStorage.getItem(SYNC_NAME_KEY) || "";
+  }
+  function isOffline() {
+    return navigator.onLine === false;
+  }
+  function defaultLoadGis() {
+    if (window.google && window.google.accounts) return Promise.resolve(window.google);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = GIS_SRC;
+      script.async = true;
+      script.onload = () => resolve(window.google);
+      script.onerror = () => reject(new Error("GIS_LOAD_FAILED"));
+      document.head.appendChild(script);
+    });
+  }
+  async function defaultFetchUserInfo(token) {
+    const response = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error("USERINFO_FAILED");
+    return response.json();
+  }
+  function createGoogleAuth({
+    clientId,
+    loadGis = defaultLoadGis,
+    fetchUserInfo = defaultFetchUserInfo
+  }) {
+    let token = null;
+    let expiresAtMs = 0;
+    let tokenClient = null;
+    let pending = null;
+    let inFlight = null;
+    async function ensureClient() {
+      if (tokenClient) return tokenClient;
+      const google = await loadGis();
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: SCOPES,
+        callback: (response) => {
+          const resolve = pending;
+          pending = null;
+          if (!resolve) return;
+          if (response && response.access_token) {
+            token = response.access_token;
+            expiresAtMs = Date.now() + (Number(response.expires_in) || 3600) * 1e3 - 6e4;
+            resolve(response.access_token);
+          } else {
+            token = null;
+            expiresAtMs = 0;
+            resolve(null);
+          }
+        }
+      });
+      return tokenClient;
+    }
+    function requestToken(options) {
+      if (inFlight) return inFlight;
+      inFlight = new Promise((resolve) => {
+        pending = resolve;
+        tokenClient.requestAccessToken(options);
+      }).finally(() => {
+        inFlight = null;
+      });
+      return inFlight;
+    }
+    async function signIn() {
+      if (isOffline()) throw new Error("OFFLINE");
+      await ensureClient();
+      const fresh = await requestToken({});
+      if (!fresh) throw new Error("SIGN_IN_CANCELLED");
+      const profile = await fetchUserInfo(fresh);
+      const name = profile && profile.name || "";
+      writeSyncMode("google");
+      localStorage.setItem(SYNC_NAME_KEY, name);
+      return { name };
+    }
+    async function resume() {
+      if (readSyncMode() !== "google") return null;
+      if (isOffline()) return null;
+      await ensureClient();
+      const fresh = await requestToken({ prompt: "" });
+      if (!fresh) return null;
+      return { name: readDisplayName() };
+    }
+    async function getAccessToken() {
+      if (token && Date.now() < expiresAtMs) return token;
+      const refreshed = await resume();
+      if (!refreshed || !token) throw new AuthExpiredError("AUTH_REQUIRED");
+      return token;
+    }
+    function signOut() {
+      token = null;
+      expiresAtMs = 0;
+      clearSyncMode();
+    }
+    return { signIn, resume, getAccessToken, signOut, isSignedIn: () => Boolean(token) };
   }
 
   // src/storage/syncStateDb.js
@@ -31033,8 +31038,10 @@ Content-Type: ${contentType}\r
           });
         }
       }
+      const deferredUids = /* @__PURE__ */ new Set();
       for (const item of autoMerged.sort(byDependencyOrder)) {
-        await applyRemoteRecord({ store: item.store, uid: item.uid, payload: item.merged }, snapshot);
+        const outcome = await applyRemoteRecord({ store: item.store, uid: item.uid, payload: item.merged }, snapshot);
+        if (outcome === "deferred") deferredUids.add(item.uid);
       }
       if (conflicts.length > 0) {
         const answers = await resolveConflicts(conflicts.map((c) => ({
@@ -31048,17 +31055,18 @@ Content-Type: ${contentType}\r
         for (const conflict of conflicts.sort(byDependencyOrder)) {
           const choice = choices.get(conflict.uid) || "local";
           if (choice === "cloud") {
-            await applyRemoteRecord(
+            const outcome = await applyRemoteRecord(
               { store: conflict.store, uid: conflict.uid, payload: conflict.cloudPayload },
               snapshot
             );
+            if (outcome === "deferred") deferredUids.add(conflict.uid);
           } else if (choice === "both") {
             await keepBoth(conflict.uid, conflict.store, conflict.cloudPayload, snapshot);
           }
         }
         snapshot = await readLocalSnapshot();
       }
-      const settledUids = [...autoMerged, ...conflicts].map((item) => item.uid);
+      const settledUids = [...autoMerged, ...conflicts].map((item) => item.uid).filter((uid) => !deferredUids.has(uid));
       const uploadUids = /* @__PURE__ */ new Set([...plan.creates, ...plan.uploads, ...settledUids]);
       for (const [uid] of snapshot.records) {
         if (!state.has(uid) && !cloudRecords.has(uid)) uploadUids.add(uid);
@@ -31340,6 +31348,8 @@ Content-Type: ${contentType}\r
     let header = null;
     let appContainer = null;
     let resumeApp = null;
+    let syncing = false;
+    let listenersWired = false;
     async function resolveConflicts(conflicts) {
       if (!appContainer) return conflicts.map((conflict) => ({ uid: conflict.uid, choice: "local" }));
       const choices = await renderConflictResolveView(appContainer, { conflicts });
@@ -31366,18 +31376,27 @@ Content-Type: ${contentType}\r
         },
         onSignOut: () => {
           auth.signOut();
+          syncing = false;
           setWriteListener(null);
           paintHeader("guest");
         }
       });
     }
+    function wireListenersOnce() {
+      if (listenersWired) return;
+      listenersWired = true;
+      document.addEventListener("visibilitychange", () => {
+        if (syncing && !document.hidden) engine.scheduleSync();
+      });
+      window.addEventListener("online", () => {
+        if (syncing) engine.scheduleSync();
+      });
+    }
     function startSyncing() {
       paintHeader("google");
+      syncing = true;
       setWriteListener(() => engine.scheduleSync());
-      document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) engine.scheduleSync();
-      });
-      window.addEventListener("online", () => engine.scheduleSync());
+      wireListenersOnce();
       engine.runSync();
     }
     async function gate(container, { onDone }) {
@@ -31400,8 +31419,9 @@ Content-Type: ${contentType}\r
       if (readSyncMode() === "google") {
         if (isOffline()) {
           paintHeader("google");
+          syncing = true;
           setWriteListener(() => engine.scheduleSync());
-          window.addEventListener("online", () => engine.scheduleSync());
+          wireListenersOnce();
           onDone();
           return;
         }
