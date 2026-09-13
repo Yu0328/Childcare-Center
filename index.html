@@ -4922,8 +4922,15 @@ var CFormApp = (() => {
   async function deleteBehaviorObservation(id) {
     await deleteRecord("behaviorObservations", id);
   }
-  async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt }) {
-    return addRecord("highlightEntries", { reportId, photos, caption, uid, updatedAt });
+  async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt, createdAt }) {
+    return addRecord("highlightEntries", {
+      reportId,
+      photos,
+      caption,
+      uid,
+      updatedAt,
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    });
   }
   async function listHighlightEntriesForReport(reportId) {
     let entries;
@@ -4932,6 +4939,7 @@ var CFormApp = (() => {
     } catch (err) {
       throw new Error(`IndexedDB \u67E5\u8A62\u5931\u6557\uFF1A${err?.message || err}`, { cause: err });
     }
+    entries = entries.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
     return Promise.all(
       entries.map(async (entry) => ({
         ...entry,
@@ -28359,7 +28367,7 @@ var CFormApp = (() => {
       const previewEl = container.querySelector(`[data-preview-slot="${i}"]`);
       try {
         const compressed = await compressImage(file);
-        pendingPhotos[i] = compressed;
+        pendingPhotos[i] = { ...compressed, photoUid: newUid() };
         previewEl.innerHTML = `
         <img class="highlight-thumb" src="${URL.createObjectURL(compressed.blob)}" alt="">
         <button type="button" class="highlight-thumb-remove" data-remove-pending-slot="${i}" aria-label="\u79FB\u9664\u7167\u7247 ${i + 1}">\xD7</button>
@@ -29837,7 +29845,8 @@ var CFormApp = (() => {
         photos,
         caption: highlight.caption,
         uid: highlight.uid,
-        updatedAt: highlight.updatedAt
+        updatedAt: highlight.updatedAt,
+        createdAt: highlight.createdAt
       });
     }
   }
@@ -30684,6 +30693,12 @@ Content-Type: ${contentType}\r
         if (!row.uid || !row.updatedAt) {
           row.uid = row.uid || newUid();
           row.updatedAt = row.updatedAt || row.createdAt || (/* @__PURE__ */ new Date(0)).toISOString();
+          await rawPut(store, row);
+        }
+        if (store === PHOTO_STORE && (row.photos || []).some((photo) => photo && !photo.photoUid)) {
+          row.photos = row.photos.map(
+            (photo) => photo && !photo.photoUid ? { ...photo, photoUid: newUid() } : photo
+          );
           await rawPut(store, row);
         }
         uidById.set(refKey(store, row.id), row.uid);
