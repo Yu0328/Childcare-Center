@@ -2311,25 +2311,29 @@ fieldset.panel-form__field.import-preview__child legend {
   color: #3f8f3f;
 }
 
-.sync-header__status[data-syncing='true'] {
+.sync-header__status[data-sync-light] {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
 }
 
-.sync-header__status[data-syncing='true']::before {
+.sync-header__status[data-sync-light]::before {
   content: '';
-  width: 0.75em;
-  height: 0.75em;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
+  width: 0.6em;
+  height: 0.6em;
   border-radius: 50%;
-  animation: sync-spin 0.8s linear infinite;
+  background: currentColor;
   flex-shrink: 0;
+  animation: sync-blink 1.2s ease-in-out infinite;
 }
 
-@keyframes sync-spin {
-  to { transform: rotate(360deg); }
+.sync-header__status[data-sync-light='ok'] { color: #3f8f3f; }
+.sync-header__status[data-sync-light='syncing'] { color: #c97a12; }
+.sync-header__status[data-sync-light='error'] { color: #c0392b; }
+
+@keyframes sync-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 
 .sync-header__status[data-persistent='true'] {
@@ -2440,9 +2444,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/jszip/dist/jszip.min.js
+  // ../../../node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -7043,7 +7047,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // node_modules/docx/dist/index.mjs
+  // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -31517,6 +31521,12 @@ Content-Type: ${contentType}\r
     return "";
   }
   var PERSISTENT_ERRORS = /* @__PURE__ */ new Set(["AUTH_EXPIRED", "FORMAT"]);
+  function syncLightState(status) {
+    if (status.phase === "syncing") return "syncing";
+    if (status.error || status.photoPending > 0) return "error";
+    if (status.textSyncedAt) return "ok";
+    return null;
+  }
   function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, onSyncNow, now = () => /* @__PURE__ */ new Date() }) {
     if (mode === "google") {
       slot.innerHTML = `
@@ -31545,8 +31555,9 @@ Content-Type: ${contentType}\r
     const statusEl = slot.querySelector("[data-sync-status]");
     function update(nextStatus) {
       statusEl.textContent = formatSyncStatus(nextStatus);
-      if (nextStatus.phase === "syncing") statusEl.dataset.syncing = "true";
-      else delete statusEl.dataset.syncing;
+      const light = syncLightState(nextStatus);
+      if (light) statusEl.dataset.syncLight = light;
+      else delete statusEl.dataset.syncLight;
       if (PERSISTENT_ERRORS.has(nextStatus.error)) statusEl.dataset.persistent = "true";
       else delete statusEl.dataset.persistent;
     }
