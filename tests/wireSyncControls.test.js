@@ -25,6 +25,13 @@ function fakeEngine(overrides = {}) {
   };
 }
 
+// gate() no longer auto-resumes a previously-signed-in device on load (see below) — every test
+// that needs an actually-connected google header clicks through this same button first.
+async function clickSignIn(syncSlot) {
+  syncSlot.querySelector('[data-action="sync-sign-in"]').click();
+  await vi.waitFor(() => expect(syncSlot.querySelector('[data-action="sync-sign-out"]')).toBeTruthy());
+}
+
 describe('wireSyncControls', () => {
   let container;
   let syncSlot;
@@ -67,34 +74,28 @@ describe('wireSyncControls', () => {
     expect(container.querySelector('[data-action="continue-guest"]')).toBe(null);
   });
 
-  it('之前登入過就靜默續用、開啟後立刻同步一次', async () => {
+  it('之前登入過的裝置重整後，顯示登入按鈕而不是自動彈出 Google 視窗，點了才連線同步', async () => {
+    // 自動彈視窗曾經造成兩個問題：被瀏覽器擋掉（沒有使用者手勢），或是真的跳出來卻讓人措手不及、
+    // 來不及在逾時內完成。改成等一個明確的點擊，任何跳出來的視窗都不會被擋，使用者也能自己抓時間。
     writeSyncMode('google');
     localStorage.setItem('c-form-sync-name', '小美');
+    const resume = vi.fn();
     const runSync = vi.fn().mockResolvedValue(idleStatus);
     const controls = wireSyncControls({
       clientId: 'test', syncSlot,
-      createAuth: fakeAuthFactory(), createDrive: () => ({}),
+      createAuth: fakeAuthFactory({ resume }), createDrive: () => ({}),
       createEngine: () => fakeEngine({ runSync }),
     });
 
     await controls.gate(container, { onDone: () => {} });
+    expect(resume).not.toHaveBeenCalled();
+    expect(syncSlot.querySelector('[data-action="sync-sign-in"]')).toBeTruthy();
+    expect(syncSlot.querySelector('[data-sync-greeting]')).toBe(null);
+    expect(runSync).not.toHaveBeenCalled();
+
+    await clickSignIn(syncSlot);
     expect(syncSlot.querySelector('[data-sync-greeting]').textContent).toContain('小美');
     await vi.waitFor(() => expect(runSync).toHaveBeenCalled());
-  });
-
-  it('授權被收回（resume 回 null）時顯示不自動消失的警示', async () => {
-    writeSyncMode('google');
-    localStorage.setItem('c-form-sync-name', '小美');
-    const controls = wireSyncControls({
-      clientId: 'test', syncSlot,
-      createAuth: fakeAuthFactory({ resume: async () => null }),
-      createDrive: () => ({}), createEngine: () => fakeEngine(),
-    });
-
-    await controls.gate(container, { onDone: () => {} });
-    const statusEl = syncSlot.querySelector('[data-sync-status]');
-    expect(statusEl.textContent).toBe('登入已失效，請重新登入');
-    expect(statusEl.dataset.persistent).toBe('true');
   });
 
   it('登出後標題列回到訪客模式，IndexedDB 裡的資料還在', async () => {
@@ -109,6 +110,7 @@ describe('wireSyncControls', () => {
     });
 
     await controls.gate(container, { onDone: () => {} });
+    await clickSignIn(syncSlot);
     syncSlot.querySelector('[data-action="sync-sign-out"]').click();
 
     expect(signOut).toHaveBeenCalled();
@@ -127,7 +129,8 @@ describe('wireSyncControls', () => {
     });
 
     await controls.gate(container, { onDone: () => {} });
-    await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(1)); // 開啟時自動同步的那一次
+    await clickSignIn(syncSlot);
+    await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(1)); // 登入後自動同步的那一次
 
     syncSlot.querySelector('[data-action="sync-now"]').click();
     expect(runSync).toHaveBeenCalledTimes(2);
@@ -146,6 +149,7 @@ describe('wireSyncControls', () => {
       });
 
       await controls.gate(container, { onDone: () => {} });
+      await clickSignIn(syncSlot);
       await vi.advanceTimersByTimeAsync(120000);
 
       expect(scheduleSync).toHaveBeenCalled();
@@ -165,6 +169,7 @@ describe('wireSyncControls', () => {
     });
 
     await controls.gate(container, { onDone: () => {} });
+    await clickSignIn(syncSlot);
     syncSlot.querySelector('[data-action="sync-sign-out"]').click();
     scheduleSync.mockClear();
 

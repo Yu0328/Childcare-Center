@@ -123,13 +123,13 @@ export function wireSyncControls({
         onDone();
         return;
       }
-      const resumed = await auth.resume();
-      if (resumed) {
-        startSyncing();
-      } else {
-        paintHeader('google');
-        header.update({ ...engine.getStatus(), phase: 'auth', error: 'AUTH_EXPIRED' });
-      }
+      // Deliberately does NOT auto-call auth.resume() here. A silent resume can still need to
+      // open a real, visible popup when Google can't confirm the session invisibly — and doing
+      // that automatically on page load ambushes the person with a Google window they never asked
+      // for, with no time to be ready for it. Waiting for the same "使用 Google 登入" button guest
+      // mode already uses means any popup that appears is one they just clicked for — it can't be
+      // browser-blocked either, since a real click is behind it — and they set the pace themselves.
+      paintHeader('guest');
       onDone();
       return;
     }
