@@ -114,7 +114,7 @@ describe('renderSyncHeader', () => {
     expect(statusEl.dataset.persistent).toBe('true');
   });
 
-  it('同步中會標記轉圈動畫，結束後移除', () => {
+  it('依同步狀態切換閃燈顏色：同步中橘燈、成功綠燈、失敗紅燈', () => {
     const header = renderSyncHeader(slot, {
       mode: 'google', name: '小美', status: idle,
       onSignIn: () => {}, onSignOut: () => {},
@@ -123,10 +123,16 @@ describe('renderSyncHeader', () => {
     const statusEl = slot.querySelector('[data-sync-status]');
 
     header.update({ ...idle, phase: 'syncing' });
-    expect(statusEl.dataset.syncing).toBe('true');
+    expect(statusEl.dataset.syncLight).toBe('syncing');
 
     header.update({ ...idle, phase: 'done', textSyncedAt: '2026-09-13T06:32:00.000Z' });
-    expect(statusEl.dataset.syncing).toBeUndefined();
+    expect(statusEl.dataset.syncLight).toBe('ok');
+
+    header.update({ ...idle, phase: 'error', error: 'NETWORK' });
+    expect(statusEl.dataset.syncLight).toBe('error');
+
+    header.update(idle);
+    expect(statusEl.dataset.syncLight).toBeUndefined();
   });
 
   it('登出會呼叫 onSignOut', () => {
