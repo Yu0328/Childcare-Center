@@ -26,9 +26,9 @@ function fakeEngine(overrides = {}) {
 }
 
 // gate() no longer auto-resumes a previously-signed-in device on load (see below) — every test
-// that needs an actually-connected google header clicks through this same button first.
-async function clickSignIn(syncSlot) {
-  syncSlot.querySelector('[data-action="sync-sign-in"]').click();
+// that needs an actually-connected google header clicks through this same choice screen first.
+async function clickSignIn(container, syncSlot) {
+  container.querySelector('[data-action="sign-in-google"]').click();
   await vi.waitFor(() => expect(syncSlot.querySelector('[data-action="sync-sign-out"]')).toBeTruthy());
 }
 
@@ -74,7 +74,7 @@ describe('wireSyncControls', () => {
     expect(container.querySelector('[data-action="continue-guest"]')).toBe(null);
   });
 
-  it('之前登入過的裝置重整後，顯示登入按鈕而不是自動彈出 Google 視窗，點了才連線同步', async () => {
+  it('之前登入過的裝置重整後，顯示跟第一次一樣的登入選擇畫面，而不是自動彈出 Google 視窗', async () => {
     // 自動彈視窗曾經造成兩個問題：被瀏覽器擋掉（沒有使用者手勢），或是真的跳出來卻讓人措手不及、
     // 來不及在逾時內完成。改成等一個明確的點擊，任何跳出來的視窗都不會被擋，使用者也能自己抓時間。
     writeSyncMode('google');
@@ -89,11 +89,12 @@ describe('wireSyncControls', () => {
 
     await controls.gate(container, { onDone: () => {} });
     expect(resume).not.toHaveBeenCalled();
-    expect(syncSlot.querySelector('[data-action="sync-sign-in"]')).toBeTruthy();
+    expect(container.querySelector('[data-action="sign-in-google"]')).toBeTruthy();
+    expect(container.querySelector('[data-action="continue-guest"]')).toBeTruthy();
     expect(syncSlot.querySelector('[data-sync-greeting]')).toBe(null);
     expect(runSync).not.toHaveBeenCalled();
 
-    await clickSignIn(syncSlot);
+    await clickSignIn(container, syncSlot);
     expect(syncSlot.querySelector('[data-sync-greeting]').textContent).toContain('小美');
     await vi.waitFor(() => expect(runSync).toHaveBeenCalled());
   });
@@ -110,7 +111,7 @@ describe('wireSyncControls', () => {
     });
 
     await controls.gate(container, { onDone: () => {} });
-    await clickSignIn(syncSlot);
+    await clickSignIn(container, syncSlot);
     syncSlot.querySelector('[data-action="sync-sign-out"]').click();
 
     expect(signOut).toHaveBeenCalled();
@@ -129,7 +130,7 @@ describe('wireSyncControls', () => {
     });
 
     await controls.gate(container, { onDone: () => {} });
-    await clickSignIn(syncSlot);
+    await clickSignIn(container, syncSlot);
     await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(1)); // 登入後自動同步的那一次
 
     syncSlot.querySelector('[data-action="sync-now"]').click();
@@ -149,7 +150,7 @@ describe('wireSyncControls', () => {
       });
 
       await controls.gate(container, { onDone: () => {} });
-      await clickSignIn(syncSlot);
+      await clickSignIn(container, syncSlot);
       await vi.advanceTimersByTimeAsync(120000);
 
       expect(scheduleSync).toHaveBeenCalled();
@@ -169,7 +170,7 @@ describe('wireSyncControls', () => {
     });
 
     await controls.gate(container, { onDone: () => {} });
-    await clickSignIn(syncSlot);
+    await clickSignIn(container, syncSlot);
     syncSlot.querySelector('[data-action="sync-sign-out"]').click();
     scheduleSync.mockClear();
 

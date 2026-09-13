@@ -93,29 +93,41 @@ export function wireSyncControls({
     engine.runSync();
   }
 
+  // Deliberately not auto-resuming: a silent resume can still need to open a real, visible popup
+  // when Google can't confirm the session invisibly, and doing that automatically ambushes the
+  // person with a Google window they never asked for, with no time to be ready for it. Showing
+  // the same choice screen a first-time visitor sees — rather than just a bare header button —
+  // means the popup, if one appears, only ever follows a deliberate "使用 Google 登入" click on a
+  // full screen the person is looking at, not a small button they might not even notice yet.
+  function renderChoice(container, onDone) {
+    renderSignInChoiceView(container, {
+      onGoogle: async () => {
+        await auth.signIn();
+        startSyncing();
+        onDone();
+      },
+      onGuest: () => {
+        paintHeader('guest');
+        onDone();
+      },
+    });
+  }
+
   async function gate(container, { onDone }) {
     appContainer = container;
     resumeApp = onDone;
 
     if (needsSignInChoice()) {
-      renderSignInChoiceView(container, {
-        onGoogle: async () => {
-          await auth.signIn();
-          startSyncing();
-          onDone();
-        },
-        onGuest: () => {
-          paintHeader('guest');
-          onDone();
-        },
-      });
+      renderChoice(container, onDone);
       return;
     }
 
     if (readSyncMode() === 'google') {
       if (isOffline()) {
         // Starting offline is normal, not an error: the app is local-first and will sync when the
-        // network comes back (the 'online' listener above).
+        // network comes back (the 'online' listener above). No popup risk offline either way, so
+        // this skips the choice screen and just continues — asking to choose again would block
+        // someone from using the app at all until they're back online.
         paintHeader('google');
         syncing = true;
         setWriteListener(() => engine.scheduleSync());
@@ -123,14 +135,7 @@ export function wireSyncControls({
         onDone();
         return;
       }
-      // Deliberately does NOT auto-call auth.resume() here. A silent resume can still need to
-      // open a real, visible popup when Google can't confirm the session invisibly — and doing
-      // that automatically on page load ambushes the person with a Google window they never asked
-      // for, with no time to be ready for it. Waiting for the same "使用 Google 登入" button guest
-      // mode already uses means any popup that appears is one they just clicked for — it can't be
-      // browser-blocked either, since a real click is behind it — and they set the pace themselves.
-      paintHeader('guest');
-      onDone();
+      renderChoice(container, onDone);
       return;
     }
 
