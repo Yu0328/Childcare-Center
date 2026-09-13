@@ -8,11 +8,28 @@ export const isMobile = () => typeof matchMedia === 'function' && matchMedia(MOB
 // showModal() alone doesn't stop the page behind the popup from scrolling on touch devices —
 // locking body scroll while a popup is open keeps the backdrop from feeling like it's just
 // floating over a page the user can still drag around underneath it.
+//
+// `overflow: hidden` alone isn't enough on iOS Safari: it stops the body's own scrollbar but not
+// the rubber-band bounce/drag gesture, which moves the whole visual viewport (dragging the
+// popup's `position: fixed` box along with it) rather than anything CSS `overflow` governs — this
+// is the "面板可以跟著頁面上下滑動" bug, most obvious once the page is pinch-zoomed in and there's
+// more empty space to drag through. Pinning the body itself at its current scroll offset via
+// `position: fixed` takes it out of the document flow entirely so there's nothing left to
+// rubber-band, without touching pinch-zoom itself.
+let scrollYBeforeLock = 0;
 export const lockBodyScroll = () => {
+  scrollYBeforeLock = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${scrollYBeforeLock}px`;
+  document.body.style.width = '100%';
   document.body.style.overflow = 'hidden';
 };
 export const unlockBodyScroll = () => {
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
   document.body.style.overflow = '';
+  window.scrollTo(0, scrollYBeforeLock);
 };
 
 // Shared by every "+" trigger (the list-level FABs below and monthlyPlanEditorView's day-cell

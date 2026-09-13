@@ -904,6 +904,10 @@ button {
   background: transparent;
   max-height: 85vh;
   overflow-y: auto;
+  /* Stops this dialog's own scroll from "chaining" into whatever's behind it once it hits the
+     top/bottom of its content — iOS Safari otherwise hands off leftover scroll momentum to the
+     page underneath even while the popup is modal. */
+  overscroll-behavior-y: contain;
   /* A native <input type="date"> can render wider than this popup on iOS Safari (its internal
      control has a minimum width CSS can't shrink below) — clip that overflow instead of letting
      it make the whole popup pan sideways on a touch swipe. */
