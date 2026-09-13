@@ -19,7 +19,11 @@ function clockTime(iso) {
 export function formatSyncStatus(status) {
   if (status.error === 'AUTH_EXPIRED') return '登入已失效，請重新登入';
   if (status.error === 'FORMAT') return '雲端資料夾異常，已停止同步';
-  if (status.phase === 'syncing') return '同步中…';
+  // A first sync on a device with existing data can mean many round-trips to Drive; the plain
+  // "同步中…" that's accurate for a normal quick sync reads as stuck when it runs for minutes.
+  if (status.phase === 'syncing') {
+    return status.textSyncedAt ? '同步中…' : '首次同步中，資料量較多時可能需要幾分鐘，請不要關閉視窗…';
+  }
   // A single rolled-up time would claim the photos made it too. Splitting them is the difference
   // between an honest status and one that quietly loses a teacher's photos.
   if (status.photoPending > 0) {
@@ -60,6 +64,9 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
 
   function update(nextStatus) {
     statusEl.textContent = formatSyncStatus(nextStatus);
+    // Drives the CSS spinner — the only visible sign a multi-minute first sync is alive, not stuck.
+    if (nextStatus.phase === 'syncing') statusEl.dataset.syncing = 'true';
+    else delete statusEl.dataset.syncing;
     // Marked so styles.css can render it as a standing warning rather than something that fades;
     // an expired login is only fixable by the teacher and must not disappear on its own.
     if (PERSISTENT_ERRORS.has(nextStatus.error)) statusEl.dataset.persistent = 'true';

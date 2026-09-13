@@ -44,6 +44,12 @@ describe('formatSyncStatus', () => {
     expect(formatSyncStatus({ ...base, phase: 'syncing' })).toBe('同步中…');
   });
 
+  it('第一次同步時說明可能要等一下，而不是單純的「同步中」', () => {
+    const text = formatSyncStatus({ ...base, phase: 'syncing', textSyncedAt: null });
+    expect(text).toContain('首次同步中');
+    expect(text).not.toBe('同步中…');
+  });
+
   it('登入失效的訊息要明確', () => {
     expect(formatSyncStatus({ ...base, phase: 'auth', error: 'AUTH_EXPIRED' })).toBe('登入已失效，請重新登入');
   });
@@ -107,6 +113,21 @@ describe('renderSyncHeader', () => {
     const statusEl = slot.querySelector('[data-sync-status]');
     expect(statusEl.textContent).toBe('登入已失效，請重新登入');
     expect(statusEl.dataset.persistent).toBe('true');
+  });
+
+  it('同步中會標記轉圈動畫，結束後移除', () => {
+    const header = renderSyncHeader(slot, {
+      mode: 'google', name: '小美', status: idle,
+      onSignIn: () => {}, onSignOut: () => {},
+      now: () => at('2026-09-13T09:00:00'),
+    });
+    const statusEl = slot.querySelector('[data-sync-status]');
+
+    header.update({ ...idle, phase: 'syncing' });
+    expect(statusEl.dataset.syncing).toBe('true');
+
+    header.update({ ...idle, phase: 'done', textSyncedAt: '2026-09-13T06:32:00.000Z' });
+    expect(statusEl.dataset.syncing).toBeUndefined();
   });
 
   it('登出會呼叫 onSignOut', () => {
