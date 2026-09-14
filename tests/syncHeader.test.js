@@ -97,12 +97,12 @@ describe('renderSyncHeader', () => {
     expect(slot.querySelector('#import-backup')).toBeTruthy();
   });
 
-  it('訪客模式的登入按鈕在匯出/匯入備份按鈕的上一排，不會擋到狀態欄', () => {
+  it('訪客模式的登入按鈕跟問候語同一排，匯出/匯入備份跟狀態欄同一排，不會擠成一團', () => {
     renderSyncHeader(slot, {
       mode: 'guest', name: '', status: idle, onSignIn: () => {}, onSignOut: () => {},
     });
-    const signInRow = slot.querySelector('[data-action="sync-sign-in"]').closest('.sync-header__status-row');
-    const backupRow = slot.querySelector('#export-backup').closest('.sync-header__backup-row');
+    const signInRow = slot.querySelector('[data-action="sync-sign-in"]').closest('.sync-header__greeting-row');
+    const backupRow = slot.querySelector('#export-backup').closest('.sync-header__status-row');
     expect(signInRow).toBeTruthy();
     expect(backupRow).toBeTruthy();
     expect(signInRow.compareDocumentPosition(backupRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -45,11 +45,12 @@ function syncLightState(status) {
   return null;
 }
 
-// The greeting sits on its own row above the status/action row (rather than sharing it) so a
-// long status message or extra action button on mobile never crowds it — see
-// docs/superpowers/specs et al. for the original "同步和用戶名差那欄會讓按鈕跑掉" report. Google
-// mode greets by the account's given name; guest mode still gets the same row with a generic
-// "訪客" placeholder rather than skipping it, so the header keeps the same two-row shape either way.
+// The greeting sits on its own row above the status/action row (rather than sharing it with the
+// status text) so a long status message never crowds it — see docs/superpowers/specs et al. for
+// the original "同步和用戶名差那欄會讓按鈕跑掉" report. Google mode greets by the account's given
+// name; guest mode still gets the same row with a generic "訪客" placeholder rather than skipping
+// it, so the header keeps the same two-row shape either way. On wide screens the two rows collapse
+// into one (see the min-width media query in styles.css) since there's room for it there.
 export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut, onSyncNow, now = () => new Date() }) {
   const greeting = `<span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}，${mode === 'google' ? name : '訪客'}`)}</span>`;
 
@@ -68,21 +69,20 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
     slot.querySelector('[data-action="sync-now"]').addEventListener('click', () => onSyncNow && onSyncNow());
   } else {
     // Guest mode has no cloud copy of its own, so the local export/import backup buttons — pointless
-    // once Google sync covers that — live here instead of in google mode's action group. Kept on
-    // their own row below the status row (rather than sharing it with the sign-in button) so they
-    // never crowd the status text; the sign-in button stays in the status row, mirroring where
-    // 立即同步/登出 sit in google mode.
+    // once Google sync covers that — live here instead. The sign-in button sits on the greeting row
+    // rather than the status row: pairing each line of text with its own single-line button group
+    // (greeting+sign-in, status+backup buttons) keeps mobile to two tight rows instead of three.
     slot.innerHTML = `
-      <div class="sync-header__greeting-row">${greeting}</div>
+      <div class="sync-header__greeting-row">
+        ${greeting}
+        <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
+      </div>
       <div class="sync-header__status-row">
         <span class="sync-header__status" data-sync-status></span>
         <div class="sync-header__actions">
-          <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
+          <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
+          <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
         </div>
-      </div>
-      <div class="sync-header__backup-row">
-        <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
-        <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
       </div>
     `;
     slot.querySelector('[data-action="sync-sign-in"]').addEventListener('click', async () => {

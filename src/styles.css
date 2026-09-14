@@ -220,8 +220,10 @@ button {
   margin-left: auto;
 }
 
-/* Greeting on its own row, status text + action buttons below it — same shape at every screen
-   size, so there's no separate mobile-only override to keep in sync with this one. The status
+/* Greeting (+ sign-in button) on its own row, status text + backup/action buttons below it. Below
+   the mobile breakpoint each row keeps its own text paired with its own single-line button group;
+   above it, the two rows collapse into one (see the min-width query near the mobile breakpoint
+   below) since there's enough width to fit everything on one line without crowding. The status
    row's flex rule (below) is what keeps 立即同步/登出 from drifting as the status text next to
    them changes length. */
 .sync-header {
@@ -230,6 +232,13 @@ button {
   gap: 0.3rem;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.sync-header__greeting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
 }
 
 .sync-header__status-row {
@@ -255,15 +264,6 @@ button {
   gap: 0.5rem;
 }
 
-/* Guest mode only: 匯出/匯入備份 get their own row below the status row instead of sharing it
-   with the sign-in button, so they never crowd the status text next to them. */
-.sync-header__backup-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
 @media (max-width: 640px) {
   /* Two-row header: title on its own row, then the sync controls below. Without this the title
      and the sync-header column fight for one row and everything shrinks. */
@@ -278,6 +278,22 @@ button {
   .app-header__actions {
     flex: 1 1 100%;
     margin-left: 0;
+  }
+}
+
+/* Above the mobile breakpoint there's enough width to fit greeting, status, and every button on
+   one line (see pasted screenshot in the original report) rather than the two-row stack mobile
+   needs. display:contents flattens the two row wrappers so their children join .sync-header's own
+   flex row directly, instead of nesting another layer of flex rows inside a flex row. */
+@media (min-width: 641px) {
+  .sync-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .sync-header__greeting-row,
+  .sync-header__status-row {
+    display: contents;
   }
 }
 
