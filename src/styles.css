@@ -916,6 +916,12 @@ button {
   background: rgba(0, 0, 0, 0.4);
 }
 .form-popup__close {
+  /* Mobile-only: on mobile this is the modal dialog's only close affordance besides
+     backdrop-click/Escape. On desktop the form is meant to stay permanently inline (see
+     docs/superpowers/specs/2026-09-11-mobile-add-form-popup-design.md — "桌面版畫面與互動完全
+     不變") with no FAB to reopen it, so leaving this button visible there let one misclick
+     hide an add-form for the rest of that screen's render with no way back. */
+  display: none;
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -945,6 +951,10 @@ button {
     position: fixed;
     inset: 0;
     margin: auto;
+  }
+
+  .form-popup__close {
+    display: block;
   }
 
   .fab {
@@ -1980,6 +1990,13 @@ fieldset.panel-form__field.import-preview__child legend {
   .page-header__title {
     order: -1;
     flex-basis: 100%;
+    /* Giving the title its own full-width row above (see comment above) narrows but doesn't
+       close the overflow — a realistic 3-character child name already fills the row with zero
+       margin, so any longer name (a common 4-character full name) still hit the base rule's
+       `white-space: nowrap` + ellipsis and silently dropped the trailing 月 — i.e. exactly which
+       month this record is, the one thing in the title staff most need to tell records apart on
+       a phone. Letting it wrap to a second line instead keeps every character visible. */
+    white-space: normal;
   }
 
   /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
