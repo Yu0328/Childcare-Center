@@ -56,6 +56,19 @@ describe('renderFormEditorView', () => {
     expect(container.textContent).toContain('可以來回穩定行走');
   });
 
+  it('日期顯示成民國年，○ 和 △ 用不同顏色的標記', async () => {
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: 'a' });
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-2', date: '2026-01-08', status: 'developing', note: 'b' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    const dates = [...container.querySelectorAll('.entry-row__date')].map(el => el.textContent);
+    expect(dates).toEqual(['○115/01/07', '△115/01/08']);
+    expect(container.querySelector('.entry-row__mark--developed')).not.toBeNull();
+    expect(container.querySelector('.entry-row__mark--developing')).not.toBeNull();
+  });
+
   it('adds a new entry for an indicator via its inline form', async () => {
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} });

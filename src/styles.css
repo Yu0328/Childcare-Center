@@ -271,14 +271,69 @@ button {
     justify-content: flex-start;
     padding: 0.7rem 1rem;
   }
-  .app-header__brand {
-    flex: 1 1 100%;
-    margin-right: 0;
+  .app-header {
+    gap: 0.6rem;
   }
-  .app-header__actions {
+  .app-header__brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 0;
+    font-size: 0.92rem;
+  }
+  /* Offline build: title and 備份 stay on one line, the title wrapping itself on very narrow phones. */
+  .app-header:not(:has(.sync-header)) {
+    flex-wrap: nowrap;
+  }
+  .app-header__actions:not(:has(.sync-header)) {
+    flex: none;
+  }
+  /* The offline build's actions are just the 備份 menu, which fits beside the title; the hosted
+     build's sync header (greeting + sign-in + 備份) still needs its own row below. */
+  .app-header__actions:has(.sync-header) {
     flex: 1 1 100%;
     margin-left: 0;
   }
+}
+
+/* The guest status row only holds an occasional message (e.g. "目前離線"), so it takes no space
+   until there is one. */
+.sync-header__status-row:not(:has(.sync-header__actions)):has(> .sync-header__status:empty) {
+  display: none;
+}
+
+/* 匯出備份/匯入備份 folded into one small drop-down so the header stays a single line on phones. */
+.backup-menu {
+  position: relative;
+}
+.backup-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.backup-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.backup-menu > summary::after {
+  content: '▾';
+  font-size: 0.8em;
+}
+.backup-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 20, 0.15);
+}
+.backup-menu__list .btn {
+  justify-content: center;
+  white-space: nowrap;
 }
 
 /* Above the mobile breakpoint there's enough width to fit greeting, status, and every button on
@@ -470,6 +525,10 @@ button {
   color: var(--text-primary);
   margin: 0;
   text-align: center;
+}
+
+.page-header__period::before {
+  content: '　';
 }
 
 /* Groups multiple right-side header actions (課程月計畫 editor: 管理小朋友 + 匯出 Word) as one
@@ -936,6 +995,12 @@ button {
   cursor: pointer;
 }
 
+@media (min-width: 641px) {
+  .fab {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   /* Only constrained to a centered popup width on mobile, where showModal() promotes the dialog
      to the top layer as a floating overlay. On desktop .form-popup is a plain in-flow grid item
@@ -1301,6 +1366,32 @@ fieldset.panel-form__field.import-preview__child legend {
   grid-template-columns: 1fr;
 }
 
+/* 課程計畫表: domain cards stacked full width (a closed card beside an open one left a tall empty
+   gap), with the open card's activities spread across columns inside it instead. */
+.domain-grid--stack {
+  grid-template-columns: 1fr;
+}
+.domain-grid--stack > .domain-card > .domain-card__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-items: start;
+}
+
+/* Five narrow columns: month/day only — the period in the page title already says which year. */
+@media (min-width: 641px) {
+  .domain-grid--row .entry-row__year {
+    display: none;
+  }
+  /* Slimmer corner buttons here, so the space reserved for them leaves room for "○ 04/02" on
+     one line in these narrow columns. */
+  .domain-grid--row .entry-row__top {
+    padding-right: 4.6rem;
+  }
+  .domain-grid--row .entry-row__actions .btn--small {
+    padding: 0.35em 0.55em;
+  }
+}
+
 /* 備註 is a sixth card after the five domains — full width on its own row, remarks laid out side
    by side, rather than squeezed into one fifth-width column. */
 .domain-grid--row > [data-remark-section] {
@@ -1487,6 +1578,22 @@ fieldset.panel-form__field.import-preview__child legend {
    the ○ alone on its own line. */
 .entry-row__status {
   white-space: nowrap;
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0.05em 0.6em;
+  border-radius: 999px;
+  font-size: 0.85em;
+  background: #eaf7ee;
+  color: #1f8a3c;
+}
+.entry-row__status--developing {
+  background: #fdf0e1;
+  color: var(--warm-accent);
+}
+.entry-row__status--absent,
+.entry-row__status--courseChanged {
+  background: #fdecea;
+  color: var(--danger);
 }
 
 .entry-row__top {
@@ -1502,9 +1609,16 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 .entry-row__mark {
-  color: #1f8a3c;
+  font-size: 1.2em;
+  line-height: 1;
   font-weight: 700;
   margin-right: 0.3em;
+}
+.entry-row__mark--developed {
+  color: #1f8a3c;
+}
+.entry-row__mark--developing {
+  color: var(--warm-accent);
 }
 
 .entry-row__date {
@@ -2034,6 +2148,52 @@ fieldset.panel-form__field.import-preview__child legend {
        overflow-wrap still breaks a separator-less title too long for the row. */
     word-break: keep-all;
     overflow-wrap: anywhere;
+    font-size: 1.25rem;
+  }
+  /* Name + tier on the first line, period on a second, smaller line — the same two-line shape for
+     every editor instead of wrapping wherever a long period happens to run out of room. */
+  .page-header__period {
+    display: block;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+  }
+  .page-header__period::before {
+    content: none;
+  }
+
+  /* D: each nesting level (page → domain card → indicator card → entry row) added its own
+     side padding, leaving the actual text a narrow strip on a phone. */
+  #app {
+    padding: 1.25rem 0.75rem 4rem;
+  }
+  .domain-card {
+    padding: 0.8rem 0.6rem 1rem;
+  }
+  .indicator-block {
+    padding: 0.7rem 0.6rem;
+  }
+  .entry-row {
+    padding: 0.45rem 0.5rem;
+  }
+
+  /* E: four tabs as an even 2×2 block instead of wrapping 2+2 at their own widths. */
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    padding: 0.3rem;
+    border-bottom: none;
+    border-radius: 12px;
+    background: rgba(15, 23, 20, 0.05);
+  }
+  .tabs__button {
+    border-bottom: none;
+    border-radius: 9px;
+    padding: 0.5rem;
+  }
+  .tabs__button--active {
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgba(15, 23, 20, 0.12);
   }
 
   /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
@@ -2154,6 +2314,21 @@ fieldset.panel-form__field.import-preview__child legend {
     top: 1.5rem;
     max-height: calc(100vh - 3rem);
     overflow-y: auto;
+  }
+}
+
+@media (min-width: 641px) {
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) {
+    grid-template-columns: 1fr;
+  }
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) > .monthly-plan-side {
+    order: -1;
+    position: static;
+  }
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) .monthly-plan-side > .panel-form {
+    max-width: none;
+    padding: 0.6rem 1rem;
+    gap: 0;
   }
 }
 

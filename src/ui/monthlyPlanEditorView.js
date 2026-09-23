@@ -163,7 +163,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         `)}
         ${nestedEntryFormDialog(`
         <div class="panel-form" data-panel>
-          <h3 class="panel-form__title" data-panel-header>點選左側的日期格子開始規劃</h3>
+          <h3 class="panel-form__title" data-panel-header>點選日期格子開始規劃</h3>
           <div data-panel-items></div>
         </div>
         `)}

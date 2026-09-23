@@ -5,6 +5,7 @@ import {
 } from '../storage/parentReportDb.js';
 import { DOMAINS, TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
+import { toRocDate } from '../export/docxShared.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
@@ -12,7 +13,7 @@ import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.j
 const BIRTH_DATE_FIELDS = { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' };
 
 function coursePlanEntryRow(entry, index) {
-  const occurrenceSummary = entry.occurrences.map(o => `${escapeHtml(o.date)}${o.absent ? '（請假）' : o.status === 'developed' ? '○' : '△'}`).join('、');
+  const occurrenceSummary = entry.occurrences.map(o => `${escapeHtml(toRocDate(o.date))}${o.courseChanged ? '（更換課程）' : o.absent ? '（請假）' : o.status === 'developed' ? '○' : '△'}`).join('、');
   return `
     <li class="import-preview__entry">
       <label>

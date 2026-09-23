@@ -69,20 +69,24 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
     slot.querySelector('[data-action="sync-now"]').addEventListener('click', () => onSyncNow && onSyncNow());
   } else {
     // Guest mode has no cloud copy of its own, so the local export/import backup buttons — pointless
-    // once Google sync covers that — live here instead. The sign-in button sits on the greeting row
-    // rather than the status row: pairing each line of text with its own single-line button group
-    // (greeting+sign-in, status+backup buttons) keeps mobile to two tight rows instead of three.
+    // once Google sync covers that — live here instead, folded into one 備份 menu so greeting,
+    // sign-in and backup all fit one mobile row. The status row below only shows up when it has text.
     slot.innerHTML = `
       <div class="sync-header__greeting-row">
         ${greeting}
-        <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
+        <div class="sync-header__actions">
+          <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
+          <details class="backup-menu">
+            <summary class="btn btn--header">備份</summary>
+            <div class="backup-menu__list">
+              <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
+              <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
+            </div>
+          </details>
+        </div>
       </div>
       <div class="sync-header__status-row">
         <span class="sync-header__status" data-sync-status></span>
-        <div class="sync-header__actions">
-          <button type="button" class="btn btn--header" id="export-backup" title="此備份檔為未加密的完整資料（含幼兒姓名、出生日期等個資），請勿放在共用雲端資料夾">匯出備份</button>
-          <label class="btn btn--header btn--header-file">匯入備份 <input type="file" id="import-backup" accept="application/json"></label>
-        </div>
       </div>
     `;
     slot.querySelector('[data-action="sync-sign-in"]').addEventListener('click', async () => {

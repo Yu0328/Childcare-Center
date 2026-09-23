@@ -155,6 +155,19 @@ export function mountApp(container, { onUnlock, gate } = {}) {
   }
 }
 
+// The hosted build re-wires the backup controls on every guest header repaint, so this document
+// listener is added once and closes whichever 備份 menu is open rather than one captured menu.
+let outsideClickWired = false;
+function closeBackupMenusOnOutsideClick() {
+  if (outsideClickWired) return;
+  outsideClickWired = true;
+  document.addEventListener('click', event => {
+    for (const menu of document.querySelectorAll('details.backup-menu[open]')) {
+      if (!menu.contains(event.target)) menu.open = false;
+    }
+  });
+}
+
 export function wireBackupControls({
   exportButton,
   importInput,
@@ -180,6 +193,13 @@ export function wireBackupControls({
     importInput.disabled = locked;
   }
   updateLockState();
+
+  const menu = exportButton.closest('details');
+  if (menu) {
+    exportButton.addEventListener('click', () => { menu.open = false; });
+    importInput.addEventListener('change', () => { menu.open = false; });
+    closeBackupMenusOnOutsideClick();
+  }
 
   // Export and import controls can live in different DOM branches (e.g. the import input is
   // wrapped in its own <label>), so feedback always targets one shared container rather than

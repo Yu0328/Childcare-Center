@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllData, addChild, addForm } from '../src/storage/db.js';
+import { clearAllData, addChild, addForm, addEntry } from '../src/storage/db.js';
 import { renderFormListView } from '../src/ui/formListView.js';
 import { waitFor } from './helpers.js';
 
@@ -19,6 +19,21 @@ describe('renderFormListView', () => {
 
     expect(container.textContent).toContain('Ⅳ');
     expect(container.textContent).toContain('115年01月');
+  });
+
+  it('每份總表顯示紀錄筆數，同一期間的總表按階段排在一起', async () => {
+    const iv = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+    await addForm({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
+    await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+    await addEntry({ formId: iv.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '' });
+    await addEntry({ formId: iv.id, indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', status: 'developed', note: '' });
+
+    const container = document.createElement('div');
+    await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {} });
+
+    const names = [...container.querySelectorAll('.card-list__name')].map(el => el.textContent);
+    expect(names).toEqual(['Ⅴ 階段', 'Ⅳ 階段', 'Ⅳ 階段']);
+    expect(container.querySelector(`[data-form-id="${iv.id}"] .card-list__meta`).textContent).toBe('115年01月　2 筆紀錄');
   });
 
   it('shows a 新 badge for a form created via import, not for a normally-added one', async () => {

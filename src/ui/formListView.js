@@ -1,4 +1,4 @@
-import { addForm, listFormsForChild, deleteForm } from '../storage/db.js';
+import { addForm, listFormsForChild, deleteForm, listEntriesForForm } from '../storage/db.js';
 import { suggestTier } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
@@ -12,8 +12,11 @@ export async function renderFormListView(
   container,
   { child, onSelectForm, onBack, onAggregate = () => {}, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
 ) {
-  // Most recent record period first.
-  const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period));
+  // Most recent record period first; within one period, higher tier first so same-tier forms sit together.
+  const tierIndex = code => TIERS.findIndex(t => t.code === code);
+  const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period) || tierIndex(b.tier) - tierIndex(a.tier));
+  // Shown in each row so two forms with the same tier and period can still be told apart.
+  const entryCounts = await Promise.all(forms.map(async form => (await listEntriesForForm(form.id)).length));
   const today = new Date().toISOString().slice(0, 10);
   const suggested = suggestTier(child.birthDate, today);
   const defaultYear = currentRocYear();
@@ -30,11 +33,11 @@ export async function renderFormListView(
         <ul class="card-list card-list--rows">
           ${forms
             .map(
-              form =>
+              (form, index) =>
                 `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-form-id="${escapeHtml(form.id)}">
                     <span class="card-list__name">${escapeHtml(form.tier)} 階段${form.isNew ? '<span class="new-badge">新</span>' : ''}</span>
-                    <span class="card-list__meta">${escapeHtml(form.period)}</span>
+                    <span class="card-list__meta">${escapeHtml(form.period)}　${entryCounts[index]} 筆紀錄</span>
                   </button>
                   <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="刪除${escapeHtml(form.tier)} ${escapeHtml(form.period)}">×</button>
                 </li>`

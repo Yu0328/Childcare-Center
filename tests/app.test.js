@@ -219,6 +219,24 @@ describe('wireBackupControls', () => {
     await waitFor(() => header.querySelector('[data-progress="backup"]') === null);
   });
 
+  it('「備份」選單：按下匯出後收起，點選單以外的地方也會收起', async () => {
+    vi.spyOn(backup, 'exportBackup').mockResolvedValue(['{}']);
+    vi.spyOn(downloadBlobModule, 'downloadBlob').mockImplementation(() => {});
+    const menu = document.createElement('details');
+    menu.className = 'backup-menu';
+    menu.append(exportButton, importInput);
+    header.append(menu);
+    wireBackupControls({ exportButton, importInput });
+
+    menu.open = true;
+    exportButton.click();
+    expect(menu.open).toBe(false);
+
+    menu.open = true;
+    document.body.click();
+    expect(menu.open).toBe(false);
+  });
+
   it('shows feedback when the export fails', async () => {
     vi.spyOn(backup, 'exportBackup').mockRejectedValueOnce(new Error('nope'));
     wireBackupControls({ exportButton, importInput });

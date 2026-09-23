@@ -97,15 +97,15 @@ describe('renderSyncHeader', () => {
     expect(slot.querySelector('#import-backup')).toBeTruthy();
   });
 
-  it('訪客模式的登入按鈕跟問候語同一排，匯出/匯入備份跟狀態欄同一排，不會擠成一團', () => {
+  it('訪客模式的登入按鈕和收在「備份」選單裡的匯出/匯入備份，都跟問候語同一排', () => {
     renderSyncHeader(slot, {
       mode: 'guest', name: '', status: idle, onSignIn: () => {}, onSignOut: () => {},
     });
-    const signInRow = slot.querySelector('[data-action="sync-sign-in"]').closest('.sync-header__greeting-row');
-    const backupRow = slot.querySelector('#export-backup').closest('.sync-header__status-row');
-    expect(signInRow).toBeTruthy();
-    expect(backupRow).toBeTruthy();
-    expect(signInRow.compareDocumentPosition(backupRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const row = slot.querySelector('[data-action="sync-sign-in"]').closest('.sync-header__greeting-row');
+    const menu = slot.querySelector('#export-backup').closest('details.backup-menu');
+    expect(row).toBeTruthy();
+    expect(menu.closest('.sync-header__greeting-row')).toBe(row);
+    expect(menu.contains(slot.querySelector('#import-backup'))).toBe(true);
   });
 
   it('登入 google 模式不顯示匯出/匯入備份按鈕', () => {

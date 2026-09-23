@@ -1,5 +1,6 @@
 import { addChild, listChildren, addForm, addEntry } from '../storage/db.js';
 import { TIERS } from '../data/indicators.js';
+import { toRocDate } from '../export/docxShared.js';
 import { escapeHtml } from './escapeHtml.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
@@ -22,7 +23,7 @@ function entryRow(entry, index) {
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
         ${unresolved ? '（無法對應到系統指標，建議取消勾選）' : escapeHtml(description)}
         —
-        ${escapeHtml(entry.date)}${STATUS_MARKS[entry.status] ?? ''}
+        ${escapeHtml(toRocDate(entry.date))}${STATUS_MARKS[entry.status] ?? ''}
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>

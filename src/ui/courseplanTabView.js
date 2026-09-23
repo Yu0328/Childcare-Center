@@ -4,6 +4,7 @@ import {
   addCourseOccurrence, listCourseOccurrencesForEntry, deleteCourseOccurrence, updateCourseOccurrence,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
+import { toRocDate } from '../export/docxShared.js';
 import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 
 // Which domain <details> cards are open persists across renders keyed by report.id, since
@@ -51,15 +52,16 @@ function wireAbsentCourseChangedExclusion(absentEl, courseChangedEl, statusRadio
 }
 
 function occurrenceRow(occurrence) {
-  const statusLabel = occurrence.courseChanged ? '更換課程'
-    : occurrence.absent ? '請假'
-    : occurrence.status === 'developed' ? '已發展○' : '發展中△';
+  const statusKey = occurrence.courseChanged ? 'courseChanged'
+    : occurrence.absent ? 'absent'
+    : occurrence.status === 'developed' ? 'developed' : 'developing';
+  const statusLabel = { courseChanged: '更換課程', absent: '請假', developed: '已發展○', developing: '發展中△' }[statusKey];
   const isFlagged = occurrence.absent || occurrence.courseChanged || occurrence.status === 'developing';
   const rowClass = occurrence.courseChanged ? ' entry-row--course-changed' : occurrence.absent ? ' entry-row--absent' : '';
   return `
     <li class="entry-row${rowClass}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date${isFlagged ? ' entry-row__date--flag' : ''}">${escapeHtml(occurrence.date)}　<span class="entry-row__status">${statusLabel}</span></span>
+        <span class="entry-row__date${isFlagged ? ' entry-row__date--flag' : ''}">${escapeHtml(toRocDate(occurrence.date))}<span class="entry-row__status entry-row__status--${statusKey}">${statusLabel}</span></span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="編輯實施紀錄：${escapeHtml(occurrence.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="刪除實施紀錄：${escapeHtml(occurrence.date)}">×</button>
@@ -236,7 +238,7 @@ export async function renderCoursePlanTab(
         `,
         fabLabel: '新增課程計畫項目',
       })}
-      <div class="domain-grid">
+      <div class="domain-grid domain-grid--stack">
         ${domainGroups
           .map(([domainId, domainName, group], index) => {
             const isOpen = isFirstRenderForReport ? index === 0 : openDomains.has(String(domainId));
