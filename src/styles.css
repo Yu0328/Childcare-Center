@@ -1392,21 +1392,6 @@ fieldset.panel-form__field.import-preview__child legend {
   align-items: start;
 }
 
-/* Five narrow columns: month/day only — the period in the page title already says which year. */
-@media (min-width: 641px) {
-  .domain-grid--row .entry-row__year {
-    display: none;
-  }
-  /* Slimmer corner buttons here, so the space reserved for them leaves room for "○ 04/02" on
-     one line in these narrow columns. */
-  .domain-grid--row .entry-row__top {
-    padding-right: 4.6rem;
-  }
-  .domain-grid--row .entry-row__actions .btn--small {
-    padding: 0.35em 0.55em;
-  }
-}
-
 /* 備註 is a sixth card after the five domains — full width on its own row, remarks laid out side
    by side, rather than squeezed into one fifth-width column. */
 .domain-grid--row > [data-remark-section] {
@@ -1435,7 +1420,7 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 /* formEditorView's indicator-block__title never carries the corner-fixed action buttons (only
-   its per-entry rows do), so the 5.5rem clearance .indicator-block__title reserves for those
+   its per-entry rows do), so the 2.6rem clearance .indicator-block__title reserves for those
    buttons elsewhere is dead space here — reclaiming it matters once .domain-grid--row's five
    columns leave much less width per card than the other domain-grid users. */
 .domain-grid--row .indicator-block__title {
@@ -1500,9 +1485,9 @@ fieldset.panel-form__field.import-preview__child legend {
   font-size: 0.92rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  /* Reserve room for the corner-fixed 編輯/× buttons so this title's own text never has to
+  /* Reserve room for the corner-fixed × button so this title's own text never has to
      make room for them inline — it can wrap freely underneath instead. */
-  padding-right: 5.5rem;
+  padding-right: 2.6rem;
   color: var(--text-primary);
 }
 
@@ -1615,15 +1600,17 @@ fieldset.panel-form__field.import-preview__child legend {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Reserve room for the corner-fixed 編輯/× buttons so the date text never collides with them.
+  /* Reserve room for the corner-fixed × button so the date text never collides with it.
      min-height guarantees clearance even when the date text is empty (date isn't required, and
      an achieved-less/dateless row would otherwise collapse to ~0 height, letting the note below
      ride up underneath the absolutely-positioned buttons). */
   min-height: 1.9rem;
-  padding-right: 5.2rem;
+  padding-right: 2.4rem;
 }
 
 .entry-row__mark {
+  /* Many fonts (system UI, Microsoft JhengHei) draw △ as a tiny glyph next to their ○; these draw both the same size. */
+  font-family: "Segoe UI Symbol", "PMingLiU", "PingFang TC", "Noto Sans TC", sans-serif;
   font-size: 1.2em;
   line-height: 1;
   font-weight: 700;
@@ -1718,6 +1705,16 @@ fieldset.panel-form__field.import-preview__child legend {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  white-space: nowrap;
+}
+.entry-form__radio .entry-row__mark {
+  margin-right: 0;
+}
+
+/* A long label (更換課程's explanation) would otherwise shrink the tick box itself. */
+.entry-form__checkbox input,
+.entry-form__radio input {
+  flex: none;
 }
 
 /* Excludes radio/checkbox inputs: they're native tick controls, not text-entry boxes, so
@@ -2384,6 +2381,30 @@ fieldset.panel-form__field.import-preview__child legend {
   border-radius: 16px;
 }
 
+/* 月計畫's child picker: one pill per child, the shown one filled. */
+.child-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+}
+.child-switch__button {
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.child-switch__button[aria-pressed="true"] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-weight: 600;
+}
+
 .monthly-calendar__title {
   margin: 0 0 0.9rem;
   font-size: 1.05rem;
@@ -2610,4 +2631,30 @@ fieldset.panel-form__field.import-preview__child legend {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+/* ---------- Tap-to-edit (see rowClickEdit.js) ----------
+   The 編輯 buttons stay in the page for keyboard users but are hidden until tabbed to; tapping the
+   entry itself does the same thing. A soft outline on hover hints the entry is clickable. */
+[data-row-edit]:not(:focus-visible) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
+}
+[data-click-edit] {
+  cursor: pointer;
+}
+[data-click-edit] .entry-form {
+  cursor: auto;
+}
+@media (hover: hover) {
+  [data-click-edit]:hover:not(:has([data-click-edit]:hover)) {
+    outline: 2px solid rgba(47, 111, 214, 0.28);
+    outline-offset: -2px;
+  }
 }

@@ -5,6 +5,7 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { wireRowClickEdit } from './rowClickEdit.js';
 
 // "Ⅳ-2-4" -> 4 (the item number within its domain) — see courseplanTabView.js's identical helper
 // for why: sorts the reference checkboxes in the indicator picker's own order regardless of the
@@ -78,11 +79,11 @@ function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDoma
   `;
 
   return `
-    <div class="indicator-block" data-development-record="${escapeHtml(record.id)}">
+    <div class="indicator-block" data-click-edit data-development-record="${escapeHtml(record.id)}">
       <ul class="entry-list">${lines}</ul>
       <p class="entry-row__note">${escapeHtml(record.narrative)}</p>
       <span class="indicator-block__actions">
-        <button type="button" class="btn btn--edit btn--small" data-edit-record="${escapeHtml(record.id)}" aria-label="編輯適性發展紀錄段落：${escapeHtml(recordLabel(record))}">編輯</button>
+        <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-record="${escapeHtml(record.id)}" aria-label="編輯適性發展紀錄段落：${escapeHtml(recordLabel(record))}">編輯</button>
         <button type="button" class="btn--delete-circle" data-delete-record="${escapeHtml(record.id)}" aria-label="刪除適性發展紀錄段落：${escapeHtml(recordLabel(record))}">×</button>
       </span>
       ${editFormHtml}
@@ -185,6 +186,7 @@ export async function renderDevelopmentRecordTab(
   `;
 
   wireFormPopup(container);
+  wireRowClickEdit(container);
 
   container.querySelector('[data-field="domain"]').addEventListener('change', event => {
     renderDevelopmentRecordTab(container, {

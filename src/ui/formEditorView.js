@@ -6,15 +6,16 @@ import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { keepScroll } from './keepScroll.js';
 import { nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
+import { wireRowClickEdit } from './rowClickEdit.js';
 
 function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
   return `
     <div class="entry-form__radio-group">
       <label class="entry-form__radio">
-        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === 'developed' ? 'checked' : ''}> 已發展○
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === 'developed' ? 'checked' : ''}> <span class="entry-row__mark entry-row__mark--developed">○</span>已發展
       </label>
       <label class="entry-form__radio">
-        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === 'developing' ? 'checked' : ''}> 發展中△
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === 'developing' ? 'checked' : ''}> <span class="entry-row__mark entry-row__mark--developing">△</span>發展中
       </label>
       <label class="entry-form__radio">
         <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="absent" ${checkedStatus === 'absent' ? 'checked' : ''}> 請假
@@ -56,11 +57,11 @@ function entryRow(entry) {
   const mark = flaggedLabel ? '' : entry.status === 'developed' ? '○' : '△';
   const rowClass = entry.status === 'developed' ? ' entry-row--achieved' : flaggedLabel ? ' entry-row--flagged' : '';
   return `
-    <li class="entry-row${rowClass}" data-entry="${escapeHtml(entry.id)}">
+    <li class="entry-row${rowClass}" data-click-edit data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
         <span class="entry-row__date"><span class="entry-row__mark entry-row__mark--${entry.status}">${mark}</span>${rocDateHtml(entry.date)}</span>
         <div class="entry-row__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">×</button>
         </div>
       </div>
@@ -110,13 +111,13 @@ function remarkBlock(entry) {
   const indicator = getIndicator(entry.indicatorCode);
   const mark = FLAGGED_STATUS_LABELS[entry.status] ? '' : entry.status === 'developed' ? '○' : '△';
   return `
-    <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
+    <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}"${entry.isLocal ? ' data-click-edit' : ''}>
       <div class="entry-row__top">
         <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? entry.activityName ?? '')}</h4>
         ${
           entry.isLocal
             ? `<div class="entry-row__actions">
-                <button type="button" class="btn btn--edit btn--small" data-edit-remark="${escapeHtml(entry.id)}" aria-label="編輯備註：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
+                <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-remark="${escapeHtml(entry.id)}" aria-label="編輯備註：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
                 <button type="button" class="btn--delete-circle" data-delete-remark="${escapeHtml(entry.id)}" aria-label="刪除備註：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">×</button>
               </div>`
             : ''
@@ -262,6 +263,7 @@ export async function renderFormEditorView(
   const rerender = () => keepScroll(() => renderFormEditorView(container, { child, form, onBack, confirmDelete }));
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
+  wireRowClickEdit(container);
 
   container.querySelector('[data-action="export"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-error="export"]');

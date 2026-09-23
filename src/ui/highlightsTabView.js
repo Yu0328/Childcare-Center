@@ -5,6 +5,7 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { wireRowClickEdit } from './rowClickEdit.js';
 
 function savedThumbHtml(photo, i, entryId) {
   if (!photo) return '<span class="highlight-thumb highlight-thumb--empty"></span>';
@@ -19,11 +20,11 @@ function savedThumbHtml(photo, i, entryId) {
 function existingEntryCard(entry) {
   const thumbs = [0, 1, 2].map(i => savedThumbHtml(entry.photos[i], i, entry.id)).join('');
   return `
-    <div class="indicator-block" data-highlight-entry="${escapeHtml(entry.id)}">
+    <div class="indicator-block" data-click-edit data-highlight-entry="${escapeHtml(entry.id)}">
       <div class="highlight-thumbs">${thumbs}</div>
       <p class="entry-row__note">${escapeHtml(entry.caption)}</p>
       <div class="entry-row__actions">
-        <button type="button" class="btn btn--edit btn--small" data-edit-highlight="${escapeHtml(entry.id)}" aria-label="編輯點滴分享：${escapeHtml(entry.caption)}">編輯</button>
+        <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-highlight="${escapeHtml(entry.id)}" aria-label="編輯點滴分享：${escapeHtml(entry.caption)}">編輯</button>
         <button type="button" class="btn--delete-circle" data-delete-highlight="${escapeHtml(entry.id)}" aria-label="刪除點滴分享：${escapeHtml(entry.caption)}">×</button>
       </div>
       <div class="entry-form" data-highlight-edit-form-for="${escapeHtml(entry.id)}" hidden>
@@ -76,6 +77,7 @@ export async function renderHighlightsTab(
   `;
 
   wireFormPopup(container);
+  wireRowClickEdit(container);
 
   function clearPendingSlot(i) {
     pendingPhotos[i] = null;

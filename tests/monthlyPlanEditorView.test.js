@@ -44,6 +44,29 @@ describe('monthlyPlanEditorView: rendering', () => {
     expect(section.textContent).toContain('趙萬竑');
   });
 
+  it('兩位以上幼兒時一次只顯示一位，點名字切換，重新整理後仍停在同一位', async () => {
+    const second = await addChild({ name: '林小美', birthDate: '2024-05-01' });
+    const twoPlan = await addMonthlyCoursePlan({
+      period: '115年08月', childIds: [child.id, second.id], childTiers: { [child.id]: 'Ⅴ', [second.id]: 'Ⅴ' },
+    });
+    const visibleIds = () => [...container.querySelectorAll('.monthly-calendar')].filter(s => !s.hidden).map(s => s.dataset.childId);
+
+    await renderMonthlyPlanEditorView(container, { plan: twoPlan, onBack: vi.fn() });
+    expect(visibleIds()).toEqual([String(child.id)]);
+
+    container.querySelector(`[data-switch-child="${second.id}"]`).click();
+    expect(visibleIds()).toEqual([String(second.id)]);
+    expect(container.querySelector(`[data-switch-child="${second.id}"]`).getAttribute('aria-pressed')).toBe('true');
+
+    await renderMonthlyPlanEditorView(container, { plan: twoPlan, onBack: vi.fn() });
+    expect(visibleIds()).toEqual([String(second.id)]);
+  });
+
+  it('只有一位幼兒時不顯示切換列', async () => {
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    expect(container.querySelector('.child-switch')).toBeNull();
+  });
+
   it('renders a slot item\'s text in its day cell', async () => {
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
     await addPlanSlotItem({ slotId: slot.id, indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類' });

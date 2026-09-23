@@ -6,6 +6,7 @@ import {
 import { escapeHtml } from './escapeHtml.js';
 import { toRocDate } from '../export/docxShared.js';
 import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
+import { wireRowClickEdit } from './rowClickEdit.js';
 
 // Which domain <details> cards are open persists across renders keyed by report.id, since
 // renderCoursePlanTab's own `container` is a brand-new, empty element on every call — its parent
@@ -27,10 +28,10 @@ function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
   return `
     <div class="entry-form__radio-group">
       <label class="entry-form__radio">
-        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === 'developed' ? 'checked' : ''}> 已發展○
+        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === 'developed' ? 'checked' : ''}> <span class="entry-row__mark entry-row__mark--developed">○</span>已發展
       </label>
       <label class="entry-form__radio">
-        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === 'developing' ? 'checked' : ''}> 發展中△
+        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === 'developing' ? 'checked' : ''}> <span class="entry-row__mark entry-row__mark--developing">△</span>發展中
       </label>
     </div>
   `;
@@ -59,11 +60,11 @@ function occurrenceRow(occurrence) {
   const isFlagged = occurrence.absent || occurrence.courseChanged || occurrence.status === 'developing';
   const rowClass = occurrence.courseChanged ? ' entry-row--course-changed' : occurrence.absent ? ' entry-row--absent' : '';
   return `
-    <li class="entry-row${rowClass}" data-course-occurrence="${escapeHtml(occurrence.id)}">
+    <li class="entry-row${rowClass}" data-click-edit data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
         <span class="entry-row__date${isFlagged ? ' entry-row__date--flag' : ''}">${escapeHtml(toRocDate(occurrence.date))}<span class="entry-row__status entry-row__status--${statusKey}">${statusLabel}</span></span>
         <div class="entry-row__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="編輯實施紀錄：${escapeHtml(occurrence.date)}">編輯</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="編輯實施紀錄：${escapeHtml(occurrence.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="刪除實施紀錄：${escapeHtml(occurrence.date)}">×</button>
         </div>
       </div>
@@ -90,12 +91,12 @@ function occurrenceRow(occurrence) {
 
 function entryCard(entry, indicator, occurrences, tier) {
   return `
-    <div class="indicator-block" data-course-entry="${escapeHtml(entry.id)}">
+    <div class="indicator-block" data-click-edit data-course-entry="${escapeHtml(entry.id)}">
       <h4 class="indicator-block__title">
         <span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>
         【${escapeHtml(entry.activityName)}】${escapeHtml(entry.indicatorText || '')}
         <span class="indicator-block__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯課程計畫項目：${escapeHtml(entry.activityName)}">編輯</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯課程計畫項目：${escapeHtml(entry.activityName)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除課程計畫項目：${escapeHtml(entry.activityName)}">×</button>
         </span>
       </h4>
@@ -119,10 +120,10 @@ function entryCard(entry, indicator, occurrences, tier) {
           <label class="entry-form__field">日期 <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
           <div class="entry-form__radio-group">
             <label class="entry-form__radio">
-              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> 已發展○
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> <span class="entry-row__mark entry-row__mark--developed">○</span>已發展
             </label>
             <label class="entry-form__radio">
-              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> 發展中△
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> <span class="entry-row__mark entry-row__mark--developing">△</span>發展中
             </label>
           </div>
           <label class="entry-form__checkbox">
@@ -220,8 +221,8 @@ export async function renderCoursePlanTab(
               <div class="panel-form__field">
                 狀態
                 <div class="entry-form__radio-group">
-                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> 已發展○</label>
-                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> 發展中△</label>
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> <span class="entry-row__mark entry-row__mark--developed">○</span>已發展</label>
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> <span class="entry-row__mark entry-row__mark--developing">△</span>發展中</label>
                 </div>
               </div>
             </div>
@@ -257,6 +258,7 @@ export async function renderCoursePlanTab(
   `;
 
   wireFormPopup(container);
+  wireRowClickEdit(container);
 
   container.querySelector('[data-field="indicatorCode"]').addEventListener('change', event => {
     const indicator = getIndicator(event.target.value);

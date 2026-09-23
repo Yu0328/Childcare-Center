@@ -3,6 +3,7 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { wireRowClickEdit } from './rowClickEdit.js';
 
 function observationHeading(observation) {
   return observation.title ? `行為觀察－${observation.title}` : '行為觀察';
@@ -11,11 +12,11 @@ function observationHeading(observation) {
 function observationCard(observation) {
   const heading = observationHeading(observation);
   return `
-    <div class="indicator-block" data-behavior-observation="${escapeHtml(observation.id)}">
+    <div class="indicator-block" data-click-edit data-behavior-observation="${escapeHtml(observation.id)}">
       <h4 class="indicator-block__title">
         ${escapeHtml(heading)}
         <span class="indicator-block__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-observation="${escapeHtml(observation.id)}" aria-label="編輯${escapeHtml(heading)}">編輯</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-observation="${escapeHtml(observation.id)}" aria-label="編輯${escapeHtml(heading)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-observation="${escapeHtml(observation.id)}" aria-label="刪除${escapeHtml(heading)}">×</button>
         </span>
       </h4>
@@ -58,6 +59,7 @@ export async function renderBehaviorObservationTab(
   `;
 
   wireFormPopup(container);
+  wireRowClickEdit(container);
 
   container.querySelector('[data-action="add-observation"]').addEventListener('submit', async event => {
     event.preventDefault();

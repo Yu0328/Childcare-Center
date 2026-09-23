@@ -88,10 +88,10 @@ function dayCellHtml(child, tier, week, day, data) {
   `;
 }
 
-function childCalendarHtml(child, tier, data) {
+function childCalendarHtml(child, tier, data, hidden) {
   const ageMonths = calculateAgeInMonths(child.birthDate, `${data.weeks[0].days[0].isoDate}`);
   return `
-    <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}">
+    <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}" ${hidden ? 'hidden' : ''}>
       <h3 class="monthly-calendar__title">${escapeHtml(child.name)}　${ageMonths}M　${escapeHtml(tierFormLabel(tier))}</h3>
       <div class="monthly-calendar__weeks">
         ${data.weeks
@@ -111,6 +111,21 @@ function childCalendarHtml(child, tier, data) {
   `;
 }
 
+// One child's calendar at a time (every child's month stacked was far too long a page on phones);
+// remembered per plan so a re-render (e.g. after 管理幼兒) stays on the same child.
+const activeChildByPlan = new Map();
+
+function childSwitchHtml(children, activeId) {
+  if (children.length < 2) return '';
+  return `
+    <div class="child-switch" role="group" aria-label="選擇幼兒">
+      ${children
+        .map(c => `<button type="button" class="child-switch__button" data-switch-child="${escapeHtml(c.id)}" aria-pressed="${c.id === activeId}">${escapeHtml(c.name)}</button>`)
+        .join('')}
+    </div>
+  `;
+}
+
 export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   // See formEditorView.js's identical guard: opening the plan clears the 新 badge shown on
   // monthlyPlanListView.js's row, and mutating `plan` (not just the DB) prevents repeating this
@@ -122,6 +137,9 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
 
   const data = await loadEditorData(plan);
   let selected = null; // { child, tier, week, day }
+  const remembered = activeChildByPlan.get(plan.id);
+  const activeChildId = data.children.some(c => c.id === remembered) ? remembered : data.children[0]?.id;
+  const showOneChild = data.children.length > 1;
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -135,7 +153,8 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tab-layout">
       <div class="monthly-calendar-list">
-        ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data)).join('')}
+        ${childSwitchHtml(data.children, activeChildId)}
+        ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data, showOneChild && child.id !== activeChildId)).join('')}
       </div>
       <div class="monthly-plan-side">
         ${nestedEntryFormDialog(`
@@ -173,6 +192,15 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   `;
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
+
+  container.querySelectorAll('[data-switch-child]').forEach(button => {
+    button.addEventListener('click', () => {
+      const childId = button.dataset.switchChild; // a string, while child ids may be numbers
+      activeChildByPlan.set(plan.id, data.children.find(c => String(c.id) === childId)?.id);
+      container.querySelectorAll('[data-switch-child]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+      container.querySelectorAll('.monthly-calendar').forEach(section => { section.hidden = section.dataset.childId !== childId; });
+    });
+  });
 
   const manageChildrenForm = container.querySelector('[data-manage-children-form]');
 

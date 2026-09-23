@@ -188,6 +188,21 @@ describe('renderFormEditorView', () => {
     expect(updated.status).toBe('developing');
   });
 
+  it('點一下紀錄本身就打開編輯表單，再點一次收起；重新整理畫面後依然只切換一次', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: 'x' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    const note = () => container.querySelector(`[data-entry="${entry.id}"] .entry-row__note`);
+    const editForm = () => container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
+    note().click();
+    expect(editForm().hidden).toBe(false);
+    note().click();
+    expect(editForm().hidden).toBe(true);
+  });
+
   it('exports with a filename using the tier-mapped form letter (Ⅳ 階段 → C表)', async () => {
     const docxExportModule = await import('../src/export/docxExport.js');
     const downloadSpy = vi.spyOn(docxExportModule, 'downloadDocx').mockImplementation(() => {});
