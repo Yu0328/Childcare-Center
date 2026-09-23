@@ -820,6 +820,18 @@ button {
   box-shadow: var(--_card-shadow);
   transition: box-shadow 0.15s ease;
 }
+/* Phones: no box-in-a-page scrolling — the list grows and the whole page scrolls. The add form is a
+   popup here (the ＋ button), so nothing sits below the list that the cap was protecting. Extra
+   bottom room keeps the last row's × clear of the floating ＋. */
+@media (max-width: 640px) {
+  .card-list--rows {
+    max-height: none;
+    overflow-y: visible;
+  }
+  #app:has(.card-list--rows) {
+    padding-bottom: 6rem;
+  }
+}
 /* Scrollbar reveals only while scrolling or hovering the list. */
 .card-list--rows:hover,
 .card-list--rows.is-scrolling {
