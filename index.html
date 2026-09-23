@@ -928,6 +928,12 @@ button {
   background: rgba(0, 0, 0, 0.4);
 }
 .form-popup__close {
+  /* Mobile-only: on mobile this is the modal dialog's only close affordance besides
+     backdrop-click/Escape. On desktop the form is meant to stay permanently inline (see
+     docs/superpowers/specs/2026-09-11-mobile-add-form-popup-design.md — "桌面版畫面與互動完全
+     不變") with no FAB to reopen it, so leaving this button visible there let one misclick
+     hide an add-form for the rest of that screen's render with no way back. */
+  display: none;
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -957,6 +963,10 @@ button {
     position: fixed;
     inset: 0;
     margin: auto;
+  }
+
+  .form-popup__close {
+    display: block;
   }
 
   .fab {
@@ -1303,6 +1313,23 @@ fieldset.panel-form__field.import-preview__child legend {
   grid-template-columns: 1fr;
 }
 
+/* 備註 is a sixth card after the five domains — full width on its own row, remarks laid out side
+   by side, rather than squeezed into one fifth-width column. */
+.domain-grid--row > [data-remark-section] {
+  grid-column: 1 / -1;
+}
+
+.domain-grid--row > [data-remark-section] > .domain-card__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-items: start;
+}
+
+.domain-grid--row > [data-remark-section] > .domain-card__body > :not(.indicator-block) {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 /* #app's normal 960px cap (sized for the narrow panel-form pages) leaves each of the five
    columns above too little room for real indicator text, dates, and notes to stay readable —
    widen the page specifically when domain-grid--row is present, native :has() so no JS/markup
@@ -1466,6 +1493,12 @@ fieldset.panel-form__field.import-preview__child legend {
 .entry-row--flagged .entry-row__date,
 .entry-row--flagged .entry-row__note {
   color: var(--danger);
+}
+
+/* Keeps "已發展○" in one piece, so a narrow column breaks before the status rather than stranding
+   the ○ alone on its own line. */
+.entry-row__status {
+  white-space: nowrap;
 }
 
 .entry-row__top {
@@ -1857,6 +1890,15 @@ fieldset.panel-form__field.import-preview__child legend {
   color: var(--text-primary);
 }
 
+.import-preview__entry-remark {
+  font-size: 0.75rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--neutral-tint);
+  color: var(--neutral-accent);
+  border: 1px solid var(--neutral-border);
+}
+
 /* ---------- Errors ---------- */
 
 .field-error {
@@ -1992,6 +2034,18 @@ fieldset.panel-form__field.import-preview__child legend {
   .page-header__title {
     order: -1;
     flex-basis: 100%;
+    /* Giving the title its own full-width row above (see comment above) narrows but doesn't
+       close the overflow — a realistic 3-character child name already fills the row with zero
+       margin, so any longer name (a common 4-character full name) still hit the base rule's
+       `white-space: nowrap` + ellipsis and silently dropped the trailing 月 — i.e. exactly which
+       month this record is, the one thing in the title staff most need to tell records apart on
+       a phone. Letting it wrap to a second line instead keeps every character visible. */
+    white-space: normal;
+    /* Break only at the title's own separators (the full-width spaces, the range's "-"), not
+       between any two characters — otherwise a range period splits as "115年03 / 月-115年07月".
+       overflow-wrap still breaks a separator-less title too long for the row. */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
 
   /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
@@ -2429,9 +2483,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // ../../../node_modules/jszip/dist/jszip.min.js
+  // node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -5415,7 +5469,7 @@ var CFormApp = (() => {
         ],
         // 25個月以上 (適性活動發展實施計畫-25個月 A4.docx). Ⅵ = 指標項次/發展活動 (base),
         // Ⅶ = 延伸(進階)活動 (extension/advanced) — both belong to the same "25個月以上／E表"
-        // tier (see TIER_DATA_KEYS below), kept as separate byTier keys only to preserve their
+        // tier (see CODE_PREFIX_TIER below), kept as separate byTier keys only to preserve their
         // original Ⅵ-x-y / Ⅶ-x-y codes from the source document. No activityName in this source.
         "\u2165": [
           ["\u6703\u624B\u5FC3\u671D\u4E0B\u4E1F\u7403\u6216\u6771\u897F", ""],
@@ -5663,7 +5717,7 @@ var CFormApp = (() => {
     { code: "\u2164", label: "19-24\u500B\u6708", minMonths: 19, maxMonths: 24, formLetter: "D" },
     { code: "\u2165", label: "25\u500B\u6708\u4EE5\u4E0A", minMonths: 25, maxMonths: Infinity, formLetter: "E" }
   ];
-  var TIER_DATA_KEYS = { "\u2165": ["\u2165", "\u2166"] };
+  var CODE_PREFIX_TIER = { "\u2166": "\u2165" };
   function tierFormLabel(tierCode) {
     const tier = TIERS.find((t) => t.code === tierCode);
     if (!tier) return "";
@@ -5682,7 +5736,7 @@ var CFormApp = (() => {
     ({ domain, name, subdomain, byTier }) => Object.entries(byTier).flatMap(
       ([tier, entries]) => entries.map(([description, activityName], index) => ({
         code: `${tier}-${domain}-${index + 1}`,
-        tier,
+        tier: CODE_PREFIX_TIER[tier] || tier,
         domain,
         domainName: name,
         subdomain,
@@ -5696,14 +5750,16 @@ var CFormApp = (() => {
     )
   );
   function getIndicatorsForTier(tierCode) {
-    const dataKeys = TIER_DATA_KEYS[tierCode] || [tierCode];
-    return INDICATORS.filter((indicator) => dataKeys.includes(indicator.tier));
+    const tier = CODE_PREFIX_TIER[tierCode] || tierCode;
+    return INDICATORS.filter((indicator) => indicator.tier === tier);
   }
   var LATIN_TIER_PREFIX_TO_UNICODE = { III: "\u2162", IV: "\u2163", II: "\u2161", I: "\u2160", V: "\u2164" };
   var LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
   var MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
+  var MISNUMBERED_SOCIAL_PATTERN = /^Ⅶ-2-(3|4)$/;
   function normalizeIndicatorCode(code) {
     if (MIXED_IV_PREFIX_PATTERN.test(code ?? "")) return "\u2163" + code.slice(2);
+    if (MISNUMBERED_SOCIAL_PATTERN.test(code ?? "")) return "\u2165" + code.slice(1);
     const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? "");
     if (!match) return code;
     return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);
@@ -5711,6 +5767,9 @@ var CFormApp = (() => {
   function getIndicator(code) {
     const normalized = normalizeIndicatorCode(code);
     return INDICATORS.find((indicator) => indicator.code === normalized);
+  }
+  function unresolvedIndicatorWarning(codes) {
+    return `\u4EE5\u4E0B\u6307\u6A19\u4EE3\u78BC\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u5167\u5EFA\u7684\u6307\u6A19\uFF1A${codes.join("\u3001")}\u3002\u9019\u4E9B\u9805\u76EE\u532F\u5165\u5F8C\u53EF\u80FD\u7121\u6CD5\u6B63\u78BA\u986F\u793A\uFF0C\u5EFA\u8B70\u78BA\u8A8D\u5F8C\u518D\u532F\u5165`;
   }
 
   // src/import/docxImport.js
@@ -5786,8 +5845,8 @@ var CFormApp = (() => {
   function inferTier(rawEntries) {
     const counts = /* @__PURE__ */ new Map();
     for (const entry of rawEntries) {
-      if (!entry.indicatorCode) continue;
-      const prefix = entry.indicatorCode.split("-")[0];
+      if (!entry.indicatorCode || entry.isRemark) continue;
+      const prefix = getIndicator(entry.indicatorCode)?.tier ?? entry.indicatorCode.split("-")[0];
       counts.set(prefix, (counts.get(prefix) || 0) + 1);
     }
     let best = null;
@@ -5800,12 +5859,41 @@ var CFormApp = (() => {
     }
     return best;
   }
+  var FLAGGED_NOTE_LABELS = [["\u8ACB\u5047", "absent"], ["\u66F4\u63DB\u8AB2\u7A0B", "courseChanged"]];
+  function statusAndNote(dateCell, note) {
+    if (dateCell.includes("\u25CB")) return { status: "developed", note };
+    if (!dateCell.includes("\u25B3")) {
+      for (const [label, status] of FLAGGED_NOTE_LABELS) {
+        if (note.startsWith(label)) return { status, note: note.slice(label.length).replace(/^[\s　]+/, "") };
+      }
+    }
+    return { status: "developing", note };
+  }
   function parseBodyRows(documentXml) {
     const bodyRows = rowsOf(documentXml).slice(2);
     const rawEntries = [];
     let lastCode = null;
+    let inRemarkSection = false;
     for (const rowXml of bodyRows) {
       const cells = cellsForRow(rowXml);
+      if (cells.length === 5 && (inRemarkSection || cells[0] === "\u5099\u8A3B")) {
+        inRemarkSection = true;
+        const [, codeCell, description, dateCell2, noteCell] = cells;
+        if (!codeCell && !description && !dateCell2 && !noteCell) continue;
+        const dateMatch2 = /^(\d{1,2})\/(\d{1,2})/.exec(dateCell2);
+        const indicatorCode = normalizeIndicatorCode(codeCell);
+        rawEntries.push({
+          indicatorCode,
+          month: dateMatch2 ? Number(dateMatch2[1]) : null,
+          day: dateMatch2 ? Number(dateMatch2[2]) : null,
+          ...statusAndNote(dateCell2, noteCell),
+          // Only a code with no indicator of its own prints its activityName in the description
+          // column (see generateDocxBlob), so that's the only case it needs restoring.
+          activityName: getIndicator(indicatorCode) ? void 0 : description || void 0,
+          isRemark: true
+        });
+        continue;
+      }
       if (cells.length < 6) continue;
       const hasRemarkColumn = cells.length >= 7;
       const codeIndex = hasRemarkColumn ? 3 : 2;
@@ -5822,32 +5910,39 @@ var CFormApp = (() => {
         indicatorCode: code,
         month: Number(dateMatch[1]),
         day: Number(dateMatch[2]),
-        achieved: dateCell.includes("\u25CB"),
-        note
+        ...statusAndNote(dateCell, note)
       });
     }
     return rawEntries;
   }
-  function resolveEntryDates(rawEntries, periodYear) {
+  function resolveEntryDates(rawEntries, periodYear, periodEnd) {
     const currentYearByIndicator = /* @__PURE__ */ new Map();
     const lastMonthByIndicator = /* @__PURE__ */ new Map();
-    return rawEntries.map(({ indicatorCode, month, day, achieved, note }) => {
+    return rawEntries.map(({ indicatorCode, month, day, status, note, activityName, isRemark }) => {
+      const indicator = getIndicator(indicatorCode);
+      if (isRemark) {
+        const year = month === null ? null : month > periodEnd.month ? periodEnd.year - 1 : periodEnd.year;
+        const date = year === null ? "" : `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        return { indicatorCode, date, status, note, description: indicator ? indicator.description : null, tier: null, activityName, isRemark };
+      }
       let currentYear = currentYearByIndicator.get(indicatorCode) ?? periodYear;
       const lastMonth = lastMonthByIndicator.get(indicatorCode) ?? null;
       if (lastMonth !== null && month < lastMonth) currentYear += 1;
       currentYearByIndicator.set(indicatorCode, currentYear);
       lastMonthByIndicator.set(indicatorCode, month);
-      const indicator = getIndicator(indicatorCode);
       return {
         indicatorCode,
         date: `${currentYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-        achieved,
+        status,
         note,
         description: indicator ? indicator.description : null,
         // The entry's own tier, read off its indicator code — not necessarily the document's
         // overall (majority-vote) tier: a child not yet developed into every current-tier
         // indicator can have entries genuinely recorded against an earlier tier's codes.
-        tier: indicator ? indicator.tier : null
+        // A 備註 row stays with this form (null → the form's own tier on import): it came from this
+        // form's 備註 section, and its code not being one of this tier's is what puts it back there.
+        tier: isRemark ? null : indicator ? indicator.tier : null,
+        ...isRemark ? { activityName, isRemark } : {}
       };
     });
   }
@@ -5863,9 +5958,12 @@ var CFormApp = (() => {
     if (!tier) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u6708\u9F61\u968E\u6BB5\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
     if (!headerInfo.period) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u7D00\u9304\u5E74\u6708\uFF0C\u65E5\u671F\u5E74\u4EFD\u53EF\u80FD\u4E0D\u6E96\u78BA\uFF0C\u8ACB\u78BA\u8A8D\u6BCF\u4E00\u7B46\u65E5\u671F");
     const periodYear = headerInfo.period ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911 : (/* @__PURE__ */ new Date()).getFullYear();
-    const entries = resolveEntryDates(rawEntries, periodYear);
-    if (entries.some((entry) => !entry.description)) {
-      warnings.push("\u90E8\u5206\u6307\u6A19\u4EE3\u78BC\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u5167\u5EFA\u7684\u6307\u6A19\uFF0C\u9019\u4E9B\u9805\u76EE\u532F\u5165\u5F8C\u53EF\u80FD\u7121\u6CD5\u6B63\u78BA\u986F\u793A\uFF0C\u5EFA\u8B70\u78BA\u8A8D\u5F8C\u518D\u532F\u5165");
+    const periodEndMatch = /(\d+)年(\d+)月$/.exec(headerInfo.period ?? "");
+    const periodEnd = periodEndMatch ? { year: Number(periodEndMatch[1]) + 1911, month: Number(periodEndMatch[2]) } : { year: periodYear, month: 12 };
+    const entries = resolveEntryDates(rawEntries, periodYear, periodEnd);
+    const unresolvedCodes = [...new Set(entries.filter((entry) => !entry.description && !entry.isRemark).map((entry) => entry.indicatorCode))];
+    if (unresolvedCodes.length > 0) {
+      warnings.push(unresolvedIndicatorWarning(unresolvedCodes));
     }
     return {
       child: { name: headerInfo.name, birthDate: headerInfo.birthDate },
@@ -5874,6 +5972,65 @@ var CFormApp = (() => {
       entries,
       warnings
     };
+  }
+
+  // src/ui/birthDateField.js
+  var CURRENT_YEAR = (/* @__PURE__ */ new Date()).getFullYear();
+  var YEAR_RANGE_BACK = 6;
+  function daysInMonth(year, month) {
+    return new Date(year, month, 0).getDate();
+  }
+  function birthDateYearOptions() {
+    const years = [];
+    for (let year = CURRENT_YEAR; year >= CURRENT_YEAR - YEAR_RANGE_BACK; year -= 1) years.push(year);
+    return years;
+  }
+  function dayOptionsHtml(dayCount, selectedDay) {
+    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}</option>`).join("");
+  }
+  function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldName, value }) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
+    const selectedYear = match ? Number(match[1]) : "";
+    const selectedMonth = match ? Number(match[2]) : "";
+    const selectedDay = match ? Number(match[3]) : "";
+    const dayCount = selectedYear && selectedMonth ? daysInMonth(selectedYear, selectedMonth) : 31;
+    return `
+    <span class="panel-form__period-row">
+      <select data-field="${yearFieldName}">
+        <option value="">\u5E74</option>
+        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}</option>`).join("")}
+      </select>
+      <select data-field="${monthFieldName}">
+        <option value="">\u6708</option>
+        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}</option>`).join("")}
+      </select>
+      <select data-field="${dayFieldName}">
+        <option value="">\u65E5</option>
+        ${dayOptionsHtml(dayCount, selectedDay)}
+      </select>
+    </span>
+  `;
+  }
+  function wireBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
+    const yearEl = container.querySelector(`[data-field="${yearFieldName}"]`);
+    const monthEl = container.querySelector(`[data-field="${monthFieldName}"]`);
+    const dayEl = container.querySelector(`[data-field="${dayFieldName}"]`);
+    const refreshDayOptions = () => {
+      const year = Number(yearEl.value) || CURRENT_YEAR;
+      const month = Number(monthEl.value) || 1;
+      const dayCount = daysInMonth(year, month);
+      const selectedDay = Math.min(Number(dayEl.value) || 0, dayCount) || "";
+      dayEl.innerHTML = `<option value="">\u65E5</option>${dayOptionsHtml(dayCount, selectedDay)}`;
+    };
+    yearEl.addEventListener("change", refreshDayOptions);
+    monthEl.addEventListener("change", refreshDayOptions);
+  }
+  function parseBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
+    const year = container.querySelector(`[data-field="${yearFieldName}"]`).value;
+    const month = container.querySelector(`[data-field="${monthFieldName}"]`).value;
+    const day = container.querySelector(`[data-field="${dayFieldName}"]`).value;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
   // src/ui/periodFields.js
@@ -5918,16 +6075,20 @@ var CFormApp = (() => {
   }
 
   // src/ui/importPreviewView.js
+  var BIRTH_DATE_FIELDS = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
+  var STATUS_MARKS = { developed: "\u25CB", developing: "\u25B3", absent: "\uFF08\u8ACB\u5047\uFF09", courseChanged: "\uFF08\u66F4\u63DB\u8AB2\u7A0B\uFF09" };
   function entryRow(entry, index) {
-    const unresolved = !entry.description;
+    const unresolved = !entry.description && !entry.isRemark;
+    const description = entry.description || entry.activityName || "";
     return `
     <li class="import-preview__entry${unresolved ? " import-preview__entry--warning" : ""}">
       <label>
         <input type="checkbox" data-entry-include="${index}" checked>
+        ${entry.isRemark ? '<span class="import-preview__entry-remark">\u5099\u8A3B</span>' : ""}
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
-        ${entry.description ? escapeHtml(entry.description) : "\uFF08\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF0C\u5EFA\u8B70\u53D6\u6D88\u52FE\u9078\uFF09"}
+        ${unresolved ? "\uFF08\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF0C\u5EFA\u8B70\u53D6\u6D88\u52FE\u9078\uFF09" : escapeHtml(description)}
         \u2014
-        ${escapeHtml(entry.date)}${entry.achieved ? "\u25CB" : "\u25B3"}
+        ${escapeHtml(entry.date)}${STATUS_MARKS[entry.status] ?? ""}
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>
@@ -5952,7 +6113,7 @@ var CFormApp = (() => {
       <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
       <div class="panel-form__row">
         <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
-        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? "")}" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS, value: parsed.child.birthDate })}</label>
       </div>
       <div class="panel-form__row">
         <label class="panel-form__field">
@@ -5994,6 +6155,7 @@ var CFormApp = (() => {
     </form>
   `;
     container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
+    wireBirthDateSelects(container, BIRTH_DATE_FIELDS);
     container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
       container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
     });
@@ -6001,7 +6163,11 @@ var CFormApp = (() => {
       event.preventDefault();
       const errorEl = container.querySelector("[data-error]");
       const name = container.querySelector('[data-field="name"]').value;
-      const birthDate = container.querySelector('[data-field="birthDate"]').value;
+      const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS);
+      if (!birthDate) {
+        container.querySelector("[data-error]").textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
+        return;
+      }
       const tier = container.querySelector('[data-field="tier"]').value;
       const year = container.querySelector('[data-field="period-year"]').value;
       const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
@@ -6031,8 +6197,9 @@ var CFormApp = (() => {
               formId: form.id,
               indicatorCode: entry.indicatorCode,
               date: entry.date,
-              status: entry.achieved ? "developed" : "developing",
-              note: entry.note
+              status: entry.status,
+              note: entry.note,
+              activityName: entry.activityName
             });
           }
         }
@@ -6293,6 +6460,7 @@ var CFormApp = (() => {
   }
 
   // src/ui/parentReportImportPreviewView.js
+  var BIRTH_DATE_FIELDS2 = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
   function coursePlanEntryRow(entry, index) {
     const occurrenceSummary = entry.occurrences.map((o) => `${escapeHtml(o.date)}${o.absent ? "\uFF08\u8ACB\u5047\uFF09" : o.status === "developed" ? "\u25CB" : "\u25B3"}`).join("\u3001");
     return `
@@ -6352,7 +6520,7 @@ var CFormApp = (() => {
       <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
       <div class="panel-form__row">
         <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
-        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? "")}" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS2, value: parsed.child.birthDate })}</label>
       </div>
       <div class="panel-form__row">
         <label class="panel-form__field">
@@ -6394,11 +6562,16 @@ var CFormApp = (() => {
     </form>
   `;
     container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
+    wireBirthDateSelects(container, BIRTH_DATE_FIELDS2);
     container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const errorEl = container.querySelector("[data-error]");
       const name = container.querySelector('[data-field="name"]').value;
-      const birthDate = container.querySelector('[data-field="birthDate"]').value;
+      const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS2);
+      if (!birthDate) {
+        container.querySelector("[data-error]").textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
+        return;
+      }
       const tier = container.querySelector('[data-field="tier"]').value;
       const year = container.querySelector('[data-field="period-year"]').value;
       const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
@@ -6439,65 +6612,6 @@ var CFormApp = (() => {
         errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
       }
     });
-  }
-
-  // src/ui/birthDateField.js
-  var CURRENT_YEAR = (/* @__PURE__ */ new Date()).getFullYear();
-  var YEAR_RANGE_BACK = 6;
-  function daysInMonth(year, month) {
-    return new Date(year, month, 0).getDate();
-  }
-  function birthDateYearOptions() {
-    const years = [];
-    for (let year = CURRENT_YEAR; year >= CURRENT_YEAR - YEAR_RANGE_BACK; year -= 1) years.push(year);
-    return years;
-  }
-  function dayOptionsHtml(dayCount, selectedDay) {
-    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}</option>`).join("");
-  }
-  function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldName, value }) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
-    const selectedYear = match ? Number(match[1]) : "";
-    const selectedMonth = match ? Number(match[2]) : "";
-    const selectedDay = match ? Number(match[3]) : "";
-    const dayCount = selectedYear && selectedMonth ? daysInMonth(selectedYear, selectedMonth) : 31;
-    return `
-    <span class="panel-form__period-row">
-      <select data-field="${yearFieldName}">
-        <option value="">\u5E74</option>
-        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}</option>`).join("")}
-      </select>
-      <select data-field="${monthFieldName}">
-        <option value="">\u6708</option>
-        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}</option>`).join("")}
-      </select>
-      <select data-field="${dayFieldName}">
-        <option value="">\u65E5</option>
-        ${dayOptionsHtml(dayCount, selectedDay)}
-      </select>
-    </span>
-  `;
-  }
-  function wireBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
-    const yearEl = container.querySelector(`[data-field="${yearFieldName}"]`);
-    const monthEl = container.querySelector(`[data-field="${monthFieldName}"]`);
-    const dayEl = container.querySelector(`[data-field="${dayFieldName}"]`);
-    const refreshDayOptions = () => {
-      const year = Number(yearEl.value) || CURRENT_YEAR;
-      const month = Number(monthEl.value) || 1;
-      const dayCount = daysInMonth(year, month);
-      const selectedDay = Math.min(Number(dayEl.value) || 0, dayCount) || "";
-      dayEl.innerHTML = `<option value="">\u65E5</option>${dayOptionsHtml(dayCount, selectedDay)}`;
-    };
-    yearEl.addEventListener("change", refreshDayOptions);
-    monthEl.addEventListener("change", refreshDayOptions);
-  }
-  function parseBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
-    const year = container.querySelector(`[data-field="${yearFieldName}"]`).value;
-    const month = container.querySelector(`[data-field="${monthFieldName}"]`).value;
-    const day = container.querySelector(`[data-field="${dayFieldName}"]`).value;
-    if (!year || !month || !day) return "";
-    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
   // src/ui/toast.js
@@ -7032,7 +7146,7 @@ var CFormApp = (() => {
     }, 1e3);
   }
 
-  // ../../../node_modules/docx/dist/index.mjs
+  // node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -26211,9 +26325,8 @@ var CFormApp = (() => {
   var FLAGGED_STATUS_LABELS = { absent: "\u8ACB\u5047", courseChanged: "\u66F4\u63DB\u8AB2\u7A0B" };
   var FLAGGED_TEXT_COLOR = "C00000";
   function formatDateCell(row) {
-    if (!row.date) return "";
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
-    const formatted = match ? `${match[2]}/${match[3]}` : row.date;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date ?? "");
+    const formatted = match ? `${match[2]}/${match[3]}` : row.date ?? "";
     const glyph = row.status === "developed" ? "\u25CB" : row.status === "developing" ? "\u25B3" : "";
     return `${formatted}${glyph}`;
   }
@@ -26526,7 +26639,7 @@ var CFormApp = (() => {
   }
   function remarkBlock(entry) {
     const indicator = getIndicator(entry.indicatorCode);
-    const mark = entry.status === "developed" ? "\u25CB" : "\u25B3";
+    const mark = FLAGGED_STATUS_LABELS2[entry.status] ? "" : entry.status === "developed" ? "\u25CB" : "\u25B3";
     return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
       <div class="entry-row__top">
@@ -26537,7 +26650,7 @@ var CFormApp = (() => {
               </div>` : ""}
       </div>
       <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
-      <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+      <p class="entry-row__note">${noteLineHtml(entry)}</p>
       ${entry.isLocal ? `<div class="entry-form" data-remark-edit-form-for="${escapeHtml(entry.id)}" hidden>
               <label class="entry-form__field">\u6A19\u7C64 <input type="text" data-remark-edit-field="code" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.indicatorCode)}"></label>
               <label class="entry-form__field">\u6D3B\u52D5\u540D\u7A31\uFF08\u627E\u4E0D\u5230\u5C0D\u61C9\u6307\u6A19\u6642\u986F\u793A\uFF09 <input type="text" data-remark-edit-field="activityName" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.activityName ?? "")}"></label>
@@ -26560,9 +26673,13 @@ var CFormApp = (() => {
     const entriesPerForm = await Promise.all(forms.map((f) => listEntriesForForm(f.id)));
     return entriesPerForm.flat().filter((entry) => entry.status === "developing");
   }
+  function remarkMatchKey(entry) {
+    return [entry.indicatorCode, String(entry.date ?? "").slice(5), entry.status, (entry.note ?? "").trim()].join("|");
+  }
   async function remarkEntries(childId, tier, ownEntries, ownIndicatorCodes) {
-    const previousTierEntries = (await previousTierDevelopingEntries(childId, tier)).map((entry) => ({ ...entry, isLocal: false }));
     const ownOrphaned = ownEntries.filter((entry) => !ownIndicatorCodes.has(entry.indicatorCode)).map((entry) => ({ ...entry, isLocal: true }));
+    const ownKeys2 = new Set(ownOrphaned.map(remarkMatchKey));
+    const previousTierEntries = (await previousTierDevelopingEntries(childId, tier)).filter((entry) => !ownKeys2.has(remarkMatchKey(entry))).map((entry) => ({ ...entry, isLocal: false }));
     return [...previousTierEntries, ...ownOrphaned];
   }
   async function renderFormEditorView(container, { child, form, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
@@ -27038,9 +27155,9 @@ var CFormApp = (() => {
       if (!child.tier) warnings.push(`\u7121\u6CD5\u5224\u65B7\u300C${child.name || "\uFF08\u672A\u77E5\u59D3\u540D\uFF09"}\u300D\u7684\u6708\u9F61\u968E\u6BB5\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7`);
     }
     const { slotsByTier, children: childrenWithOverrides } = buildSlotsAndOverrides(parsedChildren);
-    const hasUnresolvedIndicator = [...slotsByTier.values()].flat().flatMap((slot) => slot.items).some((item) => item.indicatorCode && !getIndicator(item.indicatorCode));
-    if (hasUnresolvedIndicator) {
-      warnings.push("\u90E8\u5206\u6307\u6A19\u4EE3\u78BC\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u5167\u5EFA\u7684\u6307\u6A19\uFF0C\u9019\u4E9B\u9805\u76EE\u532F\u5165\u5F8C\u53EF\u80FD\u7121\u6CD5\u6B63\u78BA\u986F\u793A\uFF0C\u5EFA\u8B70\u78BA\u8A8D\u5F8C\u518D\u532F\u5165");
+    const unresolvedCodes = [...new Set([...slotsByTier.values()].flat().flatMap((slot) => slot.items).filter((item) => item.indicatorCode && !getIndicator(item.indicatorCode)).map((item) => item.indicatorCode))];
+    if (unresolvedCodes.length > 0) {
+      warnings.push(unresolvedIndicatorWarning(unresolvedCodes));
     }
     return {
       period,
@@ -27845,7 +27962,7 @@ var CFormApp = (() => {
     return `
     <li class="entry-row${rowClass}" data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date${isFlagged ? " entry-row__date--flag" : ""}">${escapeHtml(occurrence.date)}\u3000${statusLabel}</span>
+        <span class="entry-row__date${isFlagged ? " entry-row__date--flag" : ""}">${escapeHtml(occurrence.date)}\u3000<span class="entry-row__status">${statusLabel}</span></span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u7DE8\u8F2F\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u522A\u9664\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\xD7</button>
@@ -30320,14 +30437,24 @@ var CFormApp = (() => {
     function showParentReportEditor(child, report) {
       runView(() => renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }));
     }
+    let entered = false;
     const homeButton = document.getElementById("home-button");
-    if (homeButton) homeButton.addEventListener("click", showReportTypeSelect);
+    if (homeButton) {
+      homeButton.addEventListener("click", () => {
+        if (!entered || container.querySelector(".conflict-view")) return;
+        showReportTypeSelect();
+      });
+    }
+    function enter() {
+      entered = true;
+      showReportTypeSelect();
+    }
     function start() {
       if (gate) {
-        gate(container, { onDone: showReportTypeSelect });
+        gate(container, { onDone: enter });
         return;
       }
-      showReportTypeSelect();
+      enter();
     }
     function handleUnlock() {
       start();
@@ -30495,6 +30622,13 @@ Content-Type: ${contentType}\r
       });
       return (await response.json()).id;
     }
+    function writeManifest(folderId) {
+      return multipartUpload({
+        metadata: { name: MANIFEST_NAME, parents: [folderId] },
+        body: JSON.stringify({ formatVersion: FORMAT_VERSION }),
+        contentType: "application/json"
+      });
+    }
     async function ensureFolder() {
       const found = await listQuery(
         `name='${FOLDER_NAME}' and mimeType='${FOLDER_MIME}' and trashed=false`
@@ -30506,18 +30640,20 @@ Content-Type: ${contentType}\r
           body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME })
         });
         const folderId2 = (await created.json()).id;
-        await multipartUpload({
-          metadata: { name: MANIFEST_NAME, parents: [folderId2] },
-          body: JSON.stringify({ formatVersion: FORMAT_VERSION }),
-          contentType: "application/json"
-        });
+        await writeManifest(folderId2);
         return folderId2;
       }
       const folderId = found[0].id;
       const manifests = await listQuery(
         `name='${MANIFEST_NAME}' and '${folderId}' in parents and trashed=false`
       );
-      if (manifests.length === 0) throw new DriveFormatError("MANIFEST_MISSING");
+      if (manifests.length === 0) {
+        if ((await listQuery(`'${folderId}' in parents and trashed=false`)).length > 0) {
+          throw new DriveFormatError("MANIFEST_MISSING");
+        }
+        await writeManifest(folderId);
+        return folderId;
+      }
       const manifest = await (await request(`${FILES_URL}/${manifests[0].id}?alt=media`)).json();
       if (!manifest || manifest.formatVersion !== FORMAT_VERSION) throw new DriveFormatError("MANIFEST_VERSION");
       return folderId;
@@ -30652,6 +30788,14 @@ Content-Type: ${contentType}\r
             expiresAtMs = 0;
             resolve(null);
           }
+        },
+        // A closed or blocked popup never reaches `callback` above — GIS reports it only here.
+        // Without this, signIn() awaits forever: the choice screen's button stays disabled and every
+        // later header click just re-awaits the same dead in-flight request.
+        error_callback: () => {
+          const resolve = pending;
+          pending = null;
+          if (resolve) resolve(null);
         }
       });
       return tokenClient;
@@ -30738,6 +30882,14 @@ Content-Type: ${contentType}\r
       }
     }
     return purged;
+  }
+  var SYNC_FOLDER_KEY = "c-form-sync-folder-id";
+  async function bindSyncStateToFolder(folderId) {
+    const previous = localStorage.getItem(SYNC_FOLDER_KEY);
+    if (previous && previous !== folderId) {
+      await runRequest("syncState", "readwrite", (store) => store.clear());
+    }
+    localStorage.setItem(SYNC_FOLDER_KEY, folderId);
   }
 
   // src/sync/syncStores.js
@@ -31225,6 +31377,7 @@ Content-Type: ${contentType}\r
     async function runOnce() {
       setStatus({ phase: "syncing", error: null });
       const folderId = await drive.ensureFolder();
+      await bindSyncStateToFolder(folderId);
       await purgeExpiredTombstones(Date.now());
       let snapshot = await readLocalSnapshot();
       let state = await readSyncState();
@@ -31549,12 +31702,18 @@ Content-Type: ${contentType}\r
           return;
         }
         el.textContent = "";
-        await onSignIn();
+        try {
+          await onSignIn();
+        } catch {
+          el.textContent = "\u767B\u5165\u672A\u5B8C\u6210\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
       });
     }
     const statusEl = slot.querySelector("[data-sync-status]");
+    const syncNowButton = slot.querySelector('[data-action="sync-now"]');
     function update(nextStatus) {
       statusEl.textContent = formatSyncStatus(nextStatus);
+      if (syncNowButton) syncNowButton.textContent = nextStatus.error === "AUTH_EXPIRED" ? "\u91CD\u65B0\u767B\u5165" : "\u7ACB\u5373\u540C\u6B65";
       const light = syncLightState(nextStatus);
       if (light) statusEl.dataset.syncLight = light;
       else delete statusEl.dataset.syncLight;
@@ -31697,13 +31856,10 @@ Content-Type: ${contentType}\r
         mode,
         name: readDisplayName(),
         status: engine.getStatus(),
+        // A failed sign-in throws through to the guest header, which shows its own message.
         onSignIn: async () => {
-          try {
-            await auth.signIn();
-            startSyncing();
-          } catch (err) {
-            if (err.message !== "OFFLINE") header.update({ ...engine.getStatus(), error: "NETWORK" });
-          }
+          await auth.signIn();
+          startSyncing();
         },
         onSignOut: () => {
           auth.signOut();
@@ -31711,7 +31867,16 @@ Content-Type: ${contentType}\r
           setWriteListener(null);
           paintHeader("guest");
         },
-        onSyncNow: () => engine.runSync()
+        onSyncNow: async () => {
+          if (engine.getStatus().error === "AUTH_EXPIRED") {
+            try {
+              await auth.signIn();
+            } catch (err) {
+              return;
+            }
+          }
+          return engine.runSync();
+        }
       });
       if (mode === "guest" && wireBackup) {
         wireBackup(syncSlot.querySelector("#export-backup"), syncSlot.querySelector("#import-backup"));
