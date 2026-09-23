@@ -10,6 +10,7 @@ import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } fro
 import { processImportQueue } from './importQueue.js';
 import { keepScroll } from './keepScroll.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { toRocDate } from '../export/docxShared.js';
 import { wireScrollShade } from './scrollShade.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 
@@ -58,7 +59,7 @@ export async function renderChildListView(
           ${children
             .map(child => {
               const meta = child.birthDate
-                ? `${escapeHtml(child.birthDate)}　·　${calculateAgeInMonths(child.birthDate, today)} 個月`
+                ? `${escapeHtml(toRocDate(child.birthDate))}　·　${calculateAgeInMonths(child.birthDate, today)} 個月`
                 : '未填出生日期';
               return `<li class="card-list__row">
                   <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">

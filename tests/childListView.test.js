@@ -69,6 +69,7 @@ describe('renderChildListView', () => {
     await renderChildListView(container, { onSelectChild: () => {} });
 
     expect(container.textContent).toContain('陳小安');
+    expect(container.textContent).toContain('113/11/01');
   });
 
   it('shows a 新 badge on a child with an unseen imported form (assessment), not on a child without one', async () => {

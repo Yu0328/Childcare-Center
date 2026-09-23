@@ -22,7 +22,7 @@ export function formatSyncStatus(status) {
   // A first sync on a device with existing data can mean many round-trips to Drive; the plain
   // "同步中…" that's accurate for a normal quick sync reads as stuck when it runs for minutes.
   if (status.phase === 'syncing') {
-    return status.textSyncedAt ? '同步中…' : '首次同步中，可能需要幾分鐘，請稍候…';
+    return status.textSyncedAt ? '同步中…' : '首次同步中，請稍候…';
   }
   // A single rolled-up time would claim the photos made it too. Kept short for the mobile header
   // row — the honest "still missing photos" fact matters more here than the exact text-sync time.
