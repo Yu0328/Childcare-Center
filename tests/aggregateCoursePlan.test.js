@@ -183,6 +183,16 @@ describe('aggregateCoursePlanIntoForm', () => {
       expect(plan.unresolved).toEqual([]);
     });
 
+    it('Ⅵ 階段適性紀錄裡的 Ⅶ（延伸活動）項目屬於 Ⅵ，不列為對應不到', async () => {
+      const report = await addParentReport({ childId: child.id, tier: 'Ⅵ', period: '115年05月' });
+      const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅶ-1-1', activityName: '' });
+      await addCourseOccurrence({ entryId: entry.id, date: '2026-05-05', status: 'developed', absent: false, note: 'x' });
+
+      const plan = await planCoursePlanAggregation({ childId: child.id, tier: 'Ⅵ', reportIds: [report.id] });
+
+      expect(plan.unresolved).toEqual([]);
+    });
+
     it('applying a previously computed plan produces the exact same result as aggregateCoursePlanIntoForm', async () => {
       const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年01月' });
       const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });

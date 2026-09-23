@@ -71,6 +71,25 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
     expect(dates).toEqual(['2025-12-20', '2026-01-10']);
   });
 
+  it('25個月以上的總表大多是 Ⅶ（延伸活動）代碼時，整份仍判斷為 Ⅵ，每筆都歸 Ⅵ', async () => {
+    const indicators = getIndicatorsForTier('Ⅵ');
+    const entries = ['Ⅵ-1-1', 'Ⅶ-1-1', 'Ⅶ-1-2', 'Ⅶ-3-1'].map((indicatorCode, i) => ({
+      indicatorCode, date: `2026-05-0${i + 1}`, status: 'developed', note: `紀錄${i}`,
+    }));
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2023-11-01' },
+      form: { tier: 'Ⅵ', period: '115年05月' },
+      indicators,
+      entries,
+    });
+
+    const parsed = await parseDocxImport(blob);
+
+    expect(parsed.tier).toBe('Ⅵ');
+    expect(parsed.entries).toHaveLength(4);
+    expect(parsed.entries.every(e => e.tier === 'Ⅵ')).toBe(true);
+  });
+
   it('flags entries whose indicator code is not recognized', async () => {
     // Build a minimal .docx-shaped zip by hand so we can inject an unknown indicator code —
     // generateDocxBlob only ever emits real codes from src/data/indicators.js.
@@ -106,7 +125,7 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
 
     expect(parsed.entries).toHaveLength(1);
     expect(parsed.entries[0].description).toBeNull();
-    expect(parsed.warnings).toContain('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
+    expect(parsed.warnings.some(w => w.includes('無法對應到系統內建的指標：Ⅳ-9-9'))).toBe(true);
   });
 
   it('reads a real legacy 6-column document (no 備註 column) using the original code/date/note positions', async () => {

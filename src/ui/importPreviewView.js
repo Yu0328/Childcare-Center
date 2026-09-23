@@ -1,8 +1,11 @@
 import { addChild, listChildren, addForm, addEntry } from '../storage/db.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
+import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPeriodRange } from './periodFields.js';
+
+const BIRTH_DATE_FIELDS = { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' };
 
 function entryRow(entry, index) {
   const unresolved = !entry.description;
@@ -44,7 +47,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
       <h3 class="panel-form__title">幼兒基本資料</h3>
       <div class="panel-form__row">
         <label class="panel-form__field">姓名 <input data-field="name" value="${escapeHtml(parsed.child.name ?? '')}" required></label>
-        <label class="panel-form__field">出生日期 <input data-field="birthDate" type="date" value="${escapeHtml(parsed.child.birthDate ?? '')}" required></label>
+        <label class="panel-form__field">出生日期 ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS, value: parsed.child.birthDate })}</label>
       </div>
       <div class="panel-form__row">
         <label class="panel-form__field">
@@ -87,6 +90,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
   `;
 
   container.querySelector('[data-action="cancel"]').addEventListener('click', onCancel);
+  wireBirthDateSelects(container, BIRTH_DATE_FIELDS);
 
   container.querySelector('[data-field="period-is-range"]').addEventListener('change', event => {
     container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
@@ -97,7 +101,11 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
     const errorEl = container.querySelector('[data-error]');
 
     const name = container.querySelector('[data-field="name"]').value;
-    const birthDate = container.querySelector('[data-field="birthDate"]').value;
+    const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS);
+    if (!birthDate) {
+      container.querySelector('[data-error]').textContent = '請選擇完整的出生日期';
+      return;
+    }
     const tier = container.querySelector('[data-field="tier"]').value;
     const year = container.querySelector('[data-field="period-year"]').value;
     const month = container.querySelector('[data-field="period-month"]').value.padStart(2, '0');

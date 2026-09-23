@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
+import { getIndicator, normalizeIndicatorCode, unresolvedIndicatorWarning } from '../data/indicators.js';
 
 function cellText(cellXml) {
   return [...cellXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
@@ -105,7 +105,9 @@ function inferTier(rawEntries) {
   const counts = new Map();
   for (const entry of rawEntries) {
     if (!entry.indicatorCode) continue;
-    const prefix = entry.indicatorCode.split('-')[0];
+    // The indicator's own tier, not the raw code prefix: a 25個月以上 file is mostly Ⅶ-coded
+    // extension items, and "Ⅶ" is not a tier (see CODE_PREFIX_TIER in indicators.js).
+    const prefix = getIndicator(entry.indicatorCode)?.tier ?? entry.indicatorCode.split('-')[0];
     counts.set(prefix, (counts.get(prefix) || 0) + 1);
   }
   let best = null;
@@ -216,8 +218,9 @@ export async function parseDocxImport(data) {
     : new Date().getFullYear();
   const entries = resolveEntryDates(rawEntries, periodYear);
 
-  if (entries.some(entry => !entry.description)) {
-    warnings.push('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
+  const unresolvedCodes = [...new Set(entries.filter(entry => !entry.description).map(entry => entry.indicatorCode))];
+  if (unresolvedCodes.length > 0) {
+    warnings.push(unresolvedIndicatorWarning(unresolvedCodes));
   }
 
   return {

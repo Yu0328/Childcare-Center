@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { TIERS, normalizeIndicatorCode, getIndicator } from '../data/indicators.js';
+import { TIERS, normalizeIndicatorCode, getIndicator, unresolvedIndicatorWarning } from '../data/indicators.js';
 
 function flatJoinedText(xml) {
   return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
@@ -371,12 +371,13 @@ export async function parseMonthlyPlanDocxImport(data) {
 
   const { slotsByTier, children: childrenWithOverrides } = buildSlotsAndOverrides(parsedChildren);
 
-  const hasUnresolvedIndicator = [...slotsByTier.values()]
+  const unresolvedCodes = [...new Set([...slotsByTier.values()]
     .flat()
     .flatMap(slot => slot.items)
-    .some(item => item.indicatorCode && !getIndicator(item.indicatorCode));
-  if (hasUnresolvedIndicator) {
-    warnings.push('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
+    .filter(item => item.indicatorCode && !getIndicator(item.indicatorCode))
+    .map(item => item.indicatorCode))];
+  if (unresolvedCodes.length > 0) {
+    warnings.push(unresolvedIndicatorWarning(unresolvedCodes));
   }
 
   return {

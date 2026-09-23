@@ -28,7 +28,10 @@ describe('renderImportPreviewView', () => {
     renderImportPreviewView(container, { parsed: baseParsed(), onCancel: () => {}, onImported: () => {} });
 
     expect(container.querySelector('[data-field="name"]').value).toBe('陳小安');
-    expect(container.querySelector('[data-field="birthDate"]').value).toBe('2024-11-01');
+    // Year/month/day dropdowns, not the native date picker (see birthDateField.js for why).
+    expect(container.querySelector('[data-field="birthDate-year"]').value).toBe('2024');
+    expect(container.querySelector('[data-field="birthDate-month"]').value).toBe('11');
+    expect(container.querySelector('[data-field="birthDate-day"]').value).toBe('1');
     expect(container.querySelector('[data-field="tier"]').value).toBe('Ⅳ');
     expect(container.querySelector('[data-field="period-year"]').value).toBe('115');
     expect(container.querySelector('[data-field="period-month"]').value).toBe('1');
@@ -199,5 +202,22 @@ describe('renderImportPreviewView', () => {
 
     expect(imported).toBe(false);
     vi.restoreAllMocks();
+  });
+
+  it('檔案裡沒有出生日期時，沒選完整就不能匯入，並提示老師', async () => {
+    const container = document.createElement('div');
+    const onImported = vi.fn();
+    renderImportPreviewView(container, {
+      parsed: baseParsed({ child: { name: '陳小安', birthDate: '' } }),
+      onCancel: () => {},
+      onImported,
+    });
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => container.querySelector('[data-error]').textContent !== '');
+
+    expect(container.querySelector('[data-error]').textContent).toBe('請選擇完整的出生日期');
+    expect(onImported).not.toHaveBeenCalled();
+    expect(await listChildren()).toHaveLength(0);
   });
 });

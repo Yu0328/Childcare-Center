@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier } from '../src/data/indicators.js';
+import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier, normalizeIndicatorCode } from '../src/data/indicators.js';
 
 describe('indicator reference data', () => {
   it('has 6 tiers in order Ⅰ through Ⅵ', () => {
@@ -19,7 +19,10 @@ describe('indicator reference data', () => {
 
   it('every indicator code matches its tier and domain', () => {
     for (const indicator of INDICATORS) {
-      expect(indicator.code.startsWith(`${indicator.tier}-${indicator.domain}-`)).toBe(true);
+      // Ⅶ-x-y codes are 25個月以上's extension items, filed under tier Ⅵ.
+      const codeTier = indicator.code.startsWith('Ⅶ-') ? 'Ⅵ' : indicator.code.split('-')[0];
+      expect(codeTier).toBe(indicator.tier);
+      expect(indicator.code.split('-')[1]).toBe(String(indicator.domain));
     }
   });
 
@@ -37,7 +40,11 @@ describe('indicator reference data', () => {
   it('getIndicatorsForTier(\'Ⅵ\') combines the Ⅵ (base) and Ⅶ (延伸/進階) source codings under one 25個月以上 tier', () => {
     const indicators = getIndicatorsForTier('Ⅵ');
     expect(indicators).toHaveLength(41);
-    expect(indicators.every(i => i.tier === 'Ⅵ' || i.tier === 'Ⅶ')).toBe(true);
+    // Ⅶ is only a code prefix, not a tier of its own (TIERS stops at Ⅵ) — a Ⅶ-coded indicator
+    // reporting tier 'Ⅶ' made the 總表 importer file those entries into a separate, nonexistent
+    // "Ⅶ 階段" form, and made 彙整 flag them as not belonging to their own Ⅵ report.
+    expect(indicators.every(i => i.tier === 'Ⅵ')).toBe(true);
+    expect(indicators.some(i => i.code.startsWith('Ⅶ-'))).toBe(true);
     expect(indicators.every(i => i.noActivityName)).toBe(true);
   });
 
@@ -75,5 +82,16 @@ describe('indicator reference data', () => {
     expect(previousTier('Ⅱ')).toBe('Ⅰ');
     expect(previousTier('Ⅰ')).toBeNull();
     expect(previousTier('nope')).toBeNull();
+  });
+
+  it('把原始指引裡編號寫錯的 Ⅶ-2-3／Ⅶ-2-4 對應回 Ⅵ-2-3／Ⅵ-2-4（社會情緒沒有 Ⅶ 項目）', () => {
+    expect(normalizeIndicatorCode('Ⅶ-2-3')).toBe('Ⅵ-2-3');
+    expect(normalizeIndicatorCode('Ⅶ-2-4')).toBe('Ⅵ-2-4');
+    expect(getIndicator('Ⅶ-2-3')).toBe(getIndicator('Ⅵ-2-3'));
+    expect(normalizeIndicatorCode('Ⅶ-1-1')).toBe('Ⅶ-1-1');
+  });
+
+  it('之前被匯入成「Ⅶ 階段」的舊總表，仍然顯示 25個月以上 的完整指標', () => {
+    expect(getIndicatorsForTier('Ⅶ')).toEqual(getIndicatorsForTier('Ⅵ'));
   });
 });

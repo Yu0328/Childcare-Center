@@ -53,7 +53,7 @@ const RAW_DOMAINS = [
       ],
       // 25個月以上 (適性活動發展實施計畫-25個月 A4.docx). Ⅵ = 指標項次/發展活動 (base),
       // Ⅶ = 延伸(進階)活動 (extension/advanced) — both belong to the same "25個月以上／E表"
-      // tier (see TIER_DATA_KEYS below), kept as separate byTier keys only to preserve their
+      // tier (see CODE_PREFIX_TIER below), kept as separate byTier keys only to preserve their
       // original Ⅵ-x-y / Ⅶ-x-y codes from the source document. No activityName in this source.
       'Ⅵ': [
         ['會手心朝下丟球或東西', ''],
@@ -309,10 +309,11 @@ export const TIERS = [
 ];
 
 // Tier Ⅵ ("25個月以上") draws its indicators from two source-document codings — Ⅵ-x-y (base
-// 指標項次/發展活動) and Ⅶ-x-y (延伸/進階活動) — both selectable under the single Ⅵ tier/E表.
-// Every other tier code maps 1:1 to its own INDICATORS `tier` value, so only this one needs an
-// explicit multi-key entry.
-const TIER_DATA_KEYS = { 'Ⅵ': ['Ⅵ', 'Ⅶ'] };
+// 指標項次/發展活動) and Ⅶ-x-y (延伸/進階活動) — both under the single Ⅵ tier/E表. "Ⅶ" is only a
+// code prefix, never a tier: an indicator's `tier` is always a real TIERS code, since callers
+// (the 總表 importer's per-tier split, 彙整's off-tier check, tier majority votes) compare it
+// against one — a 'Ⅶ' there once filed entries into a nonexistent "Ⅶ 階段" form.
+const CODE_PREFIX_TIER = { 'Ⅶ': 'Ⅵ' };
 
 // The label to show for a tier wherever a "[letter]表" would normally appear: the lettered form
 // name for tiers Ⅱ-Ⅴ, or just the plain age range for tier Ⅰ (which has no letter). Callers should
@@ -340,7 +341,7 @@ export const INDICATORS = RAW_DOMAINS.flatMap(({ domain, name, subdomain, byTier
   Object.entries(byTier).flatMap(([tier, entries]) =>
     entries.map(([description, activityName], index) => ({
       code: `${tier}-${domain}-${index + 1}`,
-      tier,
+      tier: CODE_PREFIX_TIER[tier] || tier,
       domain,
       domainName: name,
       subdomain,
@@ -355,8 +356,10 @@ export const INDICATORS = RAW_DOMAINS.flatMap(({ domain, name, subdomain, byTier
 );
 
 export function getIndicatorsForTier(tierCode) {
-  const dataKeys = TIER_DATA_KEYS[tierCode] || [tierCode];
-  return INDICATORS.filter(indicator => dataKeys.includes(indicator.tier));
+  // A "Ⅶ" form can already exist on a device, filed by the importer before Ⅶ stopped being
+  // treated as a tier — it still gets the full 25個月以上 indicator set rather than an empty table.
+  const tier = CODE_PREFIX_TIER[tierCode] || tierCode;
+  return INDICATORS.filter(indicator => indicator.tier === tier);
 }
 
 // Bug fix: reference codes always use the Unicode ROMAN NUMERAL characters (Ⅰ Ⅱ Ⅲ Ⅳ Ⅴ, single
@@ -376,8 +379,14 @@ const LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
 // against real data to represent tier Ⅳ, same as the pure-ASCII "IV" case above.
 const MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
 
+// The official practice guide itself numbers 社會情緒's last two 25個月以上 items "Ⅶ-2-3"/"Ⅶ-2-4"
+// (see the 社會情緒 Ⅵ array above) — a slip in that document, copied into real files; they are
+// Ⅵ-2-3/Ⅵ-2-4, and no Ⅶ-2-x indicator exists.
+const MISNUMBERED_SOCIAL_PATTERN = /^Ⅶ-2-(3|4)$/;
+
 export function normalizeIndicatorCode(code) {
   if (MIXED_IV_PREFIX_PATTERN.test(code ?? '')) return 'Ⅳ' + code.slice(2);
+  if (MISNUMBERED_SOCIAL_PATTERN.test(code ?? '')) return 'Ⅵ' + code.slice(1);
   const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? '');
   if (!match) return code; // already Unicode, or unrecognized/garbled — leave untouched
   return LATIN_TIER_PREFIX_TO_UNICODE[match[1]] + code.slice(match[1].length);
@@ -388,4 +397,10 @@ export function normalizeIndicatorCode(code) {
 export function getIndicator(code) {
   const normalized = normalizeIndicatorCode(code);
   return INDICATORS.find(indicator => indicator.code === normalized);
+}
+
+// Names the offending codes so the teacher can find them in a 40-row preview (typically a typo in
+// the original Word file, e.g. a "Ⅶ" tier that doesn't exist) instead of scrolling to hunt for them.
+export function unresolvedIndicatorWarning(codes) {
+  return `以下指標代碼無法對應到系統內建的指標：${codes.join('、')}。這些項目匯入後可能無法正確顯示，建議確認後再匯入`;
 }

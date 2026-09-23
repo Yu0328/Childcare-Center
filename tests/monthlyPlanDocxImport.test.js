@@ -397,6 +397,6 @@ describe('parseMonthlyPlanDocxImport', () => {
     zip.file('word/document.xml', `<?xml version="1.0"?><w:document ${NS}><w:body>${tableXml}</w:body></w:document>`);
 
     const parsed = await parseMonthlyPlanDocxImport(await zip.generateAsync({ type: 'arraybuffer' }));
-    expect(parsed.warnings).toContain('部分指標代碼無法對應到系統內建的指標，這些項目匯入後可能無法正確顯示，建議確認後再匯入');
+    expect(parsed.warnings.some(w => w.includes('無法對應到系統內建的指標：Ⅴ-9-9'))).toBe(true);
   });
 });
