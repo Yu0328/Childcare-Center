@@ -10,8 +10,8 @@ function baseParsed(overrides = {}) {
     tier: 'Ⅳ',
     period: '115年01月',
     entries: [
-      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '可以來回穩定行走', description: '能獨立穩定行走' },
-      { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', achieved: false, note: '仍在練習', description: '能保持平衡撿拾地上物品' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走', description: '能獨立穩定行走' },
+      { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', status: 'developing', note: '仍在練習', description: '能保持平衡撿拾地上物品' },
     ],
     warnings: [],
     ...overrides,
@@ -115,7 +115,38 @@ describe('renderImportPreviewView', () => {
     expect(entries[0].indicatorCode).toBe('Ⅳ-1-1');
   });
 
-  it('maps each parsed entry\'s achieved flag to a status when saving', async () => {
+  it('紅字狀態與備註列：預覽顯示「請假」「備註」，存進同一份總表並保留活動名稱', async () => {
+    const container = document.createElement('div');
+    let imported = false;
+    const parsed = baseParsed({
+      entries: [
+        { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'absent', note: '家中有事', description: '能獨立穩定行走', tier: 'Ⅳ' },
+        { indicatorCode: 'Ⅲ-1-1', date: '2025-12-03', status: 'developing', note: '上一階段', description: 'z', tier: null, isRemark: true },
+        { indicatorCode: '自訂標籤', date: '', status: 'developed', note: '', description: null, tier: null, activityName: '我長大了', isRemark: true },
+      ],
+    });
+    renderImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+
+    expect(container.textContent).toContain('請假');
+    expect(container.textContent).toContain('我長大了');
+    expect(container.textContent).not.toContain('建議取消勾選');
+    expect(container.querySelectorAll('.import-preview__entry-remark')).toHaveLength(2);
+
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const children = await listChildren();
+    const forms = await listFormsForChild(children[0].id);
+    expect(forms).toHaveLength(1);
+    const entries = await listEntriesForForm(forms[0].id);
+    expect(entries.map(({ indicatorCode, date, status, activityName }) => ({ indicatorCode, date, status, activityName }))).toEqual([
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'absent', activityName: undefined },
+      { indicatorCode: 'Ⅲ-1-1', date: '2025-12-03', status: 'developing', activityName: undefined },
+      { indicatorCode: '自訂標籤', date: '', status: 'developed', activityName: '我長大了' },
+    ]);
+  });
+
+  it('saves each parsed entry\'s status', async () => {
     const container = document.createElement('div');
     let imported = false;
     renderImportPreviewView(container, { parsed: baseParsed(), onCancel: () => {}, onImported: () => { imported = true; } });
@@ -171,9 +202,9 @@ describe('renderImportPreviewView', () => {
     const parsed = baseParsed({
       tier: 'Ⅴ',
       entries: [
-        { indicatorCode: 'Ⅴ-1-1', date: '2026-01-07', achieved: true, note: 'V的', description: 'x', tier: 'Ⅴ' },
+        { indicatorCode: 'Ⅴ-1-1', date: '2026-01-07', status: 'developed', note: 'V的', description: 'x', tier: 'Ⅴ' },
         // Not yet developed into tier Ⅴ, so this observation is genuinely against a Ⅳ indicator.
-        { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', achieved: false, note: '尚未發展', description: 'y', tier: 'Ⅳ' },
+        { indicatorCode: 'Ⅳ-1-2', date: '2026-01-07', status: 'developing', note: '尚未發展', description: 'y', tier: 'Ⅳ' },
       ],
     });
     renderImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });

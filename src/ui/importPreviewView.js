@@ -7,16 +7,22 @@ import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPe
 
 const BIRTH_DATE_FIELDS = { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' };
 
+const STATUS_MARKS = { developed: '○', developing: '△', absent: '（請假）', courseChanged: '（更換課程）' };
+
+// A 備註 row's code is often another tier's or free text by design (see docxImport.js), so it
+// never gets the "can't match" warning — it shows its own activityName instead when it has one.
 function entryRow(entry, index) {
-  const unresolved = !entry.description;
+  const unresolved = !entry.description && !entry.isRemark;
+  const description = entry.description || entry.activityName || '';
   return `
     <li class="import-preview__entry${unresolved ? ' import-preview__entry--warning' : ''}">
       <label>
         <input type="checkbox" data-entry-include="${index}" checked>
+        ${entry.isRemark ? '<span class="import-preview__entry-remark">備註</span>' : ''}
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
-        ${entry.description ? escapeHtml(entry.description) : '（無法對應到系統指標，建議取消勾選）'}
+        ${unresolved ? '（無法對應到系統指標，建議取消勾選）' : escapeHtml(description)}
         —
-        ${escapeHtml(entry.date)}${entry.achieved ? '○' : '△'}
+        ${escapeHtml(entry.date)}${STATUS_MARKS[entry.status] ?? ''}
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>
@@ -145,8 +151,9 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
             formId: form.id,
             indicatorCode: entry.indicatorCode,
             date: entry.date,
-            status: entry.achieved ? 'developed' : 'developing',
+            status: entry.status,
             note: entry.note,
+            activityName: entry.activityName,
           });
         }
       }

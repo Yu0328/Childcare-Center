@@ -30,11 +30,11 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
 
     const ivOneOne = parsed.entries.filter(e => e.indicatorCode === 'Ⅳ-1-1');
     expect(ivOneOne).toHaveLength(2);
-    expect(ivOneOne[0]).toMatchObject({ date: '2026-01-07', achieved: true, note: '可以來回穩定行走' });
-    expect(ivOneOne[1]).toMatchObject({ date: '2026-02-26', achieved: true, note: '可穩定行走至戶外遊戲場' });
+    expect(ivOneOne[0]).toMatchObject({ date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
+    expect(ivOneOne[1]).toMatchObject({ date: '2026-02-26', status: 'developed', note: '可穩定行走至戶外遊戲場' });
 
     const ivOneTwo = parsed.entries.find(e => e.indicatorCode === 'Ⅳ-1-2');
-    expect(ivOneTwo).toMatchObject({ date: '2026-01-07', achieved: false, note: '仍在練習中' });
+    expect(ivOneTwo).toMatchObject({ date: '2026-01-07', status: 'developing', note: '仍在練習中' });
   });
 
   it('does not import indicators with no recorded entries (blank placeholder rows)', async () => {
@@ -88,6 +88,63 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
     expect(parsed.tier).toBe('Ⅵ');
     expect(parsed.entries).toHaveLength(4);
     expect(parsed.entries.every(e => e.tier === 'Ⅵ')).toBe(true);
+  });
+
+  it('請假／更換課程的紅字列匯入後還原成原本的狀態，說明不帶前綴', async () => {
+    const entries = [
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'absent', note: '' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-14', status: 'absent', note: '家中有事' },
+      { indicatorCode: 'Ⅳ-1-2', date: '2026-01-21', status: 'courseChanged', note: '改上音樂課' },
+    ];
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries,
+    });
+
+    const parsed = await parseDocxImport(blob);
+
+    expect(parsed.entries.map(({ indicatorCode, date, status, note }) => ({ indicatorCode, date, status, note }))).toEqual(entries);
+  });
+
+  it('備註區的每一列都讀得回來，歸在這份總表，不列入對應不到的警告', async () => {
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '主表' }],
+      previousTierEntries: [
+        { indicatorCode: 'Ⅲ-1-1', date: '2025-12-03', status: 'developing', note: '上一階段未完成' },
+        { indicatorCode: '自訂標籤', activityName: '我長大了', date: '2026-01-09', status: 'absent', note: '' },
+        { indicatorCode: 'Ⅱ-2-1', date: '', status: 'developed', note: '沒有日期的備註' },
+      ],
+    });
+
+    const parsed = await parseDocxImport(blob);
+
+    expect(parsed.warnings).toEqual([]);
+    expect(parsed.tier).toBe('Ⅳ');
+    const remarks = parsed.entries.filter(e => e.isRemark);
+    expect(remarks.map(({ indicatorCode, activityName, date, status, note, tier }) => ({ indicatorCode, activityName, date, status, note, tier }))).toEqual([
+      { indicatorCode: 'Ⅲ-1-1', activityName: undefined, date: '2025-12-03', status: 'developing', note: '上一階段未完成', tier: null },
+      { indicatorCode: '自訂標籤', activityName: '我長大了', date: '2026-01-09', status: 'absent', note: '', tier: null },
+      { indicatorCode: 'Ⅱ-2-1', activityName: undefined, date: '', status: 'developed', note: '沒有日期的備註', tier: null },
+    ]);
+    expect(parsed.entries.filter(e => !e.isRemark)).toHaveLength(1);
+  });
+
+  it('沒有備註時，備註區的空白占位列不會被匯入', async () => {
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '主表' }],
+    });
+
+    const parsed = await parseDocxImport(blob);
+
+    expect(parsed.entries.some(e => e.isRemark)).toBe(false);
   });
 
   it('flags entries whose indicator code is not recognized', async () => {
@@ -162,7 +219,7 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
     const parsed = await parseDocxImport(buffer);
 
     expect(parsed.entries).toHaveLength(1);
-    expect(parsed.entries[0]).toMatchObject({ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', achieved: true, note: '六欄舊格式備註' });
+    expect(parsed.entries[0]).toMatchObject({ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '六欄舊格式備註' });
   });
 
   it('flags missing header info instead of throwing', async () => {

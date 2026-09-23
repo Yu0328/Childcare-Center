@@ -104,7 +104,7 @@ async function findHeaderInfo(zip) {
 function inferTier(rawEntries) {
   const counts = new Map();
   for (const entry of rawEntries) {
-    if (!entry.indicatorCode) continue;
+    if (!entry.indicatorCode || entry.isRemark) continue; // a 備註 row is often another tier's code by design
     // The indicator's own tier, not the raw code prefix: a 25個月以上 file is mostly Ⅶ-coded
     // extension items, and "Ⅶ" is not a tier (see CODE_PREFIX_TIER in indicators.js).
     const prefix = getIndicator(entry.indicatorCode)?.tier ?? entry.indicatorCode.split('-')[0];
@@ -121,6 +121,21 @@ function inferTier(rawEntries) {
   return best;
 }
 
+// The exporter prints a flagged (請假/更換課程) row's date with no ○/△ and prefixes its note with
+// the label instead (see docxExport.js formatNoteCell) — reverse that here. A note that was empty
+// or already exactly the label prints identically, so either comes back as an empty note.
+const FLAGGED_NOTE_LABELS = [['請假', 'absent'], ['更換課程', 'courseChanged']];
+
+function statusAndNote(dateCell, note) {
+  if (dateCell.includes('○')) return { status: 'developed', note };
+  if (!dateCell.includes('△')) {
+    for (const [label, status] of FLAGGED_NOTE_LABELS) {
+      if (note.startsWith(label)) return { status, note: note.slice(label.length).replace(/^[\s　]+/, '') };
+    }
+  }
+  return { status: 'developing', note };
+}
+
 // A real legacy sample (陳小安C表-2.docx, 林浩宇-C表-...彙整.docx) has 6 columns: 發展領域/領域範疇/
 // 指標項次/發展活動/課程實施日期/課程實施記錄, code at index 2. Our own exporter (see docxExport.js)
 // now also writes a 備註 column right after 領域範疇 (7 columns total), shifting code/date/note each
@@ -131,9 +146,32 @@ function parseBodyRows(documentXml) {
   const bodyRows = rowsOf(documentXml).slice(2); // the first two rows are the fixed table header
   const rawEntries = [];
   let lastCode = null;
+  let inRemarkSection = false;
 
   for (const rowXml of bodyRows) {
     const cells = cellsForRow(rowXml);
+
+    // Our own exporter's 備註 section (see docxExport.js remarkRow): 發展領域/領域範疇 merge into
+    // one "備註" label cell, so each row has 5 cells — label, code, description, date, note. The
+    // label only prints on the first row; every 5-cell row after it belongs to the section too.
+    if (cells.length === 5 && (inRemarkSection || cells[0] === '備註')) {
+      inRemarkSection = true;
+      const [, codeCell, description, dateCell, noteCell] = cells;
+      if (!codeCell && !description && !dateCell && !noteCell) continue; // the always-present blank row
+      const dateMatch = /^(\d{1,2})\/(\d{1,2})/.exec(dateCell);
+      const indicatorCode = normalizeIndicatorCode(codeCell);
+      rawEntries.push({
+        indicatorCode,
+        month: dateMatch ? Number(dateMatch[1]) : null,
+        day: dateMatch ? Number(dateMatch[2]) : null,
+        ...statusAndNote(dateCell, noteCell),
+        // Only a code with no indicator of its own prints its activityName in the description
+        // column (see generateDocxBlob), so that's the only case it needs restoring.
+        activityName: getIndicator(indicatorCode) ? undefined : description || undefined,
+        isRemark: true,
+      });
+      continue;
+    }
     if (cells.length < 6) continue;
 
     const hasRemarkColumn = cells.length >= 7;
@@ -155,8 +193,7 @@ function parseBodyRows(documentXml) {
       indicatorCode: code,
       month: Number(dateMatch[1]),
       day: Number(dateMatch[2]),
-      achieved: dateCell.includes('○'),
-      note,
+      ...statusAndNote(dateCell, note),
     });
   }
 
@@ -169,11 +206,23 @@ function parseBodyRows(documentXml) {
 // That assumption only holds *within one indicator's own entries* (rows are grouped by indicator,
 // so indicator B's first entry can easily have an earlier month than indicator A's last entry
 // without any year having passed) — so the month/year tracking is scoped per indicator code.
-function resolveEntryDates(rawEntries, periodYear) {
+function resolveEntryDates(rawEntries, periodYear, periodEnd) {
   const currentYearByIndicator = new Map();
   const lastMonthByIndicator = new Map();
 
-  return rawEntries.map(({ indicatorCode, month, day, achieved, note }) => {
+  return rawEntries.map(({ indicatorCode, month, day, status, note, activityName, isRemark }) => {
+    const indicator = getIndicator(indicatorCode);
+    // A 備註 row can be undated (the remark form doesn't require one), and belongs to this form
+    // itself whatever its code — see the tier comment below.
+    // Its date can't use the per-indicator rolling below either: 備註 rows aren't in the main
+    // table's chronological order, and are mostly a previous tier's entries from before this
+    // period — so each takes the latest year that doesn't put it after the period's end.
+    if (isRemark) {
+      const year = month === null ? null : month > periodEnd.month ? periodEnd.year - 1 : periodEnd.year;
+      const date = year === null ? '' : `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return { indicatorCode, date, status, note, description: indicator ? indicator.description : null, tier: null, activityName, isRemark };
+    }
+
     let currentYear = currentYearByIndicator.get(indicatorCode) ?? periodYear;
     const lastMonth = lastMonthByIndicator.get(indicatorCode) ?? null;
 
@@ -182,17 +231,19 @@ function resolveEntryDates(rawEntries, periodYear) {
     currentYearByIndicator.set(indicatorCode, currentYear);
     lastMonthByIndicator.set(indicatorCode, month);
 
-    const indicator = getIndicator(indicatorCode);
     return {
       indicatorCode,
       date: `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-      achieved,
+      status,
       note,
       description: indicator ? indicator.description : null,
       // The entry's own tier, read off its indicator code — not necessarily the document's
       // overall (majority-vote) tier: a child not yet developed into every current-tier
       // indicator can have entries genuinely recorded against an earlier tier's codes.
-      tier: indicator ? indicator.tier : null,
+      // A 備註 row stays with this form (null → the form's own tier on import): it came from this
+      // form's 備註 section, and its code not being one of this tier's is what puts it back there.
+      tier: isRemark ? null : indicator ? indicator.tier : null,
+      ...(isRemark ? { activityName, isRemark } : {}),
     };
   });
 }
@@ -216,9 +267,14 @@ export async function parseDocxImport(data) {
   const periodYear = headerInfo.period
     ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911
     : new Date().getFullYear();
-  const entries = resolveEntryDates(rawEntries, periodYear);
+  // A range period's end ("114年08月-115年04月" → 115年04月); a single month is its own end.
+  const periodEndMatch = /(\d+)年(\d+)月$/.exec(headerInfo.period ?? '');
+  const periodEnd = periodEndMatch
+    ? { year: Number(periodEndMatch[1]) + 1911, month: Number(periodEndMatch[2]) }
+    : { year: periodYear, month: 12 };
+  const entries = resolveEntryDates(rawEntries, periodYear, periodEnd);
 
-  const unresolvedCodes = [...new Set(entries.filter(entry => !entry.description).map(entry => entry.indicatorCode))];
+  const unresolvedCodes = [...new Set(entries.filter(entry => !entry.description && !entry.isRemark).map(entry => entry.indicatorCode))];
   if (unresolvedCodes.length > 0) {
     warnings.push(unresolvedIndicatorWarning(unresolvedCodes));
   }

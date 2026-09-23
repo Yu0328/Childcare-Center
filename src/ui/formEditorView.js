@@ -98,7 +98,7 @@ function indicatorBlock(indicator, entries) {
 // original activity label isn't just missing on screen when the code doesn't resolve.
 function remarkBlock(entry) {
   const indicator = getIndicator(entry.indicatorCode);
-  const mark = entry.status === 'developed' ? '○' : '△';
+  const mark = FLAGGED_STATUS_LABELS[entry.status] ? '' : entry.status === 'developed' ? '○' : '△';
   return `
     <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
       <div class="entry-row__top">
@@ -113,7 +113,7 @@ function remarkBlock(entry) {
         }
       </div>
       <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
-      <p class="entry-row__note">${escapeHtml(entry.note)}</p>
+      <p class="entry-row__note">${noteLineHtml(entry)}</p>
       ${
         entry.isLocal
           ? `<div class="entry-form" data-remark-edit-form-for="${escapeHtml(entry.id)}" hidden>
@@ -150,11 +150,22 @@ async function previousTierDevelopingEntries(childId, tier) {
 // whose indicator code doesn't match one of this tier's own indicators at all (isLocal: true) —
 // either because 彙整 filed an unresolvable one here as-is (see aggregateCoursePlan.js), or
 // because the teacher added it directly via the 備註 section's own "＋ 新增備註" form.
+// A previous-tier entry this form also holds its own copy of (e.g. both forms were imported from
+// Word, where this form's 備註 section carried it) is listed once, as the editable own copy. The
+// year is left out of the match: Word only prints MM/DD, so the two imports can infer different
+// years for the very same record.
+function remarkMatchKey(entry) {
+  return [entry.indicatorCode, String(entry.date ?? '').slice(5), entry.status, (entry.note ?? '').trim()].join('|');
+}
+
 async function remarkEntries(childId, tier, ownEntries, ownIndicatorCodes) {
-  const previousTierEntries = (await previousTierDevelopingEntries(childId, tier)).map(entry => ({ ...entry, isLocal: false }));
   const ownOrphaned = ownEntries
     .filter(entry => !ownIndicatorCodes.has(entry.indicatorCode))
     .map(entry => ({ ...entry, isLocal: true }));
+  const ownKeys = new Set(ownOrphaned.map(remarkMatchKey));
+  const previousTierEntries = (await previousTierDevelopingEntries(childId, tier))
+    .filter(entry => !ownKeys.has(remarkMatchKey(entry)))
+    .map(entry => ({ ...entry, isLocal: false }));
   return [...previousTierEntries, ...ownOrphaned];
 }
 

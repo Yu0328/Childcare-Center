@@ -131,10 +131,11 @@ const FLAGGED_STATUS_LABELS = { absent: '請假', courseChanged: '更換課程' 
 const FLAGGED_TEXT_COLOR = 'C00000';
 
 // Entries are stored as YYYY-MM-DD (see storage/db.js addEntry); the printed form uses MM/DD.
+// An undated 備註 entry (the remark form doesn't require a date) still prints its glyph alone, so
+// its status isn't lost on paper or on re-import.
 function formatDateCell(row) {
-  if (!row.date) return '';
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date);
-  const formatted = match ? `${match[2]}/${match[3]}` : row.date;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date ?? '');
+  const formatted = match ? `${match[2]}/${match[3]}` : row.date ?? '';
   const glyph = row.status === 'developed' ? '○' : row.status === 'developing' ? '△' : '';
   return `${formatted}${glyph}`;
 }

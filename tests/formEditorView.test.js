@@ -210,6 +210,20 @@ describe('renderFormEditorView', () => {
     expect(remarkSection.textContent).not.toContain('已完成');
   });
 
+  it('上一階段的總表和這份總表匯入的備註是同一筆時，備註只出現一次（保留這份自己的）', async () => {
+    const previousForm = await addForm({ childId: child.id, tier: 'Ⅲ', period: '114年10月' });
+    await addEntry({ formId: previousForm.id, indicatorCode: 'Ⅲ-1-1', date: '2025-10-05', status: 'developing', note: '仍在練習' });
+    // Word only prints MM/DD, so this form's imported copy can come back with a different year.
+    const own = await addEntry({ formId: form.id, indicatorCode: 'Ⅲ-1-1', date: '2026-10-05', status: 'developing', note: '仍在練習' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    const remarkSection = container.querySelector('[data-remark-section]');
+    expect(remarkSection.textContent.match(/仍在練習/g)).toHaveLength(1);
+    expect(remarkSection.querySelector(`[data-delete-remark="${own.id}"]`)).not.toBeNull();
+  });
+
   it('shows an unresolved-code entry left on this same form (e.g. by 彙整) in 備註 too, editable/deletable from here, without crashing the main table\'s own delete/edit wiring for it', async () => {
     const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-9-9', date: '2026-01-05', status: 'developed', note: '無法對應到系統指標', activityName: '我大大了' });
 
