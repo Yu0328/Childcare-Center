@@ -295,9 +295,8 @@ button {
   }
 }
 
-/* The guest status row only holds an occasional message (e.g. "目前離線"), so it takes no space
-   until there is one. */
-.sync-header__status-row:not(:has(.sync-header__actions)):has(> .sync-header__status:empty) {
+/* The status row only holds the status text, so it takes no space until there is some. */
+.sync-header__status-row:has(> .sync-header__status:empty) {
   display: none;
 }
 
@@ -349,6 +348,10 @@ button {
   .sync-header__greeting-row,
   .sync-header__status-row {
     display: contents;
+  }
+  /* The buttons live in the greeting row (for the mobile layout) but belong after the status here. */
+  .sync-header__actions {
+    order: 1;
   }
 }
 

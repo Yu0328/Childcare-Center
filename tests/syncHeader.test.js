@@ -108,6 +108,16 @@ describe('renderSyncHeader', () => {
     expect(menu.contains(slot.querySelector('#import-backup'))).toBe(true);
   });
 
+  it('登入後「立即同步／登出」跟問候語同一排，狀態文字自己一排', () => {
+    renderSyncHeader(slot, {
+      mode: 'google', name: '小美', status: idle, onSignIn: () => {}, onSignOut: () => {},
+    });
+    const row = slot.querySelector('.sync-header__greeting-row');
+    expect(row.querySelector('[data-action="sync-now"]')).toBeTruthy();
+    expect(row.querySelector('[data-action="sync-sign-out"]')).toBeTruthy();
+    expect(slot.querySelector('.sync-header__status-row').children).toHaveLength(1);
+  });
+
   it('登入 google 模式不顯示匯出/匯入備份按鈕', () => {
     renderSyncHeader(slot, {
       mode: 'google', name: '小美', status: idle,

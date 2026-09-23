@@ -45,8 +45,8 @@ function syncLightState(status) {
   return null;
 }
 
-// The greeting sits on its own row above the status/action row (rather than sharing it with the
-// status text) so a long status message never crowds it — see docs/superpowers/specs et al. for
+// Greeting and buttons share the top row; the status text gets a row of its own so a long status
+// message never crowds the buttons or wraps into several lines — see docs/superpowers/specs et al. for
 // the original "同步和用戶名差那欄會讓按鈕跑掉" report. Google mode greets by the account's given
 // name; guest mode still gets the same row with a generic "訪客" placeholder rather than skipping
 // it, so the header keeps the same two-row shape either way. On wide screens the two rows collapse
@@ -56,13 +56,15 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
 
   if (mode === 'google') {
     slot.innerHTML = `
-      <div class="sync-header__greeting-row">${greeting}</div>
-      <div class="sync-header__status-row">
-        <span class="sync-header__status" data-sync-status></span>
+      <div class="sync-header__greeting-row">
+        ${greeting}
         <div class="sync-header__actions">
           <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="檢查另一台裝置是否有新資料">立即同步</button>
           <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">登出</button>
         </div>
+      </div>
+      <div class="sync-header__status-row">
+        <span class="sync-header__status" data-sync-status></span>
       </div>
     `;
     slot.querySelector('[data-action="sync-sign-out"]').addEventListener('click', onSignOut);
