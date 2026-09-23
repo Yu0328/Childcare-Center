@@ -115,18 +115,32 @@ export function mountApp(container, { onUnlock, gate } = {}) {
     runView(() => renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }));
   }
 
+  // Only live once the app proper has been entered: on the password screen (or the hosted
+  // build's sign-in choice screen) it would jump straight past them, and on the sync conflict
+  // screen it would strand the sync waiting on an answer that can never come.
+  let entered = false;
   const homeButton = document.getElementById('home-button');
-  if (homeButton) homeButton.addEventListener('click', showReportTypeSelect);
+  if (homeButton) {
+    homeButton.addEventListener('click', () => {
+      if (!entered || container.querySelector('.conflict-view')) return;
+      showReportTypeSelect();
+    });
+  }
 
   // The hosted build passes a `gate` so the sign-in choice screen can run between the password
   // gate and the app. Kept as an injected hook rather than an import so the offline build's
   // bundle contains no login or sync code at all.
+  function enter() {
+    entered = true;
+    showReportTypeSelect();
+  }
+
   function start() {
     if (gate) {
-      gate(container, { onDone: showReportTypeSelect });
+      gate(container, { onDone: enter });
       return;
     }
-    showReportTypeSelect();
+    enter();
   }
 
   function handleUnlock() {

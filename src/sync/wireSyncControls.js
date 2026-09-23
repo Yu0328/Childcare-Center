@@ -53,13 +53,10 @@ export function wireSyncControls({
       mode,
       name: readDisplayName(),
       status: engine.getStatus(),
+      // A failed sign-in throws through to the guest header, which shows its own message.
       onSignIn: async () => {
-        try {
-          await auth.signIn();
-          startSyncing();
-        } catch (err) {
-          if (err.message !== 'OFFLINE') header.update({ ...engine.getStatus(), error: 'NETWORK' });
-        }
+        await auth.signIn();
+        startSyncing();
       },
       onSignOut: () => {
         auth.signOut();
@@ -67,7 +64,16 @@ export function wireSyncControls({
         setWriteListener(null);
         paintHeader('guest');
       },
-      onSyncNow: () => engine.runSync(),
+      onSyncNow: async () => {
+        if (engine.getStatus().error === 'AUTH_EXPIRED') {
+          try {
+            await auth.signIn();
+          } catch (err) {
+            return; // cancelled or offline — the header keeps showing 登入已失效 with the same button
+          }
+        }
+        return engine.runSync();
+      },
     });
     if (mode === 'guest' && wireBackup) {
       wireBackup(syncSlot.querySelector('#export-backup'), syncSlot.querySelector('#import-backup'));

@@ -109,6 +109,20 @@ describe('runSync', () => {
     expect(await listChildren()).toEqual([]);
   });
 
+  it('換成另一個雲端資料夾（換 Google 帳號、或資料夾被整個刪掉重建）時，不會把本機資料當成已刪除', async () => {
+    // 同一台裝置先用帳號 A 同步過（每筆都有同步基準），登出後改用帳號 B 登入：B 的雲端是空的新資料夾。
+    // 若沿用 A 的同步基準，「本機有、雲端沒有、有基準」會被判成「雲端刪掉了」，把本機資料全部刪光。
+    await addChild({ name: '測試童', birthDate: '2024-01-01' });
+    const driveA = fakeDrive();
+    await createSyncEngine({ drive: driveA, resolveConflicts: async () => [] }).runSync();
+
+    const driveB = { ...fakeDrive(), ensureFolder: async () => 'folder-2' };
+    await createSyncEngine({ drive: driveB, resolveConflicts: async () => [] }).runSync();
+
+    expect((await listChildren()).map(c => c.name)).toEqual(['測試童']);
+    expect([...driveB.files.values()].map(f => f.payload.name)).toEqual(['測試童']);
+  });
+
   it('兩邊改了不同欄位時自動合併，不問使用者', async () => {
     const child = await addChild({ name: '測試童', birthDate: '2024-01-01' });
     const drive = fakeDrive();

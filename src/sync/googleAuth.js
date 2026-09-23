@@ -94,6 +94,14 @@ export function createGoogleAuth({
           resolve(null);
         }
       },
+      // A closed or blocked popup never reaches `callback` above — GIS reports it only here.
+      // Without this, signIn() awaits forever: the choice screen's button stays disabled and every
+      // later header click just re-awaits the same dead in-flight request.
+      error_callback: () => {
+        const resolve = pending;
+        pending = null;
+        if (resolve) resolve(null);
+      },
     });
     return tokenClient;
   }

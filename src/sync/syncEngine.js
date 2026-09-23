@@ -1,6 +1,6 @@
 import { newUid, runRequest, putRecord } from '../storage/dbCore.js';
 import {
-  readSyncState, writeSyncState, deleteSyncState,
+  readSyncState, writeSyncState, deleteSyncState, bindSyncStateToFolder,
   listTombstones, deleteTombstone, purgeExpiredTombstones,
 } from '../storage/syncStateDb.js';
 import { readLocalSnapshot, applyRemoteRecord, deleteLocalByUid, adoptUid } from './localSnapshot.js';
@@ -59,6 +59,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     setStatus({ phase: 'syncing', error: null });
 
     const folderId = await drive.ensureFolder();
+    await bindSyncStateToFolder(folderId);
     await purgeExpiredTombstones(Date.now());
 
     let snapshot = await readLocalSnapshot();

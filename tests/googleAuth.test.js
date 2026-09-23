@@ -10,14 +10,17 @@ import { AuthExpiredError } from '../src/sync/driveClient.js';
 function fakeGis() {
   const calls = [];
   let callback = null;
+  let errorCallback = null;
   return {
     calls,
     respond: response => callback(response),
+    fail: error => errorCallback(error),
     loadGis: async () => ({
       accounts: {
         oauth2: {
           initTokenClient: config => {
             callback = config.callback;
+            errorCallback = config.error_callback;
             return { requestAccessToken: options => calls.push(options || {}) };
           },
         },
@@ -51,6 +54,21 @@ describe('createGoogleAuth', () => {
     createGoogleAuth({ clientId: 'test-client', loadGis });
 
     await vi.waitFor(() => expect(loadGis).toHaveBeenCalledTimes(1));
+  });
+
+  it('使用者直接關掉 Google 登入視窗時，signIn 會結束而不是永遠卡住，之後還能再按一次', async () => {
+    // GIS 在視窗被關掉／被瀏覽器擋掉時只會呼叫 error_callback，不會呼叫 callback。沒接住的話 signIn
+    // 永遠不會結束：登入按鈕一直停在停用狀態，之後每次點擊也都只是在等那個永遠不會回來的請求。
+    const gis = fakeGis();
+    const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
+
+    const first = auth.signIn();
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
+    gis.fail({ type: 'popup_closed' });
+    await expect(first).rejects.toThrow('SIGN_IN_CANCELLED');
+
+    auth.signIn().catch(() => {});
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(2));
   });
 
   it('離線時 signIn 直接失敗，不去打 Google', async () => {

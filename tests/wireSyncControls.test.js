@@ -21,7 +21,7 @@ function fakeEngine(overrides = {}) {
   return {
     runSync: overrides.runSync || (async () => idleStatus),
     scheduleSync: overrides.scheduleSync || (() => {}),
-    getStatus: () => idleStatus,
+    getStatus: overrides.getStatus || (() => idleStatus),
   };
 }
 
@@ -135,6 +135,40 @@ describe('wireSyncControls', () => {
 
     syncSlot.querySelector('[data-action="sync-now"]').click();
     expect(runSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('登入逾時（登入已失效）時，「立即同步」按鈕變成「重新登入」，點了會重新登入再同步', async () => {
+    // Google 的存取權杖大約一小時就過期，背景自動續用沒有使用者點擊、常被瀏覽器擋掉，於是標題列顯示
+    // 「登入已失效，請重新登入」——但 google 模式的標題列原本只有「立即同步」跟「登出」，沒有地方可以
+    // 重新登入，只能先登出再登入。
+    writeSyncMode('google');
+    const signIn = vi.fn(async () => ({ name: '小美' }));
+    const runSync = vi.fn().mockResolvedValue(idleStatus);
+    let status = idleStatus;
+    let fakeEngineRef;
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: fakeAuthFactory({ signIn }), createDrive: () => ({}),
+      createEngine: ({ onStatus }) => {
+        const engine = fakeEngine({ runSync, getStatus: () => status });
+        engine.expire = () => { status = { ...idleStatus, phase: 'auth', error: 'AUTH_EXPIRED' }; onStatus(status); };
+        fakeEngineRef = engine;
+        return engine;
+      },
+    });
+
+    await controls.gate(container, { onDone: () => {} });
+    await clickSignIn(container, syncSlot);
+    await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(1));
+    expect(signIn).toHaveBeenCalledTimes(1);
+
+    fakeEngineRef.expire();
+    const button = syncSlot.querySelector('[data-action="sync-now"]');
+    expect(button.textContent).toBe('重新登入');
+
+    button.click();
+    await vi.waitFor(() => expect(runSync).toHaveBeenCalledTimes(2));
+    expect(signIn).toHaveBeenCalledTimes(2);
   });
 
   it('分頁一直開著、沒有切換或重整時，過一段時間仍會自動再檢查一次', async () => {

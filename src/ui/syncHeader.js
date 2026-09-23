@@ -92,14 +92,25 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
         return;
       }
       el.textContent = '';
-      await onSignIn();
+      // Shown here rather than as a sync status: a guest has nothing syncing, so the generic
+      // "同步失敗，稍後會自動重試" would promise a retry that never comes.
+      try {
+        await onSignIn();
+      } catch {
+        el.textContent = '登入未完成，請再試一次';
+      }
     });
   }
 
   const statusEl = slot.querySelector('[data-sync-status]');
+  const syncNowButton = slot.querySelector('[data-action="sync-now"]');
 
   function update(nextStatus) {
     statusEl.textContent = formatSyncStatus(nextStatus);
+    // An expired login can only be fixed by a click (a popup outside a click gets blocked), and
+    // this header otherwise offers only 登出 — so the sync button doubles as the re-login button.
+    // wireSyncControls' onSyncNow does the actual sign-in for this state.
+    if (syncNowButton) syncNowButton.textContent = nextStatus.error === 'AUTH_EXPIRED' ? '重新登入' : '立即同步';
     // Drives the blinking status light and matching text color (green/orange/red) instead of a
     // spinner — a steadier signal than an animated spin that some browsers render as frozen.
     const light = syncLightState(nextStatus);

@@ -132,6 +132,17 @@ describe('renderSyncHeader', () => {
     vi.restoreAllMocks();
   });
 
+  it('訪客模式登入失敗（關掉視窗、Google 載不到）顯示登入未完成，不是「會自動重試」', async () => {
+    renderSyncHeader(slot, {
+      mode: 'guest', name: '', status: idle,
+      onSignIn: async () => { throw new Error('SIGN_IN_CANCELLED'); }, onSignOut: () => {},
+    });
+    slot.querySelector('[data-action="sync-sign-in"]').click();
+    await vi.waitFor(() =>
+      expect(slot.querySelector('[data-sync-status]').textContent).toBe('登入未完成，請再試一次')
+    );
+  });
+
   it('update 會換掉狀態文字，且登入失效的警示標記為不自動消失', () => {
     const header = renderSyncHeader(slot, {
       mode: 'google', name: '小美', status: idle,

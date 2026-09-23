@@ -94,6 +94,14 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
     return (await response.json()).id;
   }
 
+  function writeManifest(folderId) {
+    return multipartUpload({
+      metadata: { name: MANIFEST_NAME, parents: [folderId] },
+      body: JSON.stringify({ formatVersion: FORMAT_VERSION }),
+      contentType: 'application/json',
+    });
+  }
+
   async function ensureFolder() {
     const found = await listQuery(
       `name='${FOLDER_NAME}' and mimeType='${FOLDER_MIME}' and trashed=false`
@@ -105,11 +113,7 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
         body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME }),
       });
       const folderId = (await created.json()).id;
-      await multipartUpload({
-        metadata: { name: MANIFEST_NAME, parents: [folderId] },
-        body: JSON.stringify({ formatVersion: FORMAT_VERSION }),
-        contentType: 'application/json',
-      });
+      await writeManifest(folderId);
       return folderId;
     }
 
@@ -117,7 +121,16 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
     const manifests = await listQuery(
       `name='${MANIFEST_NAME}' and '${folderId}' in parents and trashed=false`
     );
-    if (manifests.length === 0) throw new DriveFormatError('MANIFEST_MISSING');
+    if (manifests.length === 0) {
+      // An empty folder without a manifest is a first sync that lost its connection between
+      // creating the folder and writing the manifest — nothing in it to misjudge, so finish the
+      // job. Only a folder that still holds data is the "someone changed it by hand" case.
+      if ((await listQuery(`'${folderId}' in parents and trashed=false`)).length > 0) {
+        throw new DriveFormatError('MANIFEST_MISSING');
+      }
+      await writeManifest(folderId);
+      return folderId;
+    }
     const manifest = await (await request(`${FILES_URL}/${manifests[0].id}?alt=media`)).json();
     if (!manifest || manifest.formatVersion !== FORMAT_VERSION) throw new DriveFormatError('MANIFEST_VERSION');
     return folderId;

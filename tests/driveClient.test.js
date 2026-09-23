@@ -87,13 +87,28 @@ describe('ensureFolder', () => {
     expect(await drive.ensureFolder()).toBe('folder-1');
   });
 
-  it('資料夾存在但守門檔不見了 → 停止同步並報格式錯誤', async () => {
+  it('資料夾存在但守門檔不見了（裡面還有資料）→ 停止同步並報格式錯誤', async () => {
     const { fetchImpl } = scriptedFetch([
       { match: encodeURIComponent(FOLDER_NAME), json: { files: [{ id: 'folder-1' }] } },
       { match: encodeURIComponent('sync-manifest.json'), json: { files: [] } },
+      { match: encodeURIComponent("'folder-1' in parents"), json: { files: [{ id: 'rec-1' }] } },
     ]);
     const drive = createDriveClient({ auth, fetchImpl });
     await expect(drive.ensureFolder()).rejects.toBeInstanceOf(DriveFormatError);
+  });
+
+  it('資料夾是空的、只是當初建立時守門檔沒寫成功 → 補寫守門檔後正常繼續，不會永遠卡在格式錯誤', async () => {
+    // 第一次同步建完資料夾、還沒寫守門檔就斷線，下次同步就會看到「有資料夾、沒守門檔」。資料夾裡什麼都
+    // 沒有時，沒有任何資料會因為補寫而被誤判，直接補上即可；否則這台裝置會永遠停在「雲端資料夾異常」。
+    const { fetchImpl, calls } = scriptedFetch([
+      { match: encodeURIComponent(FOLDER_NAME), json: { files: [{ id: 'folder-1' }] } },
+      { match: encodeURIComponent('sync-manifest.json'), json: { files: [] } },
+      { match: encodeURIComponent("'folder-1' in parents"), json: { files: [] } },
+      { match: 'upload/drive/v3/files', method: 'POST', json: { id: 'manifest-file' } },
+    ]);
+    const drive = createDriveClient({ auth, fetchImpl });
+    expect(await drive.ensureFolder()).toBe('folder-1');
+    expect(calls.some(c => c.url.includes('upload/drive/v3/files') && c.method === 'POST')).toBe(true);
   });
 
   it('守門檔的 formatVersion 不認識 → 報格式錯誤', async () => {

@@ -43,3 +43,20 @@ export async function purgeExpiredTombstones(nowMs) {
   }
   return purged;
 }
+
+// Every syncState row describes agreement with one specific cloud folder. Kept in localStorage
+// (not the syncState store) so readSyncState's "empty means first sync" check stays exact.
+const SYNC_FOLDER_KEY = 'c-form-sync-folder-id';
+
+// A different folder than last time — another Google account signed in on this device, or the
+// folder was deleted from Drive and recreated — makes every stored base meaningless. Keeping them
+// would read "local has it, cloud doesn't, base exists" as a cloud-side delete and wipe every
+// local record, so the state is dropped and this sync runs as a first sync instead (everything
+// local gets uploaded to the new folder).
+export async function bindSyncStateToFolder(folderId) {
+  const previous = localStorage.getItem(SYNC_FOLDER_KEY);
+  if (previous && previous !== folderId) {
+    await runRequest('syncState', 'readwrite', store => store.clear());
+  }
+  localStorage.setItem(SYNC_FOLDER_KEY, folderId);
+}

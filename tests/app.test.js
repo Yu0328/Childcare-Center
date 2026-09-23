@@ -300,3 +300,59 @@ describe('mountApp 的 gate hook', () => {
     await vi.waitFor(() => expect(container.textContent).not.toBe(''));
   });
 });
+
+describe('標題列的首頁按鈕', () => {
+  let homeButton;
+  beforeEach(() => {
+    localStorage.clear();
+    homeButton = document.createElement('button');
+    homeButton.id = 'home-button';
+    document.body.appendChild(homeButton);
+  });
+  afterEach(() => homeButton.remove());
+
+  it('還在密碼頁時點首頁，停在密碼頁，不會直接跳過密碼進到主畫面', async () => {
+    const container = document.createElement('div');
+    mountApp(container);
+    expect(container.querySelector('[data-action="unlock"]')).toBeTruthy();
+
+    homeButton.click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(container.querySelector('[data-action="unlock"]')).toBeTruthy();
+    expect(container.textContent).not.toContain('選擇要填寫的表');
+  });
+
+  it('還在登入選擇畫面（gate）時點首頁，不會跳過登入選擇', async () => {
+    unlock();
+    const container = document.createElement('div');
+    mountApp(container, { gate: gateContainer => { gateContainer.textContent = 'gate'; } });
+
+    homeButton.click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(container.textContent).toBe('gate');
+  });
+
+  it('同步衝突畫面顯示中點首頁不會離開（否則那次同步會永遠等不到答案）', async () => {
+    unlock();
+    const container = document.createElement('div');
+    mountApp(container);
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    container.innerHTML = '<div class="conflict-view">conflict</div>';
+
+    homeButton.click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(container.textContent).toBe('conflict');
+  });
+
+  it('進到主畫面後點首頁會回到主選單', async () => {
+    unlock();
+    const container = document.createElement('div');
+    mountApp(container);
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    container.querySelector('[data-type="assessment"]').click();
+    await waitFor(() => container.textContent.includes('幼兒列表'));
+
+    homeButton.click();
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+  });
+});
