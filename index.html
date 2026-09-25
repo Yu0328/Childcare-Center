@@ -190,6 +190,14 @@ button {
   color: var(--text-muted);
   padding: 3rem 1rem;
 }
+/* A 適性紀錄 tab (點滴分享 decoding its photos) can take a second to fill; the same 180ms delay
+   as app.js's runView keeps a fast tab switch or an edit's re-render from flashing it. */
+.tabs__panel > .view-loading {
+  animation: view-loading-delay 0s 180ms both;
+}
+@keyframes view-loading-delay {
+  from { visibility: hidden; }
+}
 
 /* ---------- App shell ---------- */
 
@@ -283,14 +291,68 @@ button {
     justify-content: flex-start;
     padding: 0.7rem 1rem;
   }
-  .app-header__brand {
-    flex: 1 1 100%;
-    margin-right: 0;
+  .app-header {
+    gap: 0.6rem;
   }
-  .app-header__actions {
+  .app-header__brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 0;
+    font-size: 0.92rem;
+  }
+  /* Offline build: title and 備份 stay on one line, the title wrapping itself on very narrow phones. */
+  .app-header:not(:has(.sync-header)) {
+    flex-wrap: nowrap;
+  }
+  .app-header__actions:not(:has(.sync-header)) {
+    flex: none;
+  }
+  /* The offline build's actions are just the 備份 menu, which fits beside the title; the hosted
+     build's sync header (greeting + sign-in + 備份) still needs its own row below. */
+  .app-header__actions:has(.sync-header) {
     flex: 1 1 100%;
     margin-left: 0;
   }
+}
+
+/* The status row only holds the status text, so it takes no space until there is some. */
+.sync-header__status-row:has(> .sync-header__status:empty) {
+  display: none;
+}
+
+/* 匯出備份/匯入備份 folded into one small drop-down so the header stays a single line on phones. */
+.backup-menu {
+  position: relative;
+}
+.backup-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.backup-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.backup-menu > summary::after {
+  content: '▾';
+  font-size: 0.8em;
+}
+.backup-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.4rem);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 20, 0.15);
+}
+.backup-menu__list .btn {
+  justify-content: center;
+  white-space: nowrap;
 }
 
 /* Above the mobile breakpoint there's enough width to fit greeting, status, and every button on
@@ -306,6 +368,10 @@ button {
   .sync-header__greeting-row,
   .sync-header__status-row {
     display: contents;
+  }
+  /* The buttons live in the greeting row (for the mobile layout) but belong after the status here. */
+  .sync-header__actions {
+    order: 1;
   }
 }
 
@@ -482,6 +548,10 @@ button {
   color: var(--text-primary);
   margin: 0;
   text-align: center;
+}
+
+.page-header__period::before {
+  content: '　';
 }
 
 /* Groups multiple right-side header actions (課程月計畫 editor: 管理小朋友 + 匯出 Word) as one
@@ -773,6 +843,18 @@ button {
   box-shadow: var(--_card-shadow);
   transition: box-shadow 0.15s ease;
 }
+/* Phones: no box-in-a-page scrolling — the list grows and the whole page scrolls. The add form is a
+   popup here (the ＋ button), so nothing sits below the list that the cap was protecting. Extra
+   bottom room keeps the last row's × clear of the floating ＋. */
+@media (max-width: 640px) {
+  .card-list--rows {
+    max-height: none;
+    overflow-y: visible;
+  }
+  #app:has(.card-list--rows) {
+    padding-bottom: 6rem;
+  }
+}
 /* Scrollbar reveals only while scrolling or hovering the list. */
 .card-list--rows:hover,
 .card-list--rows.is-scrolling {
@@ -946,6 +1028,12 @@ button {
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
+}
+
+@media (min-width: 641px) {
+  .fab {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1211,8 +1299,27 @@ fieldset.panel-form__field.import-preview__child legend {
     grid-template-columns: 1fr minmax(340px, 520px);
   }
 
-  #app:has(.panel-form--wide) {
+  /* .tabs too: all four 適性紀錄 tabs share one width, including while a tab is still loading. */
+  #app:has(.panel-form--wide),
+  #app:has(.tabs) {
     max-width: 1240px;
+  }
+
+  /* Left / centre / right columns, so the title sits in the true middle whatever the two
+     buttons' widths are — or when there's no right-side button at all (管理幼兒). */
+  .page-header {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, max-content) 1fr;
+  }
+  .page-header > :first-child:not(.page-header__title) {
+    justify-self: start;
+  }
+  .page-header__title {
+    grid-column: 2;
+  }
+  .page-header__title ~ * {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .panel-form--wide {
@@ -1242,6 +1349,21 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 .panel-form__checkbox-grid .panel-form__checkbox-row {
   min-width: 0;
+  /* Long labels wrap to 2-3 lines; the tick box sits beside the first line, not the middle. */
+  align-items: flex-start;
+}
+/* Without this a long label squeezes the tick box down to a dot. */
+.panel-form__checkbox-row input {
+  flex: none;
+}
+.panel-form__checkbox-grid .panel-form__checkbox-row input {
+  margin-top: 0.3em;
+}
+/* Two columns on a phone wrap every label onto 3-4 lines. */
+@media (max-width: 640px) {
+  .panel-form__checkbox-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .panel-form__checkbox-grid .panel-form__checkbox-row span,
 .panel-form__checkbox-grid .panel-form__checkbox-row {
@@ -1313,6 +1435,26 @@ fieldset.panel-form__field.import-preview__child legend {
   grid-template-columns: 1fr;
 }
 
+/* 課程計畫表: domain cards stacked full width (a closed card beside an open one left a tall empty
+   gap), with the open card's activities spread across columns inside it instead. */
+.domain-grid--stack {
+  grid-template-columns: 1fr;
+}
+.domain-grid--stack > .domain-card > .domain-card__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-items: start;
+}
+
+/* The remark card's date line otherwise keeps a paragraph's default 1em margins, leaving a gap
+   under the (often two-line) title far wider than in the domain cards' own rows. */
+[data-remark-section] .indicator-block > .entry-row__date {
+  margin: 0.2rem 0;
+}
+[data-remark-section] .indicator-block .indicator-block__title {
+  margin-bottom: 0;
+}
+
 /* 備註 is a sixth card after the five domains — full width on its own row, remarks laid out side
    by side, rather than squeezed into one fifth-width column. */
 .domain-grid--row > [data-remark-section] {
@@ -1341,7 +1483,7 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 /* formEditorView's indicator-block__title never carries the corner-fixed action buttons (only
-   its per-entry rows do), so the 5.5rem clearance .indicator-block__title reserves for those
+   its per-entry rows do), so the 2.6rem clearance .indicator-block__title reserves for those
    buttons elsewhere is dead space here — reclaiming it matters once .domain-grid--row's five
    columns leave much less width per card than the other domain-grid users. */
 .domain-grid--row .indicator-block__title {
@@ -1406,9 +1548,9 @@ fieldset.panel-form__field.import-preview__child legend {
   font-size: 0.92rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  /* Reserve room for the corner-fixed 編輯/× buttons so this title's own text never has to
+  /* Reserve room for the corner-fixed × button so this title's own text never has to
      make room for them inline — it can wrap freely underneath instead. */
-  padding-right: 5.5rem;
+  padding-right: 2.6rem;
   color: var(--text-primary);
 }
 
@@ -1451,9 +1593,20 @@ fieldset.panel-form__field.import-preview__child legend {
 /* Cards that don't lead with a title element (development-record's referenced-indicator list,
    highlights' photo thumbnails) need their first line of content pushed clear of the
    absolutely-positioned corner buttons instead of narrowed beside them. */
-.indicator-block > .entry-list:first-child,
-.indicator-block > .highlight-thumbs:first-child {
+.indicator-block > .entry-list:first-child {
   margin-top: 1.9rem;
+}
+
+/* 點滴分享 leads with its caption, so the corner × sits beside it rather than above the photos. */
+.entry-row__note.highlight-caption-line {
+  margin: 0 0 0.6rem;
+  padding-right: 2.4rem;
+  min-height: 1.9rem;
+}
+.entry-list-wrap:has(> [data-highlight-entry]) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .entry-list {
@@ -1499,24 +1652,49 @@ fieldset.panel-form__field.import-preview__child legend {
    the ○ alone on its own line. */
 .entry-row__status {
   white-space: nowrap;
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0.05em 0.6em;
+  border-radius: 999px;
+  font-size: 0.85em;
+  background: #eaf7ee;
+  color: #1f8a3c;
+}
+.entry-row__status--developing {
+  background: #fdf0e1;
+  color: var(--warm-accent);
+}
+.entry-row__status--absent,
+.entry-row__status--courseChanged {
+  background: #fdecea;
+  color: var(--danger);
 }
 
 .entry-row__top {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Reserve room for the corner-fixed 編輯/× buttons so the date text never collides with them.
+  /* Reserve room for the corner-fixed × button so the date text never collides with it.
      min-height guarantees clearance even when the date text is empty (date isn't required, and
      an achieved-less/dateless row would otherwise collapse to ~0 height, letting the note below
      ride up underneath the absolutely-positioned buttons). */
   min-height: 1.9rem;
-  padding-right: 5.2rem;
+  padding-right: 2.4rem;
 }
 
 .entry-row__mark {
-  color: #1f8a3c;
+  /* Many fonts (system UI, Microsoft JhengHei) draw △ as a tiny glyph next to their ○; these draw both the same size. */
+  font-family: "Segoe UI Symbol", "PMingLiU", "PingFang TC", "Noto Sans TC", sans-serif;
+  font-size: 1.2em;
+  line-height: 1;
   font-weight: 700;
   margin-right: 0.3em;
+}
+.entry-row__mark--developed {
+  color: #1f8a3c;
+}
+.entry-row__mark--developing {
+  color: var(--warm-accent);
 }
 
 .entry-row__date {
@@ -1601,6 +1779,16 @@ fieldset.panel-form__field.import-preview__child legend {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  white-space: nowrap;
+}
+.entry-form__radio .entry-row__mark {
+  margin-right: 0;
+}
+
+/* A long label (更換課程's explanation) would otherwise shrink the tick box itself. */
+.entry-form__checkbox input,
+.entry-form__radio input {
+  flex: none;
 }
 
 /* Excludes radio/checkbox inputs: they're native tick controls, not text-entry boxes, so
@@ -2046,6 +2234,52 @@ fieldset.panel-form__field.import-preview__child legend {
        overflow-wrap still breaks a separator-less title too long for the row. */
     word-break: keep-all;
     overflow-wrap: anywhere;
+    font-size: 1.25rem;
+  }
+  /* Name + tier on the first line, period on a second, smaller line — the same two-line shape for
+     every editor instead of wrapping wherever a long period happens to run out of room. */
+  .page-header__period {
+    display: block;
+    font-size: 0.8em;
+    color: var(--text-secondary);
+  }
+  .page-header__period::before {
+    content: none;
+  }
+
+  /* D: each nesting level (page → domain card → indicator card → entry row) added its own
+     side padding, leaving the actual text a narrow strip on a phone. */
+  #app {
+    padding: 1.25rem 0.75rem 4rem;
+  }
+  .domain-card {
+    padding: 0.8rem 0.6rem 1rem;
+  }
+  .indicator-block {
+    padding: 0.7rem 0.6rem;
+  }
+  .entry-row {
+    padding: 0.45rem 0.5rem;
+  }
+
+  /* E: four tabs as an even 2×2 block instead of wrapping 2+2 at their own widths. */
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    padding: 0.3rem;
+    border-bottom: none;
+    border-radius: 12px;
+    background: rgba(15, 23, 20, 0.05);
+  }
+  .tabs__button {
+    border-bottom: none;
+    border-radius: 9px;
+    padding: 0.5rem;
+  }
+  .tabs__button--active {
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgba(15, 23, 20, 0.12);
   }
 
   /* The day-cell FAB (added below) is fixed at bottom:1rem, 64px tall — reaching 80px above the
@@ -2169,6 +2403,21 @@ fieldset.panel-form__field.import-preview__child legend {
   }
 }
 
+@media (min-width: 641px) {
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) {
+    grid-template-columns: 1fr;
+  }
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) > .monthly-plan-side {
+    order: -1;
+    position: static;
+  }
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) .monthly-plan-side > .panel-form {
+    max-width: none;
+    padding: 0.6rem 1rem;
+    gap: 0;
+  }
+}
+
 /* The manage-children card now lives inside this wrapper alongside the cell-editing panel
    (previously a direct .tab-layout child, which the old `> .panel-form { order: 2 }` rule targeted
    — it no longer applies here since panel-form isn't a direct child anymore). */
@@ -2204,6 +2453,30 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
+}
+
+/* 月計畫's child picker: one pill per child, the shown one filled. */
+.child-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+}
+.child-switch__button {
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.child-switch__button[aria-pressed="true"] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-weight: 600;
 }
 
 .monthly-calendar__title {
@@ -2432,6 +2705,32 @@ fieldset.panel-form__field.import-preview__child legend {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+/* ---------- Tap-to-edit (see rowClickEdit.js) ----------
+   The 編輯 buttons stay in the page for keyboard users but are hidden until tabbed to; tapping the
+   entry itself does the same thing. A soft outline on hover hints the entry is clickable. */
+[data-row-edit]:not(:focus-visible) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
+}
+[data-click-edit] {
+  cursor: pointer;
+}
+[data-click-edit] .entry-form {
+  cursor: auto;
+}
+@media (hover: hover) {
+  [data-click-edit]:hover:not(:has([data-click-edit]:hover)) {
+    outline: 2px solid rgba(47, 111, 214, 0.28);
+    outline-offset: -2px;
+  }
 }
 
 </style>
@@ -5972,1178 +6271,6 @@ var CFormApp = (() => {
       entries,
       warnings
     };
-  }
-
-  // src/ui/birthDateField.js
-  var CURRENT_YEAR = (/* @__PURE__ */ new Date()).getFullYear();
-  var YEAR_RANGE_BACK = 6;
-  function daysInMonth(year, month) {
-    return new Date(year, month, 0).getDate();
-  }
-  function birthDateYearOptions() {
-    const years = [];
-    for (let year = CURRENT_YEAR; year >= CURRENT_YEAR - YEAR_RANGE_BACK; year -= 1) years.push(year);
-    return years;
-  }
-  function dayOptionsHtml(dayCount, selectedDay) {
-    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}</option>`).join("");
-  }
-  function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldName, value }) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
-    const selectedYear = match ? Number(match[1]) : "";
-    const selectedMonth = match ? Number(match[2]) : "";
-    const selectedDay = match ? Number(match[3]) : "";
-    const dayCount = selectedYear && selectedMonth ? daysInMonth(selectedYear, selectedMonth) : 31;
-    return `
-    <span class="panel-form__period-row">
-      <select data-field="${yearFieldName}">
-        <option value="">\u5E74</option>
-        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}</option>`).join("")}
-      </select>
-      <select data-field="${monthFieldName}">
-        <option value="">\u6708</option>
-        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}</option>`).join("")}
-      </select>
-      <select data-field="${dayFieldName}">
-        <option value="">\u65E5</option>
-        ${dayOptionsHtml(dayCount, selectedDay)}
-      </select>
-    </span>
-  `;
-  }
-  function wireBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
-    const yearEl = container.querySelector(`[data-field="${yearFieldName}"]`);
-    const monthEl = container.querySelector(`[data-field="${monthFieldName}"]`);
-    const dayEl = container.querySelector(`[data-field="${dayFieldName}"]`);
-    const refreshDayOptions = () => {
-      const year = Number(yearEl.value) || CURRENT_YEAR;
-      const month = Number(monthEl.value) || 1;
-      const dayCount = daysInMonth(year, month);
-      const selectedDay = Math.min(Number(dayEl.value) || 0, dayCount) || "";
-      dayEl.innerHTML = `<option value="">\u65E5</option>${dayOptionsHtml(dayCount, selectedDay)}`;
-    };
-    yearEl.addEventListener("change", refreshDayOptions);
-    monthEl.addEventListener("change", refreshDayOptions);
-  }
-  function parseBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
-    const year = container.querySelector(`[data-field="${yearFieldName}"]`).value;
-    const month = container.querySelector(`[data-field="${monthFieldName}"]`).value;
-    const day = container.querySelector(`[data-field="${dayFieldName}"]`).value;
-    if (!year || !month || !day) return "";
-    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  }
-
-  // src/ui/periodFields.js
-  var MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
-  function currentRocYear() {
-    return (/* @__PURE__ */ new Date()).getFullYear() - 1911;
-  }
-  function rocYearOptions() {
-    const current = currentRocYear();
-    const years = [];
-    for (let year = current + 1; year >= current - 5; year -= 1) years.push(year);
-    return years;
-  }
-  function periodSelectsHtml({ yearFieldName, monthFieldName, selectedYear, selectedMonth }) {
-    return `
-    <span class="panel-form__period-row">
-      <select data-field="${yearFieldName}">
-        ${rocYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}\u5E74</option>`).join("")}
-      </select>
-      <select data-field="${monthFieldName}">
-        ${MONTHS.map(
-      (month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${String(month).padStart(2, "0")}\u6708</option>`
-    ).join("")}
-      </select>
-    </span>
-  `;
-  }
-  function parsePeriod(period) {
-    const match = /^(\d{1,3})年(\d{1,2})月$/.exec(String(period ?? "").trim());
-    if (!match) return { year: null, month: null };
-    return { year: Number(match[1]), month: Number(match[2]) };
-  }
-  function splitPeriodRange(period) {
-    const text = String(period ?? "").trim();
-    const dashIndex = text.indexOf("-");
-    if (dashIndex === -1) return { start: text, end: text };
-    return { start: text.slice(0, dashIndex), end: text.slice(dashIndex + 1) };
-  }
-  function combinedPeriod(periodA, periodB) {
-    const [first, last] = [periodA, periodB].sort();
-    return first === last ? first : `${first}-${last}`;
-  }
-
-  // src/ui/importPreviewView.js
-  var BIRTH_DATE_FIELDS = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
-  var STATUS_MARKS = { developed: "\u25CB", developing: "\u25B3", absent: "\uFF08\u8ACB\u5047\uFF09", courseChanged: "\uFF08\u66F4\u63DB\u8AB2\u7A0B\uFF09" };
-  function entryRow(entry, index) {
-    const unresolved = !entry.description && !entry.isRemark;
-    const description = entry.description || entry.activityName || "";
-    return `
-    <li class="import-preview__entry${unresolved ? " import-preview__entry--warning" : ""}">
-      <label>
-        <input type="checkbox" data-entry-include="${index}" checked>
-        ${entry.isRemark ? '<span class="import-preview__entry-remark">\u5099\u8A3B</span>' : ""}
-        <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
-        ${unresolved ? "\uFF08\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF0C\u5EFA\u8B70\u53D6\u6D88\u52FE\u9078\uFF09" : escapeHtml(description)}
-        \u2014
-        ${escapeHtml(entry.date)}${STATUS_MARKS[entry.status] ?? ""}
-        <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
-      </label>
-    </li>
-  `;
-  }
-  function renderImportPreviewView(container, { parsed, onCancel, onImported }) {
-    const defaultRocYear = currentRocYear();
-    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
-    const { start: parsedStart, end: parsedEnd } = splitPeriodRange(parsed.period);
-    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsedStart);
-    const { year: parsedEndYear, month: parsedEndMonth } = parsePeriod(parsedEnd);
-    const parsedIsRange = parsedStart !== parsedEnd;
-    container.innerHTML = `
-    <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
-      <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7E3D\u8868\uFF09</h2>
-    </div>
-    ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">
-            ${parsed.warnings.map((warning) => `<li class="field-error">${escapeHtml(warning)}</li>`).join("")}
-          </ul>` : ""}
-    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
-      <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
-      <div class="panel-form__row">
-        <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
-        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS, value: parsed.child.birthDate })}</label>
-      </div>
-      <div class="panel-form__row">
-        <label class="panel-form__field">
-          \u6708\u9F61\u968E\u6BB5
-          <select data-field="tier">
-            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-          </select>
-        </label>
-        <label class="panel-form__field">
-          \u7D00\u9304\u5E74\u6708
-          ${periodSelectsHtml({
-      yearFieldName: "period-year",
-      monthFieldName: "period-month",
-      selectedYear: parsedYear ?? defaultRocYear,
-      selectedMonth: parsedMonth ?? defaultMonth
-    })}
-        </label>
-      </div>
-      <label class="entry-form__checkbox">
-        <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? "checked" : ""}> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
-      </label>
-      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? "" : "hidden"}>
-        \u81F3
-        ${periodSelectsHtml({
-      yearFieldName: "period-end-year",
-      monthFieldName: "period-end-month",
-      selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
-      selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth
-    })}
-      </label>
-
-      <h3 class="panel-form__title">\u89C0\u5BDF\u7D00\u9304\uFF08\u5171 ${parsed.entries.length} \u7B46\uFF0C\u53D6\u6D88\u52FE\u9078\u53EF\u6392\u9664\u4E0D\u532F\u5165\uFF09</h3>
-      <ul class="import-preview__entry-list">
-        ${parsed.entries.map(entryRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u89C0\u5BDF\u7D00\u9304</li>"}
-      </ul>
-
-      <button type="submit" class="btn btn--primary">\u78BA\u8A8D\u532F\u5165</button>
-      <p class="field-error" data-error></p>
-    </form>
-  `;
-    container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
-    wireBirthDateSelects(container, BIRTH_DATE_FIELDS);
-    container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
-      container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
-    });
-    container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const errorEl = container.querySelector("[data-error]");
-      const name = container.querySelector('[data-field="name"]').value;
-      const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS);
-      if (!birthDate) {
-        container.querySelector("[data-error]").textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
-        return;
-      }
-      const tier = container.querySelector('[data-field="tier"]').value;
-      const year = container.querySelector('[data-field="period-year"]').value;
-      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
-      const startPeriod = `${year}\u5E74${month}\u6708`;
-      const isRange = container.querySelector('[data-field="period-is-range"]').checked;
-      let period = startPeriod;
-      if (isRange) {
-        const endYear = container.querySelector('[data-field="period-end-year"]').value;
-        const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, "0");
-        period = combinedPeriod(startPeriod, `${endYear}\u5E74${endMonth}\u6708`);
-      }
-      const includedEntries = parsed.entries.filter((entry, index) => container.querySelector(`[data-entry-include="${index}"]`).checked);
-      try {
-        const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);
-        const child = existingChild ?? await addChild({ name, birthDate });
-        const entriesByTier = /* @__PURE__ */ new Map();
-        for (const entry of includedEntries) {
-          const entryTier = entry.tier ?? tier;
-          if (!entriesByTier.has(entryTier)) entriesByTier.set(entryTier, []);
-          entriesByTier.get(entryTier).push(entry);
-        }
-        if (entriesByTier.size === 0) entriesByTier.set(tier, []);
-        for (const [entryTier, tierEntries] of entriesByTier) {
-          const form = await addForm({ childId: child.id, tier: entryTier, period, isNew: true });
-          for (const entry of tierEntries) {
-            await addEntry({
-              formId: form.id,
-              indicatorCode: entry.indicatorCode,
-              date: entry.date,
-              status: entry.status,
-              note: entry.note,
-              activityName: entry.activityName
-            });
-          }
-        }
-        onImported();
-      } catch (err) {
-        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
-      }
-    });
-  }
-
-  // src/import/parentReportDocxImport.js
-  var import_jszip2 = __toESM(require_jszip_min(), 1);
-  function cellsForRow2(rowXml) {
-    return [...rowXml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((match) => match[1]);
-  }
-  function rowsOf2(tableXml) {
-    return [...tableXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((match) => match[0]);
-  }
-  function paragraphsOf(cellXml) {
-    return [...cellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
-  }
-  function textOf(fragmentXml) {
-    return [...fragmentXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
-  }
-  function paragraphJoinedText(xml) {
-    return [...xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((p) => [...p[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("")).join(" ").trim();
-  }
-  function flatJoinedText(xml) {
-    return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(" ");
-  }
-  function isVMergeContinue(cellXml) {
-    return /<w:vMerge\s*\/>/.test(cellXml) || /<w:vMerge(?!\s+w:val)/.test(cellXml) || /<w:vMerge\s+w:val="continue"\s*\/>/.test(cellXml);
-  }
-  function isStruck(cellXml) {
-    return /<w:strike\s*\/>/.test(cellXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, ""));
-  }
-  function normalizeMonthDay(raw) {
-    const match = /^(\d{1,2})\/(\d{1,2})/.exec(raw);
-    if (!match) return null;
-    return `${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
-  }
-  function processCoursePlanBodyRows(bodyRows) {
-    const entries = [];
-    const occurrencesByEntryIndex = {};
-    let currentEntryIndex = -1;
-    for (const rowXml of bodyRows) {
-      const cells = cellsForRow2(rowXml);
-      if (cells.length < 5) continue;
-      const [domainCell, codeCell, activityCell, dateCell, noteCell] = cells;
-      if (!isVMergeContinue(codeCell)) {
-        const indicatorCode = normalizeIndicatorCode(textOf(codeCell));
-        const activityParagraphs = paragraphsOf(activityCell);
-        const activityNameRaw = activityParagraphs[0] ? textOf(activityParagraphs[0]) : "";
-        const activityName = activityNameRaw.replace(/^【|】$/g, "");
-        const indicatorText = activityParagraphs[1] ? textOf(activityParagraphs[1]) : "";
-        entries.push({ indicatorCode, activityName, indicatorText });
-        currentEntryIndex += 1;
-        occurrencesByEntryIndex[currentEntryIndex] = [];
-      }
-      if (currentEntryIndex < 0) continue;
-      const dateText = textOf(dateCell);
-      const date = normalizeMonthDay(dateText);
-      if (!date) continue;
-      const absent = isStruck(dateCell);
-      const status = absent ? null : dateText.includes("\u25CB") ? "developed" : dateText.includes("\u25B3") ? "developing" : null;
-      occurrencesByEntryIndex[currentEntryIndex].push({ date, status, absent, note: textOf(noteCell) });
-    }
-    return { entries, occurrencesByEntryIndex };
-  }
-  function parseCoursePlanTables(tableXmls) {
-    return processCoursePlanBodyRows(tableXmls.flatMap((xml) => rowsOf2(xml).slice(1)));
-  }
-  function isCoursePlanShapedTable(tableXml) {
-    const firstRow = rowsOf2(tableXml)[0];
-    if (!firstRow) return false;
-    const headerText = textOf(firstRow);
-    return headerText.includes("\u767C\u5C55\u9818\u57DF") && headerText.includes("\u8AB2\u7A0B\u5BE6\u65BD\u65E5\u671F");
-  }
-  function rocDotDateToIso(rocDate) {
-    const match = /^(\d{1,3})[./](\d{1,2})[./](\d{1,2})$/.exec(rocDate.trim());
-    if (!match) return null;
-    const [, rocYear, month, day] = match;
-    return `${Number(rocYear) + 1911}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-  }
-  function parseHeaderInfo2(headerText) {
-    const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
-    const birthMatch = /出生(?:年月日|日期)[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
-    const periodMatch = /(?:紀錄時間|實施時間)[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
-    return {
-      name: nameMatch ? nameMatch[1] : null,
-      birthDate: birthMatch ? rocDotDateToIso(birthMatch[1]) : null,
-      period: periodMatch ? `${periodMatch[1]}\u5E74${periodMatch[2].padStart(2, "0")}\u6708` : null
-    };
-  }
-  function parseRecordBlocks(tableXml) {
-    const rows = [...tableXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((m) => m[0]);
-    const blocks = [];
-    for (let i = 0; i < rows.length; i += 2) {
-      const headerRow = rows[i];
-      const contentRow2 = rows[i + 1];
-      if (!contentRow2) break;
-      const label = [...headerRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
-      const paragraphs = [...contentRow2.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(
-        (p) => [...p[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("")
-      );
-      const rawText = paragraphs.join("\n").trim();
-      if (label && rawText) blocks.push({ label, rawText });
-    }
-    return blocks;
-  }
-  function extractHighlightPhotoGroups(highlightsTableXml) {
-    const startIdx = highlightsTableXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
-    const scoped = startIdx === -1 ? highlightsTableXml : highlightsTableXml.slice(startIdx);
-    const rows = [...scoped.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((m) => m[0]);
-    const groups = [];
-    for (let i = 0; i < rows.length; i += 2) {
-      const photoRow = rows[i];
-      const captionRow = rows[i + 1];
-      if (!captionRow) break;
-      const photoCount = (photoRow.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
-      const caption = [...captionRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
-      if (photoCount > 0 && caption) groups.push({ photoCount, caption });
-    }
-    return groups;
-  }
-  async function countHeaderFooterDrawings(zip) {
-    const partNames = Object.keys(zip.files).filter((name) => /^word\/(header|footer)\d*\.xml$/i.test(name));
-    const xmls = await Promise.all(partNames.map((name) => zip.file(name).async("text")));
-    return xmls.reduce((total, xml) => total + (xml.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length, 0);
-  }
-  function countInlineDrawingsBeforeHighlights(documentXml) {
-    const highlightsIndex = documentXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
-    const scoped = highlightsIndex === -1 ? documentXml : documentXml.slice(0, highlightsIndex);
-    return (scoped.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
-  }
-  async function extractSortedMediaImages(zip, documentXml) {
-    const mediaNames = Object.keys(zip.files).filter((name) => /^word\/media\/image\d+\.(png|jpe?g)$/i.test(name)).sort((a, b) => {
-      const numA = Number(/image(\d+)\./.exec(a)[1]);
-      const numB = Number(/image(\d+)\./.exec(b)[1]);
-      return numA - numB;
-    });
-    const headerFooterDrawingCount = await countHeaderFooterDrawings(zip);
-    const inlineBeforeHighlightsCount = countInlineDrawingsBeforeHighlights(documentXml);
-    const skipCount = Math.min(headerFooterDrawingCount + inlineBeforeHighlightsCount, mediaNames.length);
-    const bodyMediaNames = mediaNames.slice(skipCount);
-    return Promise.all(bodyMediaNames.map(async (name) => zip.file(name).async("blob")));
-  }
-  var BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]?/;
-  var INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
-  function stripReferencedIndicatorLines(rawText) {
-    const lines = rawText.split("\n");
-    let i = 0;
-    while (i < lines.length) {
-      const match = /^([^　]+)　(.*)$/.exec(lines[i]);
-      if (!match) break;
-      const indicator = getIndicator(match[1]);
-      if (!indicator || indicator.description !== match[2]) break;
-      i += 1;
-    }
-    return lines.slice(i).join("\n").trim();
-  }
-  function classifyRecordBlocks(blocks, coursePlanEntries, warnings) {
-    const domainByName = new Map(DOMAINS.map((d) => [d.name, d.id]));
-    const developmentRecordBlocks = [];
-    const behaviorObservations = [];
-    for (const block of blocks) {
-      if (domainByName.has(block.label)) {
-        const codeMatches = [...block.rawText.matchAll(INDICATOR_CODE_IN_TEXT_PATTERN)].map((m) => normalizeIndicatorCode(m[0]));
-        const courseEntryIndexes = coursePlanEntries.map((entry, index) => codeMatches.includes(entry.indicatorCode) ? index : -1).filter((index) => index !== -1);
-        developmentRecordBlocks.push({ domain: domainByName.get(block.label), courseEntryIndexes, narrative: stripReferencedIndicatorLines(block.rawText) });
-      } else if (BEHAVIOR_OBSERVATION_LABEL.test(block.label)) {
-        const separatorMatch = BEHAVIOR_OBSERVATION_LABEL.exec(block.label);
-        behaviorObservations.push({ title: block.label.slice(separatorMatch[0].length), narrative: block.rawText });
-      } else {
-        warnings.push(`\u7121\u6CD5\u8FA8\u8B58\u7684\u6BB5\u843D\u6A19\u984C\u300C${block.label}\u300D\uFF0C\u5DF2\u7565\u904E\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u78BA\u8A8D\u662F\u5426\u9700\u8981\u624B\u52D5\u88DC\u4E0A`);
-      }
-    }
-    return { developmentRecordBlocks, behaviorObservations };
-  }
-  async function parseParentReportDocxImport(data) {
-    const zip = await import_jszip2.default.loadAsync(data);
-    const documentXml = await zip.file("word/document.xml").async("text");
-    const warnings = [];
-    const headerFileNames = Object.keys(zip.files).filter((name) => /^word\/header\d*\.xml$/.test(name));
-    let headerInfo = { name: null, birthDate: null, period: null };
-    for (const name of headerFileNames) {
-      const xml = await zip.file(name).async("text");
-      let text = paragraphJoinedText(xml);
-      if (!text.includes("\u5E7C\u5152\u59D3\u540D")) {
-        const flatText = flatJoinedText(xml);
-        if (flatText.includes("\u5E7C\u5152\u59D3\u540D")) text = flatText;
-      }
-      if (text.includes("\u5E7C\u5152\u59D3\u540D")) {
-        headerInfo = parseHeaderInfo2(text);
-        break;
-      }
-    }
-    if (!headerInfo.name) {
-      const firstTableIndex = documentXml.indexOf("<w:tbl>");
-      const bodyIntroXml = firstTableIndex === -1 ? documentXml : documentXml.slice(0, firstTableIndex);
-      const bodyIntroText = paragraphJoinedText(bodyIntroXml);
-      if (bodyIntroText.includes("\u5E7C\u5152\u59D3\u540D")) {
-        headerInfo = parseHeaderInfo2(bodyIntroText);
-      }
-    }
-    if (!headerInfo.name) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u5E7C\u5152\u59D3\u540D\uFF0C\u8ACB\u624B\u52D5\u8F38\u5165");
-    if (!headerInfo.birthDate) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u51FA\u751F\u65E5\u671F\uFF0C\u8ACB\u624B\u52D5\u8F38\u5165");
-    if (!headerInfo.period) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u7D00\u9304\u5E74\u6708\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
-    const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((m) => m[0]);
-    const coursePlanTableXmls = tables.filter(isCoursePlanShapedTable);
-    const secondTableXml = tables.filter((t) => !isCoursePlanShapedTable(t)).join("");
-    const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXmls.length ? parseCoursePlanTables(coursePlanTableXmls) : { entries: [], occurrencesByEntryIndex: {} };
-    const inferredYear = headerInfo.period ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911 : (/* @__PURE__ */ new Date()).getFullYear();
-    const coursePlanEntries = coursePlanEntriesRaw.map((entry, index) => ({
-      ...entry,
-      occurrences: (occurrencesByEntryIndex[index] || []).map((o) => ({ ...o, date: `${inferredYear}-${o.date}` }))
-    }));
-    const tier = (() => {
-      const counts = /* @__PURE__ */ new Map();
-      for (const entry of coursePlanEntries) {
-        const indicator = getIndicator(entry.indicatorCode);
-        if (!indicator) continue;
-        counts.set(indicator.tier, (counts.get(indicator.tier) || 0) + 1);
-      }
-      let best = null, bestCount = 0;
-      for (const [t, count] of counts) if (count > bestCount) {
-        best = t;
-        bestCount = count;
-      }
-      return best;
-    })();
-    if (!tier) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u6708\u9F61\u968E\u6BB5\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
-    const highlightsIndex = secondTableXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
-    const beforeHighlightsXml = highlightsIndex === -1 ? secondTableXml : secondTableXml.slice(0, highlightsIndex);
-    const blocks = beforeHighlightsXml ? parseRecordBlocks(beforeHighlightsXml) : [];
-    const { developmentRecordBlocks, behaviorObservations } = classifyRecordBlocks(blocks, coursePlanEntries, warnings);
-    const photoGroups = secondTableXml ? extractHighlightPhotoGroups(secondTableXml) : [];
-    const mediaImages = await extractSortedMediaImages(zip, documentXml);
-    let mediaCursor = 0;
-    const highlightEntries = photoGroups.map((group) => {
-      const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
-      mediaCursor += group.photoCount;
-      return { photos, caption: group.caption };
-    });
-    if (mediaImages.length > mediaCursor) {
-      warnings.push("\u5075\u6E2C\u5230\u7684\u7167\u7247\u6578\u91CF\u591A\u65BC\u9EDE\u6EF4\u5206\u4EAB\u5340\u584A\uFF0C\u90E8\u5206\u7167\u7247\u53EF\u80FD\u672A\u6B63\u78BA\u6B78\u985E\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u78BA\u8A8D");
-    }
-    return {
-      child: { name: headerInfo.name, birthDate: headerInfo.birthDate },
-      tier,
-      period: headerInfo.period,
-      coursePlanEntries,
-      developmentRecordBlocks,
-      behaviorObservations,
-      highlightEntries,
-      warnings
-    };
-  }
-
-  // src/ui/parentReportImportPreviewView.js
-  var BIRTH_DATE_FIELDS2 = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
-  function coursePlanEntryRow(entry, index) {
-    const occurrenceSummary = entry.occurrences.map((o) => `${escapeHtml(o.date)}${o.absent ? "\uFF08\u8ACB\u5047\uFF09" : o.status === "developed" ? "\u25CB" : "\u25B3"}`).join("\u3001");
-    return `
-    <li class="import-preview__entry">
-      <label>
-        <input type="checkbox" data-course-entry-include="${index}" checked>
-        <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
-        \u3010${escapeHtml(entry.activityName)}\u3011\u2014 ${occurrenceSummary || "\uFF08\u7121\u5BE6\u65BD\u7D00\u9304\uFF09"}
-      </label>
-    </li>
-  `;
-  }
-  function developmentRecordRow(block, index) {
-    const domainName = DOMAINS.find((d) => d.id === block.domain)?.name ?? "";
-    return `
-    <li class="import-preview__entry">
-      <label>
-        <input type="checkbox" data-record-include="${index}" checked>
-        <strong>${escapeHtml(domainName)}</strong>\uFF1A${escapeHtml(block.narrative)}
-      </label>
-    </li>
-  `;
-  }
-  function behaviorObservationRow(observation, index) {
-    return `
-    <li class="import-preview__entry">
-      <label>
-        <input type="checkbox" data-observation-include="${index}" checked>
-        ${escapeHtml(observation.title)}\uFF1A${escapeHtml(observation.narrative)}
-      </label>
-    </li>
-  `;
-  }
-  function highlightRow(entry, index) {
-    const thumbs = entry.photos.map((blob) => `<img class="highlight-thumb" src="${URL.createObjectURL(blob)}" alt="">`).join("");
-    return `
-    <li class="import-preview__entry">
-      <label>
-        <input type="checkbox" data-highlight-include="${index}" checked>
-        <div class="highlight-thumbs">${thumbs}</div>
-        ${escapeHtml(entry.caption)}
-      </label>
-    </li>
-  `;
-  }
-  function renderParentReportImportPreviewView(container, { parsed, onCancel, onImported }) {
-    const defaultRocYear = currentRocYear();
-    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
-    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
-    container.innerHTML = `
-    <div class="page-header">
-      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
-      <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7D00\u9304\uFF09</h2>
-    </div>
-    ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">${parsed.warnings.map((w) => `<li class="field-error">${escapeHtml(w)}</li>`).join("")}</ul>` : ""}
-    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
-      <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
-      <div class="panel-form__row">
-        <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
-        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS2, value: parsed.child.birthDate })}</label>
-      </div>
-      <div class="panel-form__row">
-        <label class="panel-form__field">
-          \u6708\u9F61\u968E\u6BB5
-          <select data-field="tier">
-            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-          </select>
-        </label>
-        <label class="panel-form__field">
-          \u7D00\u9304\u5E74\u6708
-          ${periodSelectsHtml({ yearFieldName: "period-year", monthFieldName: "period-month", selectedYear: parsedYear ?? defaultRocYear, selectedMonth: parsedMonth ?? defaultMonth })}
-        </label>
-      </div>
-
-      <div class="import-preview__sections">
-        <section class="import-preview__section">
-          <h3 class="panel-form__title">\u8AB2\u7A0B\u8A08\u756B\u8868\uFF08\u5171 ${parsed.coursePlanEntries.length} \u9805\uFF09</h3>
-          <ul class="import-preview__entry-list">${parsed.coursePlanEntries.map(coursePlanEntryRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u9805\u76EE</li>"}</ul>
-        </section>
-
-        <section class="import-preview__section">
-          <h3 class="panel-form__title">\u9069\u6027\u767C\u5C55\u7D00\u9304\u8868\uFF08\u5171 ${parsed.developmentRecordBlocks.length} \u6BB5\uFF09</h3>
-          <ul class="import-preview__entry-list">${parsed.developmentRecordBlocks.map(developmentRecordRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u6BB5\u843D</li>"}</ul>
-        </section>
-
-        <section class="import-preview__section">
-          <h3 class="panel-form__title">\u884C\u70BA\u89C0\u5BDF\uFF08\u5171 ${parsed.behaviorObservations.length} \u7B46\uFF09</h3>
-          <ul class="import-preview__entry-list">${parsed.behaviorObservations.map(behaviorObservationRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u89C0\u5BDF</li>"}</ul>
-        </section>
-
-        <section class="import-preview__section">
-          <h3 class="panel-form__title">\u9EDE\u6EF4\u5206\u4EAB\uFF08\u5171 ${parsed.highlightEntries.length} \u7D44\uFF09</h3>
-          <ul class="import-preview__entry-list">${parsed.highlightEntries.map(highlightRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u7167\u7247</li>"}</ul>
-        </section>
-      </div>
-
-      <button type="submit" class="btn btn--primary">\u78BA\u8A8D\u532F\u5165</button>
-      <p class="field-error" data-error></p>
-    </form>
-  `;
-    container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
-    wireBirthDateSelects(container, BIRTH_DATE_FIELDS2);
-    container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const errorEl = container.querySelector("[data-error]");
-      const name = container.querySelector('[data-field="name"]').value;
-      const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS2);
-      if (!birthDate) {
-        container.querySelector("[data-error]").textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
-        return;
-      }
-      const tier = container.querySelector('[data-field="tier"]').value;
-      const year = container.querySelector('[data-field="period-year"]').value;
-      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
-      const period = `${year}\u5E74${month}\u6708`;
-      const includedEntryIndexes = parsed.coursePlanEntries.map((_, i) => i).filter((i) => container.querySelector(`[data-course-entry-include="${i}"]`).checked);
-      const includedRecordIndexes = parsed.developmentRecordBlocks.map((_, i) => i).filter((i) => container.querySelector(`[data-record-include="${i}"]`).checked);
-      const includedObservationIndexes = parsed.behaviorObservations.map((_, i) => i).filter((i) => container.querySelector(`[data-observation-include="${i}"]`).checked);
-      const includedHighlightIndexes = parsed.highlightEntries.map((_, i) => i).filter((i) => container.querySelector(`[data-highlight-include="${i}"]`).checked);
-      try {
-        const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);
-        const child = existingChild ?? await addChild({ name, birthDate });
-        const report = await addParentReport({ childId: child.id, tier, period, isNew: true });
-        const entryIdByOriginalIndex = /* @__PURE__ */ new Map();
-        for (const index of includedEntryIndexes) {
-          const source = parsed.coursePlanEntries[index];
-          const created = await addCoursePlanEntry({ reportId: report.id, indicatorCode: source.indicatorCode, activityName: source.activityName, indicatorText: source.indicatorText });
-          entryIdByOriginalIndex.set(index, created.id);
-          for (const occurrence of source.occurrences) {
-            await addCourseOccurrence({ entryId: created.id, ...occurrence });
-          }
-        }
-        for (const index of includedRecordIndexes) {
-          const source = parsed.developmentRecordBlocks[index];
-          const courseEntryIds = source.courseEntryIndexes.filter((i) => entryIdByOriginalIndex.has(i)).map((i) => entryIdByOriginalIndex.get(i));
-          await addDevelopmentRecordEntry({ reportId: report.id, domain: source.domain, courseEntryIds, narrative: source.narrative });
-        }
-        for (const index of includedObservationIndexes) {
-          const source = parsed.behaviorObservations[index];
-          await addBehaviorObservation({ reportId: report.id, title: source.title, narrative: source.narrative });
-        }
-        for (const index of includedHighlightIndexes) {
-          const source = parsed.highlightEntries[index];
-          const photos = source.photos.map((blob) => ({ blob, width: 0, height: 0 }));
-          await addHighlightEntry({ reportId: report.id, photos, caption: source.caption });
-        }
-        onImported();
-      } catch (err) {
-        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
-      }
-    });
-  }
-
-  // src/ui/toast.js
-  var host = null;
-  function getHost() {
-    if (host && document.body.contains(host)) return host;
-    host = document.createElement("div");
-    host.className = "toast-host";
-    document.body.appendChild(host);
-    return host;
-  }
-  var EXIT_MS = 200;
-  function showToast(message, { durationMs = 4e3 } = {}) {
-    const toast = document.createElement("p");
-    toast.className = "toast";
-    toast.textContent = message;
-    getHost().appendChild(toast);
-    setTimeout(() => {
-      toast.classList.add("toast--out");
-      setTimeout(() => toast.remove(), EXIT_MS);
-    }, durationMs);
-    return toast;
-  }
-
-  // src/ui/importQueue.js
-  async function processImportQueue(files, { parseFn, renderPreview, container, backToList }) {
-    const queue2 = Array.from(files);
-    const skipped = [];
-    async function next(index) {
-      if (index >= queue2.length) {
-        await backToList();
-        if (skipped.length > 0) {
-          const importErrorEl = container.querySelector('[data-error="import"]');
-          if (importErrorEl) importErrorEl.textContent = `\u4EE5\u4E0B\u6A94\u6848\u7121\u6CD5\u8B80\u53D6\uFF0C\u5DF2\u7565\u904E\uFF1A${skipped.join("\u3001")}`;
-        }
-        return;
-      }
-      const file = queue2[index];
-      let parsed;
-      try {
-        parsed = await parseFn(file);
-      } catch (err) {
-        skipped.push(file.name);
-        await next(index + 1);
-        return;
-      }
-      renderPreview(container, {
-        parsed,
-        onCancel: () => next(index + 1),
-        onImported: () => {
-          showToast(`\u5DF2\u6210\u529F\u532F\u5165\uFF1A${file.name}`);
-          next(index + 1);
-        }
-      });
-    }
-    await next(0);
-  }
-
-  // src/ui/keepScroll.js
-  var isMobile = () => typeof matchMedia === "function" && matchMedia("(max-width: 640px)").matches;
-  function keepScroll(rerender) {
-    if (isMobile()) document.activeElement?.blur();
-    const y = window.scrollY;
-    return Promise.resolve(rerender()).then((result) => {
-      window.scrollTo(0, y);
-      return result;
-    });
-  }
-
-  // src/domain/ageTier.js
-  function calculateAgeInMonths(birthDate, asOfDate) {
-    const birth = /* @__PURE__ */ new Date(`${birthDate}T00:00:00`);
-    const asOf = /* @__PURE__ */ new Date(`${asOfDate}T00:00:00`);
-    let months = (asOf.getFullYear() - birth.getFullYear()) * 12 + (asOf.getMonth() - birth.getMonth());
-    if (asOf.getDate() < birth.getDate()) {
-      months -= 1;
-    }
-    return Math.max(0, months);
-  }
-  function suggestTier(birthDate, asOfDate) {
-    const months = calculateAgeInMonths(birthDate, asOfDate);
-    const tier = TIERS.find((t) => months >= t.minMonths && months <= t.maxMonths);
-    return tier ? tier.code : null;
-  }
-
-  // src/ui/scrollShade.js
-  function wireScrollShade(el) {
-    if (!el) return;
-    const update = () => {
-      const overflow = el.scrollHeight - el.clientHeight;
-      const scrollable = overflow > 1;
-      el.classList.toggle("is-scrollable", scrollable);
-      el.classList.toggle("has-overflow-top", scrollable && el.scrollTop > 1);
-      el.classList.toggle("has-overflow-bottom", scrollable && el.scrollTop < overflow - 1);
-    };
-    let scrollingTimer;
-    const onScroll = () => {
-      update();
-      el.classList.add("is-scrolling");
-      clearTimeout(scrollingTimer);
-      scrollingTimer = setTimeout(() => el.classList.remove("is-scrolling"), 700);
-    };
-    update();
-    el.addEventListener("scroll", onScroll, { passive: true });
-    if (typeof ResizeObserver !== "undefined") new ResizeObserver(update).observe(el);
-  }
-
-  // src/ui/formPopup.js
-  var MOBILE_QUERY = "(max-width: 640px)";
-  var isMobile2 = () => typeof matchMedia === "function" && matchMedia(MOBILE_QUERY).matches;
-  var scrollYBeforeLock = 0;
-  var lockBodyScroll = () => {
-    scrollYBeforeLock = window.scrollY;
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollYBeforeLock}px`;
-    document.body.style.width = "100%";
-    document.body.style.overflow = "hidden";
-  };
-  var unlockBodyScroll = () => {
-    document.body.style.position = "";
-    document.body.style.top = "";
-    document.body.style.width = "";
-    document.body.style.overflow = "";
-    window.scrollTo(0, scrollYBeforeLock);
-  };
-  var fabIconHtml = () => `
-  <svg class="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" focusable="false">
-    <path d="M12 5v14M5 12h14"/>
-  </svg>
-`;
-  var FAB_POS_KEY = "c-form-fab-pos";
-  var FAB_DRAG_THRESHOLD = 6;
-  function clampFabPosition(fab, left, top) {
-    const margin = 4;
-    const width = fab.offsetWidth || 64;
-    const height = fab.offsetHeight || 64;
-    const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-    const maxTop = Math.max(margin, window.innerHeight - height - margin);
-    return {
-      left: Math.min(Math.max(left, margin), maxLeft),
-      top: Math.min(Math.max(top, margin), maxTop)
-    };
-  }
-  function applyFabPosition(fab, left, top) {
-    fab.style.left = `${left}px`;
-    fab.style.top = `${top}px`;
-    fab.style.right = "auto";
-    fab.style.bottom = "auto";
-  }
-  function wireFabDrag(fab) {
-    const saved = localStorage.getItem(FAB_POS_KEY);
-    if (saved) {
-      try {
-        const { xFrac, yFrac } = JSON.parse(saved);
-        const { left, top } = clampFabPosition(fab, xFrac * window.innerWidth, yFrac * window.innerHeight);
-        applyFabPosition(fab, left, top);
-      } catch {
-      }
-    }
-    let pointerId = null;
-    let dragging = false;
-    let justDragged = false;
-    let startX = 0;
-    let startY = 0;
-    let originLeft = 0;
-    let originTop = 0;
-    fab.addEventListener("pointerdown", (event) => {
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      pointerId = event.pointerId;
-      dragging = false;
-      startX = event.clientX;
-      startY = event.clientY;
-      const rect = fab.getBoundingClientRect();
-      originLeft = rect.left;
-      originTop = rect.top;
-    });
-    fab.addEventListener("pointermove", (event) => {
-      if (event.pointerId !== pointerId) return;
-      const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
-      if (!dragging) {
-        if (Math.hypot(dx, dy) < FAB_DRAG_THRESHOLD) return;
-        dragging = true;
-        fab.setPointerCapture(pointerId);
-      }
-      const { left, top } = clampFabPosition(fab, originLeft + dx, originTop + dy);
-      applyFabPosition(fab, left, top);
-    });
-    fab.addEventListener("pointerup", (event) => {
-      if (event.pointerId !== pointerId) return;
-      if (dragging) {
-        justDragged = true;
-        const rect = fab.getBoundingClientRect();
-        localStorage.setItem(FAB_POS_KEY, JSON.stringify({
-          xFrac: rect.left / window.innerWidth,
-          yFrac: rect.top / window.innerHeight
-        }));
-      }
-      pointerId = null;
-      dragging = false;
-    });
-    fab.addEventListener("click", (event) => {
-      if (justDragged) {
-        justDragged = false;
-        event.stopImmediatePropagation();
-        event.preventDefault();
-      }
-    });
-  }
-  function formPopupMarkup({ formHtml, fabLabel }) {
-    const mobile = isMobile2();
-    return `
-    <dialog class="form-popup" ${mobile ? "" : "open"}>
-      <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="\u95DC\u9589">\xD7</button>
-      ${formHtml}
-    </dialog>
-    ${mobile ? `<button type="button" class="fab" data-action="open-form-popup" aria-label="${fabLabel}">${fabIconHtml()}</button>` : ""}
-  `;
-  }
-  function wireFormPopup(container) {
-    const dialog = container.querySelector(".form-popup");
-    unlockBodyScroll();
-    const fab = container.querySelector('[data-action="open-form-popup"]');
-    if (fab) {
-      wireFabDrag(fab);
-      fab.addEventListener("click", () => {
-        dialog.showModal();
-        lockBodyScroll();
-      });
-    }
-    container.querySelector('[data-action="close-form-popup"]')?.addEventListener("click", () => dialog.close());
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.close();
-    });
-    dialog.addEventListener("close", unlockBodyScroll);
-  }
-  function wireNestedEntryForm(trigger, entryForm) {
-    const dialog = entryForm.closest("dialog.form-popup");
-    if (!dialog) {
-      entryForm.hidden = true;
-      trigger.addEventListener("click", () => {
-        entryForm.hidden = !entryForm.hidden;
-      });
-      return;
-    }
-    unlockBodyScroll();
-    trigger.addEventListener("click", () => {
-      dialog.showModal();
-      lockBodyScroll();
-    });
-    dialog.querySelector('[data-action="close-form-popup"]').addEventListener("click", () => dialog.close());
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.close();
-    });
-    dialog.addEventListener("close", unlockBodyScroll);
-  }
-  function nestedEntryFormDialog(entryFormHtml) {
-    if (!isMobile2()) return entryFormHtml;
-    return `
-    <dialog class="form-popup">
-      <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="\u95DC\u9589">\xD7</button>
-      ${entryFormHtml}
-    </dialog>
-  `;
-  }
-
-  // src/ui/childListView.js
-  async function renderChildListView(container, { onSelectChild, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false, onBack, reportType }) {
-    const children = (await listChildren()).sort(
-      (a, b) => (a.birthDate || "9999-99-99").localeCompare(b.birthDate || "9999-99-99")
-    );
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    const isParentReport = reportType === "parent-report";
-    const listForType = isParentReport ? listParentReportsForChild : listFormsForChild;
-    const newChildIds = new Set(
-      (await Promise.all(
-        children.map(async (child) => (await listForType(child.id)).some((item) => item.isNew) ? child.id : null)
-      )).filter((id) => id !== null)
-    );
-    container.innerHTML = `
-    <div class="page-header page-header--editor">
-      ${onBack ? `<button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE", "\u2190 \u8FD4\u56DE")}</button>` : ""}
-      <h2 class="page-header__title">\u5E7C\u5152\u5217\u8868</h2>
-      ${// The docx-import button only makes sense when picking a child to open a form/report.
-    // In pure "管理幼兒" mode (no onSelectChild) it's just noise, so drop it.
-    !onSelectChild ? "" : isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">${headerButtonLabel("\u9069\u6027\u7D00\u9304\u532F\u5165", "\u532F\u5165")}</button>
-               <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">${headerButtonLabel("\u9069\u6027\u7E3D\u8868\u532F\u5165", "\u532F\u5165")}</button>
-               <input type="file" accept=".docx" data-field="import-file" multiple hidden>`}
-    </div>
-    <p class="field-error field-error--center" data-error="import"></p>
-    <div class="tab-layout">
-      <div class="entry-list-wrap">
-        <ul class="card-list card-list--rows">
-          ${children.map((child) => {
-      const meta = child.birthDate ? `${escapeHtml(child.birthDate)}\u3000\xB7\u3000${calculateAgeInMonths(child.birthDate, today)} \u500B\u6708` : "\u672A\u586B\u51FA\u751F\u65E5\u671F";
-      return `<li class="card-list__row">
-                  <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
-                    <span class="card-list__name">${escapeHtml(child.name)}${newChildIds.has(child.id) ? '<span class="new-badge">\u65B0</span>' : ""}</span>
-                    <span class="card-list__meta">${meta}</span>
-                  </button>
-                  <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="\u522A\u9664${escapeHtml(child.name)}">\xD7</button>
-                </li>`;
-    }).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u5E7C\u5152\u8CC7\u6599\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u5E7C\u5152\u300D\u8868\u55AE\u65B0\u589E</li>'}
-        </ul>
-        <p class="field-error" data-error="delete"></p>
-      </div>
-      ${formPopupMarkup({
-      formHtml: `
-          <form class="panel-form" data-action="add-child">
-            <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
-            <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
-            <label class="panel-form__field">
-              \u51FA\u751F\u65E5\u671F
-              ${birthDateSelectsHtml({ yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" })}
-            </label>
-            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-          </form>
-        `,
-      fabLabel: "\u65B0\u589E\u5E7C\u5152"
-    })}
-    </div>
-  `;
-    wireScrollShade(container.querySelector(".card-list--rows"));
-    wireFormPopup(container);
-    if (onBack) {
-      container.querySelector('[data-action="back"]').addEventListener("click", onBack);
-    }
-    wireBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
-    if (onSelectChild) {
-      for (const child of children) {
-        container.querySelector(`[data-child-id="${child.id}"]`).addEventListener("click", () => onSelectChild(child));
-      }
-    }
-    for (const child of children) {
-      container.querySelector(`[data-delete-child="${child.id}"]`).addEventListener("click", async () => {
-        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${child.name}\u300D\u7684\u6240\u6709\u8CC7\u6599\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
-        try {
-          await deleteChild(child.id);
-          await keepScroll(() => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }));
-        } catch (err) {
-          container.querySelector('[data-error="delete"]').textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
-        }
-      });
-    }
-    container.querySelector('[data-action="add-child"]').addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const name = container.querySelector('[data-field="name"]').value;
-      const birthDate = parseBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
-      if (!birthDate) {
-        const form = container.querySelector('[data-action="add-child"]');
-        let errorEl = form.querySelector("[data-error]");
-        if (!errorEl) {
-          errorEl = document.createElement("p");
-          errorEl.dataset.error = "";
-          errorEl.className = "field-error";
-          form.insertAdjacentElement("afterbegin", errorEl);
-        }
-        errorEl.textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
-        return;
-      }
-      try {
-        await addChild({ name, birthDate });
-        await keepScroll(() => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }));
-      } catch (err) {
-        const form = container.querySelector('[data-action="add-child"]');
-        let errorEl = form.querySelector("[data-error]");
-        if (!errorEl) {
-          errorEl = document.createElement("p");
-          errorEl.dataset.error = "";
-          errorEl.className = "field-error";
-          form.insertAdjacentElement("afterbegin", errorEl);
-        }
-        errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
-      }
-    });
-    if (onSelectChild && isParentReport) {
-      const fileInput = container.querySelector('[data-field="import-parent-report-file"]');
-      container.querySelector('[data-action="import-parent-report-docx"]').addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", async () => {
-        if (fileInput.files.length === 0) return;
-        await processImportQueue(fileInput.files, {
-          parseFn: parseParentReportDocxImport,
-          renderPreview: renderParentReportImportPreviewView,
-          container,
-          backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
-        });
-      });
-    } else if (onSelectChild) {
-      const fileInput = container.querySelector('[data-field="import-file"]');
-      container.querySelector('[data-action="import-docx"]').addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", async () => {
-        if (fileInput.files.length === 0) return;
-        await processImportQueue(fileInput.files, {
-          parseFn: parseDocxImport,
-          renderPreview: renderImportPreviewView,
-          container,
-          backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
-        });
-      });
-    }
-  }
-
-  // src/ui/formListView.js
-  async function renderFormListView(container, { child, onSelectForm, onBack, onAggregate = () => {
-  }, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
-    const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period));
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-    const suggested = suggestTier(child.birthDate, today);
-    const defaultYear = currentRocYear();
-    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
-    container.innerHTML = `
-    <div class="page-header page-header--editor">
-      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
-      <h2 class="page-header__title">${escapeHtml(child.name)} \u7684\u9069\u6027\u7E3D\u8868</h2>
-      <button type="button" class="btn btn--purple" data-action="aggregate">${headerButtonLabel("\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574", "\u5F59\u6574")}</button>
-    </div>
-    <div class="tab-layout">
-      <div class="entry-list-wrap">
-        <ul class="card-list card-list--rows">
-          ${forms.map(
-      (form) => `<li class="card-list__row">
-                  <button type="button" class="card-list__item" data-form-id="${escapeHtml(form.id)}">
-                    <span class="card-list__name">${escapeHtml(form.tier)} \u968E\u6BB5${form.isNew ? '<span class="new-badge">\u65B0</span>' : ""}</span>
-                    <span class="card-list__meta">${escapeHtml(form.period)}</span>
-                  </button>
-                  <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="\u522A\u9664${escapeHtml(form.tier)} ${escapeHtml(form.period)}">\xD7</button>
-                </li>`
-    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7E3D\u8868\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u9069\u6027\u7E3D\u8868\u300D\u8868\u55AE\u65B0\u589E\uFF0C\u6216\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</li>'}
-        </ul>
-        <p class="field-error" data-error="delete"></p>
-      </div>
-      ${formPopupMarkup({
-      formHtml: `
-          <form class="panel-form" data-action="add-form">
-            <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7E3D\u8868</h3>
-            <label class="panel-form__field">
-              \u6708\u9F61\u968E\u6BB5
-              <select data-field="tier">
-                ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
-              </select>
-            </label>
-            <label class="panel-form__field">
-              \u7D00\u9304\u5E74\u6708
-              ${periodSelectsHtml({
-        yearFieldName: "period-year",
-        monthFieldName: "period-month",
-        selectedYear: defaultYear,
-        selectedMonth: defaultMonth
-      })}
-            </label>
-            <label class="entry-form__checkbox">
-              <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
-            </label>
-            <label class="panel-form__field" data-field-group="period-end" hidden>
-              \u81F3
-              ${periodSelectsHtml({
-        yearFieldName: "period-end-year",
-        monthFieldName: "period-end-month",
-        selectedYear: defaultYear,
-        selectedMonth: defaultMonth
-      })}
-            </label>
-            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
-          </form>
-        `,
-      fabLabel: "\u65B0\u589E\u9069\u6027\u7E3D\u8868"
-    })}
-    </div>
-  `;
-    wireScrollShade(container.querySelector(".card-list--rows"));
-    wireFormPopup(container);
-    container.querySelector('[data-action="back"]').addEventListener("click", onBack);
-    container.querySelector('[data-action="aggregate"]').addEventListener("click", onAggregate);
-    container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
-      container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
-    });
-    for (const form of forms) {
-      container.querySelector(`[data-form-id="${form.id}"]`).addEventListener("click", () => onSelectForm(form));
-    }
-    for (const form of forms) {
-      container.querySelector(`[data-delete-form="${form.id}"]`).addEventListener("click", async () => {
-        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${form.tier} ${form.period}\u300D\u9019\u4EFD\u9069\u6027\u7E3D\u8868\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
-        try {
-          await deleteForm(form.id);
-          await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
-        } catch (err) {
-          container.querySelector('[data-error="delete"]').textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
-        }
-      });
-    }
-    container.querySelector('[data-action="add-form"]').addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const tier = container.querySelector('[data-field="tier"]').value;
-      const year = container.querySelector('[data-field="period-year"]').value;
-      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
-      const startPeriod = `${year}\u5E74${month}\u6708`;
-      const isRange = container.querySelector('[data-field="period-is-range"]').checked;
-      let period = startPeriod;
-      if (isRange) {
-        const endYear = container.querySelector('[data-field="period-end-year"]').value;
-        const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, "0");
-        period = combinedPeriod(startPeriod, `${endYear}\u5E74${endMonth}\u6708`);
-      }
-      try {
-        await addForm({ childId: child.id, tier, period });
-        await keepScroll(() => renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete }));
-      } catch (err) {
-        const form = container.querySelector('[data-action="add-form"]');
-        let errorEl = form.querySelector("[data-error]");
-        if (!errorEl) {
-          errorEl = document.createElement("p");
-          errorEl.dataset.error = "";
-          errorEl.className = "field-error";
-          form.insertAdjacentElement("afterbegin", errorEl);
-        }
-        errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
-      }
-    });
-  }
-
-  // src/export/downloadBlob.js
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 1e3);
   }
 
   // node_modules/docx/dist/index.mjs
@@ -26280,6 +25407,1180 @@ var CFormApp = (() => {
     return `${Number(match[1]) - 1911}/${match[2]}/${match[3]}`;
   }
 
+  // src/ui/birthDateField.js
+  var CURRENT_YEAR = (/* @__PURE__ */ new Date()).getFullYear();
+  var YEAR_RANGE_BACK = 6;
+  function daysInMonth(year, month) {
+    return new Date(year, month, 0).getDate();
+  }
+  function birthDateYearOptions() {
+    const years = [];
+    for (let year = CURRENT_YEAR; year >= CURRENT_YEAR - YEAR_RANGE_BACK; year -= 1) years.push(year);
+    return years;
+  }
+  function dayOptionsHtml(dayCount, selectedDay) {
+    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}</option>`).join("");
+  }
+  function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldName, value }) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
+    const selectedYear = match ? Number(match[1]) : "";
+    const selectedMonth = match ? Number(match[2]) : "";
+    const selectedDay = match ? Number(match[3]) : "";
+    const dayCount = selectedYear && selectedMonth ? daysInMonth(selectedYear, selectedMonth) : 31;
+    return `
+    <span class="panel-form__period-row">
+      <select data-field="${yearFieldName}">
+        <option value="">\u5E74</option>
+        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}</option>`).join("")}
+      </select>
+      <select data-field="${monthFieldName}">
+        <option value="">\u6708</option>
+        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}</option>`).join("")}
+      </select>
+      <select data-field="${dayFieldName}">
+        <option value="">\u65E5</option>
+        ${dayOptionsHtml(dayCount, selectedDay)}
+      </select>
+    </span>
+  `;
+  }
+  function wireBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
+    const yearEl = container.querySelector(`[data-field="${yearFieldName}"]`);
+    const monthEl = container.querySelector(`[data-field="${monthFieldName}"]`);
+    const dayEl = container.querySelector(`[data-field="${dayFieldName}"]`);
+    const refreshDayOptions = () => {
+      const year = Number(yearEl.value) || CURRENT_YEAR;
+      const month = Number(monthEl.value) || 1;
+      const dayCount = daysInMonth(year, month);
+      const selectedDay = Math.min(Number(dayEl.value) || 0, dayCount) || "";
+      dayEl.innerHTML = `<option value="">\u65E5</option>${dayOptionsHtml(dayCount, selectedDay)}`;
+    };
+    yearEl.addEventListener("change", refreshDayOptions);
+    monthEl.addEventListener("change", refreshDayOptions);
+  }
+  function parseBirthDateSelects(container, { yearFieldName, monthFieldName, dayFieldName }) {
+    const year = container.querySelector(`[data-field="${yearFieldName}"]`).value;
+    const month = container.querySelector(`[data-field="${monthFieldName}"]`).value;
+    const day = container.querySelector(`[data-field="${dayFieldName}"]`).value;
+    if (!year || !month || !day) return "";
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  // src/ui/periodFields.js
+  var MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
+  function currentRocYear() {
+    return (/* @__PURE__ */ new Date()).getFullYear() - 1911;
+  }
+  function rocYearOptions() {
+    const current = currentRocYear();
+    const years = [];
+    for (let year = current + 1; year >= current - 5; year -= 1) years.push(year);
+    return years;
+  }
+  function periodSelectsHtml({ yearFieldName, monthFieldName, selectedYear, selectedMonth }) {
+    return `
+    <span class="panel-form__period-row">
+      <select data-field="${yearFieldName}">
+        ${rocYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}\u5E74</option>`).join("")}
+      </select>
+      <select data-field="${monthFieldName}">
+        ${MONTHS.map(
+      (month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${String(month).padStart(2, "0")}\u6708</option>`
+    ).join("")}
+      </select>
+    </span>
+  `;
+  }
+  function parsePeriod(period) {
+    const match = /^(\d{1,3})年(\d{1,2})月$/.exec(String(period ?? "").trim());
+    if (!match) return { year: null, month: null };
+    return { year: Number(match[1]), month: Number(match[2]) };
+  }
+  function splitPeriodRange(period) {
+    const text = String(period ?? "").trim();
+    const dashIndex = text.indexOf("-");
+    if (dashIndex === -1) return { start: text, end: text };
+    return { start: text.slice(0, dashIndex), end: text.slice(dashIndex + 1) };
+  }
+  function combinedPeriod(periodA, periodB) {
+    const [first, last] = [periodA, periodB].sort();
+    return first === last ? first : `${first}-${last}`;
+  }
+
+  // src/ui/importPreviewView.js
+  var BIRTH_DATE_FIELDS = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
+  var STATUS_MARKS = { developed: "\u25CB", developing: "\u25B3", absent: "\uFF08\u8ACB\u5047\uFF09", courseChanged: "\uFF08\u66F4\u63DB\u8AB2\u7A0B\uFF09" };
+  function entryRow(entry, index) {
+    const unresolved = !entry.description && !entry.isRemark;
+    const description = entry.description || entry.activityName || "";
+    return `
+    <li class="import-preview__entry${unresolved ? " import-preview__entry--warning" : ""}">
+      <label>
+        <input type="checkbox" data-entry-include="${index}" checked>
+        ${entry.isRemark ? '<span class="import-preview__entry-remark">\u5099\u8A3B</span>' : ""}
+        <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
+        ${unresolved ? "\uFF08\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF0C\u5EFA\u8B70\u53D6\u6D88\u52FE\u9078\uFF09" : escapeHtml(description)}
+        \u2014
+        ${escapeHtml(toRocDate(entry.date))}${STATUS_MARKS[entry.status] ?? ""}
+        <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
+      </label>
+    </li>
+  `;
+  }
+  function renderImportPreviewView(container, { parsed, onCancel, onImported }) {
+    const defaultRocYear = currentRocYear();
+    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
+    const { start: parsedStart, end: parsedEnd } = splitPeriodRange(parsed.period);
+    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsedStart);
+    const { year: parsedEndYear, month: parsedEndMonth } = parsePeriod(parsedEnd);
+    const parsedIsRange = parsedStart !== parsedEnd;
+    container.innerHTML = `
+    <div class="page-header">
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
+      <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7E3D\u8868\uFF09</h2>
+    </div>
+    ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">
+            ${parsed.warnings.map((warning) => `<li class="field-error">${escapeHtml(warning)}</li>`).join("")}
+          </ul>` : ""}
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
+      <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
+      <div class="panel-form__row">
+        <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS, value: parsed.child.birthDate })}</label>
+      </div>
+      <div class="panel-form__row">
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          \u7D00\u9304\u5E74\u6708
+          ${periodSelectsHtml({
+      yearFieldName: "period-year",
+      monthFieldName: "period-month",
+      selectedYear: parsedYear ?? defaultRocYear,
+      selectedMonth: parsedMonth ?? defaultMonth
+    })}
+        </label>
+      </div>
+      <label class="entry-form__checkbox">
+        <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? "checked" : ""}> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
+      </label>
+      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? "" : "hidden"}>
+        \u81F3
+        ${periodSelectsHtml({
+      yearFieldName: "period-end-year",
+      monthFieldName: "period-end-month",
+      selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
+      selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth
+    })}
+      </label>
+
+      <h3 class="panel-form__title">\u89C0\u5BDF\u7D00\u9304\uFF08\u5171 ${parsed.entries.length} \u7B46\uFF0C\u53D6\u6D88\u52FE\u9078\u53EF\u6392\u9664\u4E0D\u532F\u5165\uFF09</h3>
+      <ul class="import-preview__entry-list">
+        ${parsed.entries.map(entryRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u89C0\u5BDF\u7D00\u9304</li>"}
+      </ul>
+
+      <button type="submit" class="btn btn--primary">\u78BA\u8A8D\u532F\u5165</button>
+      <p class="field-error" data-error></p>
+    </form>
+  `;
+    container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
+    wireBirthDateSelects(container, BIRTH_DATE_FIELDS);
+    container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
+      container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
+    });
+    container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorEl = container.querySelector("[data-error]");
+      const name = container.querySelector('[data-field="name"]').value;
+      const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS);
+      if (!birthDate) {
+        container.querySelector("[data-error]").textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
+        return;
+      }
+      const tier = container.querySelector('[data-field="tier"]').value;
+      const year = container.querySelector('[data-field="period-year"]').value;
+      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
+      const startPeriod = `${year}\u5E74${month}\u6708`;
+      const isRange = container.querySelector('[data-field="period-is-range"]').checked;
+      let period = startPeriod;
+      if (isRange) {
+        const endYear = container.querySelector('[data-field="period-end-year"]').value;
+        const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, "0");
+        period = combinedPeriod(startPeriod, `${endYear}\u5E74${endMonth}\u6708`);
+      }
+      const includedEntries = parsed.entries.filter((entry, index) => container.querySelector(`[data-entry-include="${index}"]`).checked);
+      try {
+        const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);
+        const child = existingChild ?? await addChild({ name, birthDate });
+        const entriesByTier = /* @__PURE__ */ new Map();
+        for (const entry of includedEntries) {
+          const entryTier = entry.tier ?? tier;
+          if (!entriesByTier.has(entryTier)) entriesByTier.set(entryTier, []);
+          entriesByTier.get(entryTier).push(entry);
+        }
+        if (entriesByTier.size === 0) entriesByTier.set(tier, []);
+        for (const [entryTier, tierEntries] of entriesByTier) {
+          const form = await addForm({ childId: child.id, tier: entryTier, period, isNew: true });
+          for (const entry of tierEntries) {
+            await addEntry({
+              formId: form.id,
+              indicatorCode: entry.indicatorCode,
+              date: entry.date,
+              status: entry.status,
+              note: entry.note,
+              activityName: entry.activityName
+            });
+          }
+        }
+        onImported();
+      } catch (err) {
+        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
+      }
+    });
+  }
+
+  // src/import/parentReportDocxImport.js
+  var import_jszip2 = __toESM(require_jszip_min(), 1);
+  function cellsForRow2(rowXml) {
+    return [...rowXml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map((match) => match[1]);
+  }
+  function rowsOf2(tableXml) {
+    return [...tableXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((match) => match[0]);
+  }
+  function paragraphsOf(cellXml) {
+    return [...cellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((match) => match[0]);
+  }
+  function textOf(fragmentXml) {
+    return [...fragmentXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
+  }
+  function paragraphJoinedText(xml) {
+    return [...xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((p) => [...p[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("")).join(" ").trim();
+  }
+  function flatJoinedText(xml) {
+    return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join(" ");
+  }
+  function isVMergeContinue(cellXml) {
+    return /<w:vMerge\s*\/>/.test(cellXml) || /<w:vMerge(?!\s+w:val)/.test(cellXml) || /<w:vMerge\s+w:val="continue"\s*\/>/.test(cellXml);
+  }
+  function isStruck(cellXml) {
+    return /<w:strike\s*\/>/.test(cellXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, ""));
+  }
+  function normalizeMonthDay(raw) {
+    const match = /^(\d{1,2})\/(\d{1,2})/.exec(raw);
+    if (!match) return null;
+    return `${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+  }
+  function processCoursePlanBodyRows(bodyRows) {
+    const entries = [];
+    const occurrencesByEntryIndex = {};
+    let currentEntryIndex = -1;
+    for (const rowXml of bodyRows) {
+      const cells = cellsForRow2(rowXml);
+      if (cells.length < 5) continue;
+      const [domainCell, codeCell, activityCell, dateCell, noteCell] = cells;
+      if (!isVMergeContinue(codeCell)) {
+        const indicatorCode = normalizeIndicatorCode(textOf(codeCell));
+        const activityParagraphs = paragraphsOf(activityCell);
+        const activityNameRaw = activityParagraphs[0] ? textOf(activityParagraphs[0]) : "";
+        const activityName = activityNameRaw.replace(/^【|】$/g, "");
+        const indicatorText = activityParagraphs[1] ? textOf(activityParagraphs[1]) : "";
+        entries.push({ indicatorCode, activityName, indicatorText });
+        currentEntryIndex += 1;
+        occurrencesByEntryIndex[currentEntryIndex] = [];
+      }
+      if (currentEntryIndex < 0) continue;
+      const dateText = textOf(dateCell);
+      const date = normalizeMonthDay(dateText);
+      if (!date) continue;
+      const absent = isStruck(dateCell);
+      const status = absent ? null : dateText.includes("\u25CB") ? "developed" : dateText.includes("\u25B3") ? "developing" : null;
+      occurrencesByEntryIndex[currentEntryIndex].push({ date, status, absent, note: textOf(noteCell) });
+    }
+    return { entries, occurrencesByEntryIndex };
+  }
+  function parseCoursePlanTables(tableXmls) {
+    return processCoursePlanBodyRows(tableXmls.flatMap((xml) => rowsOf2(xml).slice(1)));
+  }
+  function isCoursePlanShapedTable(tableXml) {
+    const firstRow = rowsOf2(tableXml)[0];
+    if (!firstRow) return false;
+    const headerText = textOf(firstRow);
+    return headerText.includes("\u767C\u5C55\u9818\u57DF") && headerText.includes("\u8AB2\u7A0B\u5BE6\u65BD\u65E5\u671F");
+  }
+  function rocDotDateToIso(rocDate) {
+    const match = /^(\d{1,3})[./](\d{1,2})[./](\d{1,2})$/.exec(rocDate.trim());
+    if (!match) return null;
+    const [, rocYear, month, day] = match;
+    return `${Number(rocYear) + 1911}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  function parseHeaderInfo2(headerText) {
+    const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
+    const birthMatch = /出生(?:年月日|日期)[：:]\s*(\d{1,3}[./]\d{1,2}[./]\d{1,2})/.exec(headerText);
+    const periodMatch = /(?:紀錄時間|實施時間)[：:]\s*(\d{1,3})\s*年\s*(\d{1,2})\s*月/.exec(headerText);
+    return {
+      name: nameMatch ? nameMatch[1] : null,
+      birthDate: birthMatch ? rocDotDateToIso(birthMatch[1]) : null,
+      period: periodMatch ? `${periodMatch[1]}\u5E74${periodMatch[2].padStart(2, "0")}\u6708` : null
+    };
+  }
+  function parseRecordBlocks(tableXml) {
+    const rows = [...tableXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((m) => m[0]);
+    const blocks = [];
+    for (let i = 0; i < rows.length; i += 2) {
+      const headerRow = rows[i];
+      const contentRow2 = rows[i + 1];
+      if (!contentRow2) break;
+      const label = [...headerRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
+      const paragraphs = [...contentRow2.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map(
+        (p) => [...p[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("")
+      );
+      const rawText = paragraphs.join("\n").trim();
+      if (label && rawText) blocks.push({ label, rawText });
+    }
+    return blocks;
+  }
+  function extractHighlightPhotoGroups(highlightsTableXml) {
+    const startIdx = highlightsTableXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
+    const scoped = startIdx === -1 ? highlightsTableXml : highlightsTableXml.slice(startIdx);
+    const rows = [...scoped.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)].map((m) => m[0]);
+    const groups = [];
+    for (let i = 0; i < rows.length; i += 2) {
+      const photoRow = rows[i];
+      const captionRow = rows[i + 1];
+      if (!captionRow) break;
+      const photoCount = (photoRow.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
+      const caption = [...captionRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
+      if (photoCount > 0 && caption) groups.push({ photoCount, caption });
+    }
+    return groups;
+  }
+  async function countHeaderFooterDrawings(zip) {
+    const partNames = Object.keys(zip.files).filter((name) => /^word\/(header|footer)\d*\.xml$/i.test(name));
+    const xmls = await Promise.all(partNames.map((name) => zip.file(name).async("text")));
+    return xmls.reduce((total, xml) => total + (xml.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length, 0);
+  }
+  function countInlineDrawingsBeforeHighlights(documentXml) {
+    const highlightsIndex = documentXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
+    const scoped = highlightsIndex === -1 ? documentXml : documentXml.slice(0, highlightsIndex);
+    return (scoped.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
+  }
+  async function extractSortedMediaImages(zip, documentXml) {
+    const mediaNames = Object.keys(zip.files).filter((name) => /^word\/media\/image\d+\.(png|jpe?g)$/i.test(name)).sort((a, b) => {
+      const numA = Number(/image(\d+)\./.exec(a)[1]);
+      const numB = Number(/image(\d+)\./.exec(b)[1]);
+      return numA - numB;
+    });
+    const headerFooterDrawingCount = await countHeaderFooterDrawings(zip);
+    const inlineBeforeHighlightsCount = countInlineDrawingsBeforeHighlights(documentXml);
+    const skipCount = Math.min(headerFooterDrawingCount + inlineBeforeHighlightsCount, mediaNames.length);
+    const bodyMediaNames = mediaNames.slice(skipCount);
+    return Promise.all(bodyMediaNames.map(async (name) => zip.file(name).async("blob")));
+  }
+  var BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]?/;
+  var INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+  function stripReferencedIndicatorLines(rawText) {
+    const lines = rawText.split("\n");
+    let i = 0;
+    while (i < lines.length) {
+      const match = /^([^　]+)　(.*)$/.exec(lines[i]);
+      if (!match) break;
+      const indicator = getIndicator(match[1]);
+      if (!indicator || indicator.description !== match[2]) break;
+      i += 1;
+    }
+    return lines.slice(i).join("\n").trim();
+  }
+  function classifyRecordBlocks(blocks, coursePlanEntries, warnings) {
+    const domainByName = new Map(DOMAINS.map((d) => [d.name, d.id]));
+    const developmentRecordBlocks = [];
+    const behaviorObservations = [];
+    for (const block of blocks) {
+      if (domainByName.has(block.label)) {
+        const codeMatches = [...block.rawText.matchAll(INDICATOR_CODE_IN_TEXT_PATTERN)].map((m) => normalizeIndicatorCode(m[0]));
+        const courseEntryIndexes = coursePlanEntries.map((entry, index) => codeMatches.includes(entry.indicatorCode) ? index : -1).filter((index) => index !== -1);
+        developmentRecordBlocks.push({ domain: domainByName.get(block.label), courseEntryIndexes, narrative: stripReferencedIndicatorLines(block.rawText) });
+      } else if (BEHAVIOR_OBSERVATION_LABEL.test(block.label)) {
+        const separatorMatch = BEHAVIOR_OBSERVATION_LABEL.exec(block.label);
+        behaviorObservations.push({ title: block.label.slice(separatorMatch[0].length), narrative: block.rawText });
+      } else {
+        warnings.push(`\u7121\u6CD5\u8FA8\u8B58\u7684\u6BB5\u843D\u6A19\u984C\u300C${block.label}\u300D\uFF0C\u5DF2\u7565\u904E\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u78BA\u8A8D\u662F\u5426\u9700\u8981\u624B\u52D5\u88DC\u4E0A`);
+      }
+    }
+    return { developmentRecordBlocks, behaviorObservations };
+  }
+  async function parseParentReportDocxImport(data) {
+    const zip = await import_jszip2.default.loadAsync(data);
+    const documentXml = await zip.file("word/document.xml").async("text");
+    const warnings = [];
+    const headerFileNames = Object.keys(zip.files).filter((name) => /^word\/header\d*\.xml$/.test(name));
+    let headerInfo = { name: null, birthDate: null, period: null };
+    for (const name of headerFileNames) {
+      const xml = await zip.file(name).async("text");
+      let text = paragraphJoinedText(xml);
+      if (!text.includes("\u5E7C\u5152\u59D3\u540D")) {
+        const flatText = flatJoinedText(xml);
+        if (flatText.includes("\u5E7C\u5152\u59D3\u540D")) text = flatText;
+      }
+      if (text.includes("\u5E7C\u5152\u59D3\u540D")) {
+        headerInfo = parseHeaderInfo2(text);
+        break;
+      }
+    }
+    if (!headerInfo.name) {
+      const firstTableIndex = documentXml.indexOf("<w:tbl>");
+      const bodyIntroXml = firstTableIndex === -1 ? documentXml : documentXml.slice(0, firstTableIndex);
+      const bodyIntroText = paragraphJoinedText(bodyIntroXml);
+      if (bodyIntroText.includes("\u5E7C\u5152\u59D3\u540D")) {
+        headerInfo = parseHeaderInfo2(bodyIntroText);
+      }
+    }
+    if (!headerInfo.name) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u5E7C\u5152\u59D3\u540D\uFF0C\u8ACB\u624B\u52D5\u8F38\u5165");
+    if (!headerInfo.birthDate) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u51FA\u751F\u65E5\u671F\uFF0C\u8ACB\u624B\u52D5\u8F38\u5165");
+    if (!headerInfo.period) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u7D00\u9304\u5E74\u6708\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
+    const tables = [...documentXml.matchAll(/<w:tbl>[\s\S]*?<\/w:tbl>/g)].map((m) => m[0]);
+    const coursePlanTableXmls = tables.filter(isCoursePlanShapedTable);
+    const secondTableXml = tables.filter((t) => !isCoursePlanShapedTable(t)).join("");
+    const { entries: coursePlanEntriesRaw, occurrencesByEntryIndex } = coursePlanTableXmls.length ? parseCoursePlanTables(coursePlanTableXmls) : { entries: [], occurrencesByEntryIndex: {} };
+    const inferredYear = headerInfo.period ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911 : (/* @__PURE__ */ new Date()).getFullYear();
+    const coursePlanEntries = coursePlanEntriesRaw.map((entry, index) => ({
+      ...entry,
+      occurrences: (occurrencesByEntryIndex[index] || []).map((o) => ({ ...o, date: `${inferredYear}-${o.date}` }))
+    }));
+    const tier = (() => {
+      const counts = /* @__PURE__ */ new Map();
+      for (const entry of coursePlanEntries) {
+        const indicator = getIndicator(entry.indicatorCode);
+        if (!indicator) continue;
+        counts.set(indicator.tier, (counts.get(indicator.tier) || 0) + 1);
+      }
+      let best = null, bestCount = 0;
+      for (const [t, count] of counts) if (count > bestCount) {
+        best = t;
+        bestCount = count;
+      }
+      return best;
+    })();
+    if (!tier) warnings.push("\u7121\u6CD5\u5F9E\u6A94\u6848\u4E2D\u5224\u65B7\u6708\u9F61\u968E\u6BB5\uFF0C\u8ACB\u624B\u52D5\u9078\u64C7");
+    const highlightsIndex = secondTableXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
+    const beforeHighlightsXml = highlightsIndex === -1 ? secondTableXml : secondTableXml.slice(0, highlightsIndex);
+    const blocks = beforeHighlightsXml ? parseRecordBlocks(beforeHighlightsXml) : [];
+    const { developmentRecordBlocks, behaviorObservations } = classifyRecordBlocks(blocks, coursePlanEntries, warnings);
+    const photoGroups = secondTableXml ? extractHighlightPhotoGroups(secondTableXml) : [];
+    const mediaImages = await extractSortedMediaImages(zip, documentXml);
+    let mediaCursor = 0;
+    const highlightEntries = photoGroups.map((group) => {
+      const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
+      mediaCursor += group.photoCount;
+      return { photos, caption: group.caption };
+    });
+    if (mediaImages.length > mediaCursor) {
+      warnings.push("\u5075\u6E2C\u5230\u7684\u7167\u7247\u6578\u91CF\u591A\u65BC\u9EDE\u6EF4\u5206\u4EAB\u5340\u584A\uFF0C\u90E8\u5206\u7167\u7247\u53EF\u80FD\u672A\u6B63\u78BA\u6B78\u985E\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u78BA\u8A8D");
+    }
+    return {
+      child: { name: headerInfo.name, birthDate: headerInfo.birthDate },
+      tier,
+      period: headerInfo.period,
+      coursePlanEntries,
+      developmentRecordBlocks,
+      behaviorObservations,
+      highlightEntries,
+      warnings
+    };
+  }
+
+  // src/ui/parentReportImportPreviewView.js
+  var BIRTH_DATE_FIELDS2 = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
+  function coursePlanEntryRow(entry, index) {
+    const occurrenceSummary = entry.occurrences.map((o) => `${escapeHtml(toRocDate(o.date))}${o.courseChanged ? "\uFF08\u66F4\u63DB\u8AB2\u7A0B\uFF09" : o.absent ? "\uFF08\u8ACB\u5047\uFF09" : o.status === "developed" ? "\u25CB" : "\u25B3"}`).join("\u3001");
+    return `
+    <li class="import-preview__entry">
+      <label>
+        <input type="checkbox" data-course-entry-include="${index}" checked>
+        <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
+        \u3010${escapeHtml(entry.activityName)}\u3011\u2014 ${occurrenceSummary || "\uFF08\u7121\u5BE6\u65BD\u7D00\u9304\uFF09"}
+      </label>
+    </li>
+  `;
+  }
+  function developmentRecordRow(block, index) {
+    const domainName = DOMAINS.find((d) => d.id === block.domain)?.name ?? "";
+    return `
+    <li class="import-preview__entry">
+      <label>
+        <input type="checkbox" data-record-include="${index}" checked>
+        <strong>${escapeHtml(domainName)}</strong>\uFF1A${escapeHtml(block.narrative)}
+      </label>
+    </li>
+  `;
+  }
+  function behaviorObservationRow(observation, index) {
+    return `
+    <li class="import-preview__entry">
+      <label>
+        <input type="checkbox" data-observation-include="${index}" checked>
+        ${escapeHtml(observation.title)}\uFF1A${escapeHtml(observation.narrative)}
+      </label>
+    </li>
+  `;
+  }
+  function highlightRow(entry, index) {
+    const thumbs = entry.photos.map((blob) => `<img class="highlight-thumb" src="${URL.createObjectURL(blob)}" alt="">`).join("");
+    return `
+    <li class="import-preview__entry">
+      <label>
+        <input type="checkbox" data-highlight-include="${index}" checked>
+        <div class="highlight-thumbs">${thumbs}</div>
+        ${escapeHtml(entry.caption)}
+      </label>
+    </li>
+  `;
+  }
+  function renderParentReportImportPreviewView(container, { parsed, onCancel, onImported }) {
+    const defaultRocYear = currentRocYear();
+    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
+    const { year: parsedYear, month: parsedMonth } = parsePeriod(parsed.period);
+    container.innerHTML = `
+    <div class="page-header">
+      <button type="button" class="btn btn--ghost" data-action="cancel">${headerButtonLabel("\u2190 \u53D6\u6D88\u532F\u5165", "\u2190 \u53D6\u6D88")}</button>
+      <h2 class="page-header__title">\u78BA\u8A8D\u532F\u5165\u5167\u5BB9\uFF08\u9069\u6027\u7D00\u9304\uFF09</h2>
+    </div>
+    ${parsed.warnings.length > 0 ? `<ul class="import-preview__warnings">${parsed.warnings.map((w) => `<li class="field-error">${escapeHtml(w)}</li>`).join("")}</ul>` : ""}
+    <form class="panel-form panel-form--import-grid" data-action="confirm-import">
+      <h3 class="panel-form__title">\u5E7C\u5152\u57FA\u672C\u8CC7\u6599</h3>
+      <div class="panel-form__row">
+        <label class="panel-form__field">\u59D3\u540D <input data-field="name" value="${escapeHtml(parsed.child.name ?? "")}" required></label>
+        <label class="panel-form__field">\u51FA\u751F\u65E5\u671F ${birthDateSelectsHtml({ ...BIRTH_DATE_FIELDS2, value: parsed.child.birthDate })}</label>
+      </div>
+      <div class="panel-form__row">
+        <label class="panel-form__field">
+          \u6708\u9F61\u968E\u6BB5
+          <select data-field="tier">
+            ${TIERS.map((t) => `<option value="${t.code}" ${t.code === parsed.tier ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+          </select>
+        </label>
+        <label class="panel-form__field">
+          \u7D00\u9304\u5E74\u6708
+          ${periodSelectsHtml({ yearFieldName: "period-year", monthFieldName: "period-month", selectedYear: parsedYear ?? defaultRocYear, selectedMonth: parsedMonth ?? defaultMonth })}
+        </label>
+      </div>
+
+      <div class="import-preview__sections">
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u8AB2\u7A0B\u8A08\u756B\u8868\uFF08\u5171 ${parsed.coursePlanEntries.length} \u9805\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.coursePlanEntries.map(coursePlanEntryRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u9805\u76EE</li>"}</ul>
+        </section>
+
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u9069\u6027\u767C\u5C55\u7D00\u9304\u8868\uFF08\u5171 ${parsed.developmentRecordBlocks.length} \u6BB5\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.developmentRecordBlocks.map(developmentRecordRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u6BB5\u843D</li>"}</ul>
+        </section>
+
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u884C\u70BA\u89C0\u5BDF\uFF08\u5171 ${parsed.behaviorObservations.length} \u7B46\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.behaviorObservations.map(behaviorObservationRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u89C0\u5BDF</li>"}</ul>
+        </section>
+
+        <section class="import-preview__section">
+          <h3 class="panel-form__title">\u9EDE\u6EF4\u5206\u4EAB\uFF08\u5171 ${parsed.highlightEntries.length} \u7D44\uFF09</h3>
+          <ul class="import-preview__entry-list">${parsed.highlightEntries.map(highlightRow).join("") || "<li>\u6C92\u6709\u5075\u6E2C\u5230\u4EFB\u4F55\u7167\u7247</li>"}</ul>
+        </section>
+      </div>
+
+      <button type="submit" class="btn btn--primary">\u78BA\u8A8D\u532F\u5165</button>
+      <p class="field-error" data-error></p>
+    </form>
+  `;
+    container.querySelector('[data-action="cancel"]').addEventListener("click", onCancel);
+    wireBirthDateSelects(container, BIRTH_DATE_FIELDS2);
+    container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorEl = container.querySelector("[data-error]");
+      const name = container.querySelector('[data-field="name"]').value;
+      const birthDate = parseBirthDateSelects(container, BIRTH_DATE_FIELDS2);
+      if (!birthDate) {
+        container.querySelector("[data-error]").textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
+        return;
+      }
+      const tier = container.querySelector('[data-field="tier"]').value;
+      const year = container.querySelector('[data-field="period-year"]').value;
+      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
+      const period = `${year}\u5E74${month}\u6708`;
+      const includedEntryIndexes = parsed.coursePlanEntries.map((_, i) => i).filter((i) => container.querySelector(`[data-course-entry-include="${i}"]`).checked);
+      const includedRecordIndexes = parsed.developmentRecordBlocks.map((_, i) => i).filter((i) => container.querySelector(`[data-record-include="${i}"]`).checked);
+      const includedObservationIndexes = parsed.behaviorObservations.map((_, i) => i).filter((i) => container.querySelector(`[data-observation-include="${i}"]`).checked);
+      const includedHighlightIndexes = parsed.highlightEntries.map((_, i) => i).filter((i) => container.querySelector(`[data-highlight-include="${i}"]`).checked);
+      try {
+        const existingChild = (await listChildren()).find((c) => c.name === name && c.birthDate === birthDate);
+        const child = existingChild ?? await addChild({ name, birthDate });
+        const report = await addParentReport({ childId: child.id, tier, period, isNew: true });
+        const entryIdByOriginalIndex = /* @__PURE__ */ new Map();
+        for (const index of includedEntryIndexes) {
+          const source = parsed.coursePlanEntries[index];
+          const created = await addCoursePlanEntry({ reportId: report.id, indicatorCode: source.indicatorCode, activityName: source.activityName, indicatorText: source.indicatorText });
+          entryIdByOriginalIndex.set(index, created.id);
+          for (const occurrence of source.occurrences) {
+            await addCourseOccurrence({ entryId: created.id, ...occurrence });
+          }
+        }
+        for (const index of includedRecordIndexes) {
+          const source = parsed.developmentRecordBlocks[index];
+          const courseEntryIds = source.courseEntryIndexes.filter((i) => entryIdByOriginalIndex.has(i)).map((i) => entryIdByOriginalIndex.get(i));
+          await addDevelopmentRecordEntry({ reportId: report.id, domain: source.domain, courseEntryIds, narrative: source.narrative });
+        }
+        for (const index of includedObservationIndexes) {
+          const source = parsed.behaviorObservations[index];
+          await addBehaviorObservation({ reportId: report.id, title: source.title, narrative: source.narrative });
+        }
+        for (const index of includedHighlightIndexes) {
+          const source = parsed.highlightEntries[index];
+          const photos = source.photos.map((blob) => ({ blob, width: 0, height: 0 }));
+          await addHighlightEntry({ reportId: report.id, photos, caption: source.caption });
+        }
+        onImported();
+      } catch (err) {
+        errorEl.textContent = `\u532F\u5165\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21\uFF08${err?.message || err}\uFF09`;
+      }
+    });
+  }
+
+  // src/ui/toast.js
+  var host = null;
+  function getHost() {
+    if (host && document.body.contains(host)) return host;
+    host = document.createElement("div");
+    host.className = "toast-host";
+    document.body.appendChild(host);
+    return host;
+  }
+  var EXIT_MS = 200;
+  function showToast(message, { durationMs = 4e3 } = {}) {
+    const toast = document.createElement("p");
+    toast.className = "toast";
+    toast.textContent = message;
+    getHost().appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add("toast--out");
+      setTimeout(() => toast.remove(), EXIT_MS);
+    }, durationMs);
+    return toast;
+  }
+
+  // src/ui/importQueue.js
+  async function processImportQueue(files, { parseFn, renderPreview, container, backToList }) {
+    const queue2 = Array.from(files);
+    const skipped = [];
+    async function next(index) {
+      if (index >= queue2.length) {
+        await backToList();
+        if (skipped.length > 0) {
+          const importErrorEl = container.querySelector('[data-error="import"]');
+          if (importErrorEl) importErrorEl.textContent = `\u4EE5\u4E0B\u6A94\u6848\u7121\u6CD5\u8B80\u53D6\uFF0C\u5DF2\u7565\u904E\uFF1A${skipped.join("\u3001")}`;
+        }
+        return;
+      }
+      const file = queue2[index];
+      let parsed;
+      try {
+        parsed = await parseFn(file);
+      } catch (err) {
+        skipped.push(file.name);
+        await next(index + 1);
+        return;
+      }
+      renderPreview(container, {
+        parsed,
+        onCancel: () => next(index + 1),
+        onImported: () => {
+          showToast(`\u5DF2\u6210\u529F\u532F\u5165\uFF1A${file.name}`);
+          next(index + 1);
+        }
+      });
+    }
+    await next(0);
+  }
+
+  // src/ui/keepScroll.js
+  var isMobile = () => typeof matchMedia === "function" && matchMedia("(max-width: 640px)").matches;
+  function keepScroll(rerender) {
+    if (isMobile()) document.activeElement?.blur();
+    const y = window.scrollY;
+    return Promise.resolve(rerender()).then((result) => {
+      window.scrollTo(0, y);
+      return result;
+    });
+  }
+
+  // src/domain/ageTier.js
+  function calculateAgeInMonths(birthDate, asOfDate) {
+    const birth = /* @__PURE__ */ new Date(`${birthDate}T00:00:00`);
+    const asOf = /* @__PURE__ */ new Date(`${asOfDate}T00:00:00`);
+    let months = (asOf.getFullYear() - birth.getFullYear()) * 12 + (asOf.getMonth() - birth.getMonth());
+    if (asOf.getDate() < birth.getDate()) {
+      months -= 1;
+    }
+    return Math.max(0, months);
+  }
+  function suggestTier(birthDate, asOfDate) {
+    const months = calculateAgeInMonths(birthDate, asOfDate);
+    const tier = TIERS.find((t) => months >= t.minMonths && months <= t.maxMonths);
+    return tier ? tier.code : null;
+  }
+
+  // src/ui/scrollShade.js
+  function wireScrollShade(el) {
+    if (!el) return;
+    const update = () => {
+      const overflow = el.scrollHeight - el.clientHeight;
+      const scrollable = overflow > 1;
+      el.classList.toggle("is-scrollable", scrollable);
+      el.classList.toggle("has-overflow-top", scrollable && el.scrollTop > 1);
+      el.classList.toggle("has-overflow-bottom", scrollable && el.scrollTop < overflow - 1);
+    };
+    let scrollingTimer;
+    const onScroll = () => {
+      update();
+      el.classList.add("is-scrolling");
+      clearTimeout(scrollingTimer);
+      scrollingTimer = setTimeout(() => el.classList.remove("is-scrolling"), 700);
+    };
+    update();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(update).observe(el);
+  }
+
+  // src/ui/formPopup.js
+  var MOBILE_QUERY = "(max-width: 640px)";
+  var isMobile2 = () => typeof matchMedia === "function" && matchMedia(MOBILE_QUERY).matches;
+  var scrollYBeforeLock = 0;
+  var lockBodyScroll = () => {
+    scrollYBeforeLock = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollYBeforeLock}px`;
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+  };
+  var unlockBodyScroll = () => {
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.width = "";
+    document.body.style.overflow = "";
+    window.scrollTo(0, scrollYBeforeLock);
+  };
+  var fabIconHtml = () => `
+  <svg class="fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true" focusable="false">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+`;
+  var FAB_POS_KEY = "c-form-fab-pos";
+  var FAB_DRAG_THRESHOLD = 6;
+  function clampFabPosition(fab, left, top) {
+    const margin = 4;
+    const width = fab.offsetWidth || 64;
+    const height = fab.offsetHeight || 64;
+    const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - height - margin);
+    return {
+      left: Math.min(Math.max(left, margin), maxLeft),
+      top: Math.min(Math.max(top, margin), maxTop)
+    };
+  }
+  function applyFabPosition(fab, left, top) {
+    fab.style.left = `${left}px`;
+    fab.style.top = `${top}px`;
+    fab.style.right = "auto";
+    fab.style.bottom = "auto";
+  }
+  function wireFabDrag(fab) {
+    const saved = localStorage.getItem(FAB_POS_KEY);
+    if (saved) {
+      try {
+        const { xFrac, yFrac } = JSON.parse(saved);
+        const { left, top } = clampFabPosition(fab, xFrac * window.innerWidth, yFrac * window.innerHeight);
+        applyFabPosition(fab, left, top);
+      } catch {
+      }
+    }
+    let pointerId = null;
+    let dragging = false;
+    let justDragged = false;
+    let startX = 0;
+    let startY = 0;
+    let originLeft = 0;
+    let originTop = 0;
+    fab.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      pointerId = event.pointerId;
+      dragging = false;
+      startX = event.clientX;
+      startY = event.clientY;
+      const rect = fab.getBoundingClientRect();
+      originLeft = rect.left;
+      originTop = rect.top;
+    });
+    fab.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== pointerId) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (!dragging) {
+        if (Math.hypot(dx, dy) < FAB_DRAG_THRESHOLD) return;
+        dragging = true;
+        fab.setPointerCapture(pointerId);
+      }
+      const { left, top } = clampFabPosition(fab, originLeft + dx, originTop + dy);
+      applyFabPosition(fab, left, top);
+    });
+    fab.addEventListener("pointerup", (event) => {
+      if (event.pointerId !== pointerId) return;
+      if (dragging) {
+        justDragged = true;
+        const rect = fab.getBoundingClientRect();
+        localStorage.setItem(FAB_POS_KEY, JSON.stringify({
+          xFrac: rect.left / window.innerWidth,
+          yFrac: rect.top / window.innerHeight
+        }));
+      }
+      pointerId = null;
+      dragging = false;
+    });
+    fab.addEventListener("click", (event) => {
+      if (justDragged) {
+        justDragged = false;
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
+    });
+  }
+  function formPopupMarkup({ formHtml, fabLabel }) {
+    const mobile = isMobile2();
+    return `
+    <dialog class="form-popup" ${mobile ? "" : "open"}>
+      <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="\u95DC\u9589">\xD7</button>
+      ${formHtml}
+    </dialog>
+    ${mobile ? `<button type="button" class="fab" data-action="open-form-popup" aria-label="${fabLabel}">${fabIconHtml()}</button>` : ""}
+  `;
+  }
+  function wireFormPopup(container) {
+    const dialog = container.querySelector(".form-popup");
+    unlockBodyScroll();
+    const fab = container.querySelector('[data-action="open-form-popup"]');
+    if (fab) {
+      wireFabDrag(fab);
+      fab.addEventListener("click", () => {
+        dialog.showModal();
+        lockBodyScroll();
+      });
+    }
+    container.querySelector('[data-action="close-form-popup"]')?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", unlockBodyScroll);
+  }
+  function wireNestedEntryForm(trigger, entryForm) {
+    const dialog = entryForm.closest("dialog.form-popup");
+    if (!dialog) {
+      entryForm.hidden = true;
+      trigger.addEventListener("click", () => {
+        entryForm.hidden = !entryForm.hidden;
+      });
+      return;
+    }
+    unlockBodyScroll();
+    trigger.addEventListener("click", () => {
+      dialog.showModal();
+      lockBodyScroll();
+    });
+    dialog.querySelector('[data-action="close-form-popup"]').addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", unlockBodyScroll);
+  }
+  function nestedEntryFormDialog(entryFormHtml) {
+    if (!isMobile2()) return entryFormHtml;
+    return `
+    <dialog class="form-popup">
+      <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="\u95DC\u9589">\xD7</button>
+      ${entryFormHtml}
+    </dialog>
+  `;
+  }
+
+  // src/ui/childListView.js
+  async function renderChildListView(container, { onSelectChild, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false, onBack, reportType }) {
+    const children = (await listChildren()).sort(
+      (a, b) => (a.birthDate || "9999-99-99").localeCompare(b.birthDate || "9999-99-99")
+    );
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const isParentReport = reportType === "parent-report";
+    const listForType = isParentReport ? listParentReportsForChild : listFormsForChild;
+    const newChildIds = new Set(
+      (await Promise.all(
+        children.map(async (child) => (await listForType(child.id)).some((item) => item.isNew) ? child.id : null)
+      )).filter((id) => id !== null)
+    );
+    container.innerHTML = `
+    <div class="page-header page-header--editor">
+      ${onBack ? `<button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9078\u64C7\u8868\u55AE", "\u2190 \u8FD4\u56DE")}</button>` : ""}
+      <h2 class="page-header__title">\u5E7C\u5152\u5217\u8868</h2>
+      ${// The docx-import button only makes sense when picking a child to open a form/report.
+    // In pure "管理幼兒" mode (no onSelectChild) it's just noise, so drop it.
+    !onSelectChild ? "" : isParentReport ? `<button type="button" class="btn btn--purple" data-action="import-parent-report-docx">${headerButtonLabel("\u9069\u6027\u7D00\u9304\u532F\u5165", "\u532F\u5165")}</button>
+               <input type="file" accept=".docx" data-field="import-parent-report-file" multiple hidden>` : `<button type="button" class="btn btn--purple" data-action="import-docx">${headerButtonLabel("\u9069\u6027\u7E3D\u8868\u532F\u5165", "\u532F\u5165")}</button>
+               <input type="file" accept=".docx" data-field="import-file" multiple hidden>`}
+    </div>
+    <p class="field-error field-error--center" data-error="import"></p>
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list card-list--rows">
+          ${children.map((child) => {
+      const meta = child.birthDate ? `${escapeHtml(toRocDate(child.birthDate))}\u3000\xB7\u3000${calculateAgeInMonths(child.birthDate, today)} \u500B\u6708` : "\u672A\u586B\u51FA\u751F\u65E5\u671F";
+      return `<li class="card-list__row">
+                  <button type="button" class="card-list__item" data-child-id="${escapeHtml(child.id)}">
+                    <span class="card-list__name">${escapeHtml(child.name)}${newChildIds.has(child.id) ? '<span class="new-badge">\u65B0</span>' : ""}</span>
+                    <span class="card-list__meta">${meta}</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-child="${escapeHtml(child.id)}" aria-label="\u522A\u9664${escapeHtml(child.name)}">\xD7</button>
+                </li>`;
+    }).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u5E7C\u5152\u8CC7\u6599\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u5E7C\u5152\u300D\u8868\u55AE\u65B0\u589E</li>'}
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-child">
+            <h3 class="panel-form__title">\u65B0\u589E\u5E7C\u5152</h3>
+            <label class="panel-form__field">\u59D3\u540D <input data-field="name" required></label>
+            <label class="panel-form__field">
+              \u51FA\u751F\u65E5\u671F
+              ${birthDateSelectsHtml({ yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" })}
+            </label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u5E7C\u5152"
+    })}
+    </div>
+  `;
+    wireScrollShade(container.querySelector(".card-list--rows"));
+    wireFormPopup(container);
+    if (onBack) {
+      container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    }
+    wireBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
+    if (onSelectChild) {
+      for (const child of children) {
+        container.querySelector(`[data-child-id="${child.id}"]`).addEventListener("click", () => onSelectChild(child));
+      }
+    }
+    for (const child of children) {
+      container.querySelector(`[data-delete-child="${child.id}"]`).addEventListener("click", async () => {
+        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${child.name}\u300D\u7684\u6240\u6709\u8CC7\u6599\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
+        try {
+          await deleteChild(child.id);
+          await keepScroll(() => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }));
+        } catch (err) {
+          container.querySelector('[data-error="delete"]').textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+    }
+    container.querySelector('[data-action="add-child"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const name = container.querySelector('[data-field="name"]').value;
+      const birthDate = parseBirthDateSelects(container, { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" });
+      if (!birthDate) {
+        const form = container.querySelector('[data-action="add-child"]');
+        let errorEl = form.querySelector("[data-error]");
+        if (!errorEl) {
+          errorEl = document.createElement("p");
+          errorEl.dataset.error = "";
+          errorEl.className = "field-error";
+          form.insertAdjacentElement("afterbegin", errorEl);
+        }
+        errorEl.textContent = "\u8ACB\u9078\u64C7\u5B8C\u6574\u7684\u51FA\u751F\u65E5\u671F";
+        return;
+      }
+      try {
+        await addChild({ name, birthDate });
+        await keepScroll(() => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType }));
+      } catch (err) {
+        const form = container.querySelector('[data-action="add-child"]');
+        let errorEl = form.querySelector("[data-error]");
+        if (!errorEl) {
+          errorEl = document.createElement("p");
+          errorEl.dataset.error = "";
+          errorEl.className = "field-error";
+          form.insertAdjacentElement("afterbegin", errorEl);
+        }
+        errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      }
+    });
+    if (onSelectChild && isParentReport) {
+      const fileInput = container.querySelector('[data-field="import-parent-report-file"]');
+      container.querySelector('[data-action="import-parent-report-docx"]').addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", async () => {
+        if (fileInput.files.length === 0) return;
+        await processImportQueue(fileInput.files, {
+          parseFn: parseParentReportDocxImport,
+          renderPreview: renderParentReportImportPreviewView,
+          container,
+          backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
+        });
+      });
+    } else if (onSelectChild) {
+      const fileInput = container.querySelector('[data-field="import-file"]');
+      container.querySelector('[data-action="import-docx"]').addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", async () => {
+        if (fileInput.files.length === 0) return;
+        await processImportQueue(fileInput.files, {
+          parseFn: parseDocxImport,
+          renderPreview: renderImportPreviewView,
+          container,
+          backToList: () => renderChildListView(container, { onSelectChild, confirmDelete, onBack, reportType })
+        });
+      });
+    }
+  }
+
+  // src/ui/formListView.js
+  async function renderFormListView(container, { child, onSelectForm, onBack, onAggregate = () => {
+  }, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
+    const tierIndex = (code) => TIERS.findIndex((t) => t.code === code);
+    const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period) || tierIndex(b.tier) - tierIndex(a.tier));
+    const entryCounts = await Promise.all(forms.map(async (form) => (await listEntriesForForm(form.id)).length));
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const suggested = suggestTier(child.birthDate, today);
+    const defaultYear = currentRocYear();
+    const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
+    container.innerHTML = `
+    <div class="page-header page-header--editor">
+      <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u5E7C\u5152\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
+      <h2 class="page-header__title">${escapeHtml(child.name)} \u7684\u9069\u6027\u7E3D\u8868</h2>
+      <button type="button" class="btn btn--purple" data-action="aggregate">${headerButtonLabel("\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574", "\u5F59\u6574")}</button>
+    </div>
+    <div class="tab-layout">
+      <div class="entry-list-wrap">
+        <ul class="card-list card-list--rows">
+          ${forms.map(
+      (form, index) => `<li class="card-list__row">
+                  <button type="button" class="card-list__item" data-form-id="${escapeHtml(form.id)}">
+                    <span class="card-list__name">${escapeHtml(form.tier)} \u968E\u6BB5${form.isNew ? '<span class="new-badge">\u65B0</span>' : ""}</span>
+                    <span class="card-list__meta">${escapeHtml(form.period)}\u3000${entryCounts[index]} \u7B46\u7D00\u9304</span>
+                  </button>
+                  <button type="button" class="card-list__delete" data-delete-form="${escapeHtml(form.id)}" aria-label="\u522A\u9664${escapeHtml(form.tier)} ${escapeHtml(form.period)}">\xD7</button>
+                </li>`
+    ).join("") || '<li class="card-list__empty">\u76EE\u524D\u9084\u6C92\u6709\u9069\u6027\u7E3D\u8868\uFF0C\u8ACB\u5728\u300C\u65B0\u589E\u9069\u6027\u7E3D\u8868\u300D\u8868\u55AE\u65B0\u589E\uFF0C\u6216\u5F9E\u9069\u6027\u7D00\u9304\u5F59\u6574</li>'}
+        </ul>
+        <p class="field-error" data-error="delete"></p>
+      </div>
+      ${formPopupMarkup({
+      formHtml: `
+          <form class="panel-form" data-action="add-form">
+            <h3 class="panel-form__title">\u65B0\u589E\u9069\u6027\u7E3D\u8868</h3>
+            <label class="panel-form__field">
+              \u6708\u9F61\u968E\u6BB5
+              <select data-field="tier">
+                ${TIERS.map((t) => `<option value="${t.code}" ${t.code === suggested ? "selected" : ""}>${t.code}\uFF08${t.label}\uFF09</option>`).join("")}
+              </select>
+            </label>
+            <label class="panel-form__field">
+              \u7D00\u9304\u5E74\u6708
+              ${periodSelectsHtml({
+        yearFieldName: "period-year",
+        monthFieldName: "period-month",
+        selectedYear: defaultYear,
+        selectedMonth: defaultMonth
+      })}
+            </label>
+            <label class="entry-form__checkbox">
+              <input type="checkbox" data-field="period-is-range"> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
+            </label>
+            <label class="panel-form__field" data-field-group="period-end" hidden>
+              \u81F3
+              ${periodSelectsHtml({
+        yearFieldName: "period-end-year",
+        monthFieldName: "period-end-month",
+        selectedYear: defaultYear,
+        selectedMonth: defaultMonth
+      })}
+            </label>
+            <button type="submit" class="btn btn--primary">\u65B0\u589E</button>
+          </form>
+        `,
+      fabLabel: "\u65B0\u589E\u9069\u6027\u7E3D\u8868"
+    })}
+    </div>
+  `;
+    wireScrollShade(container.querySelector(".card-list--rows"));
+    wireFormPopup(container);
+    container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    container.querySelector('[data-action="aggregate"]').addEventListener("click", onAggregate);
+    container.querySelector('[data-field="period-is-range"]').addEventListener("change", (event) => {
+      container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
+    });
+    for (const form of forms) {
+      container.querySelector(`[data-form-id="${form.id}"]`).addEventListener("click", () => onSelectForm(form));
+    }
+    for (const form of forms) {
+      container.querySelector(`[data-delete-form="${form.id}"]`).addEventListener("click", async () => {
+        if (!confirmDelete(`\u78BA\u5B9A\u8981\u522A\u9664\u300C${form.tier} ${form.period}\u300D\u9019\u4EFD\u9069\u6027\u7E3D\u8868\u55CE\uFF1F\u6B64\u64CD\u4F5C\u7121\u6CD5\u5FA9\u539F\u3002`)) return;
+        try {
+          await deleteForm(form.id);
+          await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
+        } catch (err) {
+          container.querySelector('[data-error="delete"]').textContent = "\u522A\u9664\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+        }
+      });
+    }
+    container.querySelector('[data-action="add-form"]').addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const tier = container.querySelector('[data-field="tier"]').value;
+      const year = container.querySelector('[data-field="period-year"]').value;
+      const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
+      const startPeriod = `${year}\u5E74${month}\u6708`;
+      const isRange = container.querySelector('[data-field="period-is-range"]').checked;
+      let period = startPeriod;
+      if (isRange) {
+        const endYear = container.querySelector('[data-field="period-end-year"]').value;
+        const endMonth = container.querySelector('[data-field="period-end-month"]').value.padStart(2, "0");
+        period = combinedPeriod(startPeriod, `${endYear}\u5E74${endMonth}\u6708`);
+      }
+      try {
+        await addForm({ childId: child.id, tier, period });
+        await keepScroll(() => renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete }));
+      } catch (err) {
+        const form = container.querySelector('[data-action="add-form"]');
+        let errorEl = form.querySelector("[data-error]");
+        if (!errorEl) {
+          errorEl = document.createElement("p");
+          errorEl.dataset.error = "";
+          errorEl.className = "field-error";
+          form.insertAdjacentElement("afterbegin", errorEl);
+        }
+        errorEl.textContent = "\u65B0\u589E\u5931\u6557\uFF0C\u8ACB\u518D\u8A66\u4E00\u6B21";
+      }
+    });
+  }
+
+  // src/export/downloadBlob.js
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 1e3);
+  }
+
   // src/export/docxExport.js
   var INSTITUTION_NAME = "\u5C4F\u6771\u7E23\u5167\u57D4\u9109\u80B2\u82F1\u516C\u8A2D\u6C11\u71DF\u6258\u5B30\u4E2D\u5FC3";
   var COLUMN_WIDTHS = [565, 1557, 992, 1984, 1560, 2443];
@@ -26562,15 +26863,31 @@ var CFormApp = (() => {
     downloadBlob(blob, filename);
   }
 
+  // src/ui/rowClickEdit.js
+  var IGNORE = "button, a, input, select, textarea, label, summary, dialog, .entry-form";
+  var wired = /* @__PURE__ */ new WeakSet();
+  function wireRowClickEdit(container) {
+    if (wired.has(container)) return;
+    wired.add(container);
+    container.addEventListener("click", (event) => {
+      if (event.target.closest(IGNORE)) return;
+      if (String(window.getSelection?.() ?? "")) return;
+      const area = event.target.closest("[data-click-edit]");
+      if (!area || !container.contains(area)) return;
+      const button = [...area.querySelectorAll("[data-row-edit]")].find((b) => b.closest("[data-click-edit]") === area);
+      button?.click();
+    });
+  }
+
   // src/ui/formEditorView.js
   function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
     return `
     <div class="entry-form__radio-group">
       <label class="entry-form__radio">
-        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === "developed" ? "checked" : ""}> \u5DF2\u767C\u5C55\u25CB
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === "developed" ? "checked" : ""}> <span class="entry-row__mark entry-row__mark--developed">\u25CB</span>\u5DF2\u767C\u5C55
       </label>
       <label class="entry-form__radio">
-        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === "developing" ? "checked" : ""}> \u767C\u5C55\u4E2D\u25B3
+        <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === "developing" ? "checked" : ""}> <span class="entry-row__mark entry-row__mark--developing">\u25B3</span>\u767C\u5C55\u4E2D
       </label>
       <label class="entry-form__radio">
         <input type="radio" name="status-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="absent" ${checkedStatus === "absent" ? "checked" : ""}> \u8ACB\u5047
@@ -26589,16 +26906,22 @@ var CFormApp = (() => {
     if (!note || note === flaggedLabel) return escapeHtml(flaggedLabel);
     return `${escapeHtml(flaggedLabel)}\u3000${escapeHtml(entry.note)}`;
   }
+  function rocDateHtml(date) {
+    const roc = toRocDate(date);
+    const slash = roc.indexOf("/");
+    if (slash < 0) return escapeHtml(roc);
+    return `<span class="entry-row__year">${escapeHtml(roc.slice(0, slash + 1))}</span>${escapeHtml(roc.slice(slash + 1))}`;
+  }
   function entryRow2(entry) {
     const flaggedLabel = FLAGGED_STATUS_LABELS2[entry.status];
     const mark = flaggedLabel ? "" : entry.status === "developed" ? "\u25CB" : "\u25B3";
     const rowClass = entry.status === "developed" ? " entry-row--achieved" : flaggedLabel ? " entry-row--flagged" : "";
     return `
-    <li class="entry-row${rowClass}" data-entry="${escapeHtml(entry.id)}">
+    <li class="entry-row${rowClass}" data-click-edit data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</span>
+        <span class="entry-row__date"><span class="entry-row__mark entry-row__mark--${entry.status}">${mark}</span>${rocDateHtml(entry.date)}</span>
         <div class="entry-row__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u89C0\u5BDF\u7D00\u9304\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>
         </div>
       </div>
@@ -26641,15 +26964,15 @@ var CFormApp = (() => {
     const indicator = getIndicator(entry.indicatorCode);
     const mark = FLAGGED_STATUS_LABELS2[entry.status] ? "" : entry.status === "developed" ? "\u25CB" : "\u25B3";
     return `
-    <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}">
+    <div class="indicator-block" data-indicator-code="${escapeHtml(entry.indicatorCode)}"${entry.isLocal ? " data-click-edit" : ""}>
       <div class="entry-row__top">
         <h4 class="indicator-block__title"><span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>${escapeHtml(indicator?.description ?? entry.activityName ?? "")}</h4>
         ${entry.isLocal ? `<div class="entry-row__actions">
-                <button type="button" class="btn btn--edit btn--small" data-edit-remark="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
+                <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-remark="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\u7DE8\u8F2F</button>
                 <button type="button" class="btn--delete-circle" data-delete-remark="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u5099\u8A3B\uFF1A${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">\xD7</button>
               </div>` : ""}
       </div>
-      <p class="entry-row__date"><span class="entry-row__mark">${mark}</span>${escapeHtml(entry.date)}</p>
+      <p class="entry-row__date"><span class="entry-row__mark entry-row__mark--${entry.status}">${mark}</span>${rocDateHtml(entry.date)}</p>
       <p class="entry-row__note">${noteLineHtml(entry)}</p>
       ${entry.isLocal ? `<div class="entry-form" data-remark-edit-form-for="${escapeHtml(entry.id)}" hidden>
               <label class="entry-form__field">\u6A19\u7C64 <input type="text" data-remark-edit-field="code" data-remark-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.indicatorCode)}"></label>
@@ -26704,7 +27027,7 @@ var CFormApp = (() => {
     container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
-      <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(form.tier)} \u968E\u6BB5\u3000${escapeHtml(form.period)}</h2>
+      <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(form.tier)} \u968E\u6BB5<span class="page-header__period">${escapeHtml(form.period)}</span></h2>
       <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
@@ -26741,6 +27064,7 @@ var CFormApp = (() => {
   `;
     const rerender = () => keepScroll(() => renderFormEditorView(container, { child, form, onBack, confirmDelete }));
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    wireRowClickEdit(container);
     container.querySelector('[data-action="export"]').addEventListener("click", async () => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
@@ -27934,10 +28258,10 @@ var CFormApp = (() => {
     return `
     <div class="entry-form__radio-group">
       <label class="entry-form__radio">
-        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === "developed" ? "checked" : ""}> \u5DF2\u767C\u5C55\u25CB
+        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developed" ${checkedStatus === "developed" ? "checked" : ""}> <span class="entry-row__mark entry-row__mark--developed">\u25CB</span>\u5DF2\u767C\u5C55
       </label>
       <label class="entry-form__radio">
-        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === "developing" ? "checked" : ""}> \u767C\u5C55\u4E2D\u25B3
+        <input type="radio" name="${namePrefix}-${escapeHtml(id)}" data-${fieldAttr}="status" data-${idAttr}="${escapeHtml(id)}" value="developing" ${checkedStatus === "developing" ? "checked" : ""}> <span class="entry-row__mark entry-row__mark--developing">\u25B3</span>\u767C\u5C55\u4E2D
       </label>
     </div>
   `;
@@ -27956,15 +28280,16 @@ var CFormApp = (() => {
     update();
   }
   function occurrenceRow(occurrence) {
-    const statusLabel = occurrence.courseChanged ? "\u66F4\u63DB\u8AB2\u7A0B" : occurrence.absent ? "\u8ACB\u5047" : occurrence.status === "developed" ? "\u5DF2\u767C\u5C55\u25CB" : "\u767C\u5C55\u4E2D\u25B3";
+    const statusKey = occurrence.courseChanged ? "courseChanged" : occurrence.absent ? "absent" : occurrence.status === "developed" ? "developed" : "developing";
+    const statusLabel = { courseChanged: "\u66F4\u63DB\u8AB2\u7A0B", absent: "\u8ACB\u5047", developed: "\u5DF2\u767C\u5C55\u25CB", developing: "\u767C\u5C55\u4E2D\u25B3" }[statusKey];
     const isFlagged = occurrence.absent || occurrence.courseChanged || occurrence.status === "developing";
     const rowClass = occurrence.courseChanged ? " entry-row--course-changed" : occurrence.absent ? " entry-row--absent" : "";
     return `
-    <li class="entry-row${rowClass}" data-course-occurrence="${escapeHtml(occurrence.id)}">
+    <li class="entry-row${rowClass}" data-click-edit data-course-occurrence="${escapeHtml(occurrence.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date${isFlagged ? " entry-row__date--flag" : ""}">${escapeHtml(occurrence.date)}\u3000<span class="entry-row__status">${statusLabel}</span></span>
+        <span class="entry-row__date${isFlagged ? " entry-row__date--flag" : ""}">${escapeHtml(toRocDate(occurrence.date))}<span class="entry-row__status entry-row__status--${statusKey}">${statusLabel}</span></span>
         <div class="entry-row__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u7DE8\u8F2F\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\u7DE8\u8F2F</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u7DE8\u8F2F\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-occurrence="${escapeHtml(occurrence.id)}" aria-label="\u522A\u9664\u5BE6\u65BD\u7D00\u9304\uFF1A${escapeHtml(occurrence.date)}">\xD7</button>
         </div>
       </div>
@@ -27990,12 +28315,12 @@ var CFormApp = (() => {
   }
   function entryCard(entry, indicator, occurrences, tier) {
     return `
-    <div class="indicator-block" data-course-entry="${escapeHtml(entry.id)}">
+    <div class="indicator-block" data-click-edit data-course-entry="${escapeHtml(entry.id)}">
       <h4 class="indicator-block__title">
         <span class="indicator-block__code">${escapeHtml(entry.indicatorCode)}</span>
         \u3010${escapeHtml(entry.activityName)}\u3011${escapeHtml(entry.indicatorText || "")}
         <span class="indicator-block__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE\uFF1A${escapeHtml(entry.activityName)}">\u7DE8\u8F2F</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-entry="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE\uFF1A${escapeHtml(entry.activityName)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE\uFF1A${escapeHtml(entry.activityName)}">\xD7</button>
         </span>
       </h4>
@@ -28019,10 +28344,10 @@ var CFormApp = (() => {
           <label class="entry-form__field">\u65E5\u671F <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
           <div class="entry-form__radio-group">
             <label class="entry-form__radio">
-              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> \u5DF2\u767C\u5C55\u25CB
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> <span class="entry-row__mark entry-row__mark--developed">\u25CB</span>\u5DF2\u767C\u5C55
             </label>
             <label class="entry-form__radio">
-              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> \u767C\u5C55\u4E2D\u25B3
+              <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developing"> <span class="entry-row__mark entry-row__mark--developing">\u25B3</span>\u767C\u5C55\u4E2D
             </label>
           </div>
           <label class="entry-form__checkbox">
@@ -28096,8 +28421,8 @@ var CFormApp = (() => {
               <div class="panel-form__field">
                 \u72C0\u614B
                 <div class="entry-form__radio-group">
-                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> \u5DF2\u767C\u5C55\u25CB</label>
-                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> \u767C\u5C55\u4E2D\u25B3</label>
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developed" checked> <span class="entry-row__mark entry-row__mark--developed">\u25CB</span>\u5DF2\u767C\u5C55</label>
+                  <label class="entry-form__radio"><input type="radio" name="add-entry-status" data-field="occurrenceStatus" value="developing"> <span class="entry-row__mark entry-row__mark--developing">\u25B3</span>\u767C\u5C55\u4E2D</label>
                 </div>
               </div>
             </div>
@@ -28114,7 +28439,7 @@ var CFormApp = (() => {
         `,
       fabLabel: "\u65B0\u589E\u8AB2\u7A0B\u8A08\u756B\u9805\u76EE"
     })}
-      <div class="domain-grid">
+      <div class="domain-grid domain-grid--stack">
         ${domainGroups.map(([domainId, domainName, group], index) => {
       const isOpen = isFirstRenderForReport ? index === 0 : openDomains.has(String(domainId));
       return `
@@ -28130,6 +28455,7 @@ var CFormApp = (() => {
     </div>
   `;
     wireFormPopup(container);
+    wireRowClickEdit(container);
     container.querySelector('[data-field="indicatorCode"]').addEventListener("change", (event) => {
       const indicator = getIndicator(event.target.value);
       if (!indicator) return;
@@ -28316,11 +28642,11 @@ var CFormApp = (() => {
     </div>
   `;
     return `
-    <div class="indicator-block" data-development-record="${escapeHtml(record.id)}">
+    <div class="indicator-block" data-click-edit data-development-record="${escapeHtml(record.id)}">
       <ul class="entry-list">${lines}</ul>
       <p class="entry-row__note">${escapeHtml(record.narrative)}</p>
       <span class="indicator-block__actions">
-        <button type="button" class="btn btn--edit btn--small" data-edit-record="${escapeHtml(record.id)}" aria-label="\u7DE8\u8F2F\u9069\u6027\u767C\u5C55\u7D00\u9304\u6BB5\u843D\uFF1A${escapeHtml(recordLabel(record))}">\u7DE8\u8F2F</button>
+        <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-record="${escapeHtml(record.id)}" aria-label="\u7DE8\u8F2F\u9069\u6027\u767C\u5C55\u7D00\u9304\u6BB5\u843D\uFF1A${escapeHtml(recordLabel(record))}">\u7DE8\u8F2F</button>
         <button type="button" class="btn--delete-circle" data-delete-record="${escapeHtml(record.id)}" aria-label="\u522A\u9664\u9069\u6027\u767C\u5C55\u7D00\u9304\u6BB5\u843D\uFF1A${escapeHtml(recordLabel(record))}">\xD7</button>
       </span>
       ${editFormHtml}
@@ -28403,6 +28729,7 @@ var CFormApp = (() => {
     </div>
   `;
     wireFormPopup(container);
+    wireRowClickEdit(container);
     container.querySelector('[data-field="domain"]').addEventListener("change", (event) => {
       renderDevelopmentRecordTab(container, {
         report,
@@ -28482,11 +28809,11 @@ var CFormApp = (() => {
   function observationCard(observation) {
     const heading = observationHeading(observation);
     return `
-    <div class="indicator-block" data-behavior-observation="${escapeHtml(observation.id)}">
+    <div class="indicator-block" data-click-edit data-behavior-observation="${escapeHtml(observation.id)}">
       <h4 class="indicator-block__title">
         ${escapeHtml(heading)}
         <span class="indicator-block__actions">
-          <button type="button" class="btn btn--edit btn--small" data-edit-observation="${escapeHtml(observation.id)}" aria-label="\u7DE8\u8F2F${escapeHtml(heading)}">\u7DE8\u8F2F</button>
+          <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-observation="${escapeHtml(observation.id)}" aria-label="\u7DE8\u8F2F${escapeHtml(heading)}">\u7DE8\u8F2F</button>
           <button type="button" class="btn--delete-circle" data-delete-observation="${escapeHtml(observation.id)}" aria-label="\u522A\u9664${escapeHtml(heading)}">\xD7</button>
         </span>
       </h4>
@@ -28509,7 +28836,7 @@ var CFormApp = (() => {
     <div class="tab-layout">
       ${formPopupMarkup({
       formHtml: `
-          <form class="panel-form" data-action="add-observation">
+          <form class="panel-form panel-form--wide" data-action="add-observation">
             <h3 class="panel-form__title">\u65B0\u589E\u884C\u70BA\u89C0\u5BDF</h3>
             <label class="panel-form__field">\u6A19\u984C <input data-field="title"></label>
             <label class="panel-form__field">\u6558\u8FF0 <textarea data-field="narrative" required></textarea></label>
@@ -28523,6 +28850,7 @@ var CFormApp = (() => {
     </div>
   `;
     wireFormPopup(container);
+    wireRowClickEdit(container);
     container.querySelector('[data-action="add-observation"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const title = container.querySelector('[data-field="title"]').value;
@@ -28605,11 +28933,11 @@ var CFormApp = (() => {
   function existingEntryCard(entry) {
     const thumbs = [0, 1, 2].map((i) => savedThumbHtml(entry.photos[i], i, entry.id)).join("");
     return `
-    <div class="indicator-block" data-highlight-entry="${escapeHtml(entry.id)}">
+    <div class="indicator-block" data-click-edit data-highlight-entry="${escapeHtml(entry.id)}">
+      <p class="entry-row__note highlight-caption-line">${escapeHtml(entry.caption)}</p>
       <div class="highlight-thumbs">${thumbs}</div>
-      <p class="entry-row__note">${escapeHtml(entry.caption)}</p>
       <div class="entry-row__actions">
-        <button type="button" class="btn btn--edit btn--small" data-edit-highlight="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u9EDE\u6EF4\u5206\u4EAB\uFF1A${escapeHtml(entry.caption)}">\u7DE8\u8F2F</button>
+        <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-highlight="${escapeHtml(entry.id)}" aria-label="\u7DE8\u8F2F\u9EDE\u6EF4\u5206\u4EAB\uFF1A${escapeHtml(entry.caption)}">\u7DE8\u8F2F</button>
         <button type="button" class="btn--delete-circle" data-delete-highlight="${escapeHtml(entry.id)}" aria-label="\u522A\u9664\u9EDE\u6EF4\u5206\u4EAB\uFF1A${escapeHtml(entry.caption)}">\xD7</button>
       </div>
       <div class="entry-form" data-highlight-edit-form-for="${escapeHtml(entry.id)}" hidden>
@@ -28630,7 +28958,7 @@ var CFormApp = (() => {
     <div class="tab-layout">
       ${formPopupMarkup({
       formHtml: `
-          <form class="panel-form" data-action="add-highlight">
+          <form class="panel-form panel-form--wide" data-action="add-highlight">
             <h3 class="panel-form__title">\u65B0\u589E\u9EDE\u6EF4\u5206\u4EAB</h3>
             <div class="highlight-upload-grid">
               ${[0, 1, 2].map(
@@ -28654,6 +28982,7 @@ var CFormApp = (() => {
     </div>
   `;
     wireFormPopup(container);
+    wireRowClickEdit(container);
     function clearPendingSlot(i) {
       pendingPhotos[i] = null;
       const previewEl = container.querySelector(`[data-preview-slot="${i}"]`);
@@ -28802,7 +29131,7 @@ var CFormApp = (() => {
     container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7D00\u9304\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
-      <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(report.tier)} \u968E\u6BB5\u3000${escapeHtml(report.period)}</h2>
+      <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(report.tier)} \u968E\u6BB5<span class="page-header__period">${escapeHtml(report.period)}</span></h2>
       <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
@@ -28811,7 +29140,7 @@ var CFormApp = (() => {
       (tab) => `<button type="button" class="tabs__button${tab.key === activeTab ? " tabs__button--active" : ""}" data-tab="${tab.key}" role="tab">${tab.label}</button>`
     ).join("")}
     </div>
-    <div class="tabs__panel" data-tab-panel></div>
+    <div class="tabs__panel" data-tab-panel><p class="view-loading" role="status">\u8F09\u5165\u4E2D\u2026</p></div>
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     container.querySelector('[data-action="export"]').addEventListener("click", async () => {
@@ -29550,10 +29879,10 @@ var CFormApp = (() => {
     </button>
   `;
   }
-  function childCalendarHtml(child, tier, data) {
+  function childCalendarHtml(child, tier, data, hidden) {
     const ageMonths = calculateAgeInMonths(child.birthDate, `${data.weeks[0].days[0].isoDate}`);
     return `
-    <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}">
+    <section class="monthly-calendar" data-child-id="${escapeHtml(child.id)}" ${hidden ? "hidden" : ""}>
       <h3 class="monthly-calendar__title">${escapeHtml(child.name)}\u3000${ageMonths}M\u3000${escapeHtml(tierFormLabel(tier))}</h3>
       <div class="monthly-calendar__weeks">
         ${data.weeks.map(
@@ -29570,6 +29899,15 @@ var CFormApp = (() => {
     </section>
   `;
   }
+  var activeChildByPlan = /* @__PURE__ */ new Map();
+  function childSwitchHtml(children, activeId) {
+    if (children.length < 2) return "";
+    return `
+    <div class="child-switch" role="group" aria-label="\u9078\u64C7\u5E7C\u5152">
+      ${children.map((c) => `<button type="button" class="child-switch__button" data-switch-child="${escapeHtml(c.id)}" aria-pressed="${c.id === activeId}">${escapeHtml(c.name)}</button>`).join("")}
+    </div>
+  `;
+  }
   async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     if (plan.isNew) {
       await updateMonthlyCoursePlan(plan.id, { isNew: false });
@@ -29577,6 +29915,9 @@ var CFormApp = (() => {
     }
     const data = await loadEditorData(plan);
     let selected = null;
+    const remembered = activeChildByPlan.get(plan.id);
+    const activeChildId = data.children.some((c) => c.id === remembered) ? remembered : data.children[0]?.id;
+    const showOneChild = data.children.length > 1;
     container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u8AB2\u7A0B\u6708\u8A08\u756B\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
@@ -29589,7 +29930,8 @@ var CFormApp = (() => {
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tab-layout">
       <div class="monthly-calendar-list">
-        ${data.children.map((child) => childCalendarHtml(child, plan.childTiers[child.id], data)).join("")}
+        ${childSwitchHtml(data.children, activeChildId)}
+        ${data.children.map((child) => childCalendarHtml(child, plan.childTiers[child.id], data, showOneChild && child.id !== activeChildId)).join("")}
       </div>
       <div class="monthly-plan-side">
         ${nestedEntryFormDialog(`
@@ -29614,7 +29956,7 @@ var CFormApp = (() => {
         `)}
         ${nestedEntryFormDialog(`
         <div class="panel-form" data-panel>
-          <h3 class="panel-form__title" data-panel-header>\u9EDE\u9078\u5DE6\u5074\u7684\u65E5\u671F\u683C\u5B50\u958B\u59CB\u898F\u5283</h3>
+          <h3 class="panel-form__title" data-panel-header>\u9EDE\u9078\u65E5\u671F\u683C\u5B50\u958B\u59CB\u898F\u5283</h3>
           <div data-panel-items></div>
         </div>
         `)}
@@ -29623,6 +29965,16 @@ var CFormApp = (() => {
     ${isMobile2() ? `<button type="button" class="fab" data-action="open-panel-popup" hidden aria-label="\u7DE8\u8F2F\u9019\u5929\u7684\u8A08\u756B">${fabIconHtml()}</button>` : ""}
   `;
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
+    container.querySelectorAll("[data-switch-child]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const childId = button.dataset.switchChild;
+        activeChildByPlan.set(plan.id, data.children.find((c) => String(c.id) === childId)?.id);
+        container.querySelectorAll("[data-switch-child]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+        container.querySelectorAll(".monthly-calendar").forEach((section) => {
+          section.hidden = section.dataset.childId !== childId;
+        });
+      });
+    });
     const manageChildrenForm = container.querySelector("[data-manage-children-form]");
     wireNestedEntryForm(container.querySelector('[data-action="manage-children"]'), manageChildrenForm);
     container.querySelector('[data-action="cancel-manage-children"]').addEventListener("click", () => {
@@ -30466,6 +30818,16 @@ var CFormApp = (() => {
       renderPasswordGate(container, { onUnlock: handleUnlock });
     }
   }
+  var outsideClickWired = false;
+  function closeBackupMenusOnOutsideClick() {
+    if (outsideClickWired) return;
+    outsideClickWired = true;
+    document.addEventListener("click", (event) => {
+      for (const menu of document.querySelectorAll("details.backup-menu[open]")) {
+        if (!menu.contains(event.target)) menu.open = false;
+      }
+    });
+  }
   function wireBackupControls({
     exportButton,
     importInput,
@@ -30484,6 +30846,16 @@ var CFormApp = (() => {
       importInput.disabled = locked;
     }
     updateLockState();
+    const menu = exportButton.closest("details");
+    if (menu) {
+      exportButton.addEventListener("click", () => {
+        menu.open = false;
+      });
+      importInput.addEventListener("change", () => {
+        menu.open = false;
+      });
+      closeBackupMenusOnOutsideClick();
+    }
     function showMessage(text) {
       let errorEl = messageContainer.querySelector('[data-error="backup"]');
       if (!text) {
@@ -31650,7 +32022,7 @@ Content-Type: ${contentType}\r
     if (status.error === "AUTH_EXPIRED") return "\u767B\u5165\u5DF2\u5931\u6548\uFF0C\u8ACB\u91CD\u65B0\u767B\u5165";
     if (status.error === "FORMAT") return "\u96F2\u7AEF\u8CC7\u6599\u593E\u7570\u5E38\uFF0C\u5DF2\u505C\u6B62\u540C\u6B65";
     if (status.phase === "syncing") {
-      return status.textSyncedAt ? "\u540C\u6B65\u4E2D\u2026" : "\u9996\u6B21\u540C\u6B65\u4E2D\uFF0C\u53EF\u80FD\u9700\u8981\u5E7E\u5206\u9418\uFF0C\u8ACB\u7A0D\u5019\u2026";
+      return status.textSyncedAt ? "\u540C\u6B65\u4E2D\u2026" : "\u9996\u6B21\u540C\u6B65\u4E2D\uFF0C\u8ACB\u7A0D\u5019\u2026";
     }
     if (status.photoPending > 0) {
       return `\u7167\u7247\u540C\u6B65\u5931\u6557\uFF08\u5269 ${status.photoPending} \u5F35\uFF09`;
@@ -31670,13 +32042,15 @@ Content-Type: ${contentType}\r
     const greeting = `<span class="sync-header__greeting" data-sync-greeting>${escapeHtml(`${greetingFor(now())}\uFF0C${mode === "google" ? name : "\u8A2A\u5BA2"}`)}</span>`;
     if (mode === "google") {
       slot.innerHTML = `
-      <div class="sync-header__greeting-row">${greeting}</div>
-      <div class="sync-header__status-row">
-        <span class="sync-header__status" data-sync-status></span>
+      <div class="sync-header__greeting-row">
+        ${greeting}
         <div class="sync-header__actions">
           <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="\u6AA2\u67E5\u53E6\u4E00\u53F0\u88DD\u7F6E\u662F\u5426\u6709\u65B0\u8CC7\u6599">\u7ACB\u5373\u540C\u6B65</button>
           <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">\u767B\u51FA</button>
         </div>
+      </div>
+      <div class="sync-header__status-row">
+        <span class="sync-header__status" data-sync-status></span>
       </div>
     `;
       slot.querySelector('[data-action="sync-sign-out"]').addEventListener("click", onSignOut);
@@ -31685,14 +32059,19 @@ Content-Type: ${contentType}\r
       slot.innerHTML = `
       <div class="sync-header__greeting-row">
         ${greeting}
-        <button type="button" class="btn btn--header" data-action="sync-sign-in">\u4F7F\u7528 Google \u767B\u5165</button>
+        <div class="sync-header__actions">
+          <button type="button" class="btn btn--header" data-action="sync-sign-in">\u4F7F\u7528 Google \u767B\u5165</button>
+          <details class="backup-menu">
+            <summary class="btn btn--header">\u5099\u4EFD</summary>
+            <div class="backup-menu__list">
+              <button type="button" class="btn btn--header" id="export-backup" title="\u6B64\u5099\u4EFD\u6A94\u70BA\u672A\u52A0\u5BC6\u7684\u5B8C\u6574\u8CC7\u6599\uFF08\u542B\u5E7C\u5152\u59D3\u540D\u3001\u51FA\u751F\u65E5\u671F\u7B49\u500B\u8CC7\uFF09\uFF0C\u8ACB\u52FF\u653E\u5728\u5171\u7528\u96F2\u7AEF\u8CC7\u6599\u593E">\u532F\u51FA\u5099\u4EFD</button>
+              <label class="btn btn--header btn--header-file">\u532F\u5165\u5099\u4EFD <input type="file" id="import-backup" accept="application/json"></label>
+            </div>
+          </details>
+        </div>
       </div>
       <div class="sync-header__status-row">
         <span class="sync-header__status" data-sync-status></span>
-        <div class="sync-header__actions">
-          <button type="button" class="btn btn--header" id="export-backup" title="\u6B64\u5099\u4EFD\u6A94\u70BA\u672A\u52A0\u5BC6\u7684\u5B8C\u6574\u8CC7\u6599\uFF08\u542B\u5E7C\u5152\u59D3\u540D\u3001\u51FA\u751F\u65E5\u671F\u7B49\u500B\u8CC7\uFF09\uFF0C\u8ACB\u52FF\u653E\u5728\u5171\u7528\u96F2\u7AEF\u8CC7\u6599\u593E">\u532F\u51FA\u5099\u4EFD</button>
-          <label class="btn btn--header btn--header-file">\u532F\u5165\u5099\u4EFD <input type="file" id="import-backup" accept="application/json"></label>
-        </div>
       </div>
     `;
       slot.querySelector('[data-action="sync-sign-in"]').addEventListener("click", async () => {
