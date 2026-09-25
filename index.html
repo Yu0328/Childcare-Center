@@ -828,7 +828,9 @@ button {
 }
 
 /* ----- 方向 E — 幼兒 / 表單 / 紀錄 / 月計畫 lists: one card, rows separated by hairlines.
-   Left-aligned rows; caps its height and scrolls (thin, soft scrollbar) once the list gets long. ----- */
+   Left-aligned rows. No height cap: a capped box cut its bottom row in half, which read as a
+   broken layout rather than "scroll for more" — the list grows and the page scrolls instead,
+   with the 新增 form beside it kept in view (see .tab-layout:has(.card-list--rows) below). ----- */
 .card-list--rows {
   --_card-shadow: 0 1px 3px rgba(15, 23, 20, 0.06), 0 1px 2px rgba(15, 23, 20, 0.04);
   --_shade-top: inset 0 13px 11px -13px rgba(15, 23, 20, 0.1);
@@ -837,18 +839,14 @@ button {
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow-y: auto;
-  max-height: 62vh;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   box-shadow: var(--_card-shadow);
   transition: box-shadow 0.15s ease;
 }
-/* Phones: no box-in-a-page scrolling — the list grows and the whole page scrolls. The add form is a
-   popup here (the ＋ button), so nothing sits below the list that the cap was protecting. Extra
-   bottom room keeps the last row's × clear of the floating ＋. */
+/* Phones: extra bottom room keeps the last row's × clear of the floating ＋. */
 @media (max-width: 640px) {
   .card-list--rows {
-    max-height: none;
     overflow-y: visible;
   }
   #app:has(.card-list--rows) {
@@ -1280,7 +1278,7 @@ fieldset.panel-form__field.import-preview__child legend {
    every .panel-form — the short "新增幼兒"/"新增適性總表" forms elsewhere stay at the normal
    420px cap). Widens both this panel's own column and #app itself (native :has(), no markup
    changes needed elsewhere), so the domain-grid/entry-list beside it isn't squeezed by the wider
-   column — same pattern .domain-grid--row already uses for formEditorView. */
+   column — the same breakpoint formEditorView's domain tabs use. */
 .panel-form--wide {
   max-width: 520px;
 }
@@ -1404,6 +1402,11 @@ fieldset.panel-form__field.import-preview__child legend {
   .tab-layout > .form-popup {
     margin: 0;
   }
+  /* List pages: the uncapped list scrolls with the page, so keep the short 新增 form in view. */
+  .tab-layout:has(.card-list--rows) > .form-popup {
+    position: sticky;
+    top: 1.5rem;
+  }
 }
 
 .tab-layout > .domain-grid,
@@ -1421,15 +1424,31 @@ fieldset.panel-form__field.import-preview__child legend {
   align-items: start;
 }
 
-/* 適性總表 only: all five domains side by side to shorten the page (see .domain-grid above for
-   the default auto-fit behavior used by the other two domain-grid users, which stays untouched).
-   Collapses back to the default stacked layout on mobile, same breakpoint as .tab-layout below. */
-.domain-grid--row {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+/* 適性總表 only: on desktop the five domains + 備註 are tabs (same look as the 適性紀錄 editor),
+   one card shown at a time with its indicators spread across columns. Mobile keeps the default
+   stacked collapsible cards and hides the tab bar. */
+@media (min-width: 641px) {
+  .domain-grid--tabbed {
+    grid-template-columns: 1fr;
+  }
+  .domain-grid--tabbed > .domain-card:not(.domain-card--active),
+  .domain-grid--tabbed > .domain-card > .domain-card__title {
+    display: none;
+  }
+  .domain-grid--tabbed > .domain-card > .domain-card__body {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
+  }
+}
+@media (max-width: 640px) {
+  .tabs.tabs--domains {
+    display: none;
+  }
 }
 
 /* 適性紀錄's 適性發展紀錄表 only: one domain card per row, full width, stacked in domain order
-   (the opposite of .domain-grid--row above) — narrative text and reference checkboxes need real
+   (like .domain-grid--tabbed above) — narrative text and reference checkboxes need real
    width to edit comfortably, which the default auto-fit multi-column layout doesn't give them. */
 .domain-grid--single {
   grid-template-columns: 1fr;
@@ -1455,38 +1474,16 @@ fieldset.panel-form__field.import-preview__child legend {
   margin-bottom: 0;
 }
 
-/* 備註 is a sixth card after the five domains — full width on its own row, remarks laid out side
-   by side, rather than squeezed into one fifth-width column. */
-.domain-grid--row > [data-remark-section] {
-  grid-column: 1 / -1;
-}
-
-.domain-grid--row > [data-remark-section] > .domain-card__body {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  align-items: start;
-}
-
-.domain-grid--row > [data-remark-section] > .domain-card__body > :not(.indicator-block) {
+/* 備註's ＋新增備註 button and its form span the full row instead of taking one remark's column. */
+.domain-grid--tabbed > [data-remark-section] > .domain-card__body > :not(.indicator-block) {
   grid-column: 1 / -1;
   justify-self: start;
 }
 
-/* #app's normal 960px cap (sized for the narrow panel-form pages) leaves each of the five
-   columns above too little room for real indicator text, dates, and notes to stay readable —
-   widen the page specifically when domain-grid--row is present, native :has() so no JS/markup
-   is needed to flag the page from formEditorView. Still capped, not unbounded, so it doesn't
-   stretch oddly on ultra-wide monitors; on narrower windows #app simply fills what's available,
-   same as before. */
-#app:has(.domain-grid--row) {
-  max-width: 1600px;
-}
-
 /* formEditorView's indicator-block__title never carries the corner-fixed action buttons (only
    its per-entry rows do), so the 2.6rem clearance .indicator-block__title reserves for those
-   buttons elsewhere is dead space here — reclaiming it matters once .domain-grid--row's five
-   columns leave much less width per card than the other domain-grid users. */
-.domain-grid--row .indicator-block__title {
+   buttons elsewhere is dead space here. */
+.domain-grid--tabbed .indicator-block__title {
   padding-right: 0;
 }
 
@@ -1700,7 +1697,7 @@ fieldset.panel-form__field.import-preview__child legend {
 .entry-row__date {
   color: var(--text-secondary);
   /* Wraps instead of overflowing into the corner-fixed buttons' reserved padding when the column
-     is narrow (e.g. formEditorView's .domain-grid--row); anywhere is needed because the achieved
+     is narrow (e.g. a narrow card column); anywhere is needed because the achieved
      mark + date (e.g. "○2026-08-12") has no natural break character for the browser to wrap at. */
   overflow-wrap: anywhere;
   font-weight: 600;
@@ -1717,6 +1714,19 @@ fieldset.panel-form__field.import-preview__child legend {
   word-break: break-word;
 }
 
+/* 適性發展紀錄表: keep the narrative's own paragraph breaks (imported and typed text both carry
+   \n) instead of collapsing thousands of characters into one block, and rule it off from the
+   referenced-indicator list above it. */
+.record-references:not(:empty) {
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.6rem;
+  border-bottom: 1px dashed var(--border-strong);
+}
+.record-narrative {
+  white-space: pre-line;
+  line-height: 1.8;
+}
+
 .entry-form[hidden] {
   display: none;
 }
@@ -1730,8 +1740,27 @@ fieldset.panel-form__field.import-preview__child legend {
 
 /* Same problem for .panel-form__field (also display: flex): the "至 ○年○月" end-of-range group in
    the 新增適性總表 / 適性總表匯入 forms stayed visible even with the "涵蓋一段期間" box unchecked. */
-.panel-form__field[hidden] {
+.panel-form__field[hidden],
+.panel-form__row[hidden] {
   display: none;
+}
+
+/* Phones: one field per line, otherwise the date dropdowns spill past the card edge. */
+@media (max-width: 640px) {
+  .panel-form__row {
+    grid-template-columns: 1fr;
+  }
+  .panel-form__row > span:empty {
+    display: none;
+  }
+}
+
+/* A required box left blank on submit (月計畫 import's new-child name/birthdate). */
+.field--invalid,
+.panel-form .field--invalid {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  box-shadow: 0 0 0 1px var(--danger);
 }
 
 /* Redesigned to read as a distinct, self-contained panel — same visual family as
@@ -1768,18 +1797,55 @@ fieldset.panel-form__field.import-preview__child legend {
   gap: 0.4rem;
 }
 
+/* Status choices as one row of pill toggles (the whole pill is the tap target) instead of a
+   radio dot sitting next to the ○/△ mark — two markers for one choice read as clutter. The native
+   radio stays in the DOM, visually hidden, so keyboard/screen-reader use and every existing
+   `input[name=status-…]` lookup keep working unchanged. */
 .entry-form__radio-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.2rem;
+  gap: 0.4rem;
 }
 
 .entry-form__radio {
+  position: relative;
   font-size: 0.85rem;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   white-space: nowrap;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.entry-form__radio:hover {
+  border-color: var(--brand);
+}
+.entry-form__radio:has(input:checked) {
+  background: var(--brand-tint);
+  border-color: var(--brand);
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+.entry-form__radio:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.entry-form__radio:has(input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.entry-form__radio input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
 }
 .entry-form__radio .entry-row__mark {
   margin-right: 0;
@@ -2134,10 +2200,11 @@ fieldset.panel-form__field.import-preview__child legend {
      "new" flag. #7a4614 on --warm-tint is the app's established readable warm pairing. */
   background: var(--warm-tint);
   color: #7a4614;
-  font-size: 0.65rem;
+  border: 1px solid var(--warm-border);
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
-  padding: 0.2em 0.5em;
+  padding: 0.25em 0.6em;
   border-radius: 999px;
   margin-left: 0.4em;
   vertical-align: middle;
@@ -2205,7 +2272,7 @@ fieldset.panel-form__field.import-preview__child legend {
   .tab-layout > * {
     min-width: 0;
   }
-  .domain-grid--row {
+  .domain-grid--tabbed {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
@@ -2375,7 +2442,7 @@ fieldset.panel-form__field.import-preview__child legend {
 /* ---------- Monthly course plan editor ----------
    This view needs far more horizontal room than the 960px default (sized for narrow forms):
    each child gets a full-width day-by-day calendar, and 5 week-columns of indicator text need
-   real space to stay readable. Scoped via :has() (same technique as #app:has(.domain-grid--row)
+   real space to stay readable. Scoped via :has() (same technique as #app:has(.tabs)
    above) so no other view's width changes. Guarded to min-width so it never fights the mobile
    single-column collapse below, which has lower specificity and would otherwise lose to this
    unconditional :has() rule regardless of viewport. */
@@ -2413,8 +2480,19 @@ fieldset.panel-form__field.import-preview__child legend {
   }
   .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) .monthly-plan-side > .panel-form {
     max-width: none;
-    padding: 0.6rem 1rem;
+    padding: 0;
     gap: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+  }
+  /* Idle: just a quiet one-line hint, not a card. */
+  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) .monthly-plan-side > .panel-form > .panel-form__title {
+    margin: 0;
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: normal;
+    color: var(--text-muted);
   }
 }
 
@@ -2801,9 +2879,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // ../../../node_modules/jszip/dist/jszip.min.js
+  // node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -6293,7 +6371,7 @@ var CFormApp = (() => {
     };
   }
 
-  // ../../../node_modules/docx/dist/index.mjs
+  // node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -25439,7 +25517,7 @@ var CFormApp = (() => {
     return years;
   }
   function dayOptionsHtml(dayCount, selectedDay) {
-    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}</option>`).join("");
+    return Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => `<option value="${day}" ${day === selectedDay ? "selected" : ""}>${day}\u65E5</option>`).join("");
   }
   function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldName, value }) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
@@ -25451,11 +25529,11 @@ var CFormApp = (() => {
     <span class="panel-form__period-row">
       <select data-field="${yearFieldName}">
         <option value="">\u5E74</option>
-        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year}</option>`).join("")}
+        ${birthDateYearOptions().map((year) => `<option value="${year}" ${year === selectedYear ? "selected" : ""}>${year - 1911}\u5E74</option>`).join("")}
       </select>
       <select data-field="${monthFieldName}">
         <option value="">\u6708</option>
-        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}</option>`).join("")}
+        ${Array.from({ length: 12 }, (_, i) => i + 1).map((month) => `<option value="${month}" ${month === selectedMonth ? "selected" : ""}>${month}\u6708</option>`).join("")}
       </select>
       <select data-field="${dayFieldName}">
         <option value="">\u65E5</option>
@@ -25529,7 +25607,8 @@ var CFormApp = (() => {
 
   // src/ui/importPreviewView.js
   var BIRTH_DATE_FIELDS = { yearFieldName: "birthDate-year", monthFieldName: "birthDate-month", dayFieldName: "birthDate-day" };
-  var STATUS_MARKS = { developed: "\u25CB", developing: "\u25B3", absent: "\uFF08\u8ACB\u5047\uFF09", courseChanged: "\uFF08\u66F4\u63DB\u8AB2\u7A0B\uFF09" };
+  var STATUS_MARKS = { developed: "\u25CB", developing: "\u25B3" };
+  var STATUS_LABELS = { absent: "\uFF08\u8ACB\u5047\uFF09", courseChanged: "\uFF08\u66F4\u63DB\u8AB2\u7A0B\uFF09" };
   function entryRow(entry, index) {
     const unresolved = !entry.description && !entry.isRemark;
     const description = entry.description || entry.activityName || "";
@@ -25541,7 +25620,7 @@ var CFormApp = (() => {
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
         ${unresolved ? "\uFF08\u7121\u6CD5\u5C0D\u61C9\u5230\u7CFB\u7D71\u6307\u6A19\uFF0C\u5EFA\u8B70\u53D6\u6D88\u52FE\u9078\uFF09" : escapeHtml(description)}
         \u2014
-        ${escapeHtml(toRocDate(entry.date))}${STATUS_MARKS[entry.status] ?? ""}
+        <span class="import-preview__entry-date">${STATUS_MARKS[entry.status] ? `<span class="entry-row__mark">${STATUS_MARKS[entry.status]}</span>` : ""}${escapeHtml(toRocDate(entry.date))}${STATUS_LABELS[entry.status] ?? ""}</span>
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>
@@ -25588,15 +25667,19 @@ var CFormApp = (() => {
       <label class="entry-form__checkbox">
         <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? "checked" : ""}> \u6DB5\u84CB\u4E00\u6BB5\u671F\u9593\uFF08\u8DE8\u591A\u500B\u6708\u4EFD\uFF09
       </label>
-      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? "" : "hidden"}>
-        \u81F3
-        ${periodSelectsHtml({
+      <!-- Empty first column keeps \u81F3 directly under \u7D00\u9304\u5E74\u6708's own column, same width. -->
+      <div class="panel-form__row" data-field-group="period-end" ${parsedIsRange ? "" : "hidden"}>
+        <span></span>
+        <label class="panel-form__field">
+          \u81F3
+          ${periodSelectsHtml({
       yearFieldName: "period-end-year",
       monthFieldName: "period-end-month",
       selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
       selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth
     })}
-      </label>
+        </label>
+      </div>
 
       <h3 class="panel-form__title">\u89C0\u5BDF\u7D00\u9304\uFF08\u5171 ${parsed.entries.length} \u7B46\uFF0C\u53D6\u6D88\u52FE\u9078\u53EF\u6392\u9664\u4E0D\u532F\u5165\uFF09</h3>
       <ul class="import-preview__entry-list">
@@ -27048,17 +27131,25 @@ var CFormApp = (() => {
     const hadPreviousRender = previousCards.length > 0;
     const previouslyOpen = new Set(previousCards.filter((el) => el.open).map((el) => el.dataset.domain || "remark"));
     const isOpen = (key) => !hadPreviousRender || previouslyOpen.has(key);
+    const previousActive = container.querySelector(".domain-card--active");
+    const activeKey = previousActive ? previousActive.dataset.domain || "remark" : String(domains[0]?.[1]);
+    const tabKeys = [...domains.map(([name, id]) => [name, String(id)]), ["\u5099\u8A3B", "remark"]];
     container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7E3D\u8868\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(form.tier)} \u968E\u6BB5<span class="page-header__period">${escapeHtml(form.period)}</span></h2>
-      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
+      <button type="button" class="btn btn--purple" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
-    <div class="domain-grid domain-grid--row">
+    <div class="tabs tabs--domains" role="tablist">
+      ${tabKeys.map(
+      ([label, key]) => `<button type="button" class="tabs__button${key === activeKey ? " tabs__button--active" : ""}" data-domain-tab="${key}" role="tab">${escapeHtml(label)}</button>`
+    ).join("")}
+    </div>
+    <div class="domain-grid domain-grid--tabbed">
       ${domains.map(
       ([domainName, domainId]) => `
-            <details class="domain-card" data-domain="${domainId}" ${isOpen(String(domainId)) ? "open" : ""}>
+            <details class="domain-card${String(domainId) === activeKey ? " domain-card--active" : ""}" data-domain="${domainId}" ${isOpen(String(domainId)) || String(domainId) === activeKey ? "open" : ""}>
               <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
               <div class="domain-card__body">
                 ${indicators.filter((i) => i.domainName === domainName).map((indicator) => indicatorBlock(indicator, entriesByIndicatorCode[indicator.code] || [])).join("")}
@@ -27066,7 +27157,7 @@ var CFormApp = (() => {
             </details>
           `
     ).join("")}
-      <details class="domain-card" data-remark-section ${isOpen("remark") ? "open" : ""}>
+      <details class="domain-card${activeKey === "remark" ? " domain-card--active" : ""}" data-remark-section ${isOpen("remark") || activeKey === "remark" ? "open" : ""}>
         <summary class="domain-card__title">\u5099\u8A3B</summary>
         <div class="domain-card__body">
           ${remarks.map(remarkBlock).join("")}
@@ -27089,6 +27180,19 @@ var CFormApp = (() => {
     const rerender = () => keepScroll(() => renderFormEditorView(container, { child, form, onBack, confirmDelete }));
     container.querySelector('[data-action="back"]').addEventListener("click", onBack);
     wireRowClickEdit(container);
+    for (const tab of container.querySelectorAll("[data-domain-tab]")) {
+      tab.addEventListener("click", () => {
+        const key = tab.dataset.domainTab;
+        for (const other of container.querySelectorAll("[data-domain-tab]")) {
+          other.classList.toggle("tabs__button--active", other === tab);
+        }
+        for (const card of container.querySelectorAll(".domain-grid--tabbed > .domain-card")) {
+          const isActive = (card.dataset.domain || "remark") === key;
+          card.classList.toggle("domain-card--active", isActive);
+          if (isActive) card.open = true;
+        }
+      });
+    }
     container.querySelector('[data-action="export"]').addEventListener("click", async () => {
       const errorEl = container.querySelector('[data-error="export"]');
       try {
@@ -27568,7 +27672,7 @@ var CFormApp = (() => {
         \u6BD4\u5C0D\u5C0F\u670B\u53CB
         <select data-child-select="${index}">
           <option value="${NEW_CHILD_VALUE}" ${preselected === NEW_CHILD_VALUE ? "selected" : ""}>\u5EFA\u7ACB\u65B0\u5C0F\u670B\u53CB</option>
-          ${existingChildren.map((c) => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? "selected" : ""}>${escapeHtml(c.name)}\uFF08${escapeHtml(c.birthDate)}\uFF09</option>`).join("")}
+          ${existingChildren.map((c) => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? "selected" : ""}>${escapeHtml(c.name)}\uFF08${escapeHtml(toRocDate(c.birthDate))}\uFF09</option>`).join("")}
         </select>
       </label>
       <div class="import-preview__new-child" data-child-new-fields="${index}" ${preselected === NEW_CHILD_VALUE ? "" : "hidden"}>
@@ -27628,6 +27732,9 @@ var CFormApp = (() => {
         container.querySelector(`[data-child-new-fields="${index}"]`).hidden = event.target.value !== NEW_CHILD_VALUE;
       });
     });
+    const clearInvalid = (event) => event.target.classList?.remove("field--invalid");
+    container.querySelector('[data-action="confirm-import"]').addEventListener("input", clearInvalid);
+    container.querySelector('[data-action="confirm-import"]').addEventListener("change", clearInvalid);
     container.querySelector('[data-action="confirm-import"]').addEventListener("submit", async (event) => {
       event.preventDefault();
       const errorEl = container.querySelector("[data-error]");
@@ -27635,6 +27742,13 @@ var CFormApp = (() => {
       const month = container.querySelector('[data-field="period-month"]').value.padStart(2, "0");
       const period = `${year}\u5E74${month}\u6708`;
       const includedIndexes = parsed.children.map((_, i) => i).filter((i) => container.querySelector(`[data-child-include="${i}"]`).checked);
+      for (const el of container.querySelectorAll(".field--invalid")) el.classList.remove("field--invalid");
+      const blankFields = includedIndexes.filter((i) => container.querySelector(`[data-child-select="${i}"]`).value === NEW_CHILD_VALUE).flatMap((i) => [
+        container.querySelector(`[data-child-new-name="${i}"]`),
+        ...Object.values(birthDateFieldNames(i)).map((name) => container.querySelector(`[data-field="${name}"]`))
+      ]).filter((el) => !el.value.trim());
+      for (const el of blankFields) el.classList.add("field--invalid");
+      blankFields[0]?.scrollIntoView?.({ block: "center", behavior: "smooth" });
       try {
         const resolutions = [];
         for (const index of includedIndexes) {
@@ -28667,8 +28781,8 @@ var CFormApp = (() => {
   `;
     return `
     <div class="indicator-block" data-click-edit data-development-record="${escapeHtml(record.id)}">
-      <ul class="entry-list">${lines}</ul>
-      <p class="entry-row__note">${escapeHtml(record.narrative)}</p>
+      <ul class="entry-list record-references">${lines}</ul>
+      <p class="entry-row__note record-narrative">${escapeHtml(record.narrative)}</p>
       <span class="indicator-block__actions">
         <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-record="${escapeHtml(record.id)}" aria-label="\u7DE8\u8F2F\u9069\u6027\u767C\u5C55\u7D00\u9304\u6BB5\u843D\uFF1A${escapeHtml(recordLabel(record))}">\u7DE8\u8F2F</button>
         <button type="button" class="btn--delete-circle" data-delete-record="${escapeHtml(record.id)}" aria-label="\u522A\u9664\u9069\u6027\u767C\u5C55\u7D00\u9304\u6BB5\u843D\uFF1A${escapeHtml(recordLabel(record))}">\xD7</button>
@@ -29156,7 +29270,7 @@ var CFormApp = (() => {
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel("\u2190 \u8FD4\u56DE\u9069\u6027\u7D00\u9304\u5217\u8868", "\u2190 \u8FD4\u56DE")}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}\u3000${escapeHtml(report.tier)} \u968E\u6BB5<span class="page-header__period">${escapeHtml(report.period)}</span></h2>
-      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
+      <button type="button" class="btn btn--purple" data-action="export">${headerButtonLabel("\u532F\u51FA Word", "\u532F\u51FA")}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tabs" role="tablist">
