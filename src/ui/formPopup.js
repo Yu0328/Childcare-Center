@@ -203,10 +203,11 @@ export function wireNestedEntryForm(trigger, entryForm) {
 }
 
 // Wraps a nested entry-form's markup in the same `<dialog class="form-popup">` chrome as
-// formPopupMarkup, without a FAB (the caller already has its own trigger button). Mobile only —
-// desktop passes `entryFormHtml` straight through unchanged.
-export function nestedEntryFormDialog(entryFormHtml) {
-  if (!isMobile()) return entryFormHtml;
+// formPopupMarkup, without a FAB (the caller already has its own trigger button). Mobile only by
+// default — desktop passes `entryFormHtml` straight through unchanged. `wrap` lets a caller that
+// needs a popup at wider widths too (monthlyPlanEditorView on mid-size screens) force it.
+export function nestedEntryFormDialog(entryFormHtml, wrap = isMobile()) {
+  if (!wrap) return entryFormHtml;
   return `
     <dialog class="form-popup">
       <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="關閉">×</button>

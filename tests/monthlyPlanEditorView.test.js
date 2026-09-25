@@ -62,6 +62,23 @@ describe('monthlyPlanEditorView: rendering', () => {
     expect(visibleIds()).toEqual([String(second.id)]);
   });
 
+  it('切換幼兒時清掉上一位幼兒已選的格子與編輯面板，避免勾到別人身上', async () => {
+    const second = await addChild({ name: '林小美', birthDate: '2024-05-01' });
+    const twoPlan = await addMonthlyCoursePlan({
+      period: '115年09月', childIds: [child.id, second.id], childTiers: { [child.id]: 'Ⅴ', [second.id]: 'Ⅴ' },
+    });
+    await renderMonthlyPlanEditorView(container, { plan: twoPlan, onBack: vi.fn() });
+
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector('[data-panel-items]').children.length > 0);
+
+    container.querySelector(`[data-switch-child="${second.id}"]`).click();
+    await waitFor(() => container.querySelector('[data-panel-items]').children.length === 0);
+
+    expect(container.querySelector('.monthly-calendar__day--selected')).toBeNull();
+    expect(container.querySelector('[data-panel-header]').textContent).not.toContain('趙萬竑');
+  });
+
   it('只有一位幼兒時不顯示切換列', async () => {
     await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
     expect(container.querySelector('.child-switch')).toBeNull();

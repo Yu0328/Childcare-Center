@@ -115,6 +115,12 @@ function childCalendarHtml(child, tier, data, hidden) {
 // remembered per plan so a re-render (e.g. after 管理幼兒) stays on the same child.
 const activeChildByPlan = new Map();
 
+// Below this width a side-by-side edit panel squeezes the 5-column calendar down to 3-4 characters
+// per line, so the panel becomes a popup instead (same as phones) and the calendar keeps the full
+// width. Must match the 1280px breakpoint in styles.css's monthly-plan section.
+const PANEL_POPUP_QUERY = '(max-width: 1279px)';
+const IDLE_PANEL_HINT = '點選左側日期格子開始規劃';
+
 function childSwitchHtml(children, activeId) {
   if (children.length < 2) return '';
   return `
@@ -140,6 +146,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
   const remembered = activeChildByPlan.get(plan.id);
   const activeChildId = data.children.some(c => c.id === remembered) ? remembered : data.children[0]?.id;
   const showOneChild = data.children.length > 1;
+  const panelAsPopup = typeof matchMedia === 'function' && matchMedia(PANEL_POPUP_QUERY).matches;
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -179,13 +186,13 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
           </div>
           <p class="field-error" data-error="manage-children"></p>
         </form>
-        `)}
+        `, panelAsPopup)}
         ${nestedEntryFormDialog(`
         <div class="panel-form" data-panel>
-          <h3 class="panel-form__title" data-panel-header>點選日期格子開始規劃</h3>
+          <h3 class="panel-form__title" data-panel-header>${IDLE_PANEL_HINT}</h3>
           <div data-panel-items></div>
         </div>
-        `)}
+        `, panelAsPopup)}
       </div>
     </div>
     ${isMobile() ? `<button type="button" class="fab" data-action="open-panel-popup" hidden aria-label="編輯這天的計畫">${fabIconHtml()}</button>` : ''}
@@ -199,6 +206,13 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       activeChildByPlan.set(plan.id, data.children.find(c => String(c.id) === childId)?.id);
       container.querySelectorAll('[data-switch-child]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
       container.querySelectorAll('.monthly-calendar').forEach(section => { section.hidden = section.dataset.childId !== childId; });
+      // The open cell belongs to the previous child — drop it so the panel (and the FAB) can't
+      // keep editing that child's overrides while another child's calendar is on screen.
+      selected = null;
+      container.querySelectorAll('.monthly-calendar__day--selected').forEach(el => el.classList.remove('monthly-calendar__day--selected'));
+      container.querySelector('[data-panel-header]').textContent = IDLE_PANEL_HINT;
+      renderPanelItems();
+      updateFabVisibility();
     });
   });
 
@@ -254,8 +268,10 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     const isDoubleTap = key === lastTapKey && now - lastTapTime < DOUBLE_TAP_WINDOW_MS;
     lastTapKey = isDoubleTap ? null : key;
     lastTapTime = now;
+    // Phones keep double-tap (a single tap there is often just scrolling past); mid-size screens
+    // have no FAB, so a single click opens the popup directly.
     selectCell(child, tier, week, day).then(() => {
-      if (isDoubleTap) openPanelPopup();
+      if (isDoubleTap || !isMobile()) openPanelPopup();
     });
   }
 

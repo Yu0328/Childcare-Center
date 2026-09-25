@@ -992,6 +992,19 @@ button {
 .form-popup > .entry-form {
   margin: 0;
 }
+/* Any popup actually opened as a modal (phones, plus 月計畫's edit panel on mid-size screens)
+   floats centered with a close button — same as the phone-only rules below, keyed on the dialog's
+   state instead of the screen width. An in-flow desktop dialog is never :modal, so it's untouched. */
+.form-popup:modal {
+  width: min(90vw, 420px);
+  position: fixed;
+  inset: 0;
+  margin: auto;
+}
+.form-popup:modal .form-popup__close {
+  display: block;
+}
+
 .form-popup::backdrop {
   background: rgba(0, 0, 0, 0.4);
 }
@@ -2438,7 +2451,19 @@ fieldset.panel-form__field.import-preview__child legend {
   #app:has(.monthly-calendar-list) {
     max-width: 1680px;
   }
+}
 
+/* Mid-size screens: the edit panel is a popup there (see PANEL_POPUP_QUERY in
+   monthlyPlanEditorView.js), so the calendar takes the whole width instead of sharing it. */
+@media (min-width: 641px) and (max-width: 1279px) {
+  .tab-layout:has(.monthly-calendar-list) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Wide screens: the side column is always there, idle or not, so clicking a cell never
+   re-flows the calendar narrower. */
+@media (min-width: 1280px) {
   .tab-layout:has(.monthly-calendar-list) {
     grid-template-columns: 1fr minmax(340px, 420px);
   }
@@ -2458,30 +2483,19 @@ fieldset.panel-form__field.import-preview__child legend {
   }
 }
 
-@media (min-width: 641px) {
-  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) {
-    grid-template-columns: 1fr;
-  }
-  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) > .monthly-plan-side {
-    order: -1;
-    position: static;
-  }
-  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) .monthly-plan-side > .panel-form {
-    max-width: none;
-    padding: 0;
-    gap: 0;
-    background: none;
-    border: none;
-    box-shadow: none;
-  }
-  /* Idle: just a quiet one-line hint, not a card. */
-  .tab-layout:has(.monthly-calendar-list):has([data-panel-items]:empty):not(:has([data-manage-children-form]:not([hidden]))) .monthly-plan-side > .panel-form > .panel-form__title {
-    margin: 0;
-    text-align: left;
-    font-size: 0.85rem;
-    font-weight: normal;
-    color: var(--text-muted);
-  }
+/* Idle (no cell picked yet): the panel keeps its place in the side column but its title reads as a
+   quiet hint rather than a heading. */
+.monthly-plan-side > .panel-form:has([data-panel-items]:empty) > .panel-form__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: var(--text-muted);
+}
+
+/* This panel's item cards carry two corner buttons (編輯 + ×), not the one × that
+   .indicator-block__title's padding-right reserves room for, so long titles ran underneath 編輯. */
+.monthly-plan-side .indicator-block__title {
+  padding-right: 5.4rem;
 }
 
 /* The manage-children card now lives inside this wrapper alongside the cell-editing panel
