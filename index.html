@@ -2733,6 +2733,25 @@ fieldset.panel-form__field.import-preview__child legend {
   }
 }
 
+/* Hosted build only: shown when a redeploy is waiting (src/pwa/updatePrompt.js). Bottom-centred,
+   clear of the FAB at bottom: 25vh on the right, and above it in stacking order. */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border-radius: 999px;
+  background: var(--text-primary);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 20, 0.25);
+  z-index: 30;
+  white-space: nowrap;
+}
+
 </style>
 </head>
 <body>
@@ -2782,9 +2801,9 @@ var CFormApp = (() => {
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/jszip/dist/jszip.min.js
+  // ../../../node_modules/jszip/dist/jszip.min.js
   var require_jszip_min = __commonJS({
-    "node_modules/jszip/dist/jszip.min.js"(exports, module) {
+    "../../../node_modules/jszip/dist/jszip.min.js"(exports, module) {
       !function(e) {
         if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
         else if ("function" == typeof define && define.amd) define([], e);
@@ -5153,7 +5172,8 @@ var CFormApp = (() => {
   __export(webEntry_exports, {
     mountApp: () => mountApp,
     wireBackupControls: () => wireBackupControls,
-    wireSyncControls: () => wireSyncControls
+    wireSyncControls: () => wireSyncControls,
+    wireUpdatePrompt: () => wireUpdatePrompt
   });
 
   // src/storage/dbCore.js
@@ -6273,7 +6293,7 @@ var CFormApp = (() => {
     };
   }
 
-  // node_modules/docx/dist/index.mjs
+  // ../../../node_modules/docx/dist/index.mjs
   var __create2 = Object.create;
   var __defProp2 = Object.defineProperty;
   var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -26129,6 +26149,10 @@ var CFormApp = (() => {
     const tier = TIERS.find((t) => months >= t.minMonths && months <= t.maxMonths);
     return tier ? tier.code : null;
   }
+  function todayIsoDate(now = /* @__PURE__ */ new Date()) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  }
 
   // src/ui/scrollShade.js
   function wireScrollShade(el) {
@@ -26316,7 +26340,7 @@ var CFormApp = (() => {
     const children = (await listChildren()).sort(
       (a, b) => (a.birthDate || "9999-99-99").localeCompare(b.birthDate || "9999-99-99")
     );
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const isParentReport = reportType === "parent-report";
     const listForType = isParentReport ? listParentReportsForChild : listFormsForChild;
     const newChildIds = new Set(
@@ -26453,7 +26477,7 @@ var CFormApp = (() => {
     const tierIndex = (code) => TIERS.findIndex((t) => t.code === code);
     const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period) || tierIndex(b.tier) - tierIndex(a.tier));
     const entryCounts = await Promise.all(forms.map(async (form) => (await listEntriesForForm(form.id)).length));
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const suggested = suggestTier(child.birthDate, today);
     const defaultYear = currentRocYear();
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
@@ -27752,7 +27776,7 @@ var CFormApp = (() => {
   // src/ui/parentReportListView.js
   async function renderParentReportListView(container, { child, onSelectReport, onBack, confirmDelete = (message) => typeof confirm === "function" ? confirm(message) : false }) {
     const reports = (await listParentReportsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period));
-    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const suggested = suggestTier(child.birthDate, today);
     const defaultYear = currentRocYear();
     const defaultMonth = (/* @__PURE__ */ new Date()).getMonth() + 1;
@@ -30890,7 +30914,7 @@ var CFormApp = (() => {
       try {
         const parts = await exportBackup(showProgress);
         const blob = new Blob(parts, { type: "application/json" });
-        downloadBlob(blob, `${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}_\u5099\u4EFD.json`);
+        downloadBlob(blob, `${todayIsoDate()}_\u5099\u4EFD.json`);
         showMessage("");
       } catch (err) {
         showMessage(`${EXPORT_FAILED_MESSAGE}\uFF08${err?.message || err}\uFF09`);
@@ -32318,6 +32342,40 @@ Content-Type: ${contentType}\r
     }
     return { gate };
   }
+
+  // src/pwa/updatePrompt.js
+  async function wireUpdatePrompt({
+    serviceWorker = navigator.serviceWorker,
+    host: host2 = document.body,
+    reload = () => location.reload()
+  } = {}) {
+    let updateRequested = false;
+    serviceWorker.addEventListener("controllerchange", () => {
+      if (updateRequested) reload();
+    });
+    const registration = await serviceWorker.register("sw.js");
+    function offer() {
+      if (!serviceWorker.controller || host2.querySelector(".update-banner")) return;
+      host2.insertAdjacentHTML(
+        "beforeend",
+        '<div class="update-banner" role="status">\u6709\u65B0\u7248\u672C<button type="button" class="btn btn--primary btn--small">\u66F4\u65B0</button></div>'
+      );
+      host2.querySelector(".update-banner button").addEventListener("click", () => {
+        const waiting = registration.waiting;
+        if (!waiting) return reload();
+        updateRequested = true;
+        waiting.postMessage("SKIP_WAITING");
+      });
+    }
+    if (registration.waiting) offer();
+    registration.addEventListener("updatefound", () => {
+      const worker = registration.installing;
+      worker?.addEventListener("statechange", () => {
+        if (worker.state === "installed") offer();
+      });
+    });
+    return registration;
+  }
   return __toCommonJS(webEntry_exports);
 })();
 /*! Bundled license information:
@@ -32373,12 +32431,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (window.__cformReloaded) return;
-    window.__cformReloaded = true;
-    location.reload();
-  });
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  window.addEventListener('load', () => CFormApp.wireUpdatePrompt());
 }
 </script>
 </body>

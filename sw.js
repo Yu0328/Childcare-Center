@@ -1,9 +1,14 @@
-const CACHE_NAME = 'c-form-cache-27fe7351e0ea';
+const CACHE_NAME = 'c-form-cache-c6c67d016be7';
 const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
+});
+
+// A new version waits for the page's 更新 button (src/pwa/updatePrompt.js) instead of taking
+// over mid-edit on its own.
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
