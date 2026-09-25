@@ -213,19 +213,32 @@ export async function renderFormEditorView(
   const hadPreviousRender = previousCards.length > 0;
   const previouslyOpen = new Set(previousCards.filter(el => el.open).map(el => el.dataset.domain || 'remark'));
   const isOpen = key => !hadPreviousRender || previouslyOpen.has(key);
+  // Desktop shows one domain at a time via the tab bar (hidden on mobile, where the cards stack);
+  // keep the teacher on the same tab across re-renders.
+  const previousActive = container.querySelector('.domain-card--active');
+  const activeKey = previousActive ? previousActive.dataset.domain || 'remark' : String(domains[0]?.[1]);
+  const tabKeys = [...domains.map(([name, id]) => [name, String(id)]), ['備註', 'remark']];
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性總表列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}　${escapeHtml(form.tier)} 階段<span class="page-header__period">${escapeHtml(form.period)}</span></h2>
-      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
+      <button type="button" class="btn btn--purple" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
-    <div class="domain-grid domain-grid--row">
+    <div class="tabs tabs--domains" role="tablist">
+      ${tabKeys
+        .map(
+          ([label, key]) =>
+            `<button type="button" class="tabs__button${key === activeKey ? ' tabs__button--active' : ''}" data-domain-tab="${key}" role="tab">${escapeHtml(label)}</button>`
+        )
+        .join('')}
+    </div>
+    <div class="domain-grid domain-grid--tabbed">
       ${domains
         .map(
           ([domainName, domainId]) => `
-            <details class="domain-card" data-domain="${domainId}" ${isOpen(String(domainId)) ? 'open' : ''}>
+            <details class="domain-card${String(domainId) === activeKey ? ' domain-card--active' : ''}" data-domain="${domainId}" ${isOpen(String(domainId)) || String(domainId) === activeKey ? 'open' : ''}>
               <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
               <div class="domain-card__body">
                 ${indicators
@@ -237,7 +250,7 @@ export async function renderFormEditorView(
           `
         )
         .join('')}
-      <details class="domain-card" data-remark-section ${isOpen('remark') ? 'open' : ''}>
+      <details class="domain-card${activeKey === 'remark' ? ' domain-card--active' : ''}" data-remark-section ${isOpen('remark') || activeKey === 'remark' ? 'open' : ''}>
         <summary class="domain-card__title">備註</summary>
         <div class="domain-card__body">
           ${remarks.map(remarkBlock).join('')}
@@ -264,6 +277,22 @@ export async function renderFormEditorView(
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
   wireRowClickEdit(container);
+
+  for (const tab of container.querySelectorAll('[data-domain-tab]')) {
+    tab.addEventListener('click', () => {
+      const key = tab.dataset.domainTab;
+      for (const other of container.querySelectorAll('[data-domain-tab]')) {
+        other.classList.toggle('tabs__button--active', other === tab);
+      }
+      for (const card of container.querySelectorAll('.domain-grid--tabbed > .domain-card')) {
+        const isActive = (card.dataset.domain || 'remark') === key;
+        card.classList.toggle('domain-card--active', isActive);
+        // The collapse toggle is hidden on desktop, so a card collapsed earlier must be reopened
+        // here or its tab would show nothing.
+        if (isActive) card.open = true;
+      }
+    });
+  }
 
   container.querySelector('[data-action="export"]').addEventListener('click', async () => {
     const errorEl = container.querySelector('[data-error="export"]');

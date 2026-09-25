@@ -44,7 +44,7 @@ export async function renderParentReportEditorView(container, { child, report, o
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性紀錄列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}　${escapeHtml(report.tier)} 階段<span class="page-header__period">${escapeHtml(report.period)}</span></h2>
-      <button type="button" class="btn btn--primary" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
+      <button type="button" class="btn btn--purple" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tabs" role="tablist">

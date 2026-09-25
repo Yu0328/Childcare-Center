@@ -1,6 +1,7 @@
 import { addChild, listChildren } from '../storage/db.js';
 import { addMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem, setChildItemOverride } from '../storage/monthlyPlanDb.js';
 import { TIERS } from '../data/indicators.js';
+import { toRocDate } from '../export/docxShared.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
@@ -46,7 +47,7 @@ function childBlock(parsedChild, index, existingChildren) {
         <select data-child-select="${index}">
           <option value="${NEW_CHILD_VALUE}" ${preselected === NEW_CHILD_VALUE ? 'selected' : ''}>建立新小朋友</option>
           ${existingChildren
-            .map(c => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? 'selected' : ''}>${escapeHtml(c.name)}（${escapeHtml(c.birthDate)}）</option>`)
+            .map(c => `<option value="${escapeHtml(c.id)}" ${preselected === c.id ? 'selected' : ''}>${escapeHtml(c.name)}（${escapeHtml(toRocDate(c.birthDate))}）</option>`)
             .join('')}
         </select>
       </label>
@@ -117,6 +118,10 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
     });
   });
 
+  const clearInvalid = event => event.target.classList?.remove('field--invalid');
+  container.querySelector('[data-action="confirm-import"]').addEventListener('input', clearInvalid);
+  container.querySelector('[data-action="confirm-import"]').addEventListener('change', clearInvalid);
+
   container.querySelector('[data-action="confirm-import"]').addEventListener('submit', async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-error]');
@@ -128,6 +133,19 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
     const includedIndexes = parsed.children
       .map((_, i) => i)
       .filter(i => container.querySelector(`[data-child-include="${i}"]`).checked);
+
+    // Outline every new child's blank name/birthdate box in red (not just report the first one in
+    // the message at the bottom), and bring the first into view.
+    for (const el of container.querySelectorAll('.field--invalid')) el.classList.remove('field--invalid');
+    const blankFields = includedIndexes
+      .filter(i => container.querySelector(`[data-child-select="${i}"]`).value === NEW_CHILD_VALUE)
+      .flatMap(i => [
+        container.querySelector(`[data-child-new-name="${i}"]`),
+        ...Object.values(birthDateFieldNames(i)).map(name => container.querySelector(`[data-field="${name}"]`)),
+      ])
+      .filter(el => !el.value.trim());
+    for (const el of blankFields) el.classList.add('field--invalid');
+    blankFields[0]?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
 
     try {
       // Validation pre-pass: touch nothing in IndexedDB yet. Every included child must

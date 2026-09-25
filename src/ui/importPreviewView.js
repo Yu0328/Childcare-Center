@@ -8,7 +8,8 @@ import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPe
 
 const BIRTH_DATE_FIELDS = { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' };
 
-const STATUS_MARKS = { developed: '○', developing: '△', absent: '（請假）', courseChanged: '（更換課程）' };
+const STATUS_MARKS = { developed: '○', developing: '△' };
+const STATUS_LABELS = { absent: '（請假）', courseChanged: '（更換課程）' };
 
 // A 備註 row's code is often another tier's or free text by design (see docxImport.js), so it
 // never gets the "can't match" warning — it shows its own activityName instead when it has one.
@@ -23,7 +24,9 @@ function entryRow(entry, index) {
         <span class="import-preview__entry-code">${escapeHtml(entry.indicatorCode)}</span>
         ${unresolved ? '（無法對應到系統指標，建議取消勾選）' : escapeHtml(description)}
         —
-        ${escapeHtml(toRocDate(entry.date))}${STATUS_MARKS[entry.status] ?? ''}
+        <span class="import-preview__entry-date">${
+          STATUS_MARKS[entry.status] ? `<span class="entry-row__mark">${STATUS_MARKS[entry.status]}</span>` : ''
+        }${escapeHtml(toRocDate(entry.date))}${STATUS_LABELS[entry.status] ?? ''}</span>
         <span class="import-preview__entry-note">${escapeHtml(entry.note)}</span>
       </label>
     </li>
@@ -76,15 +79,19 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
       <label class="entry-form__checkbox">
         <input type="checkbox" data-field="period-is-range" ${parsedIsRange ? 'checked' : ''}> 涵蓋一段期間（跨多個月份）
       </label>
-      <label class="panel-form__field" data-field-group="period-end" ${parsedIsRange ? '' : 'hidden'}>
-        至
-        ${periodSelectsHtml({
-          yearFieldName: 'period-end-year',
-          monthFieldName: 'period-end-month',
-          selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
-          selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth,
-        })}
-      </label>
+      <!-- Empty first column keeps 至 directly under 紀錄年月's own column, same width. -->
+      <div class="panel-form__row" data-field-group="period-end" ${parsedIsRange ? '' : 'hidden'}>
+        <span></span>
+        <label class="panel-form__field">
+          至
+          ${periodSelectsHtml({
+            yearFieldName: 'period-end-year',
+            monthFieldName: 'period-end-month',
+            selectedYear: parsedEndYear ?? parsedYear ?? defaultRocYear,
+            selectedMonth: parsedEndMonth ?? parsedMonth ?? defaultMonth,
+          })}
+        </label>
+      </div>
 
       <h3 class="panel-form__title">觀察紀錄（共 ${parsed.entries.length} 筆，取消勾選可排除不匯入）</h3>
       <ul class="import-preview__entry-list">

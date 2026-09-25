@@ -1,4 +1,4 @@
-// Gregorian year/month/day <select> triplet for 出生日期 fields, replacing native
+// Year/month/day <select> triplet (Gregorian values, ROC-labelled) for 出生日期 fields, replacing native
 // <input type="date">. On macOS Safari, that native picker's calendar popup has no year-jump —
 // only ‹ › month-at-a-time navigation — so entering a birthdate years in the past means paging
 // back one month at a time. Plain <select> dropdowns (same approach as periodFields.js's ROC
@@ -21,7 +21,7 @@ function birthDateYearOptions() {
 
 function dayOptionsHtml(dayCount, selectedDay) {
   return Array.from({ length: dayCount }, (_, i) => i + 1)
-    .map(day => `<option value="${day}" ${day === selectedDay ? 'selected' : ''}>${day}</option>`)
+    .map(day => `<option value="${day}" ${day === selectedDay ? 'selected' : ''}>${day}日</option>`)
     .join('');
 }
 
@@ -38,13 +38,14 @@ export function birthDateSelectsHtml({ yearFieldName, monthFieldName, dayFieldNa
       <select data-field="${yearFieldName}">
         <option value="">年</option>
         ${birthDateYearOptions()
-          .map(year => `<option value="${year}" ${year === selectedYear ? 'selected' : ''}>${year}</option>`)
+          // Labelled in ROC years like every other date on screen; the value stays Gregorian.
+          .map(year => `<option value="${year}" ${year === selectedYear ? 'selected' : ''}>${year - 1911}年</option>`)
           .join('')}
       </select>
       <select data-field="${monthFieldName}">
         <option value="">月</option>
         ${Array.from({ length: 12 }, (_, i) => i + 1)
-          .map(month => `<option value="${month}" ${month === selectedMonth ? 'selected' : ''}>${month}</option>`)
+          .map(month => `<option value="${month}" ${month === selectedMonth ? 'selected' : ''}>${month}月</option>`)
           .join('')}
       </select>
       <select data-field="${dayFieldName}">

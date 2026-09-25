@@ -47,6 +47,28 @@ describe('renderFormEditorView', () => {
     expect(noteEl.textContent).toBe('請假　生病請假');
   });
 
+  it('領域分頁：預設第一個領域，點別的分頁就換成那張卡片（並展開），重畫後仍停在同一頁', async () => {
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    const activeCard = () => container.querySelector('.domain-card--active');
+    const tabs = [...container.querySelectorAll('[data-domain-tab]')];
+    expect(tabs.map(t => t.textContent)).toEqual(['身體動作', '社會情緒', '語言溝通', '認知探索', '生活自理', '備註']);
+    expect(activeCard().dataset.domain).toBe(tabs[0].dataset.domainTab);
+
+    const remarkCard = container.querySelector('[data-remark-section]');
+    remarkCard.open = false;
+    tabs[5].click();
+    expect(activeCard()).toBe(remarkCard);
+    expect(remarkCard.open).toBe(true);
+    expect(container.querySelectorAll('.domain-card--active')).toHaveLength(1);
+    expect(tabs[5].classList.contains('tabs__button--active')).toBe(true);
+
+    tabs[2].click();
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+    expect(activeCard().dataset.domain).toBe(tabs[2].dataset.domainTab);
+  });
+
   it('renders existing entries under their indicator', async () => {
     await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '可以來回穩定行走' });
 

@@ -80,8 +80,8 @@ function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDoma
 
   return `
     <div class="indicator-block" data-click-edit data-development-record="${escapeHtml(record.id)}">
-      <ul class="entry-list">${lines}</ul>
-      <p class="entry-row__note">${escapeHtml(record.narrative)}</p>
+      <ul class="entry-list record-references">${lines}</ul>
+      <p class="entry-row__note record-narrative">${escapeHtml(record.narrative)}</p>
       <span class="indicator-block__actions">
         <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-record="${escapeHtml(record.id)}" aria-label="編輯適性發展紀錄段落：${escapeHtml(recordLabel(record))}">編輯</button>
         <button type="button" class="btn--delete-circle" data-delete-record="${escapeHtml(record.id)}" aria-label="刪除適性發展紀錄段落：${escapeHtml(recordLabel(record))}">×</button>
