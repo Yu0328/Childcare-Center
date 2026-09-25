@@ -34,9 +34,9 @@ Staff previously filled these out by hand in Word, re-copying the same indicator
 
 ## Version control
 
-- `main` is the only long-lived branch and is the source of truth — it tracks `origin/main`, which GitHub Pages serves from. (It was renamed from a local-only `public` branch on 2026-08-18 after that branch and `origin/main` drifted apart; don't recreate a separately-named local branch for this.)
-- Feature work happens on a worktree + branch per feature. Once a feature branch is reviewed and ready, fast-forward it into `main` and immediately delete the branch and worktree — don't leave finished branches lying around (this repo once accumulated 8 stale/superseded branches from skipping this step).
-- After merging a `src/`-affecting change into `main`, immediately do the deploy snapshot (see Architecture above: `npm run build:web`, copy `site/index.html`/`site/sw.js` to the repo root, commit as one "public snapshot update") and push to `origin/main` right away. Don't let local `main` sit ahead of `origin/main` — a branch pushed straight to `origin/main` from elsewhere while local `main` lags behind is exactly how the split above happened.
+- `main` is the only long-lived branch and is the source of truth — it tracks `origin/main`, which GitHub Pages serves from. Don't create a separately-named local branch for deploys; two branches for one site drift apart.
+- Feature work happens on a worktree + branch per feature. Once a feature branch is reviewed and ready, fast-forward it into `main` and immediately delete the branch and worktree — don't leave finished branches lying around.
+- After merging a `src/`-affecting change into `main`, immediately do the deploy snapshot (see Architecture above: `npm run build:web`, copy `site/index.html`/`site/sw.js` to the repo root, commit as one "public snapshot update") and push to `origin/main` right away. Don't let local `main` sit ahead of `origin/main` — if something else pushes to `origin/main` while local `main` lags, the two diverge.
 - `master` is a frozen legacy branch (predates a history rewrite of what's now `main` — it shares no common ancestor with `main`). Keep it around for archival reference only; never merge it into `main` or build on top of it.
 
 ## Testing
