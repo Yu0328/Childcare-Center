@@ -1,5 +1,5 @@
 import { addForm, listFormsForChild, deleteForm, listEntriesForForm } from '../storage/db.js';
-import { suggestTier } from '../domain/ageTier.js';
+import { suggestTier, todayIsoDate } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
@@ -17,7 +17,7 @@ export async function renderFormListView(
   const forms = (await listFormsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period) || tierIndex(b.tier) - tierIndex(a.tier));
   // Shown in each row so two forms with the same tier and period can still be told apart.
   const entryCounts = await Promise.all(forms.map(async form => (await listEntriesForForm(form.id)).length));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const suggested = suggestTier(child.birthDate, today);
   const defaultYear = currentRocYear();
   const defaultMonth = new Date().getMonth() + 1;

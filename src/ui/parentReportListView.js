@@ -1,5 +1,5 @@
 import { addParentReport, listParentReportsForChild, deleteParentReport } from '../storage/parentReportDb.js';
-import { suggestTier } from '../domain/ageTier.js';
+import { suggestTier, todayIsoDate } from '../domain/ageTier.js';
 import { TIERS } from '../data/indicators.js';
 import { escapeHtml } from './escapeHtml.js';
 import { currentRocYear, periodSelectsHtml } from './periodFields.js';
@@ -14,7 +14,7 @@ export async function renderParentReportListView(
 ) {
   // Most recent record period first.
   const reports = (await listParentReportsForChild(child.id)).sort((a, b) => b.period.localeCompare(a.period));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const suggested = suggestTier(child.birthDate, today);
   const defaultYear = currentRocYear();
   const defaultMonth = new Date().getMonth() + 1;

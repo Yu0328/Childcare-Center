@@ -10,6 +10,7 @@ import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
 import { exportBackup, importBackup, importHugeBackupFile, HUGE_IMPORT_THRESHOLD_BYTES } from './storage/backup.js';
 import { downloadBlob } from './export/downloadBlob.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
+import { todayIsoDate } from './domain/ageTier.js';
 
 const RENDER_FAILED_MESSAGE = '載入失敗，請重新整理頁面';
 const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
@@ -245,7 +246,7 @@ export function wireBackupControls({
     try {
       const parts = await exportBackup(showProgress);
       const blob = new Blob(parts, { type: 'application/json' });
-      downloadBlob(blob, `${new Date().toISOString().slice(0, 10)}_備份.json`);
+      downloadBlob(blob, `${todayIsoDate()}_備份.json`);
       showMessage('');
     } catch (err) {
       // The generic message alone gives no way to diagnose device-specific failures (e.g. Safari-only

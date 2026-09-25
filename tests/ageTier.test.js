@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateAgeInMonths, suggestTier } from '../src/domain/ageTier.js';
+import { calculateAgeInMonths, suggestTier, todayIsoDate } from '../src/domain/ageTier.js';
 
 describe('calculateAgeInMonths', () => {
   it('returns 0 for a newborn on the same day', () => {
@@ -30,5 +30,13 @@ describe('suggestTier', () => {
 
   it('suggests Ⅵ for a child older than 24 months', () => {
     expect(suggestTier('2023-01-01', '2026-03-01')).toBe('Ⅵ');
+  });
+});
+
+describe('todayIsoDate', () => {
+  it("uses the device's local date, not UTC (07:30 in Taiwan is still the previous day in UTC)", () => {
+    // Local-time constructor, so this is 07:30 wherever the test runs; the helper must echo the local calendar date.
+    expect(todayIsoDate(new Date(2026, 8, 25, 7, 30))).toBe('2026-09-25');
+    expect(todayIsoDate(new Date(2026, 0, 5, 0, 1))).toBe('2026-01-05');
   });
 });

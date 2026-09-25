@@ -9,7 +9,7 @@ import { renderParentReportImportPreviewView } from './parentReportImportPreview
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { processImportQueue } from './importQueue.js';
 import { keepScroll } from './keepScroll.js';
-import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { calculateAgeInMonths, todayIsoDate } from '../domain/ageTier.js';
 import { toRocDate } from '../export/docxShared.js';
 import { wireScrollShade } from './scrollShade.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
@@ -22,7 +22,7 @@ export async function renderChildListView(
   const children = (await listChildren()).sort((a, b) =>
     (a.birthDate || '9999-99-99').localeCompare(b.birthDate || '9999-99-99')
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const isParentReport = reportType === 'parent-report';
   // A child gets the 新 badge if any of their forms/reports for *this* screen's type (matching
   // whichever list the badge on that form/report itself would show) was created by docx import

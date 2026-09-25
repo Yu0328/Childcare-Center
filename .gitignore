@@ -12,3 +12,12 @@ dist/
 site/
 .superpowers/
 .claude/
+
+# Screenshots/slides kept next to the project (e.g. OAuth client secrets, staff manuals) — not app files.
+*.jpg
+*.jpeg
+*.pptx
+
+# Local code-index tool output.
+.codegraph/
+graphify-out/
