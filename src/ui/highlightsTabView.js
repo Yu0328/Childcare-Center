@@ -21,8 +21,8 @@ function existingEntryCard(entry) {
   const thumbs = [0, 1, 2].map(i => savedThumbHtml(entry.photos[i], i, entry.id)).join('');
   return `
     <div class="indicator-block" data-click-edit data-highlight-entry="${escapeHtml(entry.id)}">
+      <p class="entry-row__note highlight-caption-line">${escapeHtml(entry.caption)}</p>
       <div class="highlight-thumbs">${thumbs}</div>
-      <p class="entry-row__note">${escapeHtml(entry.caption)}</p>
       <div class="entry-row__actions">
         <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-highlight="${escapeHtml(entry.id)}" aria-label="編輯點滴分享：${escapeHtml(entry.caption)}">編輯</button>
         <button type="button" class="btn--delete-circle" data-delete-highlight="${escapeHtml(entry.id)}" aria-label="刪除點滴分享：${escapeHtml(entry.caption)}">×</button>
@@ -50,7 +50,7 @@ export async function renderHighlightsTab(
     <div class="tab-layout">
       ${formPopupMarkup({
         formHtml: `
-          <form class="panel-form" data-action="add-highlight">
+          <form class="panel-form panel-form--wide" data-action="add-highlight">
             <h3 class="panel-form__title">新增點滴分享</h3>
             <div class="highlight-upload-grid">
               ${[0, 1, 2]

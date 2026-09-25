@@ -53,7 +53,7 @@ export async function renderParentReportEditorView(container, { child, report, o
           `<button type="button" class="tabs__button${tab.key === activeTab ? ' tabs__button--active' : ''}" data-tab="${tab.key}" role="tab">${tab.label}</button>`
       ).join('')}
     </div>
-    <div class="tabs__panel" data-tab-panel></div>
+    <div class="tabs__panel" data-tab-panel><p class="view-loading" role="status">載入中…</p></div>
   `;
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);

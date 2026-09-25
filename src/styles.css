@@ -178,6 +178,14 @@ button {
   color: var(--text-muted);
   padding: 3rem 1rem;
 }
+/* A 適性紀錄 tab (點滴分享 decoding its photos) can take a second to fill; the same 180ms delay
+   as app.js's runView keeps a fast tab switch or an edit's re-render from flashing it. */
+.tabs__panel > .view-loading {
+  animation: view-loading-delay 0s 180ms both;
+}
+@keyframes view-loading-delay {
+  from { visibility: hidden; }
+}
 
 /* ---------- App shell ---------- */
 
@@ -1279,8 +1287,27 @@ fieldset.panel-form__field.import-preview__child legend {
     grid-template-columns: 1fr minmax(340px, 520px);
   }
 
-  #app:has(.panel-form--wide) {
+  /* .tabs too: all four 適性紀錄 tabs share one width, including while a tab is still loading. */
+  #app:has(.panel-form--wide),
+  #app:has(.tabs) {
     max-width: 1240px;
+  }
+
+  /* Left / centre / right columns, so the title sits in the true middle whatever the two
+     buttons' widths are — or when there's no right-side button at all (管理幼兒). */
+  .page-header {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, max-content) 1fr;
+  }
+  .page-header > :first-child:not(.page-header__title) {
+    justify-self: start;
+  }
+  .page-header__title {
+    grid-column: 2;
+  }
+  .page-header__title ~ * {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .panel-form--wide {
@@ -1405,6 +1432,15 @@ fieldset.panel-form__field.import-preview__child legend {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   align-items: start;
+}
+
+/* The remark card's date line otherwise keeps a paragraph's default 1em margins, leaving a gap
+   under the (often two-line) title far wider than in the domain cards' own rows. */
+[data-remark-section] .indicator-block > .entry-row__date {
+  margin: 0.2rem 0;
+}
+[data-remark-section] .indicator-block .indicator-block__title {
+  margin-bottom: 0;
 }
 
 /* 備註 is a sixth card after the five domains — full width on its own row, remarks laid out side
@@ -1545,9 +1581,20 @@ fieldset.panel-form__field.import-preview__child legend {
 /* Cards that don't lead with a title element (development-record's referenced-indicator list,
    highlights' photo thumbnails) need their first line of content pushed clear of the
    absolutely-positioned corner buttons instead of narrowed beside them. */
-.indicator-block > .entry-list:first-child,
-.indicator-block > .highlight-thumbs:first-child {
+.indicator-block > .entry-list:first-child {
   margin-top: 1.9rem;
+}
+
+/* 點滴分享 leads with its caption, so the corner × sits beside it rather than above the photos. */
+.entry-row__note.highlight-caption-line {
+  margin: 0 0 0.6rem;
+  padding-right: 2.4rem;
+  min-height: 1.9rem;
+}
+.entry-list-wrap:has(> [data-highlight-entry]) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .entry-list {

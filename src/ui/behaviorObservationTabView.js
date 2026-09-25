@@ -44,7 +44,7 @@ export async function renderBehaviorObservationTab(
     <div class="tab-layout">
       ${formPopupMarkup({
         formHtml: `
-          <form class="panel-form" data-action="add-observation">
+          <form class="panel-form panel-form--wide" data-action="add-observation">
             <h3 class="panel-form__title">新增行為觀察</h3>
             <label class="panel-form__field">標題 <input data-field="title"></label>
             <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>

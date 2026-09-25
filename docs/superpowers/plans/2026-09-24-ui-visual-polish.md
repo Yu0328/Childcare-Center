@@ -15,3 +15,9 @@
 8. K：`monthlyPlanEditorView` 加幼兒切換列，未選中的 `.monthly-calendar` 設為 hidden，選擇記在模組內的 Map（依計畫 id）。測試：切換後只顯示那位；重新整理後仍是同一位。
 9. L：`.entry-form__checkbox input`／`.entry-form__radio input` 加 `flex: none`；兩個 `statusRadios` 的 ○△ 改用 `entry-row__mark` 樣式放前面。
 10. 跑全部測試、建置、拍前後對照、走查。
+
+## 第三輪
+
+11. N：`.panel-form__checkbox-row input` 加 `flex: none`，勾選清單手機改單欄。
+12. O–S：行為觀察／點滴分享表單加 `panel-form--wide`；`parentReportEditorView` 分頁容器先放 `.view-loading` 的「載入中…」；點滴分享卡片說明移到最前、清單加間距；備註卡片日期的上下距縮小；電腦版 `.page-header` 改三欄格線。
+13. 跑全部測試、建置、拍前後對照、走查；沒問題就合併到 main、部署、刪除分支。
