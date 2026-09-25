@@ -384,7 +384,18 @@ const MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
 // Ⅵ-2-3/Ⅵ-2-4, and no Ⅶ-2-x indicator exists.
 const MISNUMBERED_SOCIAL_PATTERN = /^Ⅶ-2-(3|4)$/;
 
+// A few real 月計畫 files type the Latin-letter prefix with the fullwidth "ＩＶ" (U+FF29/U+FF36) —
+// shifted down to plain ASCII first, then handled like any other Latin prefix below.
+const FULLWIDTH_LATIN_PREFIX_PATTERN = /^[ＩＶ]+(?=-)/;
+
+// The one shared "is this an indicator code" rule every importer scans free text with, covering
+// every prefix normalizeIndicatorCode can fix plus Ⅶ (tier Ⅵ's extension items — see
+// CODE_PREFIX_TIER). Each importer used to keep its own copy, and all of them missed Ⅶ. Longest
+// alternatives first, same reason as LATIN_TIER_PREFIX_PATTERN.
+export const INDICATOR_CODE_PATTERN_SOURCE = '(?:[ⅠⅡⅢⅣⅤⅥⅦ]|IⅤ|III|IV|II|I|V|ＩＩＩ|ＩＶ|ＩＩ|Ｉ|Ｖ)-\\d-\\d+';
+
 export function normalizeIndicatorCode(code) {
+  code = code?.replace(FULLWIDTH_LATIN_PREFIX_PATTERN, prefix => [...prefix].map(c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).join(''));
   if (MIXED_IV_PREFIX_PATTERN.test(code ?? '')) return 'Ⅳ' + code.slice(2);
   if (MISNUMBERED_SOCIAL_PATTERN.test(code ?? '')) return 'Ⅵ' + code.slice(1);
   const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? '');

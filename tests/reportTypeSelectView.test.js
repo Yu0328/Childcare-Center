@@ -178,9 +178,9 @@ describe('renderReportTypeSelectView', () => {
       container.querySelector('[data-field="child-new-birthDate-day-0"]').value = '1';
       container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
-      await waitFor(() => document.querySelectorAll('.toast').length === 2);
-      const toasts = [...document.querySelectorAll('.toast')].map(t => t.textContent);
-      expect(toasts).toEqual(['已成功匯入：陳小安.docx', '已成功匯入：115年06月課程計畫.docx']);
+      // The second toast replaces the first rather than stacking under it.
+      await waitFor(() => document.querySelector('.toast')?.textContent === '已成功匯入：115年06月課程計畫.docx');
+      expect(document.querySelectorAll('.toast')).toHaveLength(1);
     });
   });
 });

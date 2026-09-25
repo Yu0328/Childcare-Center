@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier, normalizeIndicatorCode } from '../src/data/indicators.js';
+import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier, normalizeIndicatorCode, INDICATOR_CODE_PATTERN_SOURCE } from '../src/data/indicators.js';
 
 describe('indicator reference data', () => {
   it('has 6 tiers in order Ⅰ through Ⅵ', () => {
@@ -89,6 +89,17 @@ describe('indicator reference data', () => {
     expect(normalizeIndicatorCode('Ⅶ-2-4')).toBe('Ⅵ-2-4');
     expect(getIndicator('Ⅶ-2-3')).toBe(getIndicator('Ⅵ-2-3'));
     expect(normalizeIndicatorCode('Ⅶ-1-1')).toBe('Ⅶ-1-1');
+  });
+
+  it('把全形英文字母打的階段代號（ＩＶ-1-1）對應回羅馬數字', () => {
+    expect(normalizeIndicatorCode('ＩＶ-1-1')).toBe('Ⅳ-1-1');
+    expect(normalizeIndicatorCode('Ｖ-2-3')).toBe('Ⅴ-2-3');
+  });
+
+  it('共用的指標代號比對規則認得 Ⅶ、全形字母與常見的打錯寫法', () => {
+    const pattern = new RegExp(`^${INDICATOR_CODE_PATTERN_SOURCE}$`);
+    for (const code of ['Ⅶ-1-1', 'Ⅵ-3-10', 'ＩＶ-1-2', 'IⅤ-2-1', 'III-1-2', 'V-5-4']) expect(pattern.test(code)).toBe(true);
+    expect(pattern.test('KⅤ-1-1')).toBe(false);
   });
 
   it('之前被匯入成「Ⅶ 階段」的舊總表，仍然顯示 25個月以上 的完整指標', () => {

@@ -1,9 +1,9 @@
 // Floating success notifications for events (like one file of a multi-file import queue
 // finishing) that need to register with the user even though the screen changes again
 // immediately after — appended to document.body, outside any view's own container, so the next
-// view's container.innerHTML swap never wipes a toast out mid-display. Toasts stack (each is its
-// own element, independently timed) rather than being merged into one message, so a multi-file
-// batch naturally reads as one line per file instead of a single long comma-joined string.
+// view's container.innerHTML swap never wipes a toast out mid-display. A new toast replaces any
+// still showing instead of stacking: a multi-file import used to pile up one per file and, on a
+// phone, cover the next file's preview underneath.
 let host = null;
 
 function getHost() {
@@ -20,7 +20,7 @@ export function showToast(message, { durationMs = 4000 } = {}) {
   const toast = document.createElement('p');
   toast.className = 'toast';
   toast.textContent = message;
-  getHost().appendChild(toast);
+  getHost().replaceChildren(toast);
   // Slide out (add the class) rather than snapping away, then remove once that's done.
   setTimeout(() => {
     toast.classList.add('toast--out');

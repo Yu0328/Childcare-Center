@@ -194,7 +194,8 @@ describe('renderChildListView', () => {
     expect(container.textContent).toContain('陳小安');
     expect(container.textContent).toContain('林小美');
     const toasts = [...document.querySelectorAll('.toast')].map(t => t.textContent);
-    expect(toasts).toEqual(['已成功匯入：陳小安.docx', '已成功匯入：林小美.docx']);
+    // Only the newest one stays — stacked toasts covered the screen on a phone.
+    expect(toasts).toEqual(['已成功匯入：林小美.docx']);
   });
 
   it('shows an error and stays on the child list when the selected file cannot be read', async () => {

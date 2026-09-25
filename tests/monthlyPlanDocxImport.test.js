@@ -140,6 +140,12 @@ describe('splitChildTables', () => {
 function plainRun(text) {
   return `<w:r><w:t>${text}</w:t></w:r>`;
 }
+// This app's exporter puts every line after an item's first one in its own run preceded by a
+// <w:br/> (see monthlyPlanDocxExport.js cellParagraphsFromRuns) — that break, not the run boundary,
+// is what separates lines.
+function lineRun(text) {
+  return `<w:r><w:br/><w:t>${text}</w:t></w:r>`;
+}
 function styledRun(text, { color, strike } = {}) {
   const rPr = `<w:rPr>${color ? '<w:color w:val="FF0000"/>' : ''}${strike ? '<w:strike/>' : ''}</w:rPr>`;
   return `<w:r>${rPr}<w:t>${text}</w:t></w:r>`;
@@ -147,7 +153,7 @@ function styledRun(text, { color, strike } = {}) {
 
 describe('parseExportedDayCellItems', () => {
   it('parses an indicator item as code/name/text with no override', () => {
-    const cellXml = `<w:p>${plainRun('Ⅴ-4-3')}${plainRun('【分類遊戲】')}${plainRun('能依形狀或顏色分類')}</w:p>`;
+    const cellXml = `<w:p>${plainRun('Ⅴ-4-3')}${lineRun('【分類遊戲】')}${lineRun('能依形狀或顏色分類')}</w:p>`;
     expect(parseExportedDayCellItems(cellXml)).toEqual([
       { indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '能依形狀或顏色分類', notAchieved: false, replaced: false, replacementText: '' },
     ]);
@@ -161,7 +167,7 @@ describe('parseExportedDayCellItems', () => {
   });
 
   it('parses a tier-Ⅵ item with no activity name (code + text only, two lines)', () => {
-    const cellXml = `<w:p>${plainRun('Ⅵ-1-1')}${plainRun('會手心朝下丟球或東西')}</w:p>`;
+    const cellXml = `<w:p>${plainRun('Ⅵ-1-1')}${lineRun('會手心朝下丟球或東西')}</w:p>`;
     const [item] = parseExportedDayCellItems(cellXml);
     expect(item).toMatchObject({ indicatorCode: 'Ⅵ-1-1', activityName: '', indicatorText: '會手心朝下丟球或東西' });
   });
@@ -188,6 +194,13 @@ describe('parseExportedDayCellItems', () => {
 
   it('returns an empty array for an empty/placeholder cell', () => {
     expect(parseExportedDayCellItems('<w:p></w:p>')).toEqual([]);
+  });
+
+  // Bug (pre-launch real-file check): Word can split one typed line across several runs (e.g.
+  // "【" / name / "】"); treating each run as a line truncated the activity name to "【".
+  it('joins runs with no line break between them into one line', () => {
+    const cellXml = `<w:p>${plainRun('香蕉')}${plainRun('鬆餅')}</w:p>`;
+    expect(parseExportedDayCellItems(cellXml)[0]).toMatchObject({ indicatorCode: null, activityName: '香蕉鬆餅' });
   });
 });
 
@@ -279,12 +292,47 @@ describe('parseDayCellItems', () => {
     ]);
   });
 
+  // Bug (pre-launch real-file check): legacy files spread one activity over several paragraphs,
+  // which used to come back as 2-3 separate items (each with its own 未達成/請假 checkbox), with
+  // brackets doubled up ("【【name】】") or the name truncated to "【".
+  const DONE = { notAchieved: false, replaced: false, replacementText: '' };
+  it('merges a legacy code / 【name】 / text three-paragraph entry into one item, without the brackets', () => {
+    const contentCellXml = legacyParagraph('Ⅲ-1-2') + legacyParagraph('【換一隻手】') + legacyParagraph('內容文字');
+    expect(parseDayCellItems('<w:p></w:p>', contentCellXml)).toEqual([
+      { indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手', indicatorText: '內容文字', ...DONE },
+    ]);
+  });
+
+  it('merges a legacy 【name】 paragraph into the code + text paragraph that follows it', () => {
+    const contentCellXml = legacyParagraph('【換一隻手】') + legacyParagraph('Ⅲ-1-2內容文字') + legacyParagraph('大團體活動');
+    expect(parseDayCellItems('<w:p></w:p>', contentCellXml)).toEqual([
+      { indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手', indicatorText: '內容文字', ...DONE },
+      { indicatorCode: null, activityName: '大團體活動', indicatorText: '', ...DONE },
+    ]);
+  });
+
+  it('keeps a legacy 【name】 split across runs whole when merging it', () => {
+    const contentCellXml = legacyParagraph('Ⅲ-1-2') + `<w:p>${plainRun('【')}${plainRun('換一隻手')}${plainRun('】')}</w:p>` + legacyParagraph('內容文字');
+    expect(parseDayCellItems('<w:p></w:p>', contentCellXml)).toEqual([
+      { indicatorCode: 'Ⅲ-1-2', activityName: '換一隻手', indicatorText: '內容文字', ...DONE },
+    ]);
+  });
+
+  // Bug (pre-launch real-file check): tier Ⅵ's extension items are coded Ⅶ-x-y, which no importer
+  // pattern recognized — every such activity lost its code and fell apart into loose pieces.
+  it('recognizes Ⅶ-coded and fullwidth-letter-coded items', () => {
+    const contentCellXml = legacyParagraph('Ⅶ-1-1') + legacyParagraph('【換一隻手】') + legacyParagraph('內容文字') + legacyParagraph('ＩＶ-1-2【打招呼】文字二');
+    expect(parseDayCellItems('<w:p></w:p>', contentCellXml).map(i => [i.indicatorCode, i.activityName])).toEqual([
+      ['Ⅶ-1-1', '換一隻手'], ['Ⅳ-1-2', '打招呼'],
+    ]);
+  });
+
   it('does not fall back to the legacy parser just because a real item\'s own text mentions another code', () => {
     // A legitimate own-export item's indicatorText can itself contain a
     // code-shaped substring (e.g. a note referencing another indicator).
     // That substring is already inside a correctly-recognized field and must
     // not be counted as a "missed" code that forces legacy re-parsing.
-    const contentCellXml = `<w:p>${plainRun('Ⅴ-4-3')}${plainRun('【分類遊戲】')}${plainRun('可搭配Ⅲ-1-2一起練習')}</w:p>`;
+    const contentCellXml = `<w:p>${plainRun('Ⅴ-4-3')}${lineRun('【分類遊戲】')}${lineRun('可搭配Ⅲ-1-2一起練習')}</w:p>`;
     const items = parseDayCellItems('<w:p></w:p>', contentCellXml);
     expect(items).toEqual([
       { indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', indicatorText: '可搭配Ⅲ-1-2一起練習', notAchieved: false, replaced: false, replacementText: '' },
@@ -352,7 +400,7 @@ describe('parseMonthlyPlanDocxImport', () => {
       nameCellXml,
       weeksCount: 1,
       cellForDay: (weekday, weekIndex) =>
-        weekday === 1 && weekIndex === 1 ? `<w:p>${plainRun('Ⅴ-4-3')}${plainRun('【分類遊戲】')}${plainRun('能依形狀或顏色分類')}</w:p>` : '<w:p></w:p>',
+        weekday === 1 && weekIndex === 1 ? `<w:p>${plainRun('Ⅴ-4-3')}${lineRun('【分類遊戲】')}${lineRun('能依形狀或顏色分類')}</w:p>` : '<w:p></w:p>',
     });
     zip.file('word/document.xml', `<?xml version="1.0"?><w:document ${NS}><w:body>${tableXml}</w:body></w:document>`);
 

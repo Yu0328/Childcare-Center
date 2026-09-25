@@ -60,13 +60,27 @@ describe('parseCoursePlanTable', () => {
   it('parses an achieved occurrence with the date and note', () => {
     const { occurrencesByEntryIndex } = parseCoursePlanTable(FIXTURE_XML);
     expect(occurrencesByEntryIndex[0][0]).toEqual({
-      date: '06-11', status: 'developed', absent: false, note: '小安能拿著海綿印章畫畫',
+      date: '06-11', status: 'developed', absent: false, courseChanged: false, note: '小安能拿著海綿印章畫畫',
     });
   });
 
   it('parses a struck-through row as absent, with no status glyph required', () => {
     const { occurrencesByEntryIndex } = parseCoursePlanTable(FIXTURE_XML);
-    expect(occurrencesByEntryIndex[0][1]).toEqual({ date: '06-10', status: null, absent: true, note: '請假' });
+    expect(occurrencesByEntryIndex[0][1]).toEqual({ date: '06-10', status: null, absent: true, courseChanged: false, note: '' });
+  });
+
+  // Bug (pre-launch round-trip): the exporter prefixes a flagged occurrence's note with its label
+  // (請假／更換課程, see parentReportDocxExport.js formatNoteText) but import kept the label in the
+  // note, so every export→re-import cycle added another "請假　", and 更換課程 came back as 請假.
+  const flaggedRow = note => FIXTURE_XML.replace('<w:t>請假</w:t>', `<w:t>${note}</w:t>`);
+  it.each([
+    ['請假　有點發燒', { absent: true, courseChanged: false, note: '有點發燒' }],
+    ['更換課程', { absent: false, courseChanged: true, note: '' }],
+    ['更換課程　改上律動課', { absent: false, courseChanged: true, note: '改上律動課' }],
+    ['家裡有事', { absent: true, courseChanged: false, note: '家裡有事' }],
+  ])('reads a struck row whose note is "%s" back into its flag and own note', (note, expected) => {
+    const { occurrencesByEntryIndex } = parseCoursePlanTable(flaggedRow(note));
+    expect(occurrencesByEntryIndex[0][1]).toEqual({ date: '06-10', status: null, ...expected });
   });
 });
 
@@ -126,8 +140,8 @@ describe('extractHighlightPhotoGroups', () => {
   it('counts drawings per photo row and pairs each group with its following caption', () => {
     const groups = extractHighlightPhotoGroups(HIGHLIGHTS_XML);
     expect(groups).toEqual([
-      { photoCount: 3, caption: '我最喜歡騎車車了！' },
-      { photoCount: 1, caption: '一張就好' },
+      { photoCount: 3, embedIds: [], caption: '我最喜歡騎車車了！' },
+      { photoCount: 1, embedIds: [], caption: '一張就好' },
     ]);
   });
 });
@@ -395,6 +409,39 @@ describe('parseParentReportDocxImport', () => {
     expect(photos).toHaveLength(3);
     const contents = await Promise.all(photos.map(p => blobText(p)));
     expect(contents).toEqual(['body-photo-A', 'body-photo-B', 'body-photo-C']);
+  });
+
+  // Bug (pre-launch round-trip): this app's own export (the docx library) names media files by
+  // content hash, not imageN, so the imageN-only scan found nothing and every re-imported photo
+  // was lost. Each drawing's r:embed must be resolved through document.xml.rels instead.
+  it('resolves 點滴分享 photos through their relationship ids when media files are not named imageN (this app\'s own export)', async () => {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const drawing = rId => `<w:tc><w:p><w:r><w:drawing><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="${rId}"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></w:drawing></w:r></w:p></w:tc>`;
+    const highlights = `<w:tbl>
+      <w:tr><w:tc><w:p><w:r><w:t>點滴分享</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr>${drawing('rId9')}${drawing('rId7')}</w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>第一組</w:t></w:r></w:p></w:tc></w:tr>
+      <w:tr>${drawing('rId8')}</w:tr>
+      <w:tr><w:tc><w:p><w:r><w:t>第二組</w:t></w:r></w:p></w:tc></w:tr>
+      </w:tbl>`;
+    zip.file('word/document.xml', `<w:document><w:body>${COURSE_PLAN_TABLE_XML}${highlights}</w:body></w:document>`);
+    zip.file('word/_rels/document.xml.rels', `<?xml version="1.0"?><Relationships>
+      <Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/b2c.jpg"/>
+      <Relationship Id="rId8" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/c3d.png"/>
+      <Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/a1b.jpg"/>
+      </Relationships>`);
+    zip.file('word/header1.xml', '<w:hdr><w:drawing/></w:hdr>');
+    zip.file('word/media/0logo.png', 'header-logo');
+    zip.file('word/media/a1b.jpg', 'photo-A');
+    zip.file('word/media/b2c.jpg', 'photo-B');
+    zip.file('word/media/c3d.png', 'photo-C');
+    const result = await parseParentReportDocxImport(await zip.generateAsync({ type: 'blob' }));
+
+    expect(result.highlightEntries.map(e => e.caption)).toEqual(['第一組', '第二組']);
+    const contents = await Promise.all(result.highlightEntries.map(e => Promise.all(e.photos.map(blobText))));
+    expect(contents).toEqual([['photo-A', 'photo-B'], ['photo-C']]);
+    expect(result.warnings.filter(w => w.includes('照片'))).toEqual([]);
   });
 
   // Regression (real sample: 06陳禹彤-115年4月適性紀錄-家長 115.5.15.docx): everything after the

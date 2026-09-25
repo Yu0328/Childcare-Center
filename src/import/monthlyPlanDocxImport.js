@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { TIERS, normalizeIndicatorCode, getIndicator, unresolvedIndicatorWarning } from '../data/indicators.js';
+import { TIERS, INDICATOR_CODE_PATTERN_SOURCE, normalizeIndicatorCode, getIndicator, unresolvedIndicatorWarning } from '../data/indicators.js';
 
 function flatJoinedText(xml) {
   return [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('');
@@ -104,7 +104,7 @@ export function splitChildTables(documentXml) {
   });
 }
 
-const INDICATOR_CODE_EXACT = /^(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+$/;
+const INDICATOR_CODE_EXACT = new RegExp(`^${INDICATOR_CODE_PATTERN_SOURCE}$`);
 
 function extractRuns(xml) {
   return [...xml.matchAll(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/g)].map(m => {
@@ -112,6 +112,7 @@ function extractRuns(xml) {
     const rPr = /<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(runXml)?.[1] || '';
     return {
       text: [...runXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(t => t[1]).join(''),
+      startsLine: /<w:br\b/.test(runXml),
       hasStrike: /<w:strike\s*\/>/.test(rPr),
       hasRedColor: /<w:color\b[^>]*w:val="FF0000"/i.test(rPr),
     };
@@ -150,7 +151,13 @@ function parseExportedItemParagraph(paragraphXml) {
     }
   }
 
-  const lines = itemRuns.map(r => r.text);
+  // A new line starts only at a <w:br/> (how this app's exporter separates an item's lines), not at
+  // every run: Word freely splits one typed line into several runs (e.g. "【" / name / "】").
+  const lines = [];
+  itemRuns.forEach((r, i) => {
+    if (i === 0 || r.startsLine) lines.push(r.text);
+    else lines[lines.length - 1] += r.text;
+  });
   const notAchieved = itemRuns.some(r => r.hasRedColor);
   const replaced = itemRuns.some(r => r.hasStrike);
 
@@ -162,7 +169,7 @@ export function parseExportedDayCellItems(contentCellXml) {
   return paragraphs.map(parseExportedItemParagraph).filter(Boolean);
 }
 
-const INDICATOR_CODE_ANCHOR = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+const INDICATOR_CODE_ANCHOR = new RegExp(INDICATOR_CODE_PATTERN_SOURCE, 'g');
 const ABSENT_MARKER_ON_DATE = /[（(]\s*(請假|更換課程)\s*[）)]/;
 const ABSENT_REPLACEMENT_PARAGRAPH = /^(請假|更換課程)$/;
 
@@ -237,7 +244,7 @@ export function parseLegacyDayCellItems(dateCellXml, contentCellXml) {
 // fallback just like a real no-code activity (e.g. "大團體活動") would — both
 // come back as a non-empty array, so a bare length check can't tell them
 // apart.
-const INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/;
+const INDICATOR_CODE_SUBSTRING = new RegExp(INDICATOR_CODE_PATTERN_SOURCE);
 
 // Task 12 real-file finding: some legacy documents write each entry as three
 // separate paragraphs (bare code / name / description) instead of combining
@@ -255,13 +262,28 @@ const INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d
 // would silently graft the free activity's text onto the coded item and
 // delete the free activity as its own entry — precise items are already
 // complete by construction when correctly parsed, so they never need this.
+//
+// Pre-launch real-file finding: the other legacy layout puts a "【name】" paragraph BEFORE its
+// "code + text" paragraph, so a bracketed free item directly followed by a coded item that has no
+// name of its own becomes that item's name. Either way the name loses its brackets, which the
+// UI/exporter add back themselves (otherwise it showed as "【【name】】").
+const BRACKETED_NAME = /^【[^】]*】$/;
+const unbracket = name => (BRACKETED_NAME.test(name) ? name.slice(1, -1) : name);
+
 function mergeCodeOnlySequentialItems(items) {
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
+    const following = items[i + 1];
+    if (!item.indicatorCode && BRACKETED_NAME.test(item.activityName) && following?.indicatorCode && !following.activityName) {
+      following.activityName = unbracket(item.activityName);
+      items.splice(i, 1);
+      i -= 1;
+      continue;
+    }
     if (!item.indicatorCode || item.activityName || item.indicatorText) continue;
     const nameItem = items[i + 1];
     if (!nameItem || nameItem.indicatorCode) continue;
-    item.activityName = nameItem.activityName;
+    item.activityName = unbracket(nameItem.activityName);
     items.splice(i + 1, 1);
     const textItem = items[i + 1];
     if (textItem && !textItem.indicatorCode) {
@@ -278,7 +300,10 @@ function legacyItems(dateCellXml, contentCellXml) {
 
 export function parseDayCellItems(dateCellXml, contentCellXml) {
   const precise = parseExportedDayCellItems(contentCellXml);
-  const looksMisparsed = precise.some(item => item.indicatorCode === null && INDICATOR_CODE_SUBSTRING.test(item.activityName));
+  // This app's exporter writes a free (no-code) item's name without brackets, so a code-less
+  // "【name】" line can only be a legacy file's name paragraph, split off its own code paragraph.
+  const looksMisparsed = precise.some(item => item.indicatorCode === null
+    && (INDICATOR_CODE_SUBSTRING.test(item.activityName) || BRACKETED_NAME.test(item.activityName)));
   // Task 12 real-file finding: a hand-edited legacy cell can have Word run
   // fragmentation that scatters a code across multiple runs (e.g. spell-check
   // history splits it mid-string), so no single "line" (== one run, the

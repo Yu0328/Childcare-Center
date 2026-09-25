@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { DOMAINS, getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
+import { DOMAINS, INDICATOR_CODE_PATTERN_SOURCE, getIndicator, normalizeIndicatorCode } from '../data/indicators.js';
 
 function cellsForRow(rowXml) {
   return [...rowXml.matchAll(/<w:tc>([\s\S]*?)<\/w:tc>/g)].map(match => match[1]);
@@ -67,6 +67,17 @@ function isStruck(cellXml) {
   return /<w:strike\s*\/>/.test(cellXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, ''));
 }
 
+// The exporter prints a struck (請假/更換課程) occurrence's note prefixed with its label (see
+// parentReportDocxExport.js formatNoteText) — reverse that here, mirroring docxImport.js's
+// statusAndNote, or every export→re-import cycle adds another label and 更換課程 turns into 請假.
+// A struck legacy row with no label is still read as 請假, as before.
+function flagsAndNote(struck, note) {
+  if (!struck) return { absent: false, courseChanged: false, note };
+  const courseChanged = note.startsWith('更換課程');
+  const label = courseChanged ? '更換課程' : note.startsWith('請假') ? '請假' : '';
+  return { absent: !courseChanged, courseChanged, note: note.slice(label.length).replace(/^[\s　]+/, '') };
+}
+
 // "06/11" -> "06-11" (kept without a year — see Task 20's note on why year inference is deferred
 // to the preview step, exactly like docxImport.js's existing 適性總表 importer).
 function normalizeMonthDay(raw) {
@@ -104,10 +115,10 @@ function processCoursePlanBodyRows(bodyRows) {
     const date = normalizeMonthDay(dateText);
     if (!date) continue; // an unfilled placeholder row
 
-    const absent = isStruck(dateCell);
-    const status = absent ? null : dateText.includes('○') ? 'developed' : dateText.includes('△') ? 'developing' : null;
+    const struck = isStruck(dateCell);
+    const status = struck ? null : dateText.includes('○') ? 'developed' : dateText.includes('△') ? 'developing' : null;
 
-    occurrencesByEntryIndex[currentEntryIndex].push({ date, status, absent, note: textOf(noteCell) });
+    occurrencesByEntryIndex[currentEntryIndex].push({ date, status, ...flagsAndNote(struck, textOf(noteCell)) });
   }
 
   return { entries, occurrencesByEntryIndex };
@@ -213,8 +224,9 @@ export function extractHighlightPhotoGroups(highlightsTableXml) {
     if (!captionRow) break;
 
     const photoCount = (photoRow.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
+    const embedIds = [...photoRow.matchAll(/<a:blip\b[^>]*\br:embed="([^"]+)"/g)].map(m => m[1]);
     const caption = [...captionRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('').trim();
-    if (photoCount > 0 && caption) groups.push({ photoCount, caption });
+    if (photoCount > 0 && caption) groups.push({ photoCount, embedIds, caption });
   }
   return groups;
 }
@@ -252,6 +264,24 @@ function countInlineDrawingsBeforeHighlights(documentXml) {
   return (scoped.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
 }
 
+// The exact route: each 點滴分享 drawing's r:embed id, looked up in document.xml.rels, names its
+// own media file — so file names and ordering don't matter. This app's own export (the docx
+// library) names media by content hash rather than imageN, which the numeric-order fallback below
+// can't see at all. Returns null (→ fall back) unless every drawing resolves to a real image file.
+async function resolveEmbeddedPhotos(zip, photoGroups) {
+  const relsFile = zip.file('word/_rels/document.xml.rels');
+  if (!relsFile || photoGroups.length === 0) return null;
+  const rels = await relsFile.async('text');
+  const targets = new Map(
+    [...rels.matchAll(/<Relationship\b[^>]*>/g)].map(m => [/\bId="([^"]+)"/.exec(m[0])?.[1], /\bTarget="([^"]+)"/.exec(m[0])?.[1]])
+  );
+  const groupFiles = photoGroups.map(group => group.embedIds.length === group.photoCount
+    ? group.embedIds.map(id => targets.get(id) && zip.file(`word/${targets.get(id).replace(/^\/?(word\/)?/, '')}`))
+    : null);
+  if (groupFiles.some(files => !files || files.some(file => !file))) return null;
+  return Promise.all(groupFiles.map(files => Promise.all(files.map(file => file.async('blob')))));
+}
+
 async function extractSortedMediaImages(zip, documentXml) {
   const mediaNames = Object.keys(zip.files)
     .filter(name => /^word\/media\/image\d+\.(png|jpe?g)$/i.test(name))
@@ -284,7 +314,7 @@ const BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]?/;
 // coursePlanEntries' already-normalized indicatorCode, or a non-canonical reference here would
 // never match its (now-Unicode) course-plan entry. The item-index group is \d+, not \d, because
 // tier Ⅵ (src/data/indicators.js) is the only tier with domains that run past 9 items.
-const INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+const INDICATOR_CODE_IN_TEXT_PATTERN = new RegExp(INDICATOR_CODE_PATTERN_SOURCE, 'g');
 
 // parentReportDocxExport.js's referencedIndicatorLines() prepends one line per linked
 // course-plan entry — formatted exactly "code　description" — before a developmentRecordEntry's
@@ -424,15 +454,21 @@ export async function parseParentReportDocxImport(data) {
   const { developmentRecordBlocks, behaviorObservations } = classifyRecordBlocks(blocks, coursePlanEntries, warnings);
 
   const photoGroups = secondTableXml ? extractHighlightPhotoGroups(secondTableXml) : [];
-  const mediaImages = await extractSortedMediaImages(zip, documentXml);
-  let mediaCursor = 0;
-  const highlightEntries = photoGroups.map(group => {
-    const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
-    mediaCursor += group.photoCount;
-    return { photos, caption: group.caption };
-  });
-  if (mediaImages.length > mediaCursor) {
-    warnings.push('偵測到的照片數量多於點滴分享區塊，部分照片可能未正確歸類，請於預覽畫面確認');
+  const embeddedPhotos = await resolveEmbeddedPhotos(zip, photoGroups);
+  let highlightEntries;
+  if (embeddedPhotos) {
+    highlightEntries = photoGroups.map((group, i) => ({ photos: embeddedPhotos[i], caption: group.caption }));
+  } else {
+    const mediaImages = await extractSortedMediaImages(zip, documentXml);
+    let mediaCursor = 0;
+    highlightEntries = photoGroups.map(group => {
+      const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
+      mediaCursor += group.photoCount;
+      return { photos, caption: group.caption };
+    });
+    if (mediaImages.length > mediaCursor) {
+      warnings.push('偵測到的照片數量多於點滴分享區塊，部分照片可能未正確歸類，請於預覽畫面確認');
+    }
   }
 
   return {
