@@ -6154,7 +6154,10 @@ var CFormApp = (() => {
   var LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
   var MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
   var MISNUMBERED_SOCIAL_PATTERN = /^Ⅶ-2-(3|4)$/;
+  var FULLWIDTH_LATIN_PREFIX_PATTERN = /^[ＩＶ]+(?=-)/;
+  var INDICATOR_CODE_PATTERN_SOURCE = "(?:[\u2160\u2161\u2162\u2163\u2164\u2165\u2166]|I\u2164|III|IV|II|I|V|\uFF29\uFF29\uFF29|\uFF29\uFF36|\uFF29\uFF29|\uFF29|\uFF36)-\\d-\\d+";
   function normalizeIndicatorCode(code) {
+    code = code?.replace(FULLWIDTH_LATIN_PREFIX_PATTERN, (prefix) => [...prefix].map((c) => String.fromCharCode(c.charCodeAt(0) - 65248)).join(""));
     if (MIXED_IV_PREFIX_PATTERN.test(code ?? "")) return "\u2163" + code.slice(2);
     if (MISNUMBERED_SOCIAL_PATTERN.test(code ?? "")) return "\u2165" + code.slice(1);
     const match = LATIN_TIER_PREFIX_PATTERN.exec(code ?? "");
@@ -25772,6 +25775,12 @@ var CFormApp = (() => {
   function isStruck(cellXml) {
     return /<w:strike\s*\/>/.test(cellXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, ""));
   }
+  function flagsAndNote(struck, note) {
+    if (!struck) return { absent: false, courseChanged: false, note };
+    const courseChanged = note.startsWith("\u66F4\u63DB\u8AB2\u7A0B");
+    const label = courseChanged ? "\u66F4\u63DB\u8AB2\u7A0B" : note.startsWith("\u8ACB\u5047") ? "\u8ACB\u5047" : "";
+    return { absent: !courseChanged, courseChanged, note: note.slice(label.length).replace(/^[\s　]+/, "") };
+  }
   function normalizeMonthDay(raw) {
     const match = /^(\d{1,2})\/(\d{1,2})/.exec(raw);
     if (!match) return null;
@@ -25799,9 +25808,9 @@ var CFormApp = (() => {
       const dateText = textOf(dateCell);
       const date = normalizeMonthDay(dateText);
       if (!date) continue;
-      const absent = isStruck(dateCell);
-      const status = absent ? null : dateText.includes("\u25CB") ? "developed" : dateText.includes("\u25B3") ? "developing" : null;
-      occurrencesByEntryIndex[currentEntryIndex].push({ date, status, absent, note: textOf(noteCell) });
+      const struck = isStruck(dateCell);
+      const status = struck ? null : dateText.includes("\u25CB") ? "developed" : dateText.includes("\u25B3") ? "developing" : null;
+      occurrencesByEntryIndex[currentEntryIndex].push({ date, status, ...flagsAndNote(struck, textOf(noteCell)) });
     }
     return { entries, occurrencesByEntryIndex };
   }
@@ -25856,8 +25865,9 @@ var CFormApp = (() => {
       const captionRow = rows[i + 1];
       if (!captionRow) break;
       const photoCount = (photoRow.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
+      const embedIds = [...photoRow.matchAll(/<a:blip\b[^>]*\br:embed="([^"]+)"/g)].map((m) => m[1]);
       const caption = [...captionRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("").trim();
-      if (photoCount > 0 && caption) groups.push({ photoCount, caption });
+      if (photoCount > 0 && caption) groups.push({ photoCount, embedIds, caption });
     }
     return groups;
   }
@@ -25870,6 +25880,17 @@ var CFormApp = (() => {
     const highlightsIndex = documentXml.indexOf("\u9EDE\u6EF4\u5206\u4EAB");
     const scoped = highlightsIndex === -1 ? documentXml : documentXml.slice(0, highlightsIndex);
     return (scoped.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
+  }
+  async function resolveEmbeddedPhotos(zip, photoGroups) {
+    const relsFile = zip.file("word/_rels/document.xml.rels");
+    if (!relsFile || photoGroups.length === 0) return null;
+    const rels = await relsFile.async("text");
+    const targets = new Map(
+      [...rels.matchAll(/<Relationship\b[^>]*>/g)].map((m) => [/\bId="([^"]+)"/.exec(m[0])?.[1], /\bTarget="([^"]+)"/.exec(m[0])?.[1]])
+    );
+    const groupFiles = photoGroups.map((group) => group.embedIds.length === group.photoCount ? group.embedIds.map((id) => targets.get(id) && zip.file(`word/${targets.get(id).replace(/^\/?(word\/)?/, "")}`)) : null);
+    if (groupFiles.some((files) => !files || files.some((file) => !file))) return null;
+    return Promise.all(groupFiles.map((files) => Promise.all(files.map((file) => file.async("blob")))));
   }
   async function extractSortedMediaImages(zip, documentXml) {
     const mediaNames = Object.keys(zip.files).filter((name) => /^word\/media\/image\d+\.(png|jpe?g)$/i.test(name)).sort((a, b) => {
@@ -25884,7 +25905,7 @@ var CFormApp = (() => {
     return Promise.all(bodyMediaNames.map(async (name) => zip.file(name).async("blob")));
   }
   var BEHAVIOR_OBSERVATION_LABEL = /^行為觀察[－-]?/;
-  var INDICATOR_CODE_IN_TEXT_PATTERN = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+  var INDICATOR_CODE_IN_TEXT_PATTERN = new RegExp(INDICATOR_CODE_PATTERN_SOURCE, "g");
   function stripReferencedIndicatorLines(rawText) {
     const lines = rawText.split("\n");
     let i = 0;
@@ -25973,15 +25994,21 @@ var CFormApp = (() => {
     const blocks = beforeHighlightsXml ? parseRecordBlocks(beforeHighlightsXml) : [];
     const { developmentRecordBlocks, behaviorObservations } = classifyRecordBlocks(blocks, coursePlanEntries, warnings);
     const photoGroups = secondTableXml ? extractHighlightPhotoGroups(secondTableXml) : [];
-    const mediaImages = await extractSortedMediaImages(zip, documentXml);
-    let mediaCursor = 0;
-    const highlightEntries = photoGroups.map((group) => {
-      const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
-      mediaCursor += group.photoCount;
-      return { photos, caption: group.caption };
-    });
-    if (mediaImages.length > mediaCursor) {
-      warnings.push("\u5075\u6E2C\u5230\u7684\u7167\u7247\u6578\u91CF\u591A\u65BC\u9EDE\u6EF4\u5206\u4EAB\u5340\u584A\uFF0C\u90E8\u5206\u7167\u7247\u53EF\u80FD\u672A\u6B63\u78BA\u6B78\u985E\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u78BA\u8A8D");
+    const embeddedPhotos = await resolveEmbeddedPhotos(zip, photoGroups);
+    let highlightEntries;
+    if (embeddedPhotos) {
+      highlightEntries = photoGroups.map((group, i) => ({ photos: embeddedPhotos[i], caption: group.caption }));
+    } else {
+      const mediaImages = await extractSortedMediaImages(zip, documentXml);
+      let mediaCursor = 0;
+      highlightEntries = photoGroups.map((group) => {
+        const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
+        mediaCursor += group.photoCount;
+        return { photos, caption: group.caption };
+      });
+      if (mediaImages.length > mediaCursor) {
+        warnings.push("\u5075\u6E2C\u5230\u7684\u7167\u7247\u6578\u91CF\u591A\u65BC\u9EDE\u6EF4\u5206\u4EAB\u5340\u584A\uFF0C\u90E8\u5206\u7167\u7247\u53EF\u80FD\u672A\u6B63\u78BA\u6B78\u985E\uFF0C\u8ACB\u65BC\u9810\u89BD\u756B\u9762\u78BA\u8A8D");
+      }
     }
     return {
       child: { name: headerInfo.name, birthDate: headerInfo.birthDate },
@@ -26164,7 +26191,7 @@ var CFormApp = (() => {
     const toast = document.createElement("p");
     toast.className = "toast";
     toast.textContent = message;
-    getHost().appendChild(toast);
+    getHost().replaceChildren(toast);
     setTimeout(() => {
       toast.classList.add("toast--out");
       setTimeout(() => toast.remove(), EXIT_MS);
@@ -27412,13 +27439,14 @@ var CFormApp = (() => {
       return { nameCellXml, days };
     });
   }
-  var INDICATOR_CODE_EXACT = /^(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+$/;
+  var INDICATOR_CODE_EXACT = new RegExp(`^${INDICATOR_CODE_PATTERN_SOURCE}$`);
   function extractRuns(xml) {
     return [...xml.matchAll(/<w:r\b[^>]*>([\s\S]*?)<\/w:r>/g)].map((m) => {
       const runXml = m[1];
       const rPr = /<w:rPr>([\s\S]*?)<\/w:rPr>/.exec(runXml)?.[1] || "";
       return {
         text: [...runXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((t) => t[1]).join(""),
+        startsLine: /<w:br\b/.test(runXml),
         hasStrike: /<w:strike\s*\/>/.test(rPr),
         hasRedColor: /<w:color\b[^>]*w:val="FF0000"/i.test(rPr)
       };
@@ -27453,7 +27481,11 @@ var CFormApp = (() => {
         itemRuns = runs.slice(0, -1);
       }
     }
-    const lines = itemRuns.map((r) => r.text);
+    const lines = [];
+    itemRuns.forEach((r, i) => {
+      if (i === 0 || r.startsLine) lines.push(r.text);
+      else lines[lines.length - 1] += r.text;
+    });
     const notAchieved = itemRuns.some((r) => r.hasRedColor);
     const replaced = itemRuns.some((r) => r.hasStrike);
     return linesToItem(lines, { notAchieved, replaced, replacementText });
@@ -27462,7 +27494,7 @@ var CFormApp = (() => {
     const paragraphs = [...contentCellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)].map((m) => m[0]);
     return paragraphs.map(parseExportedItemParagraph).filter(Boolean);
   }
-  var INDICATOR_CODE_ANCHOR = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/g;
+  var INDICATOR_CODE_ANCHOR = new RegExp(INDICATOR_CODE_PATTERN_SOURCE, "g");
   var ABSENT_MARKER_ON_DATE = /[（(]\s*(請假|更換課程)\s*[）)]/;
   var ABSENT_REPLACEMENT_PARAGRAPH = /^(請假|更換課程)$/;
   function paragraphInfo(paragraphXml) {
@@ -27516,14 +27548,23 @@ var CFormApp = (() => {
     }
     return items;
   }
-  var INDICATOR_CODE_SUBSTRING = /(?:[ⅠⅡⅢⅣⅤⅥ]|IⅤ|III|IV|II|I|V)-\d-\d+/;
+  var INDICATOR_CODE_SUBSTRING = new RegExp(INDICATOR_CODE_PATTERN_SOURCE);
+  var BRACKETED_NAME = /^【[^】]*】$/;
+  var unbracket = (name) => BRACKETED_NAME.test(name) ? name.slice(1, -1) : name;
   function mergeCodeOnlySequentialItems(items) {
     for (let i = 0; i < items.length; i += 1) {
       const item = items[i];
+      const following = items[i + 1];
+      if (!item.indicatorCode && BRACKETED_NAME.test(item.activityName) && following?.indicatorCode && !following.activityName) {
+        following.activityName = unbracket(item.activityName);
+        items.splice(i, 1);
+        i -= 1;
+        continue;
+      }
       if (!item.indicatorCode || item.activityName || item.indicatorText) continue;
       const nameItem = items[i + 1];
       if (!nameItem || nameItem.indicatorCode) continue;
-      item.activityName = nameItem.activityName;
+      item.activityName = unbracket(nameItem.activityName);
       items.splice(i + 1, 1);
       const textItem = items[i + 1];
       if (textItem && !textItem.indicatorCode) {
@@ -27538,7 +27579,7 @@ var CFormApp = (() => {
   }
   function parseDayCellItems(dateCellXml, contentCellXml) {
     const precise = parseExportedDayCellItems(contentCellXml);
-    const looksMisparsed = precise.some((item) => item.indicatorCode === null && INDICATOR_CODE_SUBSTRING.test(item.activityName));
+    const looksMisparsed = precise.some((item) => item.indicatorCode === null && (INDICATOR_CODE_SUBSTRING.test(item.activityName) || BRACKETED_NAME.test(item.activityName)));
     const preciseCodeCount = precise.filter((item) => item.indicatorCode).length;
     const rawCodeCount = [...flatJoinedText2(contentCellXml).matchAll(INDICATOR_CODE_ANCHOR)].length;
     const alreadyAttributedCodeCount = precise.reduce(
