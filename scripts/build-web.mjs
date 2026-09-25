@@ -69,12 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (window.__cformReloaded) return;
-    window.__cformReloaded = true;
-    location.reload();
-  });
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  window.addEventListener('load', () => CFormApp.wireUpdatePrompt());
 }
 </script>
 </body>
@@ -100,7 +95,12 @@ const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png',
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
+});
+
+// A new version waits for the page's 更新 button (src/pwa/updatePrompt.js) instead of taking
+// over mid-edit on its own.
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
