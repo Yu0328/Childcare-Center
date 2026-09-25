@@ -1310,6 +1310,21 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 .panel-form__checkbox-grid .panel-form__checkbox-row {
   min-width: 0;
+  /* Long labels wrap to 2-3 lines; the tick box sits beside the first line, not the middle. */
+  align-items: flex-start;
+}
+/* Without this a long label squeezes the tick box down to a dot. */
+.panel-form__checkbox-row input {
+  flex: none;
+}
+.panel-form__checkbox-grid .panel-form__checkbox-row input {
+  margin-top: 0.3em;
+}
+/* Two columns on a phone wrap every label onto 3-4 lines. */
+@media (max-width: 640px) {
+  .panel-form__checkbox-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .panel-form__checkbox-grid .panel-form__checkbox-row span,
 .panel-form__checkbox-grid .panel-form__checkbox-row {
