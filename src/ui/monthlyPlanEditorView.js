@@ -158,9 +158,9 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       </div>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
+    ${childSwitchHtml(data.children, activeChildId)}
     <div class="tab-layout">
       <div class="monthly-calendar-list">
-        ${childSwitchHtml(data.children, activeChildId)}
         ${data.children.map(child => childCalendarHtml(child, plan.childTiers[child.id], data, showOneChild && child.id !== activeChildId)).join('')}
       </div>
       <div class="monthly-plan-side">
