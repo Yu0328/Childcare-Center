@@ -370,8 +370,9 @@ export function getIndicatorsForTier(tierCode) {
 // Latin-prefixed code still displays fine as text, but an exact-match lookup silently fails to
 // resolve it. Longest-prefix-first ordering matters: "IV" and "III" must be checked before the
 // single-letter "I"/"V" fallbacks, or "IV-1-2" would match "I" and leave a bogus "V-1-2" remainder.
-const LATIN_TIER_PREFIX_TO_UNICODE = { III: 'Ⅲ', IV: 'Ⅳ', II: 'Ⅱ', I: 'Ⅰ', V: 'Ⅴ' };
-const LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
+// VI/VII too: a real 月計畫 file types tier Ⅵ as "VI-5-1", which used to be read as "V" + "I-5-1".
+const LATIN_TIER_PREFIX_TO_UNICODE = { VII: 'Ⅶ', VI: 'Ⅵ', III: 'Ⅲ', IV: 'Ⅳ', II: 'Ⅱ', I: 'Ⅰ', V: 'Ⅴ' };
+const LATIN_TIER_PREFIX_PATTERN = /^(VII|VI|III|IV|II|I|V)-/;
 
 // A second, distinct garbling: Latin "I" (U+0049) directly followed by the Unicode Roman numeral
 // "Ⅴ" (U+2164) — visually resembling "IV" but mixing an ASCII and a Unicode character — found
@@ -392,7 +393,7 @@ const FULLWIDTH_LATIN_PREFIX_PATTERN = /^[ＩＶ]+(?=-)/;
 // every prefix normalizeIndicatorCode can fix plus Ⅶ (tier Ⅵ's extension items — see
 // CODE_PREFIX_TIER). Each importer used to keep its own copy, and all of them missed Ⅶ. Longest
 // alternatives first, same reason as LATIN_TIER_PREFIX_PATTERN.
-export const INDICATOR_CODE_PATTERN_SOURCE = '(?:[ⅠⅡⅢⅣⅤⅥⅦ]|IⅤ|III|IV|II|I|V|ＩＩＩ|ＩＶ|ＩＩ|Ｉ|Ｖ)-\\d-\\d+';
+export const INDICATOR_CODE_PATTERN_SOURCE = '(?:[ⅠⅡⅢⅣⅤⅥⅦ]|IⅤ|VII|VI|III|IV|II|I|V|ＶＩＩ|ＶＩ|ＩＩＩ|ＩＶ|ＩＩ|Ｉ|Ｖ)-\\d-\\d+';
 
 export function normalizeIndicatorCode(code) {
   code = code?.replace(FULLWIDTH_LATIN_PREFIX_PATTERN, prefix => [...prefix].map(c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).join(''));

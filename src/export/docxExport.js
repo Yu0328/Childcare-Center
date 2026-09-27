@@ -50,8 +50,9 @@ const SUBDOMAIN_SEPARATOR = '、';
 // The docx default (1" margins) is too narrow and makes the header title wrap onto a second line.
 const PAGE_MARGIN = { top: 851, right: 851, bottom: 851, left: 1134, header: 851, footer: 992 };
 
-// Header title font size in half-points: 34 half-points = 17pt, as in the original.
-const HEADER_TITLE_SIZE = 34;
+// Header title font size in half-points: 32 = 16pt, one step below the original's 17pt — this
+// institution's name is two characters longer, and at 17pt the title's last "月" wrapped alone.
+const HEADER_TITLE_SIZE = 32;
 
 // Smaller than DEFAULT_TEXT_SIZE (24 = 12pt): the 幼兒姓名/出生日期/實際月齡/實施時間 line has grown
 // longer since a merged form's 實施時間 can be a "115年05月-115年08月" range, and at the default
@@ -261,6 +262,7 @@ function mergedCell(index, children, isFirstRowOfMerge) {
 // prose, matching the original.
 function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) {
   return new TableRow({
+    cantSplit: true, // a row split by a page break cut its note in half across two pages
     children: [
       mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
       mergedCell(1, subdomainParagraphs(indicator.subdomain), isFirstRowOfDomain),

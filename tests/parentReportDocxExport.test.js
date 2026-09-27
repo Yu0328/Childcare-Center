@@ -202,6 +202,14 @@ describe('buildCoursePlanTable', () => {
     const fillCount = (bodyRowXml.match(/w:fill="FBE4D5"/g) || []).length;
     expect(fillCount).toBe(5);
   });
+
+  // A row split across a page break left a near-empty page holding only its last line.
+  it('keeps each body row on one page', async () => {
+    const occurrencesByEntryId = { 1: [{ date: '2026-06-11', status: 'developed', absent: false, note: 'n' }] };
+    const xml = await tableToXml(buildCoursePlanTable(entries, occurrencesByEntryId));
+    const bodyRowXml = xml.split('<w:tr>').find(r => r.includes('Ⅴ-1-6'));
+    expect(bodyRowXml).toContain('<w:cantSplit/>');
+  });
 });
 
 describe('groupEntriesByDomainInFirstAppearanceOrder', () => {

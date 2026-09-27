@@ -75,6 +75,8 @@ describe('indicator reference data', () => {
     expect(getIndicator('IV-1-1')).toEqual(getIndicator('Ⅳ-1-1'));
     expect(getIndicator('V-1-1')).toEqual(getIndicator('Ⅴ-1-1'));
     expect(getIndicator('III-1-1')).toEqual(getIndicator('Ⅲ-1-1'));
+    expect(getIndicator('VI-5-1')).toEqual(getIndicator('Ⅵ-5-1'));
+    expect(normalizeIndicatorCode('VII-1-1')).toBe('Ⅶ-1-1');
   });
 
   it('previousTier returns the tier immediately before, null for Ⅰ or an unknown code', () => {
@@ -98,7 +100,7 @@ describe('indicator reference data', () => {
 
   it('共用的指標代號比對規則認得 Ⅶ、全形字母與常見的打錯寫法', () => {
     const pattern = new RegExp(`^${INDICATOR_CODE_PATTERN_SOURCE}$`);
-    for (const code of ['Ⅶ-1-1', 'Ⅵ-3-10', 'ＩＶ-1-2', 'IⅤ-2-1', 'III-1-2', 'V-5-4']) expect(pattern.test(code)).toBe(true);
+    for (const code of ['Ⅶ-1-1', 'Ⅵ-3-10', 'ＩＶ-1-2', 'IⅤ-2-1', 'III-1-2', 'V-5-4', 'VI-5-1', 'VII-1-1']) expect(pattern.test(code)).toBe(true);
     expect(pattern.test('KⅤ-1-1')).toBe(false);
   });
 

@@ -217,11 +217,20 @@ describe('docx export acceptance (matches 陳小安C表-2.docx sample data)', ()
     );
   });
 
-  it('renders the header title at 17pt with the decorative icon embedded beside it', async () => {
+  it('keeps every body row on one page (Word may not split a row across a page break)', async () => {
+    const { documentXml } = await exportParts();
+    const rows = documentXml.split('<w:tr>').slice(1);
+    const bodyRows = rows.filter(r => r.includes('-1-'));
+    expect(bodyRows.length).toBeGreaterThan(0);
+    for (const row of bodyRows) expect(row).toContain('<w:cantSplit/>');
+  });
+
+  it('renders the header title at 16pt with the decorative icon embedded beside it', async () => {
     const { headerXml, zip } = await exportParts();
 
-    // 34 half-points = 17pt, as in the original header2.xml.
-    expect(headerXml).toContain('<w:sz w:val="34"/>');
+    // 32 half-points = 16pt: the original's 17pt, one step down, because this institution's name
+    // is two characters longer and at 17pt the title's last "月" wrapped onto a line of its own.
+    expect(headerXml).toContain('<w:sz w:val="32"/>');
 
     // The icon is a real embedded drawing, not a placeholder.
     expect(headerXml).toContain('<w:drawing>');

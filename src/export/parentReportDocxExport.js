@@ -190,6 +190,7 @@ function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }
   const domainShading = { shading: { type: ShadingType.CLEAR, color: 'auto', fill: DOMAIN_FILL_COLORS[group.domain] || 'FFFFFF' } };
 
   return new TableRow({
+    cantSplit: true, // a split last row left a near-empty page holding only its final line
     children: [
       mergedCell(0, [textParagraph(domainName, { bold: true, ...CENTERED })], isFirstRowOfDomain, domainShading),
       mergedCell(1, [textParagraph(group.entry.indicatorCode, CENTERED)], isFirstRowOfEntry, domainShading),
