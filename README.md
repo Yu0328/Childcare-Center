@@ -15,7 +15,7 @@
 npm install
 npm test              # 執行測試
 npm run build          # 產生 dist/TableC.html（離線版）
-npm run build:web      # 產生 site/（網頁版），發布前需把 site/index.html、site/sw.js 複製到根目錄並一起 commit
+npm run build:web      # 產生 site/（網頁版）；推上 main 後 GitHub 會自動測試、產生並發布，不需手動複製
 ```
 
 設計文件與實作計畫在 `docs/superpowers/specs/`、`docs/superpowers/plans/`，開發慣例見 `CLAUDE.md`。
