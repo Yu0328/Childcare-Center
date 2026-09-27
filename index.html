@@ -6165,12 +6165,12 @@ var CFormApp = (() => {
     const tier = CODE_PREFIX_TIER[tierCode] || tierCode;
     return INDICATORS.filter((indicator) => indicator.tier === tier);
   }
-  var LATIN_TIER_PREFIX_TO_UNICODE = { III: "\u2162", IV: "\u2163", II: "\u2161", I: "\u2160", V: "\u2164" };
-  var LATIN_TIER_PREFIX_PATTERN = /^(III|IV|II|I|V)-/;
+  var LATIN_TIER_PREFIX_TO_UNICODE = { VII: "\u2166", VI: "\u2165", III: "\u2162", IV: "\u2163", II: "\u2161", I: "\u2160", V: "\u2164" };
+  var LATIN_TIER_PREFIX_PATTERN = /^(VII|VI|III|IV|II|I|V)-/;
   var MIXED_IV_PREFIX_PATTERN = /^IⅤ-/;
   var MISNUMBERED_SOCIAL_PATTERN = /^Ⅶ-2-(3|4)$/;
   var FULLWIDTH_LATIN_PREFIX_PATTERN = /^[ＩＶ]+(?=-)/;
-  var INDICATOR_CODE_PATTERN_SOURCE = "(?:[\u2160\u2161\u2162\u2163\u2164\u2165\u2166]|I\u2164|III|IV|II|I|V|\uFF29\uFF29\uFF29|\uFF29\uFF36|\uFF29\uFF29|\uFF29|\uFF36)-\\d-\\d+";
+  var INDICATOR_CODE_PATTERN_SOURCE = "(?:[\u2160\u2161\u2162\u2163\u2164\u2165\u2166]|I\u2164|VII|VI|III|IV|II|I|V|\uFF36\uFF29\uFF29|\uFF36\uFF29|\uFF29\uFF29\uFF29|\uFF29\uFF36|\uFF29\uFF29|\uFF29|\uFF36)-\\d-\\d+";
   function normalizeIndicatorCode(code) {
     code = code?.replace(FULLWIDTH_LATIN_PREFIX_PATTERN, (prefix) => [...prefix].map((c) => String.fromCharCode(c.charCodeAt(0) - 65248)).join(""));
     if (MIXED_IV_PREFIX_PATTERN.test(code ?? "")) return "\u2163" + code.slice(2);
@@ -26737,7 +26737,7 @@ var CFormApp = (() => {
   var TABLE_CELL_MARGIN_DXA = 115;
   var SUBDOMAIN_SEPARATOR = "\u3001";
   var PAGE_MARGIN = { top: 851, right: 851, bottom: 851, left: 1134, header: 851, footer: 992 };
-  var HEADER_TITLE_SIZE = 34;
+  var HEADER_TITLE_SIZE = 32;
   var CHILD_INFO_LINE_SIZE = 22;
   var HEADER_ICON_OFFSET_EMU = { horizontal: -(HEADER_ICON_EMU.width + 4e4), vertical: 8890 };
   var TABLE_HEADER_ROW_HEIGHTS = [438, 720];
@@ -26877,6 +26877,8 @@ var CFormApp = (() => {
   }
   function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) {
     return new TableRow({
+      cantSplit: true,
+      // a row split by a page break cut its note in half across two pages
       children: [
         mergedCell(0, [textParagraph(domainLabelFor(indicator), CENTERED)], isFirstRowOfDomain),
         mergedCell(1, subdomainParagraphs(indicator.subdomain), isFirstRowOfDomain),
@@ -28145,6 +28147,8 @@ var CFormApp = (() => {
     const description = group.entry.indicatorText || "";
     const domainShading = { shading: { type: ShadingType.CLEAR, color: "auto", fill: DOMAIN_FILL_COLORS[group.domain] || "FFFFFF" } };
     return new TableRow({
+      cantSplit: true,
+      // a split last row left a near-empty page holding only its final line
       children: [
         mergedCell2(0, [textParagraph(domainName, { bold: true, ...CENTERED2 })], isFirstRowOfDomain, domainShading),
         mergedCell2(1, [textParagraph(group.entry.indicatorCode, CENTERED2)], isFirstRowOfEntry, domainShading),
