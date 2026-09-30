@@ -102,7 +102,9 @@ export function buildDayCellRuns(items, overrideByItemId) {
   return items.map(item => {
     const override = overrideByItemId.get(item.id);
     const lines = item.indicatorCode
-      ? [item.indicatorCode, item.activityName && `【${item.activityName}】`, item.indicatorText].filter(Boolean)
+      ? [item.indicatorCode, item.activityName && `【${item.activityName}】`]
+        .filter(Boolean)
+        .concat(item.indicatorText ? item.indicatorText.split('\n') : []) // each typed line its own line
       : [item.activityName];
     return {
       lines,

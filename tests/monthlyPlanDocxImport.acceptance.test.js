@@ -1,5 +1,6 @@
 // tests/monthlyPlanDocxImport.acceptance.test.js
 import { describe, it, expect } from 'vitest';
+import JSZip from 'jszip';
 import { Blob as NodeBlob } from 'node:buffer';
 globalThis.Blob = NodeBlob;
 import { generateMonthlyPlanDocxBlob } from '../src/export/monthlyPlanDocxExport.js';
@@ -67,5 +68,25 @@ describe('parseMonthlyPlanDocxImport (round-trip against our own generateMonthly
 
     expect(parsed.warnings).toEqual([]);
     expect(parsed.slotsByTier['Ⅵ'][0].items).toEqual([{ indicatorCode: 'Ⅵ-1-1', activityName: '', indicatorText: '會手心朝下丟球或東西' }]);
+  });
+
+  // Word shows a raw \n inside <w:t> as a space: each typed line must be its own <w:br/> line.
+  it('round-trips a multi-line 指標內容, with and without an activity name', async () => {
+    const plan = { id: 1, period: '115年06月', childIds: [10], childTiers: { 10: 'Ⅵ' } };
+    const children = [{ id: 10, name: '測試寶寶', birthDate: '2023-01-01' }];
+    const slots = [{ id: 100, planId: 1, tier: 'Ⅵ', weekIndex: 1, weekday: 1 }];
+    const items = [
+      { indicatorCode: 'Ⅵ-1-1', activityName: '丟球', indicatorText: '內容一\n內容二' },
+      { indicatorCode: 'Ⅵ-1-2', activityName: '', indicatorText: '內容三\n內容四' },
+    ];
+    const itemsBySlotId = { 100: items.map((item, i) => ({ id: 1000 + i, slotId: 100, ...item })) };
+
+    const blob = await generateMonthlyPlanDocxBlob({ plan, children, slots, itemsBySlotId, overrides: [] });
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const documentXml = await (await JSZip.loadAsync(bytes)).file('word/document.xml').async('text');
+    expect(documentXml).not.toMatch(/<w:t[^>]*>[^<]*\n[^<]*<\/w:t>/);
+
+    const parsed = await parseMonthlyPlanDocxImport(bytes);
+    expect(parsed.slotsByTier['Ⅵ'][0].items).toEqual(items);
   });
 });

@@ -129,9 +129,9 @@ function linesToItem(lines, flags) {
   let indicatorText = '';
   if (rest[0] && rest[0].startsWith('【') && rest[0].endsWith('】')) {
     activityName = rest[0].slice(1, -1);
-    indicatorText = rest[1] || '';
+    indicatorText = rest.slice(1).join('\n'); // a multi-line 指標內容 is one line per typed line
   } else {
-    indicatorText = rest[0] || '';
+    indicatorText = rest.join('\n');
   }
   return { indicatorCode, activityName, indicatorText, ...flags };
 }
