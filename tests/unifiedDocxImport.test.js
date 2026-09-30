@@ -67,6 +67,16 @@ describe('detectDocxImportType', () => {
     expect(await detectDocxImportType(await buildMonthlyPlanFile())).toBe('monthly-plan');
   });
 
+  it('總表的備註裡寫到「行為觀察」「點滴分享」，仍判斷為總表', async () => {
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '行為觀察中發現能穩定行走，已放入點滴分享' }],
+    });
+    expect(await detectDocxImportType(blob)).toBe('assessment');
+  });
+
   it('returns null for a docx with none of the known markers', async () => {
     expect(await detectDocxImportType(await buildUnrecognizedFile())).toBeNull();
   });

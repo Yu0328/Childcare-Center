@@ -1,3 +1,4 @@
+import { compressImage } from '../media/imagePreprocess.js';
 import { addChild, listChildren } from '../storage/db.js';
 import {
   addParentReport, addCoursePlanEntry, addCourseOccurrence,
@@ -186,7 +187,13 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
 
       for (const index of includedHighlightIndexes) {
         const source = parsed.highlightEntries[index];
-        const photos = source.photos.map(blob => ({ blob, width: 0, height: 0 })); // dimensions unknown for legacy photos — see parentReportDocxExport.js's highlightPhotoCell guard
+        // Shrunk like a photo added by hand, which also measures it — stored at 0×0, export had
+        // to guess and printed every imported photo square. One that won't decode (e.g. a Word
+        // vector image) goes in as-is, still 0×0 — see parentReportDocxExport.js's highlightPhotoCell guard.
+        const photos = [];
+        for (const blob of source.photos) {
+          photos.push(await compressImage(blob).catch(() => ({ blob, width: 0, height: 0 })));
+        }
         await addHighlightEntry({ reportId: report.id, photos, caption: source.caption });
       }
 

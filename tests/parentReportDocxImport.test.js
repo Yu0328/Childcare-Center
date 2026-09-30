@@ -90,6 +90,12 @@ describe('parseHeaderInfo', () => {
     expect(parseHeaderInfo(headerText)).toEqual({ name: '陳小安', birthDate: '2024-06-20', period: '115年06月' });
   });
 
+  it('名字裡有「出」字不會被截斷；名字和「出生年月日」之間沒空格也能分開', () => {
+    expect(parseHeaderInfo('幼兒姓名：林出華 出生年月日：113.06.20 紀錄時間：115 年 06 月').name).toBe('林出華');
+    expect(parseHeaderInfo('幼兒姓名：林出華出生年月日：113.06.20 紀錄時間：115 年 06 月').name).toBe('林出華');
+    expect(parseHeaderInfo('幼兒姓名：林出華出生日期：113/06/20').name).toBe('林出華');
+  });
+
   // A real sample (06陳禹彤-115年4月適性紀錄-家長 115.5.15.docx) uses the 適性總表 template's own
   // labels ("出生日期"/"實施時間") instead of this template's usual ones, with everything else the
   // same shape — verified this silently dropped both the birth date and record period before.

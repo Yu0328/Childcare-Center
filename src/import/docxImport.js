@@ -81,7 +81,9 @@ export function parsePeriodFromHeaderText(headerText) {
 }
 
 function parseHeaderInfo(headerText) {
-  const nameMatch = /幼兒姓名[：:]\s*([^\s　出]+)/.exec(headerText);
+  // Stops at whitespace or the next label, which some files run straight into the name with no
+  // space — the full "出生…" label, not a bare 出, so a name containing 出 isn't cut short.
+  const nameMatch = /幼兒姓名[：:]\s*([^\s　]+?)(?=[\s　]|出生(?:日期|年月日)|$)/.exec(headerText);
   const birthMatch = /出生日期[：:]\s*(\d{1,3}\/\d{1,2}\/\d{1,2})/.exec(headerText);
 
   return {

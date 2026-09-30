@@ -89,10 +89,31 @@ export function canonicalJson(value) {
   return `{${keys.map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
 }
 
+// Every sync re-reads the whole local dataset (at least twice, plus a poll every 2 minutes), and
+// SHA-256 was ~60% of that time — 10k records took ~0.8s here, several times that on an old iPad.
+// A record that hasn't changed produces the same JSON, so its hash is reused instead of recomputed.
+// Keyed by the JSON itself, so a changed record can never pick up a stale hash. Two generations,
+// rotated per snapshot (startHashGeneration), keep memory at about two snapshots' worth instead of
+// every version ever hashed.
+let hashCache = new Map();
+let previousHashCache = new Map();
+
+export function startHashGeneration() {
+  previousHashCache = hashCache;
+  hashCache = new Map();
+}
+
 export async function hashPayload(payload) {
-  const bytes = new TextEncoder().encode(canonicalJson(payload));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  const json = canonicalJson(payload);
+  const cached = hashCache.get(json) ?? previousHashCache.get(json);
+  if (cached) {
+    hashCache.set(json, cached);
+    return cached;
+  }
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(json));
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  hashCache.set(json, hash);
+  return hash;
 }
 
 export function serializeRecord(storeName, record, uidOf) {

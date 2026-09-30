@@ -12,11 +12,19 @@ export function rocYearOptions() {
   return years;
 }
 
+// A year outside the usual range (an old file being imported) still gets an option — otherwise
+// nothing is selected and the browser shows the first option, next year, instead.
+function yearOptionsIncluding(selectedYear) {
+  const years = rocYearOptions();
+  if (!selectedYear || years.includes(selectedYear)) return years;
+  return [...years, selectedYear].sort((a, b) => b - a);
+}
+
 export function periodSelectsHtml({ yearFieldName, monthFieldName, selectedYear, selectedMonth }) {
   return `
     <span class="panel-form__period-row">
       <select data-field="${yearFieldName}">
-        ${rocYearOptions()
+        ${yearOptionsIncluding(selectedYear)
           .map(year => `<option value="${year}" ${year === selectedYear ? 'selected' : ''}>${year}年</option>`)
           .join('')}
       </select>

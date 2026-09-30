@@ -9,11 +9,30 @@ import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
 
+// Every thumbnail's object URL pins its photo in memory until revoked. Each render revokes the
+// previous render's, so a report with many photos doesn't keep piling up copies on every tab
+// switch or save. (The last render's stay until the next one — a bounded, single render's worth.)
+let thumbUrls = [];
+
+function thumbUrl(blob) {
+  const url = URL.createObjectURL(blob);
+  thumbUrls.push(url);
+  return url;
+}
+
+function revokeThumbUrls() {
+  for (const url of thumbUrls) URL.revokeObjectURL(url);
+  thumbUrls = [];
+}
+
+// Holds a slot while its photo is still being shrunk, so a second pick doesn't land in it too.
+const PROCESSING = Symbol('processing');
+
 function savedThumbHtml(photo, i, entryId) {
   if (!photo) return '<span class="highlight-thumb highlight-thumb--empty"></span>';
   return `
     <span class="highlight-thumb-wrap">
-      <img class="highlight-thumb" src="${URL.createObjectURL(photo.blob)}" alt="">
+      <img class="highlight-thumb" src="${thumbUrl(photo.blob)}" alt="">
       <button type="button" class="highlight-thumb-remove" data-remove-saved-photo="${escapeHtml(entryId)}" data-photo-index="${i}" aria-label="移除第 ${i + 1} 張照片">×</button>
     </span>
   `;
@@ -47,6 +66,10 @@ export async function renderHighlightsTab(
 ) {
   const entries = await listHighlightEntriesForReport(report.id);
   const pendingPhotos = [null, null, null]; // in-memory only, see Task 17's design note
+  // Shrinking a phone photo takes about a second; 新增 waits on this so a quick tap doesn't save
+  // before the photos are ready (which used to drop them silently).
+  let processing = Promise.resolve();
+  revokeThumbUrls();
 
   container.innerHTML = `
     <div class="tab-layout">
@@ -89,15 +112,23 @@ export async function renderHighlightsTab(
 
   // Fills empty slots starting at `startIndex` with as many of the chosen/dropped files as fit,
   // so picking or dropping several photos at once no longer requires repeating the action per slot.
-  async function handleFilesChosen(startIndex, fileList) {
+  function handleFilesChosen(startIndex, fileList) {
     const files = [...(fileList || [])];
+    const picks = [];
     let slot = startIndex;
     for (const file of files) {
       while (slot < 3 && pendingPhotos[slot]) slot++;
       if (slot >= 3) break;
-      await handleFileChosen(slot, file);
+      pendingPhotos[slot] = PROCESSING;
+      container.querySelector(`[data-preview-slot="${slot}"]`).textContent = '處理中…';
+      picks.push([slot, file]);
       slot++;
     }
+    const run = (async () => {
+      for (const [pickSlot, file] of picks) await handleFileChosen(pickSlot, file);
+    })();
+    processing = Promise.all([processing, run]);
+    return run;
   }
 
   async function handleFileChosen(i, file) {
@@ -110,7 +141,7 @@ export async function renderHighlightsTab(
       // never left toUpload's filter in photoSync.js's collectLocalPhotos().
       pendingPhotos[i] = { ...compressed, photoUid: newUid() };
       previewEl.innerHTML = `
-        <img class="highlight-thumb" src="${URL.createObjectURL(compressed.blob)}" alt="">
+        <img class="highlight-thumb" src="${thumbUrl(compressed.blob)}" alt="">
         <button type="button" class="highlight-thumb-remove" data-remove-pending-slot="${i}" aria-label="移除照片 ${i + 1}">×</button>
       `;
       previewEl.querySelector(`[data-remove-pending-slot="${i}"]`).addEventListener('click', event => {
@@ -122,6 +153,7 @@ export async function renderHighlightsTab(
         clearPendingSlot(i);
       });
     } catch (err) {
+      pendingPhotos[i] = null;
       previewEl.textContent = '照片讀取失敗';
     }
   }
@@ -154,7 +186,8 @@ export async function renderHighlightsTab(
     event.preventDefault();
     const errorEl = container.querySelector('[data-action="add-highlight"] [data-error]');
     const caption = container.querySelector('[data-field="caption"]').value;
-    const photos = pendingPhotos.filter(Boolean);
+    await processing;
+    const photos = pendingPhotos.filter(photo => photo && photo !== PROCESSING);
     if (photos.length === 0) {
       errorEl.textContent = '請至少上傳一張照片';
       return;

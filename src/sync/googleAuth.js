@@ -7,22 +7,6 @@ import { AuthExpiredError } from './driveClient.js';
 export const SCOPES = 'openid profile https://www.googleapis.com/auth/drive.file';
 export const SYNC_MODE_KEY = 'c-form-sync-mode';
 export const SYNC_NAME_KEY = 'c-form-sync-name';
-// A silent resume (prompt: '') runs automatically on page load, with no click behind it. If the
-// browser's popup blocker (or a missing third-party-cookie session) swallows GIS's attempt, GIS
-// can fail to ever invoke its callback, and gate() awaits that promise forever — a permanently
-// blank header with no sign-in button, on the very reload that should show one. This bounds the
-// wait so a swallowed silent attempt falls back to the existing "登入已失效，請重新登入" state,
-// which does offer a button — one a real click can open a popup from.
-//
-// NOT kept short: "prompt: ''" is a request for silence, not a guarantee of it — when Google
-// can't confirm the session invisibly, it can still open a real, visible popup asking the person
-// to pick/confirm an account, same as an explicit sign-in. A too-short timeout cancels that popup
-// out from under a person who is genuinely in the middle of using it (confirmed in practice: a
-// real popup appeared, but wasn't finished within the old 3s value, and the attempt was killed).
-// Long enough for a person to actually see and use a popup; still finite so a truly swallowed,
-// silently-blocked attempt eventually recovers instead of hanging forever.
-export const RESUME_TIMEOUT_MS = 60000;
-
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
@@ -115,10 +99,9 @@ export function createGoogleAuth({
   // set, so requestAccessToken() fires with barely any async gap after the click.
   ensureClient().catch(() => {});
 
-  // driveClient runs up to MAX_CONCURRENCY requests in parallel, and each one awaits
-  // getAccessToken() independently. Without caching the in-flight refresh, a token expiring
-  // mid-batch would have every concurrent caller overwrite `pending` in turn, so only the last
-  // one's promise would ever resolve and the rest would hang forever.
+  // One request at a time: a second call while the popup is still open (a double tap on the
+  // header's sign-in button) shares it instead of overwriting `pending` and leaving the first
+  // caller hanging forever.
   function requestToken(options) {
     if (inFlight) return inFlight;
     inFlight = new Promise(resolve => {
@@ -145,39 +128,14 @@ export function createGoogleAuth({
     return { name };
   }
 
-  // prompt: '' asks for a token without showing anything, which works while Google still has a
-  // live session and consent on file. A null return is the "登入已失效，請重新登入" case — the
-  // same case a swallowed/blocked silent attempt is forced into once RESUME_TIMEOUT_MS passes.
-  async function resume() {
-    if (readSyncMode() !== 'google') return null;
-    if (isOffline()) return null;
-    await ensureClient();
-    const attempt = requestToken({ prompt: '' });
-    const timedOut = await Promise.race([
-      attempt.then(() => false),
-      new Promise(resolve => setTimeout(() => resolve(true), RESUME_TIMEOUT_MS)),
-    ]);
-    if (timedOut) {
-      // The GIS call itself may be permanently stuck (its popup blocked, no callback ever
-      // coming). Forget it so the next request — in particular a real, click-driven signIn() —
-      // opens a fresh popup instead of awaiting this one forever too.
-      inFlight = null;
-      pending = null;
-      return null;
-    }
-    const fresh = await attempt;
-    if (!fresh) return null;
-    return { name: readDisplayName() };
-  }
-
+  // No silent refresh once the ~1-hour token runs out. prompt: '' still needs a popup, and from a
+  // background sync (no click behind it) the browser either blocks it — sync hung until a timeout
+  // — or it pops a Google window at a teacher who never asked for one. Failing straight away puts
+  // up the header's "登入已失效，請重新登入" with its button, and that click opens the popup.
+  // AuthExpiredError (not a generic Error) so syncEngine treats it like a 401/403 from Drive.
   async function getAccessToken() {
     if (token && Date.now() < expiresAtMs) return token;
-    const refreshed = await resume();
-    // Thrown as AuthExpiredError (not a generic Error) so syncEngine's catch recognizes a failed
-    // silent resume the same way it recognizes a 401/403 from Drive, and surfaces the persistent
-    // "登入已失效，請重新登入" warning instead of a generic network-failure message.
-    if (!refreshed || !token) throw new AuthExpiredError('AUTH_REQUIRED');
-    return token;
+    throw new AuthExpiredError('AUTH_REQUIRED');
   }
 
   function signOut() {
@@ -188,5 +146,5 @@ export function createGoogleAuth({
     clearSyncMode();
   }
 
-  return { signIn, resume, getAccessToken, signOut, isSignedIn: () => Boolean(token) };
+  return { signIn, getAccessToken, signOut, isSignedIn: () => Boolean(token) };
 }

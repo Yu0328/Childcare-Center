@@ -210,12 +210,23 @@ describe('runSync', () => {
     expect(status.error).toBe('AUTH_EXPIRED');
   });
 
-  it('靜默續用失敗時回報 AUTH_EXPIRED，而不是 NETWORK', async () => {
+  it('同步到一半登入才過期（上傳時被拒）也回報 AUTH_EXPIRED，不是「稍後重試」的 NETWORK', async () => {
+    await addChild({ name: '測試童', birthDate: '2024-01-01' });
+    const drive = fakeDrive();
+    drive.uploadRecord = async () => { throw new AuthExpiredError('AUTH_EXPIRED'); };
+
+    const status = await createSyncEngine({ drive, resolveConflicts: async () => [] }).runSync();
+
+    expect(status.phase).toBe('auth');
+    expect(status.error).toBe('AUTH_EXPIRED');
+  });
+
+  it('沒有有效 token 時回報 AUTH_EXPIRED，而不是 NETWORK，也不送出任何請求', async () => {
     await addChild({ name: '測試童', birthDate: '2024-01-01' });
     writeSyncMode('google');
 
     // A real googleAuth + driveClient pair, wired the way wireSyncControls does it, so the actual
-    // failure path (getAccessToken throwing on a failed silent resume) runs end to end instead of
+    // failure path (getAccessToken throwing with no live token) runs end to end instead of
     // a fake drive throwing AuthExpiredError directly.
     let gisCallback = null;
     const auth = createGoogleAuth({
