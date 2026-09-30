@@ -17,6 +17,11 @@ function textOf(fragmentXml) {
   return [...fragmentXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('').trim();
 }
 
+// A typed multi-line value is one paragraph per line (see docxShared.js textParagraphs).
+function linesOf(paragraphXmls) {
+  return paragraphXmls.map(textOf).join('\n').trim();
+}
+
 // Joins <w:t> runs WITHIN each paragraph with '' (no separator) — Word can legitimately split a
 // single logical value (e.g. a two-digit month "03") across adjacent <w:r> runs for internal
 // font/formatting reasons, and joining those with a space would turn "03" into "0 3", which then
@@ -103,7 +108,7 @@ function processCoursePlanBodyRows(bodyRows) {
       const activityParagraphs = paragraphsOf(activityCell);
       const activityNameRaw = activityParagraphs[0] ? textOf(activityParagraphs[0]) : '';
       const activityName = activityNameRaw.replace(/^【|】$/g, '');
-      const indicatorText = activityParagraphs[1] ? textOf(activityParagraphs[1]) : '';
+      const indicatorText = linesOf(activityParagraphs.slice(1));
       entries.push({ indicatorCode, activityName, indicatorText });
       currentEntryIndex += 1;
       occurrencesByEntryIndex[currentEntryIndex] = [];
@@ -118,7 +123,7 @@ function processCoursePlanBodyRows(bodyRows) {
     const struck = isStruck(dateCell);
     const status = struck ? null : dateText.includes('○') ? 'developed' : dateText.includes('△') ? 'developing' : null;
 
-    occurrencesByEntryIndex[currentEntryIndex].push({ date, status, ...flagsAndNote(struck, textOf(noteCell)) });
+    occurrencesByEntryIndex[currentEntryIndex].push({ date, status, ...flagsAndNote(struck, linesOf(paragraphsOf(noteCell))) });
   }
 
   return { entries, occurrencesByEntryIndex };
@@ -225,7 +230,7 @@ export function extractHighlightPhotoGroups(highlightsTableXml) {
 
     const photoCount = (photoRow.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
     const embedIds = [...photoRow.matchAll(/<a:blip\b[^>]*\br:embed="([^"]+)"/g)].map(m => m[1]);
-    const caption = [...captionRow.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(m => m[1]).join('').trim();
+    const caption = linesOf(paragraphsOf(captionRow));
     if (photoCount > 0 && caption) groups.push({ photoCount, embedIds, caption });
   }
   return groups;

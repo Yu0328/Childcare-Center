@@ -50,6 +50,12 @@ export function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, al
   });
 }
 
+// For typed multi-line text: Word shows a raw \n inside a run as a space, and the real sample files
+// put each line in its own paragraph, so one paragraph per line.
+export function textParagraphs(text, options) {
+  return String(text ?? '').split('\n').map(line => textParagraph(line, options));
+}
+
 export function emptyParagraph() {
   return new Paragraph({ children: [] });
 }

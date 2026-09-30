@@ -6,6 +6,7 @@ import {
   groupEntriesByDomainInFirstAppearanceOrder, buildDevelopmentRecordTable,
   buildHighlightsTable, generateParentReportDocxBlob,
 } from '../src/export/parentReportDocxExport.js';
+import { extractHighlightPhotoGroups } from '../src/import/parentReportDocxImport.js';
 
 async function tableToXml(table) {
   const doc = new Document({ sections: [{ children: [table] }] });
@@ -389,5 +390,17 @@ describe('buildHighlightsTable', () => {
     const table = await buildHighlightsTable(entries);
     const xml = await tableToXml(table);
     expect(xml).toContain('<w:drawing>'); // did not throw / divide by zero
+  });
+});
+
+// A photo can't round-trip through the full generate→parse path in this harness (see CLAUDE.md), so
+// the caption's line breaks are checked table-level instead: one paragraph per line, read back as \n.
+describe('buildHighlightsTable caption line breaks', () => {
+  it('writes each caption line as its own paragraph and reads it back', async () => {
+    const entries = [{ id: 1, reportId: 1, photos: [{ blob: new Blob(['a']), width: 100, height: 80 }], caption: '描述一\n描述二' }];
+    const xml = await tableToXml(await buildHighlightsTable(entries));
+    expect(xml).toMatch(/<w:t[^>]*>描述一<\/w:t>/);
+    expect(xml).toMatch(/<w:t[^>]*>描述二<\/w:t>/);
+    expect(extractHighlightPhotoGroups(xml).map(g => g.caption)).toEqual(['描述一\n描述二']);
   });
 });

@@ -7,7 +7,7 @@ import { TIERS, DOMAINS, getIndicator } from '../data/indicators.js';
 import { downloadBlob } from './downloadBlob.js';
 import {
   FONT, DEFAULT_TEXT_SIZE, PAGE_SIZE, HEADER_ICON_EMU, EMU_PER_PIXEL,
-  textParagraph, emptyParagraph, headerIconRunBehindText, toRocDate,
+  textParagraph, textParagraphs, emptyParagraph, headerIconRunBehindText, toRocDate,
 } from './docxShared.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 
@@ -171,14 +171,18 @@ function occurrenceDateRun(row) {
   });
 }
 
-function occurrenceNoteRun(row) {
-  return new TextRun({
-    text: formatNoteText(row),
-    font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
-    size: DEFAULT_TEXT_SIZE,
-    ...(isStruckRow(row) ? { strike: true } : {}),
-    ...(isFlaggedRow(row) ? { color: 'FF0000' } : {}),
-  });
+// One paragraph per typed line, each keeping a flagged row's strikethrough/red.
+function occurrenceNoteParagraphs(row) {
+  return formatNoteText(row).split('\n').map(line => new Paragraph({
+    alignment: AlignmentType.CENTER,
+    children: [new TextRun({
+      text: line,
+      font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT },
+      size: DEFAULT_TEXT_SIZE,
+      ...(isStruckRow(row) ? { strike: true } : {}),
+      ...(isFlaggedRow(row) ? { color: 'FF0000' } : {}),
+    })],
+  }));
 }
 
 function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }) {
@@ -196,7 +200,7 @@ function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }
       mergedCell(1, [textParagraph(group.entry.indicatorCode, CENTERED)], isFirstRowOfEntry, domainShading),
       mergedCell(2, [
         textParagraph(`【${group.entry.activityName}】`, CENTERED),
-        textParagraph(description, CENTERED),
+        ...textParagraphs(description, CENTERED),
       ], isFirstRowOfEntry, domainShading),
       new TableCell({
         width: cellWidth(3),
@@ -208,7 +212,7 @@ function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }
         width: cellWidth(4),
         verticalAlign: VerticalAlign.CENTER,
         ...domainShading,
-        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [occurrenceNoteRun(row)] })],
+        children: occurrenceNoteParagraphs(row),
       }),
     ],
   });
@@ -262,12 +266,12 @@ function domainHeaderRow(label, fill) {
 }
 
 // First-line indent (each paragraph's first line indented, matching the essay-style prose in the
-// real sample) — 480 twips ≈ two 標楷體 full-width characters at 12pt.
-function narrativeParagraph(text) {
-  return new Paragraph({
+// real sample) — 480 twips ≈ two 標楷體 full-width characters at 12pt. One paragraph per typed line.
+function narrativeParagraphs(text) {
+  return String(text ?? '').split('\n').map(line => new Paragraph({
     indent: { firstLine: 480 },
-    children: [new TextRun({ text: String(text ?? ''), font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT }, size: DEFAULT_TEXT_SIZE })],
-  });
+    children: [new TextRun({ text: line, font: { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT }, size: DEFAULT_TEXT_SIZE })],
+  }));
 }
 
 function referencedIndicatorLines(courseEntryIds, coursePlanEntriesById) {
@@ -293,7 +297,7 @@ export function buildDevelopmentRecordTable(developmentRecordEntries, behaviorOb
           fullWidthCell(
             entries.flatMap(entry => [
               ...referencedIndicatorLines(entry.courseEntryIds, coursePlanEntriesById),
-              narrativeParagraph(entry.narrative),
+              ...narrativeParagraphs(entry.narrative),
             ])
           ),
         ],
@@ -303,7 +307,7 @@ export function buildDevelopmentRecordTable(developmentRecordEntries, behaviorOb
 
   const behaviorRows = behaviorObservations.flatMap(observation => [
     domainHeaderRow(observation.title ? `行為觀察－${observation.title}` : '行為觀察', SECTION_HEADER_FILL),
-    new TableRow({ children: [fullWidthCell([narrativeParagraph(observation.narrative)])] }),
+    new TableRow({ children: [fullWidthCell(narrativeParagraphs(observation.narrative))] }),
   ]);
 
   return new Table({
@@ -427,7 +431,7 @@ async function highlightEntryRows(entry) {
         new TableCell({
           columnSpan: HIGHLIGHT_GRID_COLUMN_COUNT,
           width: { size: COURSE_PLAN_TABLE_WIDTH_DXA, type: WidthType.DXA },
-          children: [textParagraph(entry.caption, { bold: true, ...CENTERED })],
+          children: textParagraphs(entry.caption, { bold: true, ...CENTERED }),
         }),
       ],
     }),
