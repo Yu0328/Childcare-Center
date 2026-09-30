@@ -22,7 +22,9 @@ write, and what the importers now read back as `\n`.
   適性紀錄 能力指標內容 (every paragraph after 【活動名稱】, not only the first), 說明, caption;
   總表 note; 月計畫 指標內容 (every line after the name). Narratives already did this.
   Side effect on legacy files: a note/caption typed as several paragraphs used to be glued into one
-  run-on line; it now keeps its lines.
+  run-on line; it now keeps its lines. And a 能力指標內容 that Word wrapped onto a second paragraph
+  used to lose everything after the first paragraph (checked on the real samples: the kept lines
+  rejoin into the official indicator wording); it is now imported whole.
 - **Editing no longer flattens a note**: the 修改 forms for a 課程計畫 occurrence's 說明 and a 總表
   entry's 觀察敘述 used a single-line box (which silently drops line breaks — opening and saving
   flattened the note), while the matching 新增 forms use a multi-line box. Both become multi-line.
@@ -34,5 +36,5 @@ write, and what the importers now read back as `\n`.
 - Single-line fields (names, 活動名稱, titles, 月計畫 replacement text, 總表 備註 rows) — typed into
   single-line boxes, so they can't contain a line break.
 - The legacy (non-app) 月計畫 cell parser: a real legacy cell's layout is not this app's own.
-- 總表 cells other than the note keep joining all text with no separator (the date cell's ○/△ and
-  codes rely on it).
+- 總表 import reads every cell one line per paragraph (one shared helper), but on the real samples
+  only notes actually span several paragraphs — the date, ○/△ and code cells come out unchanged.
