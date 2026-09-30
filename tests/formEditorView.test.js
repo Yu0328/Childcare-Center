@@ -194,6 +194,20 @@ describe('renderFormEditorView', () => {
     expect(updated.note).toBe('現在走得更穩了');
   });
 
+  it('editing an entry keeps a multi-line note\'s line breaks (a single-line box used to drop them)', async () => {
+    const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '第一行\n第二行' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    container.querySelector(`[data-edit-entry="${entry.id}"]`).click();
+    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).click();
+
+    await waitFor(() => container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`).hidden); // saved and re-rendered
+    const [updated] = await listEntriesForForm(form.id);
+    expect(updated.note).toBe('第一行\n第二行');
+  });
+
   it('changes an entry from 已發展○ to 發展中△ via the edit form', async () => {
     const entry = await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: 'x' });
 

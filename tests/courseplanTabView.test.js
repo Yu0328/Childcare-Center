@@ -247,6 +247,22 @@ describe('renderCoursePlanTab', () => {
     expect(updated.note).toBe('小安畫得更開心了');
   });
 
+  it('editing an occurrence keeps a multi-line note\'s line breaks (a single-line box used to drop them)', async () => {
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' });
+    const occurrence = await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: false, note: '第一行\n第二行' });
+
+    const container = document.createElement('div');
+    let changed = false;
+    await renderCoursePlanTab(container, { report, onChange: () => { changed = true; } });
+
+    container.querySelector(`[data-edit-occurrence="${occurrence.id}"]`).click();
+    container.querySelector(`[data-occurrence-edit-save-for="${occurrence.id}"]`).click();
+
+    await waitFor(() => changed);
+    const [updated] = await listCourseOccurrencesForEntry(entry.id);
+    expect(updated.note).toBe('第一行\n第二行');
+  });
+
   it('editing an occurrence and changing only the note does not silently flip its status (regression)', async () => {
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' });
     const occurrence = await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developing', absent: false, note: '小安正在嘗試' });

@@ -78,7 +78,7 @@ function occurrenceRow(occurrence) {
         <label class="entry-form__checkbox">
           <input type="checkbox" data-occurrence-edit-field="courseChanged" data-occurrence-id="${escapeHtml(occurrence.id)}" ${occurrence.courseChanged ? 'checked' : ''}> 更換課程（劃掉日期與說明，請於下方說明欄描述更換後的活動內容）
         </label>
-        <input type="text" class="entry-form__note" data-occurrence-edit-field="note" data-occurrence-id="${escapeHtml(occurrence.id)}" placeholder="說明" value="${escapeHtml(occurrence.note)}">
+        <textarea class="entry-form__note" data-occurrence-edit-field="note" data-occurrence-id="${escapeHtml(occurrence.id)}" placeholder="說明">${escapeHtml(occurrence.note)}</textarea>
         <div class="entry-form__actions">
           <button type="button" class="btn btn--primary btn--small" data-occurrence-edit-save-for="${escapeHtml(occurrence.id)}">儲存</button>
           <button type="button" class="btn btn--outline btn--small" data-occurrence-edit-cancel-for="${escapeHtml(occurrence.id)}">取消</button>

@@ -69,7 +69,7 @@ function entryRow(entry) {
       <div class="entry-form" data-entry-edit-form-for="${escapeHtml(entry.id)}" hidden>
         <label class="entry-form__field">日期 <input type="date" data-entry-edit-field="date" data-entry-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.date)}"></label>
         ${statusRadios(entry.id, { fieldAttr: 'entry-edit-field', idAttr: 'entry-id', checkedStatus: entry.status })}
-        <input type="text" class="entry-form__note" data-entry-edit-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="觀察敘述" value="${escapeHtml(entry.note)}">
+        <textarea class="entry-form__note" data-entry-edit-field="note" data-entry-id="${escapeHtml(entry.id)}" placeholder="觀察敘述">${escapeHtml(entry.note)}</textarea>
         <div class="entry-form__actions">
           <button type="button" class="btn btn--primary btn--small" data-entry-edit-save-for="${escapeHtml(entry.id)}">儲存</button>
           <button type="button" class="btn btn--outline btn--small" data-entry-edit-cancel-for="${escapeHtml(entry.id)}">取消</button>
