@@ -218,6 +218,28 @@ describe('monthlyPlanEditorView: slot item editing', () => {
     expect(cell.textContent).toContain('改過的活動');
   });
 
+  it('clicking quickly from one day to another leaves the panel on the last day clicked', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '第三天' });
+    // Day 4 has no slot yet, so its panel load (which creates one) finishes after day 3's.
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="4"]`).click();
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-delete-item="${item.id}"]`));
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    expect(container.querySelector(`[data-delete-item="${item.id}"]`)).not.toBeNull();
+  });
+
+  it('clicking the same day twice quickly still shows its items', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 2, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '連點' });
+    const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="2"][data-weekday="3"]`);
+    cell.click();
+    cell.click();
+
+    await waitFor(() => container.querySelector(`[data-delete-item="${item.id}"]`));
+  });
+
   it('deleting an item removes it from storage and the cell', async () => {
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
     const item = await addPlanSlotItem({ slotId: slot.id, activityName: '要刪除' });

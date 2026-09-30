@@ -330,7 +330,8 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     const sameAsSelected =
       selected && selected.child.id === child.id && selected.tier === tier &&
       selected.week.weekIndex === week.weekIndex && selected.day.weekday === day.weekday;
-    selected = { child, tier, week, day };
+    // Kept as the same object on a reselect, so a load still in flight for it isn't taken as stale.
+    if (!sameAsSelected) selected = { child, tier, week, day };
     container.querySelectorAll('.monthly-calendar__day--selected').forEach(el => el.classList.remove('monthly-calendar__day--selected'));
     container.querySelector(
       `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
@@ -422,10 +423,13 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       panelItems.innerHTML = '';
       return;
     }
+    const loadingFor = selected;
     const { child, tier, week, day } = selected;
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: week.weekIndex, weekday: day.weekday });
     const items = await listPlanSlotItems(slot.id);
     const allOverrides = await listChildItemOverridesForPlan(plan.id);
+    // Another day was clicked while this one loaded: its own load paints the panel, not this stale one.
+    if (selected !== loadingFor) return;
     const overrideByItemId = new Map(allOverrides.filter(o => o.childId === child.id).map(o => [o.itemId, o]));
 
     // Lets staff pick an indicator from a tier other than this cell's own tier — a child may not
