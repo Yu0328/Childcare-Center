@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   createGoogleAuth, readSyncMode, writeSyncMode, clearSyncMode, readDisplayName, SCOPES,
-  RESUME_TIMEOUT_MS,
 } from '../src/sync/googleAuth.js';
 import { AuthExpiredError } from '../src/sync/driveClient.js';
 
@@ -127,102 +126,16 @@ describe('createGoogleAuth', () => {
     await expect(auth.getAccessToken()).rejects.toThrow('AUTH_REQUIRED');
   });
 
-  it('resume 在上次是訪客模式時不做任何事', async () => {
+  it('token 過期時直接要求重新登入，不在背景自己開 Google 視窗', async () => {
     const gis = fakeGis();
-    writeSyncMode('guest');
-    const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
-    expect(await auth.resume()).toBe(null);
-    expect(gis.calls).toHaveLength(0);
-  });
-
-  it('resume 用靜默模式取 token；被收回授權時回 null', async () => {
-    const gis = fakeGis();
-    writeSyncMode('google');
-    localStorage.setItem('c-form-sync-name', '小美');
-    const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
-
-    const pending = auth.resume();
-    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
-    expect(gis.calls[0].prompt).toBe('');
-    gis.respond({ error: 'access_denied' });
-
-    expect(await pending).toBe(null);
-    expect(auth.isSignedIn()).toBe(false);
-  });
-
-  it('靜默續用的回呼被瀏覽器擋掉、永遠不會來時，逾時後視為續用失敗，不會卡住呼叫者', async () => {
-    vi.useFakeTimers();
-    try {
-      const gis = fakeGis();
-      writeSyncMode('google');
-      const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
-
-      const pending = auth.resume(); // gis.respond(...) 故意不呼叫，模擬彈出視窗被擋、回呼永遠不會來
-      await vi.advanceTimersByTimeAsync(RESUME_TIMEOUT_MS + 100);
-
-      expect(await pending).toBe(null);
-      expect(gis.calls).toHaveLength(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('續用逾時後，接下來真的點登入仍會開一個新的請求，不會卡在被擋掉的舊請求上', async () => {
-    vi.useFakeTimers();
-    try {
-      const gis = fakeGis();
-      writeSyncMode('google');
-      const auth = createGoogleAuth({
-        clientId: 'test-client', loadGis: gis.loadGis, fetchUserInfo: async () => ({ name: '小美' }),
-      });
-
-      const resumePending = auth.resume();
-      await vi.advanceTimersByTimeAsync(RESUME_TIMEOUT_MS + 100);
-      expect(await resumePending).toBe(null);
-      expect(gis.calls).toHaveLength(1);
-
-      const signInPending = auth.signIn();
-      await vi.advanceTimersByTimeAsync(0);
-      expect(gis.calls).toHaveLength(2); // 新的請求，不是沿用卡住的那個
-      gis.respond({ access_token: 'tok-1', expires_in: 3600 });
-      expect(await signInPending).toEqual({ name: '小美' });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('token 過期時多個併發 getAccessToken 共用同一次 refresh，全部都會拿到結果', async () => {
-    const gis = fakeGis();
-    const auth = createGoogleAuth({
-      clientId: 'test-client',
-      loadGis: gis.loadGis,
-      fetchUserInfo: async () => ({ name: '小美' }),
-    });
+    const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis, fetchUserInfo: async () => ({ name: '小美' }) });
     const first = auth.signIn();
     await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
     gis.respond({ access_token: 'tok-1', expires_in: -1 }); // already-expired token
     await first;
 
-    // Five concurrent callers (driveClient's MAX_CONCURRENCY) all see an expired token and all
-    // trigger a refresh at once; only one GIS request should go out, and every caller must resolve.
-    const calls = Array.from({ length: 5 }, () => auth.getAccessToken());
-    await vi.waitFor(() => expect(gis.calls).toHaveLength(2));
-    expect(gis.calls).toHaveLength(2); // one for signIn, exactly one shared refresh — not five
-    gis.respond({ access_token: 'tok-2', expires_in: 3600 });
-
-    await expect(Promise.all(calls)).resolves.toEqual(['tok-2', 'tok-2', 'tok-2', 'tok-2', 'tok-2']);
-  });
-
-  it('靜默續用失敗時丟出的是 AuthExpiredError，而不是一般 Error', async () => {
-    const gis = fakeGis();
-    writeSyncMode('google');
-    const auth = createGoogleAuth({ clientId: 'test-client', loadGis: gis.loadGis });
-
-    const pending = auth.getAccessToken();
-    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
-    gis.respond({ error: 'access_denied' });
-
-    await expect(pending).rejects.toBeInstanceOf(AuthExpiredError);
+    await expect(auth.getAccessToken()).rejects.toBeInstanceOf(AuthExpiredError);
+    expect(gis.calls).toHaveLength(1); // only the sign-in click's own request — no background popup
   });
 
   it('登出只清掉 token 與登入模式', async () => {

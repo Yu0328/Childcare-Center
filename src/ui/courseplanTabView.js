@@ -151,14 +151,24 @@ function indicatorOptionsHtml(tier, selectedCode = null) {
     if (!byDomain.has(indicator.domainName)) byDomain.set(indicator.domainName, []);
     byDomain.get(indicator.domainName).push(indicator);
   }
-  return [...byDomain.entries()]
-    .map(
-      ([domainName, group]) =>
-        `<optgroup label="${escapeHtml(domainName)}">
+  // An entry whose code isn't one of this tier's (an imported earlier-tier or unrecognized code)
+  // gets its own option up top — otherwise the browser falls back to the first option and saving
+  // an unrelated edit would quietly overwrite the code with it.
+  const currentOption =
+    selectedCode && !indicators.some(i => i.code === selectedCode)
+      ? `<option value="${escapeHtml(selectedCode)}" selected>${escapeHtml(selectedCode)}（目前的指標）</option>`
+      : '';
+  return (
+    currentOption +
+    [...byDomain.entries()]
+      .map(
+        ([domainName, group]) =>
+          `<optgroup label="${escapeHtml(domainName)}">
           ${group.map(i => `<option value="${escapeHtml(i.code)}" ${i.code === selectedCode ? 'selected' : ''}>${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`).join('')}
         </optgroup>`
-    )
-    .join('');
+      )
+      .join('')
+  );
 }
 
 export async function renderCoursePlanTab(

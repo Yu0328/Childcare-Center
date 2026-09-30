@@ -41,6 +41,10 @@ describe('renderParentReportImportPreviewView', () => {
   beforeEach(async () => {
     await clearAllData();
     vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() });
+    // jsdom never decodes an image, so the real compressImage would wait forever; default to its
+    // "couldn't decode" fallback (photo kept as-is) unless a test says otherwise.
+    const imagePreprocess = await import('../src/media/imagePreprocess.js');
+    vi.spyOn(imagePreprocess, 'compressImage').mockRejectedValue(new Error('jsdom cannot decode images'));
   });
 
   afterEach(() => {
@@ -171,5 +175,36 @@ describe('renderParentReportImportPreviewView', () => {
     expect(container.querySelector('[data-error]').textContent).toBe('請選擇完整的出生日期');
     expect(onImported).not.toHaveBeenCalled();
     expect(await listChildren()).toHaveLength(0);
+  });
+
+  it('匯入的點滴分享照片經過縮圖，存下真實寬高（匯出才不會被擠成正方形）', async () => {
+    const imagePreprocess = await import('../src/media/imagePreprocess.js');
+    const compressed = new Blob(['small'], { type: 'image/jpeg' });
+    vi.spyOn(imagePreprocess, 'compressImage').mockResolvedValue({ blob: compressed, width: 640, height: 480 });
+    const container = document.createElement('div');
+    let imported = false;
+    renderParentReportImportPreviewView(container, { parsed: buildParsed(), onCancel: () => {}, onImported: () => { imported = true; } });
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const [child] = await listChildren();
+    const [report] = await listParentReportsForChild(child.id);
+    const [highlight] = await listHighlightEntriesForReport(report.id);
+    expect(highlight.photos[0]).toMatchObject({ width: 640, height: 480 });
+  });
+
+  it('照片無法縮圖時照原樣匯入，不讓整份匯入失敗', async () => {
+    // beforeEach already makes compressImage fail.
+    const container = document.createElement('div');
+    let imported = false;
+    renderParentReportImportPreviewView(container, { parsed: buildParsed(), onCancel: () => {}, onImported: () => { imported = true; } });
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const [child] = await listChildren();
+    const [report] = await listParentReportsForChild(child.id);
+    const [highlight] = await listHighlightEntriesForReport(report.id);
+    expect(highlight.photos).toHaveLength(1);
+    expect(highlight.photos[0]).toMatchObject({ width: 0, height: 0 });
   });
 });

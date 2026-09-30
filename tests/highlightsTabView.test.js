@@ -313,4 +313,43 @@ describe('renderHighlightsTab', () => {
     container.querySelector(`[data-highlight-edit-cancel-for="${entry.id}"]`).click();
     expect(form.hidden).toBe(true);
   });
+
+  it('照片還在處理時按新增，會等全部處理完再存，不會少存', async () => {
+    const imagePreprocess = await import('../src/media/imagePreprocess.js');
+    let finish;
+    const gate = new Promise(resolve => { finish = resolve; });
+    vi.spyOn(imagePreprocess, 'compressImage').mockImplementation(async () => {
+      await gate;
+      return { blob: new Blob(['x']), width: 100, height: 80 };
+    });
+    const container = document.createElement('div');
+    let changed = false;
+    await renderHighlightsTab(container, { report, onChange: () => { changed = true; } });
+
+    const input = container.querySelector('[data-photo-slot="0"]');
+    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['a'], 'a.jpg'), new File(['b'], 'b.jpg')] });
+    input.dispatchEvent(new Event('change'));
+    expect(container.querySelector('[data-preview-slot="0"]').textContent).toContain('處理中');
+
+    container.querySelector('[data-field="caption"]').value = '兩張';
+    container.querySelector('[data-action="add-highlight"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    finish();
+
+    await waitFor(() => changed);
+    const [entry] = await listHighlightEntriesForReport(report.id);
+    expect(entry.photos).toHaveLength(2);
+  });
+
+  it('重新顯示時，釋放上一次縮圖佔用的記憶體', async () => {
+    await addHighlightEntry({ reportId: report.id, photos: [{ blob: new Blob(['a']), width: 10, height: 10 }], caption: 'x' });
+    let n = 0;
+    URL.createObjectURL = vi.fn(() => `blob:mock-${++n}`);
+    const container = document.createElement('div');
+    await renderHighlightsTab(container, { report, onChange: () => {} });
+    const firstUrl = container.querySelector('.highlight-thumb').getAttribute('src');
+
+    await renderHighlightsTab(container, { report, onChange: () => {} });
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(firstUrl);
+  });
 });

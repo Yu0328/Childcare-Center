@@ -1,6 +1,6 @@
 import { runRequest } from '../storage/dbCore.js';
 import { writeSyncState, deleteSyncState } from '../storage/syncStateDb.js';
-import { mapWithConcurrency, MAX_CONCURRENCY } from './driveClient.js';
+import { mapWithConcurrency, MAX_CONCURRENCY, AuthExpiredError } from './driveClient.js';
 import { PHOTO_STORE } from './syncStores.js';
 
 // A photo's sync state lives in the syncState store keyed by photoUid, never as a flag on the
@@ -79,5 +79,6 @@ export async function syncPhotos({
     downloaded: downloads.filter(r => r.ok).length,
     trashed: trashes.filter(r => r.ok).length,
     failed: all.filter(r => !r.ok).length,
+    authExpired: all.some(r => r.error instanceof AuthExpiredError),
   };
 }

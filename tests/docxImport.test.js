@@ -71,6 +71,16 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
     expect(dates).toEqual(['2025-12-20', '2026-01-10']);
   });
 
+  it('名字裡有「出」字不會被截斷', async () => {
+    const blob = await generateDocxBlob({
+      child: { name: '林出華', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries: [{ indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: 'x' }],
+    });
+    expect((await parseDocxImport(blob)).child.name).toBe('林出華');
+  });
+
   it('跨年度實施時間：只有隔年月份紀錄的指標，年份算在隔年', async () => {
     const entries = [
       { indicatorCode: 'Ⅳ-1-1', date: '2025-10-01', status: 'developed', note: '十月' },

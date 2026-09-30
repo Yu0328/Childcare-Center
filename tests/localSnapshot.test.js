@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readLocalSnapshot, applyRemoteRecord, deleteLocalByUid, adoptUid } from '../src/sync/localSnapshot.js';
 import { addChild, addForm, listChildren, listFormsForChild, clearAllData } from '../src/storage/db.js';
-import { runRequest } from '../src/storage/dbCore.js';
+import { runRequest, putRecord } from '../src/storage/dbCore.js';
 
 async function clearTombstones() {
   await runRequest('tombstones', 'readwrite', store => store.clear());
@@ -20,6 +20,23 @@ describe('readLocalSnapshot', () => {
     expect(snapshot.records.get(form.uid).hash).toMatch(/^[0-9a-f]{64}$/);
     expect(snapshot.idByUid.get(`children:${child.uid}`)).toBe(child.id);
     expect(snapshot.uidById.get(`children:${child.id}`)).toBe(child.uid);
+  });
+
+  it('沒改過的記錄重讀快照時不重算雜湊（每 2 分鐘的同步才不會把全部資料重算一遍）；改過的會重算', async () => {
+    const child = await addChild({ name: '測試童', birthDate: '2024-01-01' });
+    await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年06月' });
+    const first = await readLocalSnapshot();
+
+    const digest = vi.spyOn(crypto.subtle, 'digest');
+    const second = await readLocalSnapshot();
+    expect(digest).not.toHaveBeenCalled();
+    expect(second.records.get(child.uid).hash).toBe(first.records.get(child.uid).hash);
+
+    await putRecord('children', { ...child, name: '改名' });
+    const third = await readLocalSnapshot();
+    expect(digest).toHaveBeenCalledTimes(1);
+    expect(third.records.get(child.uid).hash).not.toBe(first.records.get(child.uid).hash);
+    digest.mockRestore();
   });
 
   it('替升級前就存在、沒有 uid 的舊記錄補上 uid，且不把 updatedAt 設成現在', async () => {

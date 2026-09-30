@@ -1,5 +1,5 @@
 import { runRequest, newUid } from '../storage/dbCore.js';
-import { SYNC_STORES, serializeRecord, deserializeRecord, hashPayload, PHOTO_STORE } from './syncStores.js';
+import { SYNC_STORES, serializeRecord, deserializeRecord, hashPayload, startHashGeneration, PHOTO_STORE } from './syncStores.js';
 
 // Stores whose list views sort by createdAt (added after these stores already existed) rather
 // than local id — id is a per-device autoIncrement, so it drifts out of creation order the moment
@@ -23,6 +23,7 @@ function rawPut(storeName, record) {
 }
 
 export async function readLocalSnapshot() {
+  startHashGeneration();
   const records = new Map();
   const uidById = new Map();
   const idByUid = new Map();

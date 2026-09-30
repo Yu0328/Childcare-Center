@@ -223,6 +223,22 @@ describe('renderCoursePlanTab', () => {
     expect(editForm.hidden).toBe(true);
   });
 
+  it('指標不屬於本階段時，只改活動名稱儲存，指標維持原樣', async () => {
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-5-4', activityName: '舊活動', indicatorText: '' });
+    const container = document.createElement('div');
+    let changed = false;
+    await renderCoursePlanTab(container, { report, onChange: () => { changed = true; } });
+
+    container.querySelector(`[data-edit-entry="${entry.id}"]`).click();
+    expect(container.querySelector(`[data-entry-edit-field="indicatorCode"][data-entry-id="${entry.id}"]`).value).toBe('Ⅳ-5-4');
+    container.querySelector(`[data-entry-edit-field="activityName"][data-entry-id="${entry.id}"]`).value = '新活動';
+    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).click();
+
+    await waitFor(() => changed);
+    const [updated] = await listCoursePlanEntriesForReport(report.id);
+    expect(updated).toMatchObject({ indicatorCode: 'Ⅳ-5-4', activityName: '新活動' });
+  });
+
   it('editing a course occurrence: shows a pre-filled form, saves via updateCourseOccurrence, and triggers onChange', async () => {
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' });
     const occurrence = await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: false, note: '小安畫得很開心' });

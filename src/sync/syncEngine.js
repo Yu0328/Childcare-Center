@@ -246,7 +246,15 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     const photoResult = await syncPhotos({ drive, folderId, snapshot, cloudPhotos, state, cloudNow, concurrency });
 
     const needsReview = [...snapshot.records.values()].filter(entry => entry.record.needsReview).length;
-    const textFailed = [...fetched, ...mergeFetched, ...uploaded].some(result => !result.ok);
+    const textResults = [...fetched, ...mergeFetched, ...uploaded];
+    const textFailed = textResults.some(result => !result.ok);
+
+    // The worker pools report each failure instead of throwing, so a token that ran out partway
+    // through a batch showed up here as a plain failure — "同步失敗，稍後會自動重試", which never
+    // succeeds on its own. Surface it as the sign-in problem it is.
+    if (photoResult.authExpired || textResults.some(result => result.error instanceof AuthExpiredError)) {
+      throw new AuthExpiredError('AUTH_EXPIRED');
+    }
 
     return setStatus({
       phase: 'done',

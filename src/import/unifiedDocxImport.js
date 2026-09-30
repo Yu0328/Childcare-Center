@@ -30,8 +30,13 @@ export async function detectDocxImportType(file) {
   const flatText = flatJoinedText([documentXml, ...headerXmls].join('\n'));
 
   // 點滴分享／行為觀察 are section headers parentReportDocxExport.js always emits — unique to
-  // this document type, so check first regardless of the other two's own markers.
-  if (/點滴分享|行為觀察/.test(flatText)) return 'parent-report';
+  // this document type, so check first regardless of the other two's own markers. Only as a
+  // paragraph of their own: a 總表 note can mention either word mid-sentence. (Every real
+  // 適性紀錄 sample has 點滴分享 as a standalone paragraph; not every one has 行為觀察.)
+  const paragraphTexts = [documentXml, ...headerXmls].flatMap(xml =>
+    [...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)].map(match => flatJoinedText(match[0]).trim())
+  );
+  if (paragraphTexts.some(text => /^(點滴分享|行為觀察)[：:]?$/.test(text))) return 'parent-report';
 
   // Reuses monthlyPlanDocxImport.js's own period-detection (header-or-body search, plus its
   // tolerance for a real legacy file's "...課程計" title typo missing the trailing 畫) instead
