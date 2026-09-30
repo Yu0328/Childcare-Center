@@ -25,6 +25,7 @@ import {
   HEADER_ICON_EMU,
   EMU_PER_PIXEL,
   textParagraph,
+  textParagraphs,
   emptyParagraph,
   headerIconRunAt,
   toRocDate,
@@ -276,7 +277,7 @@ function bodyRow(indicator, row, { isFirstRowOfDomain, isFirstRowOfIndicator }) 
       new TableCell({
         width: cellWidth(5),
         verticalAlign: VerticalAlign.CENTER,
-        children: [textParagraph(formatNoteCell(row), { color: rowTextColor(row) })],
+        children: textParagraphs(formatNoteCell(row), { color: rowTextColor(row) }),
       }),
     ],
   });
@@ -305,7 +306,7 @@ function remarkRow(row, isFirstRow) {
       new TableCell({ width: cellWidth(2), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.code, CENTERED)] }),
       new TableCell({ width: cellWidth(3), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(row.description)] }),
       new TableCell({ width: cellWidth(4), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatDateCell(row), { ...CENTERED, color: rowTextColor(row) })] }),
-      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: [textParagraph(formatNoteCell(row), { color: rowTextColor(row) })] }),
+      new TableCell({ width: cellWidth(5), verticalAlign: VerticalAlign.CENTER, children: textParagraphs(formatNoteCell(row), { color: rowTextColor(row) }) }),
     ],
   });
 }

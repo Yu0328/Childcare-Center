@@ -1,10 +1,12 @@
 import JSZip from 'jszip';
 import { getIndicator, normalizeIndicatorCode, unresolvedIndicatorWarning } from '../data/indicators.js';
 
+// One line per paragraph: a typed multi-line note is exported one paragraph per line (see
+// docxShared.js textParagraphs), and a legacy multi-paragraph note shouldn't run together either.
 function cellText(cellXml) {
-  return [...cellXml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
-    .map(match => match[1])
-    .join('')
+  return [...cellXml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)]
+    .map(p => [...p[0].matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map(match => match[1]).join('').trim())
+    .join('\n')
     .trim();
 }
 

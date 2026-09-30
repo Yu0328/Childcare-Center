@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
 import { generateParentReportDocxBlob } from '../src/export/parentReportDocxExport.js';
 import { parseParentReportDocxImport } from '../src/import/parentReportDocxImport.js';
+import { generateDocxBlob } from '../src/export/docxExport.js';
+import { parseDocxImport } from '../src/import/docxImport.js';
+import { getIndicatorsForTier } from '../src/data/indicators.js';
 
 // Word shows a raw \n inside <w:t> as a space, so a typed line break must become its own
 // paragraph (the real sample files' own convention) and come back as \n on re-import.
@@ -70,5 +73,38 @@ describe('適性紀錄 line breaks', () => {
     expect(entry.occurrences[1].absent).toBe(true);
     expect(data.developmentRecordBlocks.map(b => b.narrative)).toEqual(['第一段\n第二段']);
     expect(data.behaviorObservations.map(o => o.narrative)).toEqual(['觀察一\n觀察二']);
+  });
+});
+
+describe('總表 line breaks', () => {
+  function exportForm() {
+    return generateDocxBlob({
+      child: { name: '陳小安', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries: [
+        { indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: '敘述一\n敘述二' },
+        { indicatorCode: 'Ⅳ-1-2', date: '2026-01-08', status: 'absent', note: '請假原因\n補充' },
+      ],
+      previousTierEntries: [{ indicatorCode: 'Ⅲ-1-1', date: '2025-12-01', status: 'developing', note: '備註一\n備註二' }],
+    });
+  }
+
+  it('writes each typed line as its own paragraph, a flagged note red on every line', async () => {
+    const xml = await documentXmlOf(await exportForm());
+    expectNoRawNewlineInText(xml);
+    for (const line of ['敘述一', '敘述二', '補充', '備註一', '備註二']) {
+      expect(xml).toMatch(new RegExp(`<w:t[^>]*>${line}</w:t>`));
+    }
+    const flaggedSecondLine = /<w:r>(?:(?!<w:r>)[\s\S])*?<w:t[^>]*>補充<\/w:t>/.exec(xml)[0];
+    expect(flaggedSecondLine).toMatch(/<w:color w:val="C00000"\/>/); // 總表's red, not 適性紀錄's FF0000
+  });
+
+  it('reads every line back on re-import', async () => {
+    const { entries } = await parseDocxImport(await bytesOf(await exportForm()));
+    const notesByCode = Object.fromEntries(entries.map(e => [e.indicatorCode, e.note]));
+    expect(notesByCode['Ⅳ-1-1']).toBe('敘述一\n敘述二');
+    expect(notesByCode['Ⅳ-1-2']).toBe('請假原因\n補充');
+    expect(notesByCode['Ⅲ-1-1']).toBe('備註一\n備註二');
   });
 });
