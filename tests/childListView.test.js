@@ -222,6 +222,7 @@ describe('renderChildListView', () => {
 
     await waitFor(() => container.textContent.includes('無法讀取'));
     expect(container.textContent).toContain('壞檔案.docx');
+    expect(container.textContent).toContain('檔案可能已損壞');
     expect(container.textContent).toContain('幼兒列表');
   });
 

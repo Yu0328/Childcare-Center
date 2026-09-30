@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import {
   addParentReport, addCoursePlanEntry, addCourseOccurrence, addDevelopmentRecordEntry, listDevelopmentRecordEntriesForReport,
@@ -169,6 +169,19 @@ describe('renderDevelopmentRecordTab', () => {
 
     container.querySelector(`[data-delete-record="${record.id}"]`).click();
     await waitFor(() => changed);
+  });
+
+  it('刪除失敗時顯示錯誤訊息', async () => {
+    const record = await addDevelopmentRecordEntry({ reportId: report.id, domain: 1, courseEntryIds: [entry.id], narrative: 'x' });
+    const dbModule = await import('../src/storage/parentReportDb.js');
+    vi.spyOn(dbModule, 'deleteDevelopmentRecordEntry').mockRejectedValueOnce(new Error('Database error'));
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, confirmDelete: () => true });
+
+    container.querySelector(`[data-delete-record="${record.id}"]`).click();
+
+    await waitFor(() => document.body.textContent.includes('刪除失敗，請再試一次'));
+    vi.restoreAllMocks();
   });
 
   it('keeps the development record entry when deletion is not confirmed', async () => {

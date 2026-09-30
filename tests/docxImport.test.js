@@ -71,6 +71,45 @@ describe('parseDocxImport (round-trip against our own generateDocxBlob)', () => 
     expect(dates).toEqual(['2025-12-20', '2026-01-10']);
   });
 
+  it('跨年度實施時間：只有隔年月份紀錄的指標，年份算在隔年', async () => {
+    const entries = [
+      { indicatorCode: 'Ⅳ-1-1', date: '2025-10-01', status: 'developed', note: '十月' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-02-05', status: 'developed', note: '二月' },
+      { indicatorCode: 'Ⅳ-1-2', date: '2026-01-10', status: 'developed', note: '只有一月' },
+    ];
+
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '114年09月-115年02月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries,
+    });
+    const parsed = await parseDocxImport(blob);
+
+    expect(parsed.entries.filter(e => e.indicatorCode === 'Ⅳ-1-1').map(e => e.date)).toEqual(['2025-10-01', '2026-02-05']);
+    expect(parsed.entries.find(e => e.indicatorCode === 'Ⅳ-1-2').date).toBe('2026-01-10');
+  });
+
+  it('事後補登的較早日期，匯出時照日期排序，重新匯入年份不會被推錯', async () => {
+    const entries = [
+      { indicatorCode: 'Ⅳ-1-1', date: '2026-01-10', status: 'developed', note: '先登的一月' },
+      { indicatorCode: 'Ⅳ-1-1', date: '2025-12-20', status: 'developed', note: '補登的十二月' },
+    ];
+
+    const blob = await generateDocxBlob({
+      child: { name: '測試寶寶', birthDate: '2024-11-01' },
+      form: { tier: 'Ⅳ', period: '114年12月-115年01月' },
+      indicators: getIndicatorsForTier('Ⅳ'),
+      entries,
+    });
+    const parsed = await parseDocxImport(blob);
+
+    expect(parsed.entries.filter(e => e.indicatorCode === 'Ⅳ-1-1').map(e => [e.date, e.note])).toEqual([
+      ['2025-12-20', '補登的十二月'],
+      ['2026-01-10', '先登的一月'],
+    ]);
+  });
+
   it('25個月以上的總表大多是 Ⅶ（延伸活動）代碼時，整份仍判斷為 Ⅵ，每筆都歸 Ⅵ', async () => {
     const indicators = getIndicatorsForTier('Ⅵ');
     const entries = ['Ⅵ-1-1', 'Ⅶ-1-1', 'Ⅶ-1-2', 'Ⅶ-3-1'].map((indicatorCode, i) => ({

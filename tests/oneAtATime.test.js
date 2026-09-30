@@ -54,11 +54,13 @@ describe('oneAtATime', () => {
     expect(button.disabled).toBe(true);
   });
 
-  it('lets the action run again after a failed attempt', async () => {
+  it('shows an error message on an unhandled failure and lets the action run again', async () => {
     const button = document.createElement('button');
     const handler = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce();
     const run = oneAtATime(handler);
-    await expect(run({ type: 'click', currentTarget: button })).rejects.toThrow('boom');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await run({ type: 'click', currentTarget: button });
+    expect(document.body.textContent).toContain('操作失敗，請再試一次');
     await run({ type: 'click', currentTarget: button });
     expect(handler).toHaveBeenCalledTimes(2);
     expect(button.disabled).toBe(false);

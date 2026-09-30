@@ -208,7 +208,7 @@ function parseBodyRows(documentXml) {
 // That assumption only holds *within one indicator's own entries* (rows are grouped by indicator,
 // so indicator B's first entry can easily have an earlier month than indicator A's last entry
 // without any year having passed) — so the month/year tracking is scoped per indicator code.
-function resolveEntryDates(rawEntries, periodYear, periodEnd) {
+function resolveEntryDates(rawEntries, periodYear, periodStartMonth, periodEnd) {
   const currentYearByIndicator = new Map();
   const lastMonthByIndicator = new Map();
 
@@ -225,7 +225,10 @@ function resolveEntryDates(rawEntries, periodYear, periodEnd) {
       return { indicatorCode, date, status, note, description: indicator ? indicator.description : null, tier: null, activityName, isRemark };
     }
 
-    let currentYear = currentYearByIndicator.get(indicatorCode) ?? periodYear;
+    // An indicator's first entry in a period spanning a new year ("114年09月-115年02月"): a month
+    // before the start month can only be in the following year.
+    const firstEntryYear = periodEnd.year > periodYear && month < periodStartMonth ? periodYear + 1 : periodYear;
+    let currentYear = currentYearByIndicator.get(indicatorCode) ?? firstEntryYear;
     const lastMonth = lastMonthByIndicator.get(indicatorCode) ?? null;
 
     if (lastMonth !== null && month < lastMonth) currentYear += 1;
@@ -266,15 +269,15 @@ export async function parseDocxImport(data) {
   if (!tier) warnings.push('無法從檔案中判斷月齡階段，請手動選擇');
   if (!headerInfo.period) warnings.push('無法從檔案中判斷紀錄年月，日期年份可能不準確，請確認每一筆日期');
 
-  const periodYear = headerInfo.period
-    ? Number(/^(\d+)年/.exec(headerInfo.period)[1]) + 1911
-    : new Date().getFullYear();
+  const periodStartMatch = /^(\d+)年(\d+)月/.exec(headerInfo.period ?? '');
+  const periodYear = periodStartMatch ? Number(periodStartMatch[1]) + 1911 : new Date().getFullYear();
+  const periodStartMonth = periodStartMatch ? Number(periodStartMatch[2]) : 1;
   // A range period's end ("114年08月-115年04月" → 115年04月); a single month is its own end.
   const periodEndMatch = /(\d+)年(\d+)月$/.exec(headerInfo.period ?? '');
   const periodEnd = periodEndMatch
     ? { year: Number(periodEndMatch[1]) + 1911, month: Number(periodEndMatch[2]) }
     : { year: periodYear, month: 12 };
-  const entries = resolveEntryDates(rawEntries, periodYear, periodEnd);
+  const entries = resolveEntryDates(rawEntries, periodYear, periodStartMonth, periodEnd);
 
   const unresolvedCodes = [...new Set(entries.filter(entry => !entry.description && !entry.isRemark).map(entry => entry.indicatorCode))];
   if (unresolvedCodes.length > 0) {

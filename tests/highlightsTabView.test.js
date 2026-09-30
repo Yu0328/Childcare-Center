@@ -125,6 +125,19 @@ describe('renderHighlightsTab', () => {
     await waitFor(() => changed);
   });
 
+  it('刪除失敗時顯示錯誤訊息', async () => {
+    const entry = await addHighlightEntry({ reportId: report.id, photos: [{ blob: new Blob(['a']), width: 10, height: 10 }], caption: 'x' });
+    const dbModule = await import('../src/storage/parentReportDb.js');
+    vi.spyOn(dbModule, 'deleteHighlightEntry').mockRejectedValueOnce(new Error('Database error'));
+    const container = document.createElement('div');
+    await renderHighlightsTab(container, { report, onChange: () => {}, confirmDelete: () => true });
+
+    container.querySelector(`[data-delete-highlight="${entry.id}"]`).click();
+
+    await waitFor(() => document.body.textContent.includes('刪除失敗，請再試一次'));
+    vi.restoreAllMocks();
+  });
+
   it('keeps the highlight entry when deletion is not confirmed', async () => {
     const entry = await addHighlightEntry({
       reportId: report.id, photos: [{ blob: new Blob(['a']), width: 10, height: 10 }], caption: 'x',

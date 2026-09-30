@@ -10,6 +10,13 @@ import { showToast } from './toast.js';
 // happens (see toast.js) — the screen jumps straight to the next file's preview (or back to the
 // list, on the last file), so a summary shown only at the very end would be too late for anyone
 // to connect it back to which confirm click it was for.
+// Says why a file was skipped, so the teacher knows what to do about it.
+function skipReason(file, err) {
+  if (/\.doc$/i.test(file.name)) return '舊版 .doc 檔，請用 Word 另存為 .docx 再匯入';
+  if (err?.message === '無法辨識檔案類型') return '看不出是哪一種表單';
+  return '檔案可能已損壞，或不是 Word 的 .docx 檔';
+}
+
 export async function processImportQueue(files, { parseFn, renderPreview, container, backToList }) {
   const queue = Array.from(files);
   const skipped = [];
@@ -29,7 +36,7 @@ export async function processImportQueue(files, { parseFn, renderPreview, contai
     try {
       parsed = await parseFn(file);
     } catch (err) {
-      skipped.push(file.name);
+      skipped.push(`${file.name}（${skipReason(file, err)}）`);
       await next(index + 1);
       return;
     }
