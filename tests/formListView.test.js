@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllData, addChild, addForm, addEntry } from '../src/storage/db.js';
+import { clearAllData, addChild, addForm, addEntry, listFormsForChild } from '../src/storage/db.js';
 import { renderFormListView } from '../src/ui/formListView.js';
 import { waitFor } from './helpers.js';
 
@@ -56,6 +56,19 @@ describe('renderFormListView', () => {
 
     const tierSelect = container.querySelector('[data-field="tier"]');
     expect(tierSelect.value).not.toBe('');
+  });
+
+  it('a double click on 新增 adds the form once', async () => {
+    const container = document.createElement('div');
+    await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {} });
+
+    const form = container.querySelector('[data-action="add-form"]');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(async () => (await listFormsForChild(child.id)).length > 0);
+    await new Promise(resolve => setTimeout(resolve, 50)); // let a (wrongly) second save land too
+
+    expect(await listFormsForChild(child.id)).toHaveLength(1);
   });
 
   it('allows overriding the tier and creates a second form for the same tier', async () => {

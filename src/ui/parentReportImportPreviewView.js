@@ -9,6 +9,7 @@ import { toRocDate } from '../export/docxShared.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
+import { oneAtATime } from './oneAtATime.js';
 
 const BIRTH_DATE_FIELDS = { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' };
 
@@ -125,7 +126,7 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
   container.querySelector('[data-action="cancel"]').addEventListener('click', onCancel);
   wireBirthDateSelects(container, BIRTH_DATE_FIELDS);
 
-  container.querySelector('[data-action="confirm-import"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="confirm-import"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-error]');
 
@@ -193,5 +194,5 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
     } catch (err) {
       errorEl.textContent = `匯入失敗，請再試一次（${err?.message || err}）`;
     }
-  });
+  }));
 }

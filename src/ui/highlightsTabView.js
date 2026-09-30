@@ -6,6 +6,7 @@ import {
 import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
+import { oneAtATime } from './oneAtATime.js';
 
 function savedThumbHtml(photo, i, entryId) {
   if (!photo) return '<span class="highlight-thumb highlight-thumb--empty"></span>';
@@ -148,7 +149,7 @@ export async function renderHighlightsTab(
     });
   }
 
-  container.querySelector('[data-action="add-highlight"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-highlight"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-action="add-highlight"] [data-error]');
     const caption = container.querySelector('[data-field="caption"]').value;
@@ -163,10 +164,10 @@ export async function renderHighlightsTab(
     } catch (err) {
       errorEl.textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   for (const entry of entries) {
-    container.querySelector(`[data-delete-highlight="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-highlight="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除這則點滴分享（「${entry.caption}」）嗎？此操作無法復原。`)) return;
       try {
         await deleteHighlightEntry(entry.id);
@@ -174,7 +175,7 @@ export async function renderHighlightsTab(
       } catch (err) {
         // Non-fatal: entry stays visible; the teacher can retry the delete.
       }
-    });
+    }));
 
     container.querySelector(`[data-edit-highlight="${entry.id}"]`).addEventListener('click', () => {
       const form = container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`);
@@ -185,7 +186,7 @@ export async function renderHighlightsTab(
       container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`).hidden = true;
     });
 
-    container.querySelector(`[data-highlight-edit-save-for="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-highlight-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const caption = container.querySelector(`[data-highlight-edit-field="caption"][data-highlight-id="${entry.id}"]`).value;
       try {
         await updateHighlightEntry(entry.id, { caption });
@@ -193,12 +194,12 @@ export async function renderHighlightsTab(
       } catch (err) {
         container.querySelector(`[data-highlight-edit-form-for="${entry.id}"] [data-error]`).textContent = '更新失敗，請再試一次';
       }
-    });
+    }));
 
     entry.photos.forEach((photo, i) => {
       const btn = container.querySelector(`[data-remove-saved-photo="${entry.id}"][data-photo-index="${i}"]`);
       if (!btn) return;
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', oneAtATime(async () => {
         const nextPhotos = entry.photos.filter((_, idx) => idx !== i);
         try {
           await updateHighlightEntry(entry.id, { photos: nextPhotos });
@@ -208,7 +209,7 @@ export async function renderHighlightsTab(
             Object.assign(document.createElement('p'), { className: 'field-error', textContent: '移除照片失敗，請再試一次' })
           );
         }
-      });
+      }));
     });
   }
 }

@@ -7,6 +7,7 @@ import { renderDevelopmentRecordTab } from './developmentRecordTabView.js';
 import { renderBehaviorObservationTab } from './behaviorObservationTabView.js';
 import { renderHighlightsTab } from './highlightsTabView.js';
 import { keepScroll } from './keepScroll.js';
+import { oneAtATime } from './oneAtATime.js';
 
 const TABS = [
   { key: 'coursePlan', label: '課程計畫表', render: renderCoursePlanTab },
@@ -58,7 +59,7 @@ export async function renderParentReportEditorView(container, { child, report, o
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
-  container.querySelector('[data-action="export"]').addEventListener('click', async () => {
+  container.querySelector('[data-action="export"]').addEventListener('click', oneAtATime(async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
       const blob = await exportReport(child, report);
@@ -67,7 +68,7 @@ export async function renderParentReportEditorView(container, { child, report, o
     } catch (err) {
       if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
-  });
+  }));
 
   for (const tab of TABS) {
     container.querySelector(`[data-tab="${tab.key}"]`).addEventListener('click', () => {

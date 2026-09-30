@@ -3,6 +3,7 @@ import { listFormsForChild } from '../storage/db.js';
 import { planCoursePlanAggregation, applyCoursePlanAggregation } from '../domain/aggregateCoursePlan.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
+import { oneAtATime } from './oneAtATime.js';
 
 function unresolvedListHtml(unresolved) {
   if (unresolved.length === 0) return '';
@@ -132,10 +133,10 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
     container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
     if (previewPlan) {
-      container.querySelector('[data-action="confirm-aggregate"]').addEventListener('click', async () => {
+      container.querySelector('[data-action="confirm-aggregate"]').addEventListener('click', oneAtATime(async () => {
         const { form } = await applyCoursePlanAggregation(previewPlan);
         onCreated(form);
-      });
+      }));
       container.querySelector('[data-action="cancel-preview"]').addEventListener('click', () => {
         previewPlan = null;
         render();
@@ -164,7 +165,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
       });
     });
 
-    container.querySelector('[data-action="aggregate"]').addEventListener('submit', async event => {
+    container.querySelector('[data-action="aggregate"]').addEventListener('submit', oneAtATime(async event => {
       event.preventDefault();
       const errorEl = container.querySelector('[data-action="aggregate"] [data-error]');
       const reportIds = tierReports
@@ -199,7 +200,7 @@ export async function renderAggregateCoursePlanView(container, { child, onCreate
       } catch (err) {
         errorEl.textContent = '建立失敗，請再試一次';
       }
-    });
+    }));
   }
 
   render();

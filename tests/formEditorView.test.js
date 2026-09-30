@@ -112,6 +112,23 @@ describe('renderFormEditorView', () => {
     expect(container.textContent).toContain('可以來回穩定行走');
   });
 
+  it('a double click on 儲存 adds the entry once', async () => {
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    container.querySelector('[data-add-entry-for="Ⅳ-1-1"]').click();
+    container.querySelector('[data-entry-field="date"][data-indicator-code="Ⅳ-1-1"]').value = '2026-01-07';
+    container.querySelector('[data-entry-field="note"][data-indicator-code="Ⅳ-1-1"]').value = '連點';
+    const save = container.querySelector('[data-entry-save-for="Ⅳ-1-1"]');
+    save.click();
+    save.disabled = false; // jsdom drops clicks on a disabled button; force the second one through
+    save.click();
+    await waitFor(() => container.textContent.includes('連點'));
+    await new Promise(resolve => setTimeout(resolve, 50)); // let a (wrongly) second save land too
+
+    expect(await listEntriesForForm(form.id)).toHaveLength(1);
+  });
+
   it('adds a new entry with 發展中△ status when that radio is selected, and shows the △ mark', async () => {
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} });

@@ -7,6 +7,7 @@ import { headerButtonLabel } from './headerButtonLabel.js';
 import { keepScroll } from './keepScroll.js';
 import { nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
+import { oneAtATime } from './oneAtATime.js';
 
 function statusRadios(id, { fieldAttr, idAttr, checkedStatus }) {
   return `
@@ -294,7 +295,7 @@ export async function renderFormEditorView(
     });
   }
 
-  container.querySelector('[data-action="export"]').addEventListener('click', async () => {
+  container.querySelector('[data-action="export"]').addEventListener('click', oneAtATime(async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
       const freshEntries = await listEntriesForForm(form.id);
@@ -308,14 +309,14 @@ export async function renderFormEditorView(
     } catch (err) {
       if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
-  });
+  }));
 
   container.querySelector('[data-action="add-remark"]').addEventListener('click', () => {
     const remarkForm = container.querySelector('[data-remark-form]');
     remarkForm.hidden = !remarkForm.hidden;
   });
 
-  container.querySelector('[data-action="save-remark"]').addEventListener('click', async () => {
+  container.querySelector('[data-action="save-remark"]').addEventListener('click', oneAtATime(async () => {
     const errorEl = container.querySelector('[data-remark-form] [data-error]');
     const code = container.querySelector('[data-remark-field="code"]').value;
     const activityName = container.querySelector('[data-remark-field="activityName"]').value;
@@ -330,10 +331,10 @@ export async function renderFormEditorView(
     } catch (err) {
       if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   for (const entry of remarks.filter(r => r.isLocal)) {
-    container.querySelector(`[data-delete-remark="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-remark="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除這筆備註嗎？此操作無法復原。`)) return;
       try {
         await deleteEntry(entry.id);
@@ -342,7 +343,7 @@ export async function renderFormEditorView(
         const errorEl = container.querySelector('[data-remark-form] [data-error]');
         if (errorEl) errorEl.textContent = '刪除失敗，請再試一次';
       }
-    });
+    }));
 
     container.querySelector(`[data-edit-remark="${entry.id}"]`).addEventListener('click', () => {
       const editForm = container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`);
@@ -353,7 +354,7 @@ export async function renderFormEditorView(
       container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`).hidden = true;
     });
 
-    container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const code = container.querySelector(`[data-remark-edit-field="code"][data-remark-id="${entry.id}"]`).value;
       const activityName = container.querySelector(`[data-remark-edit-field="activityName"][data-remark-id="${entry.id}"]`).value;
       const date = container.querySelector(`[data-remark-edit-field="date"][data-remark-id="${entry.id}"]`).value;
@@ -368,7 +369,7 @@ export async function renderFormEditorView(
         const errorEl = container.querySelector(`[data-remark-edit-form-for="${entry.id}"] [data-error]`);
         if (errorEl) errorEl.textContent = '更新失敗，請再試一次';
       }
-    });
+    }));
   }
 
   for (const indicator of indicators) {
@@ -377,7 +378,7 @@ export async function renderFormEditorView(
       container.querySelector(`[data-entry-form-for="${indicator.code}"]`)
     );
 
-    container.querySelector(`[data-entry-save-for="${indicator.code}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-entry-save-for="${indicator.code}"]`).addEventListener('click', oneAtATime(async () => {
       const date = container.querySelector(`[data-entry-field="date"][data-indicator-code="${indicator.code}"]`).value;
       const radios = container.querySelectorAll(`input[name="status-${escapeHtml(indicator.code)}"]`);
       const statusInput = Array.from(radios).find(r => r.checked);
@@ -391,13 +392,13 @@ export async function renderFormEditorView(
         const errorEl = entryForm.querySelector('[data-error]');
         if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
       }
-    });
+    }));
   }
 
   // Only this tier's own entries got an indicator block rendered above — a remark (previous-tier,
   // or an unresolved-code entry left on this form by 彙整) has no delete/edit buttons to wire.
   for (const entry of ownEntries) {
-    container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${entry.indicatorCode} ${entry.date}」這筆觀察紀錄嗎？此操作無法復原。`)) return;
       try {
         await deleteEntry(entry.id);
@@ -413,7 +414,7 @@ export async function renderFormEditorView(
         }
         errorEl.textContent = '刪除失敗，請再試一次';
       }
-    });
+    }));
 
     container.querySelector(`[data-edit-entry="${entry.id}"]`).addEventListener('click', () => {
       const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
@@ -424,7 +425,7 @@ export async function renderFormEditorView(
       container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`).hidden = true;
     });
 
-    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const date = container.querySelector(`[data-entry-edit-field="date"][data-entry-id="${entry.id}"]`).value;
       const radios = container.querySelectorAll(`input[name="status-${escapeHtml(entry.id)}"]`);
       const statusInput = Array.from(radios).find(r => r.checked);
@@ -437,6 +438,6 @@ export async function renderFormEditorView(
         const errorEl = container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`);
         if (errorEl) errorEl.textContent = '更新失敗，請再試一次';
       }
-    });
+    }));
   }
 }

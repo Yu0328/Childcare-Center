@@ -6,6 +6,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod } from './periodFields.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
+import { oneAtATime } from './oneAtATime.js';
 
 const NEW_CHILD_VALUE = '__new__';
 
@@ -122,7 +123,7 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
   container.querySelector('[data-action="confirm-import"]').addEventListener('input', clearInvalid);
   container.querySelector('[data-action="confirm-import"]').addEventListener('change', clearInvalid);
 
-  container.querySelector('[data-action="confirm-import"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="confirm-import"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-error]');
 
@@ -229,5 +230,5 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
     } catch (err) {
       errorEl.textContent = `匯入失敗，請再試一次（${err?.message || err}）`;
     }
-  });
+  }));
 }

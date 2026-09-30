@@ -1,5 +1,6 @@
 import { isOffline } from '../sync/googleAuth.js';
 import { escapeHtml } from './escapeHtml.js';
+import { oneAtATime } from './oneAtATime.js';
 
 export function greetingFor(date) {
   const hour = date.getHours();
@@ -68,7 +69,7 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
       </div>
     `;
     slot.querySelector('[data-action="sync-sign-out"]').addEventListener('click', onSignOut);
-    slot.querySelector('[data-action="sync-now"]').addEventListener('click', () => onSyncNow && onSyncNow());
+    slot.querySelector('[data-action="sync-now"]').addEventListener('click', oneAtATime(async () => onSyncNow && onSyncNow()));
   } else {
     // Guest mode has no cloud copy of its own, so the local export/import backup buttons — pointless
     // once Google sync covers that — live here instead, folded into one 備份 menu so greeting,
@@ -91,7 +92,7 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
         <span class="sync-header__status" data-sync-status></span>
       </div>
     `;
-    slot.querySelector('[data-action="sync-sign-in"]').addEventListener('click', async () => {
+    slot.querySelector('[data-action="sync-sign-in"]').addEventListener('click', oneAtATime(async () => {
       const el = slot.querySelector('[data-sync-status]');
       if (isOffline()) {
         el.textContent = '目前離線，暫時無法登入';
@@ -105,7 +106,7 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
       } catch {
         el.textContent = '登入未完成，請再試一次';
       }
-    });
+    }));
   }
 
   const statusEl = slot.querySelector('[data-sync-status]');

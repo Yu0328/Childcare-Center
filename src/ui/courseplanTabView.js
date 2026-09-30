@@ -7,6 +7,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { toRocDate } from '../export/docxShared.js';
 import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
+import { oneAtATime } from './oneAtATime.js';
 
 // Which domain <details> cards are open persists across renders keyed by report.id, since
 // renderCoursePlanTab's own `container` is a brand-new, empty element on every call — its parent
@@ -271,7 +272,7 @@ export async function renderCoursePlanTab(
     container.querySelector('[data-field="indicatorText"]').value = indicator.description;
   });
 
-  container.querySelector('[data-action="add-entry"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-entry"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const indicatorCode = container.querySelector('[data-field="indicatorCode"]').value;
     const activityName = container.querySelector('[data-field="activityName"]').value;
@@ -295,7 +296,7 @@ export async function renderCoursePlanTab(
     } catch (err) {
       container.querySelector('[data-action="add-entry"] [data-error]').textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   wireAbsentCourseChangedExclusion(
     container.querySelector('[data-field="occurrenceAbsent"]'),
@@ -313,7 +314,7 @@ export async function renderCoursePlanTab(
   });
 
   for (const entry of entries) {
-    container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-entry="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${entry.indicatorCode} 【${entry.activityName}】」這個課程計畫項目嗎？此操作無法復原。`)) return;
       try {
         await deleteCoursePlanEntry(entry.id);
@@ -323,7 +324,7 @@ export async function renderCoursePlanTab(
           Object.assign(document.createElement('p'), { className: 'field-error', textContent: '刪除失敗，請再試一次' })
         );
       }
-    });
+    }));
 
     container.querySelector(`[data-edit-entry="${entry.id}"]`).addEventListener('click', () => {
       const form = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
@@ -334,7 +335,7 @@ export async function renderCoursePlanTab(
       container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`).hidden = true;
     });
 
-    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const indicatorCode = container.querySelector(`[data-entry-edit-field="indicatorCode"][data-entry-id="${entry.id}"]`).value;
       const activityName = container.querySelector(`[data-entry-edit-field="activityName"][data-entry-id="${entry.id}"]`).value;
       const indicatorText = container.querySelector(`[data-entry-edit-field="indicatorText"][data-entry-id="${entry.id}"]`).value;
@@ -344,7 +345,7 @@ export async function renderCoursePlanTab(
       } catch (err) {
         container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`).textContent = '更新失敗，請再試一次';
       }
-    });
+    }));
 
     wireNestedEntryForm(
       container.querySelector(`[data-add-occurrence-for="${entry.id}"]`),
@@ -357,7 +358,7 @@ export async function renderCoursePlanTab(
       container.querySelectorAll(`[data-occurrence-field="status"][data-entry-id="${entry.id}"]`)
     );
 
-    container.querySelector(`[data-occurrence-save-for="${entry.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-occurrence-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const date = container.querySelector(`[data-occurrence-field="date"][data-entry-id="${entry.id}"]`).value;
       const absent = container.querySelector(`[data-occurrence-field="absent"][data-entry-id="${entry.id}"]`).checked;
       const courseChanged = container.querySelector(`[data-occurrence-field="courseChanged"][data-entry-id="${entry.id}"]`).checked;
@@ -370,10 +371,10 @@ export async function renderCoursePlanTab(
       } catch (err) {
         container.querySelector(`[data-occurrence-form-for="${entry.id}"] [data-error]`).textContent = '新增失敗，請再試一次';
       }
-    });
+    }));
 
     for (const occurrence of occurrencesByEntryId[entry.id] || []) {
-      container.querySelector(`[data-delete-occurrence="${occurrence.id}"]`).addEventListener('click', async () => {
+      container.querySelector(`[data-delete-occurrence="${occurrence.id}"]`).addEventListener('click', oneAtATime(async () => {
         if (!confirmDelete(`確定要刪除「${occurrence.date}」這筆實施紀錄嗎？此操作無法復原。`)) return;
         try {
           await deleteCourseOccurrence(occurrence.id);
@@ -383,7 +384,7 @@ export async function renderCoursePlanTab(
             Object.assign(document.createElement('p'), { className: 'field-error', textContent: '刪除失敗，請再試一次' })
           );
         }
-      });
+      }));
 
       container.querySelector(`[data-edit-occurrence="${occurrence.id}"]`).addEventListener('click', () => {
         const form = container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"]`);
@@ -400,7 +401,7 @@ export async function renderCoursePlanTab(
         container.querySelectorAll(`[data-occurrence-edit-field="status"][data-occurrence-id="${occurrence.id}"]`)
       );
 
-      container.querySelector(`[data-occurrence-edit-save-for="${occurrence.id}"]`).addEventListener('click', async () => {
+      container.querySelector(`[data-occurrence-edit-save-for="${occurrence.id}"]`).addEventListener('click', oneAtATime(async () => {
         const date = container.querySelector(`[data-occurrence-edit-field="date"][data-occurrence-id="${occurrence.id}"]`).value;
         const absent = container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`).checked;
         const courseChanged = container.querySelector(`[data-occurrence-edit-field="courseChanged"][data-occurrence-id="${occurrence.id}"]`).checked;
@@ -413,7 +414,7 @@ export async function renderCoursePlanTab(
         } catch (err) {
           container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"] [data-error]`).textContent = '更新失敗，請再試一次';
         }
-      });
+      }));
     }
   }
 }

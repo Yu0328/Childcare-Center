@@ -5,6 +5,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { birthDateSelectsHtml, wireBirthDateSelects, parseBirthDateSelects } from './birthDateField.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { currentRocYear, periodSelectsHtml, parsePeriod, combinedPeriod, splitPeriodRange } from './periodFields.js';
+import { oneAtATime } from './oneAtATime.js';
 
 const BIRTH_DATE_FIELDS = { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' };
 
@@ -110,7 +111,7 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
     container.querySelector('[data-field-group="period-end"]').hidden = !event.target.checked;
   });
 
-  container.querySelector('[data-action="confirm-import"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="confirm-import"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-error]');
 
@@ -169,5 +170,5 @@ export function renderImportPreviewView(container, { parsed, onCancel, onImporte
     } catch (err) {
       errorEl.textContent = `匯入失敗，請再試一次（${err?.message || err}）`;
     }
-  });
+  }));
 }

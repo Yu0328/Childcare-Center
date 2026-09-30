@@ -7,6 +7,7 @@ import { currentRocYear, periodSelectsHtml, combinedPeriod } from './periodField
 import { wireScrollShade } from './scrollShade.js';
 import { keepScroll } from './keepScroll.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { oneAtATime } from './oneAtATime.js';
 
 export async function renderFormListView(
   container,
@@ -100,7 +101,7 @@ export async function renderFormListView(
   }
 
   for (const form of forms) {
-    container.querySelector(`[data-delete-form="${form.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-form="${form.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${form.tier} ${form.period}」這份適性總表嗎？此操作無法復原。`)) return;
       try {
         await deleteForm(form.id);
@@ -108,10 +109,10 @@ export async function renderFormListView(
       } catch (err) {
         container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
       }
-    });
+    }));
   }
 
-  container.querySelector('[data-action="add-form"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-form"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const tier = container.querySelector('[data-field="tier"]').value;
     const year = container.querySelector('[data-field="period-year"]').value;
@@ -138,5 +139,5 @@ export async function renderFormListView(
       }
       errorEl.textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 }

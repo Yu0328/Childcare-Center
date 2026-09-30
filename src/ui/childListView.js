@@ -13,6 +13,7 @@ import { calculateAgeInMonths, todayIsoDate } from '../domain/ageTier.js';
 import { toRocDate } from '../export/docxShared.js';
 import { wireScrollShade } from './scrollShade.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { oneAtATime } from './oneAtATime.js';
 
 export async function renderChildListView(
   container,
@@ -106,7 +107,7 @@ export async function renderChildListView(
   }
 
   for (const child of children) {
-    container.querySelector(`[data-delete-child="${child.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-child="${child.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${child.name}」的所有資料嗎？此操作無法復原。`)) return;
       try {
         await deleteChild(child.id);
@@ -114,10 +115,10 @@ export async function renderChildListView(
       } catch (err) {
         container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
       }
-    });
+    }));
   }
 
-  container.querySelector('[data-action="add-child"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-child"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const name = container.querySelector('[data-field="name"]').value;
     const birthDate = parseBirthDateSelects(container, { yearFieldName: 'birthDate-year', monthFieldName: 'birthDate-month', dayFieldName: 'birthDate-day' });
@@ -147,7 +148,7 @@ export async function renderChildListView(
       }
       errorEl.textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   if (onSelectChild && isParentReport) {
     const fileInput = container.querySelector('[data-field="import-parent-report-file"]');

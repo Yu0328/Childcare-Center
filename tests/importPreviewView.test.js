@@ -60,6 +60,23 @@ describe('renderImportPreviewView', () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
+  it('a double click on 確認匯入 imports the file once', async () => {
+    const container = document.createElement('div');
+    let imported = 0;
+    renderImportPreviewView(container, { parsed: baseParsed(), onCancel: () => {}, onImported: () => { imported++; } });
+
+    const form = container.querySelector('[data-action="confirm-import"]');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported > 0);
+    await new Promise(resolve => setTimeout(resolve, 50)); // let a (wrongly) second save land too
+
+    const children = await listChildren();
+    expect(children).toHaveLength(1);
+    expect(await listFormsForChild(children[0].id)).toHaveLength(1);
+    expect(await listEntriesForForm((await listFormsForChild(children[0].id))[0].id)).toHaveLength(2);
+  });
+
   it('creates the child, form, and all entries on confirm', async () => {
     const container = document.createElement('div');
     let imported = false;

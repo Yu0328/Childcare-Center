@@ -6,6 +6,7 @@ import {
 import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
+import { oneAtATime } from './oneAtATime.js';
 
 // "Ⅳ-2-4" -> 4 (the item number within its domain) — see courseplanTabView.js's identical helper
 // for why: sorts the reference checkboxes in the indicator picker's own order regardless of the
@@ -194,7 +195,7 @@ export async function renderDevelopmentRecordTab(
     });
   });
 
-  container.querySelector('[data-action="add-record"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-record"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const domain = Number(container.querySelector('[data-field="domain"]').value);
     const narrative = container.querySelector('[data-field="narrative"]').value;
@@ -207,10 +208,10 @@ export async function renderDevelopmentRecordTab(
     } catch (err) {
       container.querySelector('[data-action="add-record"] [data-error]').textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   for (const record of records) {
-    container.querySelector(`[data-delete-record="${record.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-record="${record.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${recordLabel(record)}」這段適性發展紀錄嗎？此操作無法復原。`)) return;
       try {
         await deleteDevelopmentRecordEntry(record.id);
@@ -218,7 +219,7 @@ export async function renderDevelopmentRecordTab(
       } catch (err) {
         // Non-fatal: entry stays visible; the teacher can retry the delete.
       }
-    });
+    }));
 
     container.querySelector(`[data-edit-record="${record.id}"]`).addEventListener('click', () => {
       renderDevelopmentRecordTab(container, {
@@ -250,7 +251,7 @@ export async function renderDevelopmentRecordTab(
         renderDevelopmentRecordTab(container, { report, onChange, selectedDomain, editingRecordId: null, confirmDelete });
       });
 
-      container.querySelector(`[data-record-edit-save-for="${record.id}"]`).addEventListener('click', async () => {
+      container.querySelector(`[data-record-edit-save-for="${record.id}"]`).addEventListener('click', oneAtATime(async () => {
         const domain = Number(container.querySelector(`[data-record-edit-field="domain"][data-record-id="${record.id}"]`).value);
         const narrative = container.querySelector(`[data-record-edit-field="narrative"][data-record-id="${record.id}"]`).value;
         const courseEntryIds = editEntries
@@ -262,7 +263,7 @@ export async function renderDevelopmentRecordTab(
         } catch (err) {
           container.querySelector(`[data-record-edit-form-for="${record.id}"] [data-error]`).textContent = '更新失敗，請再試一次';
         }
-      });
+      }));
     }
   }
 }

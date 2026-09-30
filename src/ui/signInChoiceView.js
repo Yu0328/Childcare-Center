@@ -1,4 +1,5 @@
 import { readSyncMode, writeSyncMode, isOffline } from '../sync/googleAuth.js';
+import { oneAtATime } from './oneAtATime.js';
 
 export function needsSignInChoice() {
   return readSyncMode() === null;
@@ -57,7 +58,7 @@ export function renderSignInChoiceView(container, { onGoogle, onGuest }) {
   const googleButton = container.querySelector('[data-action="sign-in-google"]');
   const errorEl = container.querySelector('[data-error]');
 
-  googleButton.addEventListener('click', async () => {
+  googleButton.addEventListener('click', oneAtATime(async () => {
     if (isOffline()) {
       errorEl.textContent = '目前離線，暫時無法登入';
       return;
@@ -71,7 +72,7 @@ export function renderSignInChoiceView(container, { onGoogle, onGuest }) {
     } finally {
       googleButton.disabled = false;
     }
-  });
+  }));
 
   container.querySelector('[data-action="continue-guest"]').addEventListener('click', () => {
     writeSyncMode('guest');

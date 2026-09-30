@@ -12,6 +12,7 @@ import { renderMonthlyPlanImportPreviewView } from './monthlyPlanImportPreviewVi
 import { wireScrollShade } from './scrollShade.js';
 import { keepScroll } from './keepScroll.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { oneAtATime } from './oneAtATime.js';
 
 export async function renderMonthlyPlanListView(
   container,
@@ -95,7 +96,7 @@ export async function renderMonthlyPlanListView(
 
   for (const plan of plans) {
     container.querySelector(`[data-plan-id="${plan.id}"]`).addEventListener('click', () => onSelectPlan(plan));
-    container.querySelector(`[data-delete-plan="${plan.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-plan="${plan.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${plan.period}」這份課程月計畫嗎？此操作無法復原。`)) return;
       try {
         await deleteMonthlyCoursePlan(plan.id);
@@ -103,10 +104,10 @@ export async function renderMonthlyPlanListView(
       } catch (err) {
         container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
       }
-    });
+    }));
   }
 
-  container.querySelector('[data-action="add-plan"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-plan"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const errorEl = container.querySelector('[data-action="add-plan"] [data-error]');
     errorEl.textContent = '';
@@ -143,7 +144,7 @@ export async function renderMonthlyPlanListView(
     } catch (err) {
       errorEl.textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   const importFileInput = container.querySelector('[data-field="import-monthly-plan-file"]');
   container.querySelector('[data-action="import-monthly-plan-docx"]').addEventListener('click', () => importFileInput.click());

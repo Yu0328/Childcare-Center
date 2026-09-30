@@ -14,6 +14,7 @@ import { headerButtonLabel } from './headerButtonLabel.js';
 import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, wireFabDrag, lockBodyScroll, unlockBodyScroll } from './formPopup.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 import { downloadBlob } from '../export/downloadBlob.js';
+import { oneAtATime } from './oneAtATime.js';
 
 // Loads everything the render pass needs in one pass: the plan's still-existing children (a
 // child deleted elsewhere after being added to this plan is silently skipped rather than
@@ -275,7 +276,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     });
   }
 
-  container.querySelector('[data-action="export-docx"]').addEventListener('click', async () => {
+  container.querySelector('[data-action="export-docx"]').addEventListener('click', oneAtATime(async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
       const blob = await generateMonthlyPlanDocxBlob({
@@ -287,9 +288,9 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     } catch (err) {
       if (errorEl) errorEl.textContent = `匯出失敗，請再試一次（${err?.message || err}）`;
     }
-  });
+  }));
 
-  container.querySelector('[data-action="save-children"]').addEventListener('click', async () => {
+  container.querySelector('[data-action="save-children"]').addEventListener('click', oneAtATime(async () => {
     try {
       const allChildren = await listChildren();
       const newChildIds = allChildren.filter(c => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`).checked).map(c => c.id);
@@ -321,7 +322,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
     } catch (err) {
       container.querySelector('[data-error="manage-children"]').textContent = '更新失敗，請再試一次';
     }
-  });
+  }));
 
   // Reselecting the cell already open (via the FAB reopening it, or a repeated double-tap) skips
   // the panel re-render, so any unsaved typed input in the add-item form survives — only a genuine
@@ -480,7 +481,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       panelItems.querySelector('[data-field="new-item-indicator-text"]').value = indicator.description;
     });
 
-    panelItems.querySelector('[data-action="add-item"]').addEventListener('submit', async event => {
+    panelItems.querySelector('[data-action="add-item"]').addEventListener('submit', oneAtATime(async event => {
       event.preventDefault();
       const indicatorCode = panelItems.querySelector('[data-field="new-item-indicator"]').value || null;
       const activityName = panelItems.querySelector('[data-field="new-item-activity-name"]').value;
@@ -498,7 +499,7 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       } catch (err) {
         panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = '新增失敗，請再試一次';
       }
-    });
+    }));
 
     for (const item of items) {
       panelItems.querySelector(`[data-edit-item="${item.id}"]`).addEventListener('click', () => {
@@ -508,16 +509,16 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       panelItems.querySelector(`[data-item-edit-cancel-for="${item.id}"]`).addEventListener('click', () => {
         panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`).hidden = true;
       });
-      panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', async () => {
+      panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
         const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value;
         const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${item.id}"]`).value;
         await updatePlanSlotItem(item.id, { activityName, indicatorText });
         await refreshCellAndPanel();
-      });
-      panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener('click', async () => {
+      }));
+      panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
         await deletePlanSlotItem(item.id);
         await refreshCellAndPanel();
-      });
+      }));
 
       const notAchievedBox = panelItems.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
       const replacedBox = panelItems.querySelector(`[data-override-field="replaced"][data-item-id="${item.id}"]`);

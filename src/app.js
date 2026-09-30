@@ -11,6 +11,7 @@ import { exportBackup, importBackup, importHugeBackupFile, HUGE_IMPORT_THRESHOLD
 import { downloadBlob } from './export/downloadBlob.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 import { todayIsoDate } from './domain/ageTier.js';
+import { oneAtATime } from './ui/oneAtATime.js';
 
 const RENDER_FAILED_MESSAGE = '載入失敗，請重新整理頁面';
 const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
@@ -241,7 +242,7 @@ export function wireBackupControls({
     progressContainer.querySelector('[data-progress="backup"]')?.remove();
   }
 
-  exportButton.addEventListener('click', async () => {
+  exportButton.addEventListener('click', oneAtATime(async () => {
     if (!isUnlocked()) return; // belt-and-suspenders: the button should already be disabled
     try {
       const parts = await exportBackup(showProgress);
@@ -256,7 +257,7 @@ export function wireBackupControls({
     } finally {
       hideProgress();
     }
-  });
+  }));
 
   importInput.addEventListener('change', async () => {
     const file = importInput.files[0];

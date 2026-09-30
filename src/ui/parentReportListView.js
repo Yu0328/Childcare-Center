@@ -7,6 +7,7 @@ import { headerButtonLabel } from './headerButtonLabel.js';
 import { wireScrollShade } from './scrollShade.js';
 import { keepScroll } from './keepScroll.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { oneAtATime } from './oneAtATime.js';
 
 export async function renderParentReportListView(
   container,
@@ -79,7 +80,7 @@ export async function renderParentReportListView(
   }
 
   for (const report of reports) {
-    container.querySelector(`[data-delete-report="${report.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-report="${report.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${report.tier} ${report.period}」這份適性紀錄嗎？此操作無法復原。`)) return;
       try {
         await deleteParentReport(report.id);
@@ -87,10 +88,10 @@ export async function renderParentReportListView(
       } catch (err) {
         container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
       }
-    });
+    }));
   }
 
-  container.querySelector('[data-action="add-report"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-report"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const tier = container.querySelector('[data-field="tier"]').value;
     const year = container.querySelector('[data-field="period-year"]').value;
@@ -110,5 +111,5 @@ export async function renderParentReportListView(
       }
       errorEl.textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 }

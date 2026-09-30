@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { clearAllData, addChild } from '../src/storage/db.js';
+import { clearAllData, addChild, listChildren } from '../src/storage/db.js';
 import { renderChildListView } from '../src/ui/childListView.js';
 import { generateDocxBlob } from '../src/export/docxExport.js';
 import { generateParentReportDocxBlob } from '../src/export/parentReportDocxExport.js';
@@ -112,6 +112,21 @@ describe('renderChildListView', () => {
     await waitFor(() => container.textContent.includes('林小晴'));
 
     expect(container.textContent).toContain('林小晴');
+  });
+
+  it('a double click on 新增 adds the child once', async () => {
+    const container = document.createElement('div');
+    await renderChildListView(container, { onSelectChild: () => {} });
+
+    container.querySelector('[data-field="name"]').value = '林小晴';
+    setBirthDate(container, '2024-07-19');
+    const form = container.querySelector('[data-action="add-child"]');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => container.textContent.includes('林小晴'));
+    await new Promise(resolve => setTimeout(resolve, 50)); // let a (wrongly) second save land too
+
+    expect(await listChildren()).toHaveLength(1);
   });
 
   it('calls onSelectChild with the clicked child', async () => {

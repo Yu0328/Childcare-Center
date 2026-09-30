@@ -4,6 +4,7 @@ import {
 import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
+import { oneAtATime } from './oneAtATime.js';
 
 function observationHeading(observation) {
   return observation.title ? `行為觀察－${observation.title}` : '行為觀察';
@@ -61,7 +62,7 @@ export async function renderBehaviorObservationTab(
   wireFormPopup(container);
   wireRowClickEdit(container);
 
-  container.querySelector('[data-action="add-observation"]').addEventListener('submit', async event => {
+  container.querySelector('[data-action="add-observation"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const title = container.querySelector('[data-field="title"]').value;
     const narrative = container.querySelector('[data-field="narrative"]').value;
@@ -71,10 +72,10 @@ export async function renderBehaviorObservationTab(
     } catch (err) {
       container.querySelector('[data-action="add-observation"] [data-error]').textContent = '新增失敗，請再試一次';
     }
-  });
+  }));
 
   for (const observation of observations) {
-    container.querySelector(`[data-delete-observation="${observation.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-delete-observation="${observation.id}"]`).addEventListener('click', oneAtATime(async () => {
       if (!confirmDelete(`確定要刪除「${observationHeading(observation)}」嗎？此操作無法復原。`)) return;
       try {
         await deleteBehaviorObservation(observation.id);
@@ -82,7 +83,7 @@ export async function renderBehaviorObservationTab(
       } catch (err) {
         // Non-fatal: entry stays visible; the teacher can retry the delete.
       }
-    });
+    }));
 
     container.querySelector(`[data-edit-observation="${observation.id}"]`).addEventListener('click', () => {
       const form = container.querySelector(`[data-observation-edit-form-for="${observation.id}"]`);
@@ -93,7 +94,7 @@ export async function renderBehaviorObservationTab(
       container.querySelector(`[data-observation-edit-form-for="${observation.id}"]`).hidden = true;
     });
 
-    container.querySelector(`[data-observation-edit-save-for="${observation.id}"]`).addEventListener('click', async () => {
+    container.querySelector(`[data-observation-edit-save-for="${observation.id}"]`).addEventListener('click', oneAtATime(async () => {
       const title = container.querySelector(`[data-observation-edit-field="title"][data-observation-id="${observation.id}"]`).value;
       const narrative = container.querySelector(`[data-observation-edit-field="narrative"][data-observation-id="${observation.id}"]`).value;
       try {
@@ -102,6 +103,6 @@ export async function renderBehaviorObservationTab(
       } catch (err) {
         container.querySelector(`[data-observation-edit-form-for="${observation.id}"] [data-error]`).textContent = '更新失敗，請再試一次';
       }
-    });
+    }));
   }
 }
