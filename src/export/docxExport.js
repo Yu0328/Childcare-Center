@@ -101,7 +101,11 @@ export function buildIndicatorRowGroups(indicators, entriesByIndicatorCode) {
   let previousDomainLabel = null;
 
   return indicators.map(indicator => {
-    const entries = entriesByIndicatorCode[indicator.code] || [];
+    // The editor lists entries in the order they were typed; the printed form (and re-import's
+    // month-rollover year inference) needs them by date, so a backfilled earlier date goes first.
+    const entries = [...(entriesByIndicatorCode[indicator.code] || [])].sort((a, b) =>
+      (a.date || '9999').localeCompare(b.date || '9999')
+    );
 
     const rows =
       entries.length === 0

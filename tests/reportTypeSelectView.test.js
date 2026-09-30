@@ -112,6 +112,19 @@ describe('renderReportTypeSelectView', () => {
       return container;
     }
 
+    it('匯入結束回到首頁後，管理幼兒按鈕仍然有作用', async () => {
+      const container = document.createElement('div');
+      let called = false;
+      await renderReportTypeSelectView(container, { onSelectType: () => {}, onManageChildren: () => { called = true; } });
+      selectFile(container.querySelector('[data-field="import-any-file"]'), await buildAssessmentFile());
+      await waitFor(() => container.textContent.includes('確認匯入內容（適性總表）'));
+      container.querySelector('[data-action="cancel"]').click();
+      await waitFor(() => container.querySelector('[data-action="manage-children"]'));
+
+      container.querySelector('[data-action="manage-children"]').click();
+      expect(called).toBe(true);
+    });
+
     it('opens the assessment (適性總表) preview for an assessment file', async () => {
       const container = await renderView();
       selectFile(container.querySelector('[data-field="import-any-file"]'), await buildAssessmentFile());
@@ -148,6 +161,7 @@ describe('renderReportTypeSelectView', () => {
       selectFile(container.querySelector('[data-field="import-any-file"]'), await buildUnrecognizedFile());
 
       await waitFor(() => container.querySelector('[data-error="import"]')?.textContent.includes('random.docx'));
+      expect(container.querySelector('[data-error="import"]').textContent).toContain('看不出是哪一種表單');
       expect(container.querySelector('.type-select')).not.toBeNull();
     });
 

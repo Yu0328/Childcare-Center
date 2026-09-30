@@ -1,3 +1,4 @@
+import { showToast } from './toast.js';
 import { DOMAINS, getIndicator } from '../data/indicators.js';
 import {
   listCoursePlanEntriesForReport, listCourseOccurrencesForEntry, addDevelopmentRecordEntry,
@@ -217,7 +218,8 @@ export async function renderDevelopmentRecordTab(
         await deleteDevelopmentRecordEntry(record.id);
         onChange();
       } catch (err) {
-        // Non-fatal: entry stays visible; the teacher can retry the delete.
+        // The entry stays visible; say so rather than looking like a dead button.
+        showToast('刪除失敗，請再試一次');
       }
     }));
 

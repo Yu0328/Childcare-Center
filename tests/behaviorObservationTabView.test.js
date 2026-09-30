@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import { addParentReport, addBehaviorObservation, listBehaviorObservationsForReport } from '../src/storage/parentReportDb.js';
 import { renderBehaviorObservationTab } from '../src/ui/behaviorObservationTabView.js';
@@ -68,6 +68,19 @@ describe('renderBehaviorObservationTab', () => {
 
     container.querySelector(`[data-delete-observation="${observation.id}"]`).click();
     await waitFor(() => changed);
+  });
+
+  it('刪除失敗時顯示錯誤訊息', async () => {
+    const observation = await addBehaviorObservation({ reportId: report.id, title: 'x', narrative: 'y' });
+    const dbModule = await import('../src/storage/parentReportDb.js');
+    vi.spyOn(dbModule, 'deleteBehaviorObservation').mockRejectedValueOnce(new Error('Database error'));
+    const container = document.createElement('div');
+    await renderBehaviorObservationTab(container, { report, onChange: () => {}, confirmDelete: () => true });
+
+    container.querySelector(`[data-delete-observation="${observation.id}"]`).click();
+
+    await waitFor(() => document.body.textContent.includes('刪除失敗，請再試一次'));
+    vi.restoreAllMocks();
   });
 
   it('keeps the observation when deletion is not confirmed', async () => {

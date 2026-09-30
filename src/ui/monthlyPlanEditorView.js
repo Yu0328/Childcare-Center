@@ -1,3 +1,4 @@
+import { showToast } from './toast.js';
 import { getChild, listChildren } from '../storage/db.js';
 import {
   listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
@@ -525,15 +526,20 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
       const replacementInput = panelItems.querySelector(`[data-override-field="replacementText"][data-item-id="${item.id}"]`);
 
       async function saveOverride() {
-        await setChildItemOverride({
-          planId: plan.id,
-          childId: child.id,
-          itemId: item.id,
-          notAchieved: notAchievedBox.checked,
-          replaced: replacedBox.checked,
-          replacementText: replacementInput.value,
-        });
-        await refreshCellAndPanel();
+        try {
+          await setChildItemOverride({
+            planId: plan.id,
+            childId: child.id,
+            itemId: item.id,
+            notAchieved: notAchievedBox.checked,
+            replaced: replacedBox.checked,
+            replacementText: replacementInput.value,
+          });
+          await refreshCellAndPanel();
+        } catch (err) {
+          console.error(err);
+          showToast('儲存失敗，請再試一次');
+        }
       }
 
       notAchievedBox.addEventListener('change', saveOverride);

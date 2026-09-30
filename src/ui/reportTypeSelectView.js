@@ -86,7 +86,7 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
       renderPreview: (container, { parsed: { type, parsed }, onCancel, onImported }) =>
         IMPORT_PREVIEW_BY_TYPE[type](container, { parsed, onCancel, onImported }),
       container,
-      backToList: () => renderReportTypeSelectView(container, { onSelectType }),
+      backToList: () => renderReportTypeSelectView(container, { onSelectType, onManageChildren }),
     });
   });
 }
