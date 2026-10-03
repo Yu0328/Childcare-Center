@@ -78,6 +78,12 @@ describe('renderFormEditorView', () => {
     expect(container.textContent).toContain('可以來回穩定行走');
   });
 
+  it('新增觀察紀錄的日期預設在這份總表的月份（不是今天的月份）', async () => {
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} }); // 115年01月, today is later
+    expect(container.querySelector('[data-entry-field="date"][data-indicator-code="Ⅳ-1-1"]').value).toBe('2026-01-01');
+  });
+
   it('日期顯示成民國年，○ 和 △ 用不同顏色的標記', async () => {
     await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'developed', note: 'a' });
     await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-2', date: '2026-01-08', status: 'developing', note: 'b' });

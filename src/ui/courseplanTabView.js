@@ -1,3 +1,4 @@
+import { defaultDateInPeriod, periodDateBounds } from './periodFields.js';
 import { DOMAINS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
 import {
   addCoursePlanEntry, listCoursePlanEntriesForReport, deleteCoursePlanEntry, updateCoursePlanEntry,
@@ -90,7 +91,7 @@ function occurrenceRow(occurrence) {
   `;
 }
 
-function entryCard(entry, indicator, occurrences, tier) {
+function entryCard(entry, indicator, occurrences, tier, period) {
   return `
     <div class="indicator-block" data-click-edit data-course-entry="${escapeHtml(entry.id)}">
       <h4 class="indicator-block__title">
@@ -118,7 +119,7 @@ function entryCard(entry, indicator, occurrences, tier) {
       <button type="button" class="btn btn--outline btn--small" data-add-occurrence-for="${escapeHtml(entry.id)}">＋ 新增實施紀錄</button>
       ${nestedEntryFormDialog(`
         <div class="entry-form" data-occurrence-form-for="${escapeHtml(entry.id)}">
-          <label class="entry-form__field">日期 <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}"></label>
+          <label class="entry-form__field">日期 <input type="date" data-occurrence-field="date" data-entry-id="${escapeHtml(entry.id)}" value="${escapeHtml(defaultDateInPeriod(period))}"></label>
           <div class="entry-form__radio-group">
             <label class="entry-form__radio">
               <input type="radio" name="status-${escapeHtml(entry.id)}" data-occurrence-field="status" data-entry-id="${escapeHtml(entry.id)}" value="developed" checked> <span class="entry-row__mark entry-row__mark--developed">○</span>已發展
@@ -142,6 +143,13 @@ function entryCard(entry, indicator, occurrences, tier) {
       `)}
     </div>
   `;
+}
+
+// Optional here (blank = no first 實施紀錄), so it can't be pre-filled like the other date boxes;
+// limiting it to the report's month is what makes the picker open on that month instead of today's.
+function dateBoundsAttrs(period) {
+  const bounds = periodDateBounds(period);
+  return bounds ? ` min="${bounds.min}" max="${bounds.max}"` : '';
 }
 
 function indicatorOptionsHtml(tier, selectedCode = null) {
@@ -228,7 +236,7 @@ export async function renderCoursePlanTab(
             <label class="panel-form__field">活動名稱 <input data-field="activityName" required value="${escapeHtml(defaultIndicator ? defaultIndicator.activityName : '')}"></label>
             <label class="panel-form__field">能力指標內容 <textarea data-field="indicatorText" rows="3">${escapeHtml(defaultIndicator ? defaultIndicator.description : '')}</textarea></label>
             <div class="panel-form__row">
-              <label class="panel-form__field">日期 <input type="date" data-field="occurrenceDate"></label>
+              <label class="panel-form__field">日期 <input type="date" data-field="occurrenceDate"${dateBoundsAttrs(report.period)}></label>
               <div class="panel-form__field">
                 狀態
                 <div class="entry-form__radio-group">
@@ -258,7 +266,7 @@ export async function renderCoursePlanTab(
               <details class="domain-card" data-domain="${escapeHtml(domainId)}" ${isOpen ? 'open' : ''}>
                 <summary class="domain-card__title">${escapeHtml(domainName)}</summary>
                 <div class="domain-card__body">
-                  ${group.map(({ entry, indicator }) => entryCard(entry, indicator, occurrencesByEntryId[entry.id] || [], report.tier)).join('')}
+                  ${group.map(({ entry, indicator }) => entryCard(entry, indicator, occurrencesByEntryId[entry.id] || [], report.tier, report.period)).join('')}
                 </div>
               </details>
             `;

@@ -137,6 +137,53 @@ describe('renderDevelopmentRecordTab', () => {
     expect(container.textContent).toContain('香蕉鬆餅');
   });
 
+  it('新增面板換領域時只換勾選清單：面板不會被重建（手機彈出視窗才不會關掉、畫面不會跳），已打的敘述保留', async () => {
+    const other = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-2', activityName: '香蕉鬆餅' });
+    const container = document.createElement('div');
+    let changed = false;
+    await renderDevelopmentRecordTab(container, { report, onChange: () => { changed = true; }, selectedDomain: 1 });
+    const form = container.querySelector('[data-action="add-record"]');
+    container.querySelector('[data-field="narrative"]').value = '先打好的敘述';
+
+    container.querySelector('[data-field="domain"]').value = '2';
+    container.querySelector('[data-field="domain"]').dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(container.querySelector('[data-action="add-record"]')).toBe(form);
+    expect(container.querySelector('[data-field="narrative"]').value).toBe('先打好的敘述');
+    container.querySelector(`[data-course-entry-checkbox="${other.id}"]`).checked = true;
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => changed);
+    const [saved] = await listDevelopmentRecordEntriesForReport(report.id);
+    expect(saved).toMatchObject({ domain: 2, courseEntryIds: [other.id], narrative: '先打好的敘述' });
+  });
+
+  it('編輯時換領域：編輯面板留在原地、不會關掉，敘述保留，存檔用新領域勾選的項目', async () => {
+    const other = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-2', activityName: '香蕉鬆餅' });
+    const record = await addDevelopmentRecordEntry({ reportId: report.id, domain: 1, courseEntryIds: [entry.id], narrative: '原本' });
+    const container = document.createElement('div');
+    let changed = false;
+    await renderDevelopmentRecordTab(container, { report, onChange: () => { changed = true; } });
+
+    container.querySelector(`[data-edit-record="${record.id}"]`).click();
+    const editForm = container.querySelector(`[data-record-edit-form-for="${record.id}"]`);
+    expect(editForm.hidden).toBe(false);
+    container.querySelector(`[data-record-edit-field="narrative"][data-record-id="${record.id}"]`).value = '改過的敘述';
+
+    const domainSelect = container.querySelector(`[data-record-edit-field="domain"][data-record-id="${record.id}"]`);
+    domainSelect.value = '2';
+    domainSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(container.querySelector(`[data-record-edit-form-for="${record.id}"]`)).toBe(editForm);
+    expect(editForm.hidden).toBe(false);
+    expect(container.querySelector(`[data-record-edit-field="narrative"][data-record-id="${record.id}"]`).value).toBe('改過的敘述');
+    container.querySelector(`[data-record-edit-entry-checkbox="${other.id}"][data-record-id="${record.id}"]`).checked = true;
+    container.querySelector(`[data-record-edit-save-for="${record.id}"]`).click();
+
+    await waitFor(() => changed);
+    const [saved] = await listDevelopmentRecordEntriesForReport(report.id);
+    expect(saved).toMatchObject({ domain: 2, courseEntryIds: [other.id], narrative: '改過的敘述' });
+  });
+
   it('adds a development record entry referencing the checked course plan entries', async () => {
     const container = document.createElement('div');
     let changed = false;

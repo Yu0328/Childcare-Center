@@ -1,3 +1,4 @@
+import { defaultDateInPeriod } from './periodFields.js';
 import { getIndicatorsForTier, tierFormLabel, previousTier, getIndicator } from '../data/indicators.js';
 import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry, updateForm } from '../storage/db.js';
 import { generateDocxBlob, downloadDocx } from '../export/docxExport.js';
@@ -81,10 +82,10 @@ function entryRow(entry) {
   `;
 }
 
-function indicatorBlock(indicator, entries) {
+function indicatorBlock(indicator, entries, period) {
   const addEntryFormHtml = `
     <div class="entry-form" data-entry-form-for="${escapeHtml(indicator.code)}">
-      <label class="entry-form__field">日期 <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}"></label>
+      <label class="entry-form__field">日期 <input type="date" data-entry-field="date" data-indicator-code="${escapeHtml(indicator.code)}" value="${escapeHtml(defaultDateInPeriod(period))}"></label>
       ${statusRadios(indicator.code, { fieldAttr: 'entry-field', idAttr: 'indicator-code', checkedStatus: 'developed' })}
       <textarea class="entry-form__note" data-entry-field="note" data-indicator-code="${escapeHtml(indicator.code)}" placeholder="觀察敘述"></textarea>
       <div class="entry-form__actions">
@@ -244,7 +245,7 @@ export async function renderFormEditorView(
               <div class="domain-card__body">
                 ${indicators
                   .filter(i => i.domainName === domainName)
-                  .map(indicator => indicatorBlock(indicator, entriesByIndicatorCode[indicator.code] || []))
+                  .map(indicator => indicatorBlock(indicator, entriesByIndicatorCode[indicator.code] || [], form.period))
                   .join('')}
               </div>
             </details>

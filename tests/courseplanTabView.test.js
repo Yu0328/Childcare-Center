@@ -196,6 +196,17 @@ describe('renderCoursePlanTab', () => {
     expect(form.hidden).toBe(true);
   });
 
+  it('新增實施紀錄的日期預設在這份紀錄的月份；新增課程計畫的選填日期留白、只能選這個月', async () => {
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫' });
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} }); // report period 115年06月
+
+    expect(container.querySelector(`[data-occurrence-field="date"][data-entry-id="${entry.id}"]`).value).toBe('2026-06-01');
+    const optional = container.querySelector('[data-field="occurrenceDate"]');
+    expect(optional.value).toBe('');
+    expect([optional.min, optional.max]).toEqual(['2026-06-01', '2026-06-30']);
+  });
+
   it('editing a course plan entry: shows a pre-filled form, saves via updateCoursePlanEntry, and triggers onChange', async () => {
     const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: '我愛畫畫', indicatorText: '能穩定握筆塗鴉' });
 
