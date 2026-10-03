@@ -49,7 +49,7 @@ function recordLabel(record) {
   return narrative.length > 12 ? `${narrative.slice(0, 12)}…` : narrative;
 }
 
-function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDomainEntries, editDomainValue, occurrencesByEntryId }) {
+function existingRecordCard(record, coursePlanEntriesById, { editDomainEntries, occurrencesByEntryId }) {
   const lines = record.courseEntryIds
     .map(id => coursePlanEntriesById.get(id))
     .filter(Boolean)
@@ -60,16 +60,16 @@ function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDoma
     .join('');
 
   const editFormHtml = `
-    <div class="entry-form" data-record-edit-form-for="${escapeHtml(record.id)}" ${isEditing ? '' : 'hidden'}>
+    <div class="entry-form" data-record-edit-form-for="${escapeHtml(record.id)}" hidden>
       <label class="panel-form__field">
         領域
         <select data-record-edit-field="domain" data-record-id="${escapeHtml(record.id)}">
-          ${DOMAINS.map(d => `<option value="${d.id}" ${d.id === editDomainValue ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('')}
+          ${DOMAINS.map(d => `<option value="${d.id}" ${d.id === record.domain ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('')}
         </select>
       </label>
       <fieldset class="panel-form__field">
         <legend>已在課程計畫表填寫的項目（勾選要引用的項目）</legend>
-        ${checkboxListHtml(editDomainEntries, { checkboxAttr: 'record-edit-entry-checkbox', checkedIds: record.courseEntryIds, recordId: record.id, occurrencesByEntryId })}
+        <div data-record-edit-checkboxes>${checkboxListHtml(editDomainEntries, { checkboxAttr: 'record-edit-entry-checkbox', checkedIds: record.courseEntryIds, recordId: record.id, occurrencesByEntryId })}</div>
       </fieldset>
       <label class="panel-form__field">敘述 <textarea data-record-edit-field="narrative" data-record-id="${escapeHtml(record.id)}">${escapeHtml(record.narrative)}</textarea></label>
       <div class="entry-form__actions">
@@ -96,7 +96,7 @@ function existingRecordCard(record, coursePlanEntriesById, { isEditing, editDoma
 export async function renderDevelopmentRecordTab(
   container,
   {
-    report, onChange, selectedDomain = DOMAINS[0].id, editingRecordId = null, editDomain = null,
+    report, onChange, selectedDomain = DOMAINS[0].id,
     confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false),
   }
 ) {
@@ -126,8 +126,6 @@ export async function renderDevelopmentRecordTab(
       })
       .sort((a, b) => indicatorItemNumber(a.indicatorCode) - indicatorItemNumber(b.indicatorCode));
 
-  const domainEntries = entriesByDomainNumber(selectedDomain);
-
   // See courseplanTabView.js's identical block for why reading the container's existing
   // <details> state (before overwriting it) is what lets collapse/expand survive re-renders.
   const previousDomainCards = [...container.querySelectorAll('.domain-card')];
@@ -148,7 +146,7 @@ export async function renderDevelopmentRecordTab(
         </label>
         <fieldset class="panel-form__field">
           <legend>已在課程計畫表填寫的項目（勾選要引用的項目）</legend>
-          <div class="panel-form__checkbox-grid">${checkboxListHtml(domainEntries, { checkboxAttr: 'course-entry-checkbox', occurrencesByEntryId })}</div>
+          <div class="panel-form__checkbox-grid" data-add-checkboxes>${checkboxListHtml(entriesByDomainNumber(selectedDomain), { checkboxAttr: 'course-entry-checkbox', occurrencesByEntryId })}</div>
         </fieldset>
         <label class="panel-form__field">敘述 <textarea data-field="narrative" required></textarea></label>
         <button type="submit" class="btn btn--primary">新增</button>
@@ -167,16 +165,12 @@ export async function renderDevelopmentRecordTab(
                 <div class="domain-card__body">
                   ${byDomain
                     .get(domain.id)
-                    .map(record => {
-                      const isEditing = record.id === editingRecordId;
-                      const domainValue = isEditing && editDomain !== null ? editDomain : record.domain;
-                      return existingRecordCard(record, coursePlanEntriesById, {
-                        isEditing,
-                        editDomainEntries: entriesByDomainNumber(domainValue),
-                        editDomainValue: domainValue,
+                    .map(record =>
+                      existingRecordCard(record, coursePlanEntriesById, {
+                        editDomainEntries: entriesByDomainNumber(record.domain),
                         occurrencesByEntryId,
-                      });
-                    })
+                      })
+                    )
                     .join('')}
                 </div>
               </details>
@@ -190,19 +184,22 @@ export async function renderDevelopmentRecordTab(
   wireFormPopup(container);
   wireRowClickEdit(container);
 
+  // Picking a domain swaps only the checkbox list, in place. Re-rendering the whole tab here used
+  // to close the add popup on a phone (jumping the page to the top) and wipe a half-typed
+  // narrative; same for the edit form's domain picker and its 編輯 toggle below.
   container.querySelector('[data-field="domain"]').addEventListener('change', event => {
-    renderDevelopmentRecordTab(container, {
-      report, onChange, selectedDomain: Number(event.target.value), editingRecordId, editDomain, confirmDelete,
-    });
+    container.querySelector('[data-add-checkboxes]').innerHTML = checkboxListHtml(
+      entriesByDomainNumber(event.target.value), { checkboxAttr: 'course-entry-checkbox', occurrencesByEntryId }
+    );
   });
 
   container.querySelector('[data-action="add-record"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
     const domain = Number(container.querySelector('[data-field="domain"]').value);
     const narrative = container.querySelector('[data-field="narrative"]').value;
-    const courseEntryIds = domainEntries
-      .filter(entry => container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).checked)
-      .map(entry => entry.id);
+    const courseEntryIds = [...container.querySelectorAll('[data-course-entry-checkbox]:checked')]
+      .map(box => coursePlanEntriesById.get(Number(box.dataset.courseEntryCheckbox))?.id)
+      .filter(id => id !== undefined);
     try {
       await addDevelopmentRecordEntry({ reportId: report.id, domain, courseEntryIds, narrative });
       onChange();
@@ -223,49 +220,33 @@ export async function renderDevelopmentRecordTab(
       }
     }));
 
+    const editForm = container.querySelector(`[data-record-edit-form-for="${record.id}"]`);
     container.querySelector(`[data-edit-record="${record.id}"]`).addEventListener('click', () => {
-      renderDevelopmentRecordTab(container, {
-        report,
-        onChange,
-        selectedDomain,
-        editingRecordId: editingRecordId === record.id ? null : record.id,
-        editDomain: null,
-        confirmDelete,
+      editForm.hidden = !editForm.hidden;
+    });
+
+    editForm.querySelector('[data-record-edit-field="domain"]').addEventListener('change', event => {
+      editForm.querySelector('[data-record-edit-checkboxes]').innerHTML = checkboxListHtml(entriesByDomainNumber(event.target.value), {
+        checkboxAttr: 'record-edit-entry-checkbox', checkedIds: record.courseEntryIds, recordId: record.id, occurrencesByEntryId,
       });
     });
 
-    if (record.id === editingRecordId) {
-      const currentEditDomain = editDomain !== null ? editDomain : record.domain;
-      const editEntries = entriesByDomainNumber(currentEditDomain);
+    container.querySelector(`[data-record-edit-cancel-for="${record.id}"]`).addEventListener('click', () => {
+      editForm.hidden = true;
+    });
 
-      container.querySelector(`[data-record-edit-field="domain"][data-record-id="${record.id}"]`).addEventListener('change', event => {
-        renderDevelopmentRecordTab(container, {
-          report,
-          onChange,
-          selectedDomain,
-          editingRecordId,
-          editDomain: Number(event.target.value),
-          confirmDelete,
-        });
-      });
-
-      container.querySelector(`[data-record-edit-cancel-for="${record.id}"]`).addEventListener('click', () => {
-        renderDevelopmentRecordTab(container, { report, onChange, selectedDomain, editingRecordId: null, confirmDelete });
-      });
-
-      container.querySelector(`[data-record-edit-save-for="${record.id}"]`).addEventListener('click', oneAtATime(async () => {
-        const domain = Number(container.querySelector(`[data-record-edit-field="domain"][data-record-id="${record.id}"]`).value);
-        const narrative = container.querySelector(`[data-record-edit-field="narrative"][data-record-id="${record.id}"]`).value;
-        const courseEntryIds = editEntries
-          .filter(entry => container.querySelector(`[data-record-edit-entry-checkbox="${entry.id}"][data-record-id="${record.id}"]`).checked)
-          .map(entry => entry.id);
-        try {
-          await updateDevelopmentRecordEntry(record.id, { domain, courseEntryIds, narrative });
-          onChange();
-        } catch (err) {
-          container.querySelector(`[data-record-edit-form-for="${record.id}"] [data-error]`).textContent = '更新失敗，請再試一次';
-        }
-      }));
-    }
+    container.querySelector(`[data-record-edit-save-for="${record.id}"]`).addEventListener('click', oneAtATime(async () => {
+      const domain = Number(editForm.querySelector('[data-record-edit-field="domain"]').value);
+      const narrative = editForm.querySelector('[data-record-edit-field="narrative"]').value;
+      const courseEntryIds = [...editForm.querySelectorAll('[data-record-edit-entry-checkbox]:checked')]
+        .map(box => coursePlanEntriesById.get(Number(box.dataset.recordEditEntryCheckbox))?.id)
+        .filter(id => id !== undefined);
+      try {
+        await updateDevelopmentRecordEntry(record.id, { domain, courseEntryIds, narrative });
+        onChange();
+      } catch (err) {
+        editForm.querySelector('[data-error]').textContent = '更新失敗，請再試一次';
+      }
+    }));
   }
 }

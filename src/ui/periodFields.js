@@ -1,3 +1,4 @@
+import { todayIsoDate } from '../domain/ageTier.js';
 export const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 
 export function currentRocYear() {
@@ -43,6 +44,31 @@ export function parsePeriod(period) {
   const match = /^(\d{1,3})年(\d{1,2})月$/.exec(String(period ?? '').trim());
   if (!match) return { year: null, month: null };
   return { year: Number(match[1]), month: Number(match[2]) };
+}
+
+function periodMonthIso(period) {
+  const { year, month } = parsePeriod(period);
+  return year === null ? null : `${year + 1911}-${String(month).padStart(2, '0')}`;
+}
+
+// First and last day ("YYYY-MM-DD") of a record's period, or null if it can't be read.
+export function periodDateBounds(period) {
+  const { start, end } = splitPeriodRange(period);
+  const [first, last] = [periodMonthIso(start), periodMonthIso(end)];
+  if (!first || !last) return null;
+  const [year, month] = last.split('-').map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  return { min: `${first}-01`, max: `${last}-${String(lastDay).padStart(2, '0')}` };
+}
+
+// What a new entry's date starts at: today if it falls in the record's period, otherwise the 1st
+// of the period's (last) month — so backfilling October in November doesn't open on November and
+// get saved there by mistake. Empty when the period can't be read (the old blank behavior).
+export function defaultDateInPeriod(period, today = todayIsoDate()) {
+  const bounds = periodDateBounds(period);
+  if (!bounds) return '';
+  if (today >= bounds.min && today <= bounds.max) return today;
+  return `${bounds.max.slice(0, 7)}-01`;
 }
 
 // "114年09月-115年02月" -> { start: "114年09月", end: "115年02月" }; a non-range period returns the
