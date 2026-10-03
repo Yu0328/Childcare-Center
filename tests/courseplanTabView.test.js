@@ -343,3 +343,71 @@ describe('renderCoursePlanTab', () => {
     expect(container.querySelector('.domain-card[data-domain="2"]').open).toBe(true);
   });
 });
+
+describe('renderCoursePlanTab — 套用其他幼兒課程計畫', () => {
+  let report;
+  let other;
+
+  beforeEach(async () => {
+    await clearAllData();
+    const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
+    const otherChild = await addChild({ name: '林小明', birthDate: '2024-07-01' });
+    report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+    other = await addParentReport({ childId: otherChild.id, tier: 'Ⅴ', period: '115年06月' });
+  });
+
+  it('shows the button with full and short labels, picker hidden until clicked', async () => {
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+
+    const toggle = container.querySelector('[data-action="toggle-copy-picker"]');
+    expect(toggle.querySelector('.btn__label-full').textContent).toBe('套用其他幼兒課程計畫');
+    expect(toggle.querySelector('.btn__label-short').textContent).toBe('套用');
+    const picker = container.querySelector('[data-copy-picker]');
+    expect(picker.hidden).toBe(true);
+
+    toggle.click();
+    expect(picker.hidden).toBe(false);
+  });
+
+  it('lists same tier/month children with entry counts, or an empty message', async () => {
+    let container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+    expect(container.querySelector('[data-copy-picker]').textContent).toContain('沒有同年齡層、同月份的其他幼兒課程計畫可以套用');
+
+    await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+    expect(container.querySelector(`[data-copy-from="${other.id}"]`).textContent).toBe('林小明（1 筆）');
+  });
+
+  it('cancelling the confirm changes nothing', async () => {
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-2-1', activityName: '舊活動' });
+    await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    let message = null;
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {}, confirmDelete: m => { message = m; return false; } });
+
+    container.querySelector(`[data-copy-from="${other.id}"]`).click();
+    await waitFor(() => message !== null);
+
+    expect(message).toContain('目前這份的 1 筆課程計畫，會換成「林小明」的 1 筆課程計畫。');
+    expect((await listCoursePlanEntriesForReport(report.id)).map(e => e.activityName)).toEqual(['舊活動']);
+  });
+
+  it('confirming replaces the course plan and re-renders', async () => {
+    await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    let message = null;
+    let changed = false;
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, {
+      report, onChange: () => { changed = true; }, confirmDelete: m => { message = m; return true; },
+    });
+
+    container.querySelector(`[data-copy-from="${other.id}"]`).click();
+    await waitFor(() => changed);
+
+    expect(message).toContain('會套用「林小明」的 1 筆課程計畫。');
+    expect((await listCoursePlanEntriesForReport(report.id)).map(e => e.activityName)).toEqual(['畫畫']);
+  });
+});

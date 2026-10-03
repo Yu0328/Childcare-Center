@@ -8,6 +8,8 @@ import { toRocDate } from '../export/docxShared.js';
 import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
+import { findCopySources, planCoursePlanCopy, copyCoursePlan } from '../domain/copyCoursePlan.js';
 
 // Which domain <details> cards are open persists across renders keyed by report.id, since
 // renderCoursePlanTab's own `container` is a brand-new, empty element on every call — its parent
@@ -161,6 +163,18 @@ function indicatorOptionsHtml(tier, selectedCode = null) {
     .join('');
 }
 
+function copyConfirmMessage({ childName, currentCount, sourceCount, unlinkedRecordCount }) {
+  const lines = [
+    currentCount > 0
+      ? `目前這份的 ${currentCount} 筆課程計畫，會換成「${childName}」的 ${sourceCount} 筆課程計畫。`
+      : `會套用「${childName}」的 ${sourceCount} 筆課程計畫。`,
+    '發展狀況一律先填 ○，請假、更換課程不會套用，請再逐筆確認。',
+  ];
+  if (unlinkedRecordCount > 0) lines.push(`有 ${unlinkedRecordCount} 段發展紀錄的對應課程會被取消勾選。`);
+  lines.push('確定要套用嗎？');
+  return lines.join('\n');
+}
+
 export async function renderCoursePlanTab(
   container,
   { report, onChange, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
@@ -170,6 +184,7 @@ export async function renderCoursePlanTab(
   for (const entry of entries) {
     occurrencesByEntryId[entry.id] = await listCourseOccurrencesForEntry(entry.id);
   }
+  const copySources = await findCopySources(report);
 
   // Keyed by numeric domain id (not insertion order) so rendering below can walk DOMAINS in its
   // canonical Ⅰ~Ⅴ-tier order instead of whatever order entries happen to have been added in.
@@ -206,6 +221,15 @@ export async function renderCoursePlanTab(
   const defaultIndicator = getIndicatorsForTier(report.tier)[0] || null;
 
   container.innerHTML = `
+    <div class="copy-plan">
+      <button type="button" class="btn btn--outline btn--small" data-action="toggle-copy-picker" aria-expanded="false">${headerButtonLabel('套用其他幼兒課程計畫', '套用')}</button>
+      <div class="copy-plan__picker" data-copy-picker hidden>
+        ${copySources.length === 0
+          ? '<p class="copy-plan__empty">沒有同年齡層、同月份的其他幼兒課程計畫可以套用</p>'
+          : copySources.map(source => `<button type="button" class="btn btn--outline btn--small" data-copy-from="${escapeHtml(source.report.id)}">${escapeHtml(source.childName)}（${source.entryCount} 筆）</button>`).join('')}
+      </div>
+      <p class="field-error" data-error="copy"></p>
+    </div>
     <div class="tab-layout">
       ${formPopupMarkup({
         formHtml: `
@@ -260,6 +284,27 @@ export async function renderCoursePlanTab(
 
   wireFormPopup(container);
   wireRowClickEdit(container);
+
+  const copyPicker = container.querySelector('[data-copy-picker]');
+  const copyToggle = container.querySelector('[data-action="toggle-copy-picker"]');
+  copyToggle.addEventListener('click', () => {
+    copyPicker.hidden = !copyPicker.hidden;
+    copyToggle.setAttribute('aria-expanded', String(!copyPicker.hidden));
+  });
+  for (const source of copySources) {
+    container.querySelector(`[data-copy-from="${source.report.id}"]`).addEventListener('click', oneAtATime(async () => {
+      const ids = { targetReportId: report.id, sourceReportId: source.report.id };
+      try {
+        const counts = await planCoursePlanCopy(ids);
+        // confirmDelete is just the tab's injectable confirm(); this replaces (deletes) rows too.
+        if (!confirmDelete(copyConfirmMessage({ childName: source.childName, ...counts }))) return;
+        await copyCoursePlan(ids);
+        onChange();
+      } catch (err) {
+        container.querySelector('[data-error="copy"]').textContent = '套用失敗，請再試一次';
+      }
+    }));
+  }
 
   container.querySelector('[data-field="indicatorCode"]').addEventListener('change', event => {
     const indicator = getIndicator(event.target.value);
