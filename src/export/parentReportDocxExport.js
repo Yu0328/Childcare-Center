@@ -356,11 +356,16 @@ const HIGHLIGHT_COLUMN_WIDTHS = (() => {
   return widths;
 })();
 const DXA_PER_PIXEL = 1440 / 96; // 1 inch = 1440 twips = 96 CSS/OOXML reference pixels
-// Every real 適性紀錄 sample prints 點滴分享 photos about 5.7cm wide (portrait ~5.7×7.6cm, landscape
-// ~5.7×4.3cm) whether an entry has one photo or three.
+// Every photo fits the same box, sized so a full A4 page holds exactly three entries of three
+// photos (nine) — the size asked for, close to the real samples' ~5.7×7.6cm. The arithmetic, from
+// a Word-rendered export: the table body runs from ~2.9cm (below the two-line page header) to the
+// 1.27cm bottom margin, ~25.5cm; each entry is its photo row (photo + ~0.1cm) plus a one-line
+// caption row (~0.55cm). 3 × (H + 0.65) ≤ 25.5 → H ≤ 7.85cm; 7.8 leaves a hair of slack. The
+// width is the 3-photo cell (6.33cm) minus its 0.2cm side margins. A two-line caption pushes the
+// third entry of that page over.
 const PX_PER_CM = 96 / 2.54;
-const PHOTO_MAX_WIDTH_PX = 5.7 * PX_PER_CM;
-const PHOTO_MAX_HEIGHT_PX = 7.6 * PX_PER_CM;
+const PHOTO_MAX_WIDTH_PX = 5.9 * PX_PER_CM;
+const PHOTO_MAX_HEIGHT_PX = 7.8 * PX_PER_CM;
 
 // For an entry with `photoCount` photos (1, 2, or 3), splits the 6-column grid into `photoCount`
 // equal-size groups of adjacent columns and returns each cell's columnSpan plus its width in DXA
@@ -412,6 +417,8 @@ async function highlightPhotoCell(photo, cellWidthDxa, columnSpan) {
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
+        // Keeps this photo row on the same page as the caption row under it.
+        keepNext: true,
         children: [
           new ImageRun({
             type: 'jpg',
