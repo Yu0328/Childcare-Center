@@ -181,7 +181,14 @@ export async function listHighlightEntriesForReport(reportId) {
         await Promise.all(
           entry.photos.map(async (photo, index) => {
             try {
-              return { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) };
+              // storedIndex: where it sits in the stored list, which differs from its position here
+              // once an unreadable photo before it has been dropped — see removeHighlightPhoto.
+              // Non-enumerable, so it never rides along into a backup file or a saved copy.
+              return Object.defineProperty(
+                { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) },
+                'storedIndex',
+                { value: index }
+              );
             } catch (err) {
               console.warn(`點滴分享 #${entry.id} 第 ${index + 1} 張照片讀取失敗，已略過：`, err);
               return null;
@@ -197,6 +204,14 @@ export async function updateHighlightEntry(id, changes) {
   const existing = await runRequest('highlightEntries', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`HighlightEntry ${id} not found`);
   return putRecord('highlightEntries', { ...existing, ...changes, id });
+}
+
+// Removes one photo by its position in the STORED list. Writing back the displayed list instead
+// would also drop every photo that failed to read (hidden from the screen, still in the database).
+export async function removeHighlightPhoto(id, storedIndex) {
+  const existing = await runRequest('highlightEntries', 'readonly', store => store.get(id));
+  if (!existing) throw new Error(`HighlightEntry ${id} not found`);
+  return putRecord('highlightEntries', { ...existing, photos: existing.photos.filter((_, i) => i !== storedIndex), id });
 }
 
 export async function deleteHighlightEntry(id) {

@@ -77,6 +77,33 @@ describe('ensureFolder', () => {
     expect(calls.some(c => c.url.includes(encodeURIComponent(FOLDER_NAME)))).toBe(true);
   });
 
+  it('兩台裝置同時第一次登入、各建了一個資料夾時，都改用最早建立的那個，並丟掉自己剛建的空資料夾', async () => {
+    let folderQueries = 0;
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      url = String(url);
+      const method = options.method || 'GET';
+      calls.push({ url, method, body: options.body });
+      const reply = json => ({ ok: true, status: 200, headers: new Headers(), json: async () => json });
+      if (url.includes(encodeURIComponent(FOLDER_NAME))) {
+        folderQueries += 1;
+        // first look: nothing yet; after creating: the other device's folder was created first
+        return reply({ files: folderQueries === 1 ? [] : [{ id: 'theirs' }, { id: 'mine' }] });
+      }
+      if (url.includes('drive/v3/files?fields=id') && method === 'POST') return reply({ id: 'mine' });
+      if (url.includes('upload/drive/v3/files') && method === 'POST') return reply({ id: 'manifest-mine' });
+      if (url.includes('/files/mine') && method === 'PATCH') return reply({});
+      if (url.includes(encodeURIComponent('sync-manifest.json'))) return reply({ files: [{ id: 'manifest-theirs' }] });
+      if (url.includes('manifest-theirs?alt=media')) return reply({ formatVersion: 1 });
+      throw new Error(`unscripted request: ${method} ${url}`);
+    };
+    const drive = createDriveClient({ auth, fetchImpl });
+
+    expect(await drive.ensureFolder()).toBe('theirs');
+    expect(calls.some(c => c.url.includes('/files/mine') && c.method === 'PATCH' && c.body.includes('"trashed":true'))).toBe(true);
+    expect(calls.filter(c => c.url.includes(encodeURIComponent(FOLDER_NAME))).every(c => c.url.includes('orderBy=createdTime'))).toBe(true);
+  });
+
   it('資料夾存在且守門檔正常時直接回傳 folderId', async () => {
     const { fetchImpl } = scriptedFetch([
       { match: encodeURIComponent(FOLDER_NAME), json: { files: [{ id: 'folder-1' }] } },

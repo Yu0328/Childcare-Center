@@ -130,6 +130,21 @@ describe('renderFormListView', () => {
     expect(container.textContent).not.toContain('115年01月');
   });
 
+  it('刪除總表後畫面停在原來的位置，不跳回最上面', async () => {
+    const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
+    const container = document.createElement('div');
+    await renderFormListView(container, { child, onSelectForm: () => {}, onBack: () => {}, confirmDelete: () => true });
+    window.scrollY = 600;
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+
+    container.querySelector(`[data-delete-form="${form.id}"]`).click();
+
+    await waitFor(() => scrollTo.mock.calls.length > 0);
+    expect(scrollTo).toHaveBeenCalledWith(0, 600);
+    scrollTo.mockRestore();
+    window.scrollY = 0;
+  });
+
   it('keeps the form when deletion is not confirmed', async () => {
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年01月' });
 

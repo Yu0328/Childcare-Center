@@ -329,6 +329,17 @@ export function parseDayCellItems(dateCellXml, contentCellXml) {
   return legacyItems(dateCellXml, contentCellXml);
 }
 
+const WEEKDAY_NAMES = ['一', '二', '三', '四', '五', '六', '日'];
+const itemKey = item => [item.indicatorCode, item.activityName, item.indicatorText].join(' ');
+const sharedFields = ({ indicatorCode, activityName, indicatorText }) => ({ indicatorCode, activityName, indicatorText });
+const ownSlots = child =>
+  child.days.map(day => ({ weekIndex: day.weekIndex, weekday: day.weekday, items: day.items.map(sharedFields) }));
+
+// Same-tier children share one copy of each day's content: the first such child's. Another child's
+// 請假／未達成 marks point at items by position, so on a day whose content differs from that copy
+// (an older hand-made file), each mark is matched to the same item by its content instead —
+// position alone could hang it on the wrong activity. Marks with no matching item are dropped,
+// and every differing day is reported so the preview can warn about it.
 export function buildSlotsAndOverrides(children) {
   const canonicalByTier = new Map();
   for (const child of children) {
@@ -336,37 +347,52 @@ export function buildSlotsAndOverrides(children) {
   }
 
   const slotsByTier = new Map();
-  for (const [tier, canonical] of canonicalByTier) {
-    slotsByTier.set(
-      tier,
-      canonical.days.map(day => ({
-        weekIndex: day.weekIndex,
-        weekday: day.weekday,
-        items: day.items.map(({ indicatorCode, activityName, indicatorText }) => ({ indicatorCode, activityName, indicatorText })),
-      }))
-    );
-  }
+  for (const [tier, canonical] of canonicalByTier) slotsByTier.set(tier, ownSlots(canonical));
 
+  const mismatches = [];
   const childrenWithOverrides = children.map(child => {
+    const canonical = child.tier ? canonicalByTier.get(child.tier) : null;
     const overrides = [];
+    const differingDays = [];
+    let droppedMarks = 0;
     for (const day of child.days) {
-      day.items.forEach((item, itemIndex) => {
-        if (item.notAchieved || item.replaced) {
-          overrides.push({
-            weekIndex: day.weekIndex,
-            weekday: day.weekday,
-            itemIndex,
-            notAchieved: item.notAchieved,
-            replaced: item.replaced,
-            replacementText: item.replacementText || '',
-          });
+      const canonicalItems = canonical && canonical !== child
+        ? canonical.days.find(d => d.weekIndex === day.weekIndex && d.weekday === day.weekday)?.items ?? []
+        : null;
+      const differs = canonicalItems !== null
+        && (canonicalItems.length !== day.items.length || canonicalItems.some((it, i) => itemKey(it) !== itemKey(day.items[i])));
+      if (differs) differingDays.push(`第${day.weekIndex}週星期${WEEKDAY_NAMES[day.weekday - 1]}`);
+      const used = new Set();
+      day.items.forEach((item, position) => {
+        let itemIndex = position;
+        if (differs) {
+          itemIndex = canonicalItems.findIndex((it, i) => !used.has(i) && itemKey(it) === itemKey(item));
+          if (itemIndex !== -1) used.add(itemIndex);
         }
+        if (!item.notAchieved && !item.replaced) return;
+        if (itemIndex === -1) {
+          droppedMarks += 1;
+          return;
+        }
+        overrides.push({
+          weekIndex: day.weekIndex,
+          weekday: day.weekday,
+          itemIndex,
+          notAchieved: item.notAchieved,
+          replaced: item.replaced,
+          replacementText: item.replacementText || '',
+        });
       });
     }
-    return { name: child.name, tier: child.tier, overrides };
+    if (differingDays.length > 0) {
+      mismatches.push({ name: child.name, canonicalName: canonical.name, tier: child.tier, days: differingDays, droppedMarks });
+    }
+    // A child whose tier wasn't recognized keeps its own content, so the preview can use it once
+    // the teacher picks the tier (no other child may share that tier).
+    return { name: child.name, tier: child.tier, overrides, ...(child.tier ? {} : { slots: ownSlots(child) }) };
   });
 
-  return { slotsByTier, children: childrenWithOverrides };
+  return { slotsByTier, children: childrenWithOverrides, mismatches };
 }
 
 export async function parseMonthlyPlanDocxImport(data) {
@@ -394,7 +420,14 @@ export async function parseMonthlyPlanDocxImport(data) {
     if (!child.tier) warnings.push(`無法判斷「${child.name || '（未知姓名）'}」的月齡階段，請手動選擇`);
   }
 
-  const { slotsByTier, children: childrenWithOverrides } = buildSlotsAndOverrides(parsedChildren);
+  const { slotsByTier, children: childrenWithOverrides, mismatches } = buildSlotsAndOverrides(parsedChildren);
+  for (const m of mismatches) {
+    const dropped = m.droppedMarks > 0 ? `，其中 ${m.droppedMarks} 個請假／未達成標記找不到對應的項目，沒有匯入` : '';
+    warnings.push(
+      `「${m.name}」和「${m.canonicalName}」同為 ${m.tier} 階段，但有 ${m.days.length} 天的課程內容不同（${m.days.join('、')}）；` +
+      `同階段共用一份內容，匯入時以「${m.canonicalName}」的為準${dropped}`
+    );
+  }
 
   const unresolvedCodes = [...new Set([...slotsByTier.values()]
     .flat()

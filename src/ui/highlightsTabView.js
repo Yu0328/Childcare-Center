@@ -2,10 +2,10 @@ import { showToast } from './toast.js';
 import { compressImage } from '../media/imagePreprocess.js';
 import { newUid } from '../storage/dbCore.js';
 import {
-  addHighlightEntry, listHighlightEntriesForReport, deleteHighlightEntry, updateHighlightEntry,
+  addHighlightEntry, listHighlightEntriesForReport, deleteHighlightEntry, updateHighlightEntry, removeHighlightPhoto,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
-import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { formPopupMarkup, wireFormPopup, wireEditForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
 
@@ -124,6 +124,9 @@ export async function renderHighlightsTab(
       picks.push([slot, file]);
       slot++;
     }
+    const skipped = files.length - picks.length;
+    container.querySelector('[data-action="add-highlight"] [data-error]').textContent =
+      skipped > 0 ? `每則最多 3 張照片，多選的 ${skipped} 張沒有加入` : '';
     const run = (async () => {
       for (const [pickSlot, file] of picks) await handleFileChosen(pickSlot, file);
     })();
@@ -212,14 +215,11 @@ export async function renderHighlightsTab(
       }
     }));
 
-    container.querySelector(`[data-edit-highlight="${entry.id}"]`).addEventListener('click', () => {
-      const form = container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`);
-      form.hidden = !form.hidden;
-    });
-
-    container.querySelector(`[data-highlight-edit-cancel-for="${entry.id}"]`).addEventListener('click', () => {
-      container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`).hidden = true;
-    });
+    wireEditForm(
+      container.querySelector(`[data-edit-highlight="${entry.id}"]`),
+      container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`),
+      container.querySelector(`[data-highlight-edit-cancel-for="${entry.id}"]`)
+    );
 
     container.querySelector(`[data-highlight-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const caption = container.querySelector(`[data-highlight-edit-field="caption"][data-highlight-id="${entry.id}"]`).value;
@@ -235,9 +235,8 @@ export async function renderHighlightsTab(
       const btn = container.querySelector(`[data-remove-saved-photo="${entry.id}"][data-photo-index="${i}"]`);
       if (!btn) return;
       btn.addEventListener('click', oneAtATime(async () => {
-        const nextPhotos = entry.photos.filter((_, idx) => idx !== i);
         try {
-          await updateHighlightEntry(entry.id, { photos: nextPhotos });
+          await removeHighlightPhoto(entry.id, photo.storedIndex);
           onChange();
         } catch (err) {
           container.querySelector(`[data-highlight-entry="${entry.id}"]`).appendChild(

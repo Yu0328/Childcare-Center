@@ -127,6 +127,17 @@ describe('monthlyPlanEditorView: rendering', () => {
     expect(itemB.textContent).toContain('請假');
   });
 
+  it('勾了請假但沒填替代內容時，日曆上的項目畫掉之外也顯示「請假」', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '拼拼圖' });
+    await setChildItemOverride({ planId: plan.id, childId: child.id, itemId: item.id, notAchieved: false, replaced: true, replacementText: '' });
+
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+
+    const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
+    expect(cell.querySelector('.monthly-calendar__replacement').textContent).toBe('請假');
+  });
+
   it('clicking a day cell selects it and updates the panel header', async () => {
     await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
 
@@ -157,14 +168,17 @@ describe('monthlyPlanEditorView: rendering', () => {
 });
 
 describe('monthlyPlanEditorView: slot item editing', () => {
-  let container, child, plan;
+  let container, child, plan, confirmMessages, confirmAnswer;
 
   beforeEach(async () => {
     await clearAllData();
     container = document.createElement('div');
     child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
     plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
-    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    confirmMessages = [];
+    confirmAnswer = true;
+    const confirmDelete = message => { confirmMessages.push(message); return confirmAnswer; };
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn(), confirmDelete });
     container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
     await waitFor(() => container.querySelector('[data-field="new-item-indicator"]'));
   });
@@ -259,6 +273,39 @@ describe('monthlyPlanEditorView: slot item editing', () => {
     expect(await listPlanSlotItems(slot.id)).toEqual([]);
     const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`);
     expect(cell.textContent).not.toContain('要刪除');
+    expect(confirmMessages).toHaveLength(1);
+    expect(confirmMessages[0]).toContain('要刪除');
+  });
+
+  it('刪除項目前先確認，按取消就不刪', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '不要刪' });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="4"]`).click();
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-delete-item="${item.id}"]`));
+    confirmAnswer = false;
+
+    container.querySelector(`[data-delete-item="${item.id}"]`).click();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(confirmMessages).toHaveLength(1);
+    expect((await listPlanSlotItems(slot.id)).map(i => i.activityName)).toEqual(['不要刪']);
+  });
+
+  it('同階段有好幾位幼兒時，確認訊息說明會一起影響幾位', async () => {
+    const other = await addChild({ name: '鍾晴妍', birthDate: '2024-08-01' });
+    const { updateMonthlyCoursePlan } = await import('../src/storage/monthlyPlanDb.js');
+    const twoPlan = await updateMonthlyCoursePlan(plan.id, { childIds: [child.id, other.id], childTiers: { [child.id]: 'Ⅴ', [other.id]: 'Ⅴ' } });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const item = await addPlanSlotItem({ slotId: slot.id, activityName: '共用活動' });
+    await renderMonthlyPlanEditorView(container, { plan: twoPlan, onBack: vi.fn(), confirmDelete: m => { confirmMessages.push(m); return false; } });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector(`[data-delete-item="${item.id}"]`));
+
+    container.querySelector(`[data-delete-item="${item.id}"]`).click();
+    await waitFor(() => confirmMessages.length === 1);
+
+    expect(confirmMessages[0]).toContain('2 位');
   });
 });
 
@@ -312,21 +359,18 @@ describe('monthlyPlanEditorView: per-child overrides', () => {
 
     const replacementInput = container.querySelector(`[data-override-field="replacementText"][data-item-id="${item.id}"]`);
     expect(replacementInput.disabled).toBe(false);
-    replacementInput.value = '請假';
+    replacementInput.value = '戶外教學';
     replacementInput.dispatchEvent(new Event('change'));
     // Wait on the rendered cell, not just the storage write: setChildItemOverride() resolving
     // only means the write landed, not that refreshCellAndPanel()'s subsequent (also async)
-    // calendar-cell rewrite has completed yet.
+    // calendar-cell rewrite has completed yet. (Not 請假: the cell already shows that by default.)
     await waitFor(() => {
       const cell = container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`);
-      return cell && cell.textContent.includes('請假');
+      return cell && cell.textContent.includes('戶外教學');
     });
 
     const overrides = await listChildItemOverridesForPlan(plan.id);
-    expect(overrides[0]).toMatchObject({ replaced: true, replacementText: '請假' });
-
-    const cellA = container.querySelector(`.monthly-calendar__day[data-child-id="${childA.id}"][data-week-index="1"][data-weekday="3"]`);
-    expect(cellA.textContent).toContain('請假');
+    expect(overrides[0]).toMatchObject({ replaced: true, replacementText: '戶外教學' });
   });
 
   it('unchecking both flags removes the override row', async () => {

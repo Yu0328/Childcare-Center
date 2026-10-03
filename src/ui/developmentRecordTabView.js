@@ -5,7 +5,7 @@ import {
   listDevelopmentRecordEntriesForReport, deleteDevelopmentRecordEntry, updateDevelopmentRecordEntry,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
-import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { formPopupMarkup, wireFormPopup, wireEditForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
 
@@ -221,18 +221,16 @@ export async function renderDevelopmentRecordTab(
     }));
 
     const editForm = container.querySelector(`[data-record-edit-form-for="${record.id}"]`);
-    container.querySelector(`[data-edit-record="${record.id}"]`).addEventListener('click', () => {
-      editForm.hidden = !editForm.hidden;
-    });
+    wireEditForm(
+      container.querySelector(`[data-edit-record="${record.id}"]`),
+      editForm,
+      container.querySelector(`[data-record-edit-cancel-for="${record.id}"]`)
+    );
 
     editForm.querySelector('[data-record-edit-field="domain"]').addEventListener('change', event => {
       editForm.querySelector('[data-record-edit-checkboxes]').innerHTML = checkboxListHtml(entriesByDomainNumber(event.target.value), {
         checkboxAttr: 'record-edit-entry-checkbox', checkedIds: record.courseEntryIds, recordId: record.id, occurrencesByEntryId,
       });
-    });
-
-    container.querySelector(`[data-record-edit-cancel-for="${record.id}"]`).addEventListener('click', () => {
-      editForm.hidden = true;
     });
 
     container.querySelector(`[data-record-edit-save-for="${record.id}"]`).addEventListener('click', oneAtATime(async () => {

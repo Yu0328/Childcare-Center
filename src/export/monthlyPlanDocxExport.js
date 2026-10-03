@@ -110,7 +110,8 @@ export function buildDayCellRuns(items, overrideByItemId) {
       lines,
       notAchieved: Boolean(override?.notAchieved),
       replaced: Boolean(override?.replaced),
-      replacementText: override?.replacementText || '',
+      // 請假 checked with nothing typed in its box still says why the item is struck out.
+      replacementText: override?.replaced ? override.replacementText || '請假' : override?.replacementText || '',
     };
   });
 }

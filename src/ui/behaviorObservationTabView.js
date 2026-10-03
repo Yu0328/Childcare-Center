@@ -3,7 +3,7 @@ import {
   addBehaviorObservation, listBehaviorObservationsForReport, deleteBehaviorObservation, updateBehaviorObservation,
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
-import { formPopupMarkup, wireFormPopup } from './formPopup.js';
+import { formPopupMarkup, wireFormPopup, wireEditForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
 
@@ -87,14 +87,11 @@ export async function renderBehaviorObservationTab(
       }
     }));
 
-    container.querySelector(`[data-edit-observation="${observation.id}"]`).addEventListener('click', () => {
-      const form = container.querySelector(`[data-observation-edit-form-for="${observation.id}"]`);
-      form.hidden = !form.hidden;
-    });
-
-    container.querySelector(`[data-observation-edit-cancel-for="${observation.id}"]`).addEventListener('click', () => {
-      container.querySelector(`[data-observation-edit-form-for="${observation.id}"]`).hidden = true;
-    });
+    wireEditForm(
+      container.querySelector(`[data-edit-observation="${observation.id}"]`),
+      container.querySelector(`[data-observation-edit-form-for="${observation.id}"]`),
+      container.querySelector(`[data-observation-edit-cancel-for="${observation.id}"]`)
+    );
 
     container.querySelector(`[data-observation-edit-save-for="${observation.id}"]`).addEventListener('click', oneAtATime(async () => {
       const title = container.querySelector(`[data-observation-edit-field="title"][data-observation-id="${observation.id}"]`).value;

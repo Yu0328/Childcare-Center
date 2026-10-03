@@ -62,10 +62,11 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
     return response;
   }
 
-  async function listQuery(query) {
+  async function listQuery(query, { orderBy } = {}) {
     const url =
       `${FILES_URL}?q=${encodeURIComponent(query)}` +
-      `&fields=${encodeURIComponent('files(id,name,appProperties)')}&spaces=drive&pageSize=1000`;
+      `&fields=${encodeURIComponent('files(id,name,appProperties)')}&spaces=drive&pageSize=1000` +
+      (orderBy ? `&orderBy=${orderBy}` : '');
     const response = await request(url);
     return (await response.json()).files || [];
   }
@@ -102,10 +103,12 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
     });
   }
 
+  // Oldest first, so every device settles on the same folder if two ever exist.
+  const listFolders = () =>
+    listQuery(`name='${FOLDER_NAME}' and mimeType='${FOLDER_MIME}' and trashed=false`, { orderBy: 'createdTime' });
+
   async function ensureFolder() {
-    const found = await listQuery(
-      `name='${FOLDER_NAME}' and mimeType='${FOLDER_MIME}' and trashed=false`
-    );
+    let found = await listFolders();
     if (found.length === 0) {
       const created = await request(`${FILES_URL}?fields=id`, {
         method: 'POST',
@@ -113,8 +116,15 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
         body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME }),
       });
       const folderId = (await created.json()).id;
-      await writeManifest(folderId);
-      return folderId;
+      // Two devices signing in for the first time at once both find nothing and both create one,
+      // and each would sync into its own — two half datasets. Look again: if another device's
+      // folder came first, drop ours (still empty) and join theirs.
+      found = await listFolders();
+      if (found.length === 0 || found[0].id === folderId) {
+        await writeManifest(folderId);
+        return folderId;
+      }
+      await trashFile(folderId);
     }
 
     const folderId = found[0].id;
