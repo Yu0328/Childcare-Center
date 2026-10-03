@@ -406,6 +406,21 @@ describe('buildHighlightsTable', () => {
     expect(lh).toBeCloseTo(4.3, 1);
   });
 
+  it('直橫照片混在同一列時，每張照片在格子裡上下左右都置中（橫的不會貼在上面）', async () => {
+    const photos = [
+      { blob: new Blob(['a']), width: 720, height: 960 },
+      { blob: new Blob(['a']), width: 960, height: 720 },
+      { blob: new Blob(['a']), width: 720, height: 960 },
+    ];
+    const xml = await tableToXml(await buildHighlightsTable([{ id: 1, reportId: 1, photos, caption: 'x' }]));
+    const photoCells = xml.split('<w:tc>').filter(cell => cell.includes('<w:drawing>'));
+    expect(photoCells).toHaveLength(3);
+    for (const cell of photoCells) {
+      expect(cell).toContain('<w:vAlign w:val="center"/>');
+      expect(cell).toContain('<w:jc w:val="center"/>');
+    }
+  });
+
   it('falls back to a square aspect ratio when a photo has no known width (e.g. legacy-imported)', async () => {
     const entries = [{ id: 1, reportId: 1, photos: [{ blob: new Blob(['a']), width: 0, height: 0 }], caption: 'x' }];
     const table = await buildHighlightsTable(entries);
