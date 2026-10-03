@@ -22,7 +22,7 @@ child's, for the same tier and the same month.
 - Picking one shows a confirm (same `confirm`-style injection the tab already uses for deletes):
 
   > 目前這份的 M 筆課程計畫，會換成「姓名」的 N 筆課程計畫。
-  > 發展狀況（○／△）、請假、更換課程不會套用，請再逐筆填寫。
+  > 發展狀況一律先填 ○，請假、更換課程不會套用，請再逐筆確認。
   > 有 K 段發展紀錄的對應課程會被取消勾選。  ← only when K > 0
   > 確定要套用嗎？
 
