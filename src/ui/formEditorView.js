@@ -1,3 +1,4 @@
+import { captureDrafts, restoreDrafts } from './unsavedInput.js';
 import { defaultDateInPeriod } from './periodFields.js';
 import { getIndicatorsForTier, tierFormLabel, previousTier, getIndicator } from '../data/indicators.js';
 import { addEntry, deleteEntry, listEntriesForForm, listFormsForChild, updateEntry, updateForm } from '../storage/db.js';
@@ -275,7 +276,13 @@ export async function renderFormEditorView(
 
   // Every add/edit/delete below re-renders this whole (very tall, 5-column) view — keepScroll
   // holds the teacher's place instead of snapping back to the top after each save.
-  const rerender = () => keepScroll(() => renderFormEditorView(container, { child, form, onBack, confirmDelete }));
+  // Several add/edit forms can be open at once on desktop; text typed into the others survives the
+  // redraw (savedFrom: the button whose own form was just saved — that one starts fresh).
+  const rerender = async savedFrom => {
+    const drafts = captureDrafts(container, savedFrom?.closest('.entry-form, .panel-form') ?? null);
+    await keepScroll(() => renderFormEditorView(container, { child, form, onBack, confirmDelete }));
+    restoreDrafts(container, drafts);
+  };
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
   wireRowClickEdit(container);
@@ -328,7 +335,7 @@ export async function renderFormEditorView(
     const note = container.querySelector('[data-remark-field="note"]').value;
     try {
       await addEntry({ formId: form.id, indicatorCode: code, date, status, note, activityName: activityName || undefined });
-      await rerender();
+      await rerender(container.querySelector('[data-action="save-remark"]'));
     } catch (err) {
       if (errorEl) errorEl.textContent = '新增失敗，請再試一次';
     }
@@ -362,7 +369,7 @@ export async function renderFormEditorView(
       const note = container.querySelector(`[data-remark-edit-field="note"][data-remark-id="${entry.id}"]`).value;
       try {
         await updateEntry(entry.id, { indicatorCode: code, date, status, note, activityName: activityName || undefined });
-        await rerender();
+        await rerender(container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`));
       } catch (err) {
         const errorEl = container.querySelector(`[data-remark-edit-form-for="${entry.id}"] [data-error]`);
         if (errorEl) errorEl.textContent = '更新失敗，請再試一次';
@@ -384,7 +391,7 @@ export async function renderFormEditorView(
       const note = container.querySelector(`[data-entry-field="note"][data-indicator-code="${indicator.code}"]`).value;
       try {
         await addEntry({ formId: form.id, indicatorCode: indicator.code, date, status, note });
-        await rerender();
+        await rerender(container.querySelector(`[data-entry-save-for="${indicator.code}"]`));
       } catch (err) {
         const entryForm = container.querySelector(`[data-entry-form-for="${indicator.code}"]`);
         const errorEl = entryForm.querySelector('[data-error]');
@@ -428,7 +435,7 @@ export async function renderFormEditorView(
       const note = container.querySelector(`[data-entry-edit-field="note"][data-entry-id="${entry.id}"]`).value;
       try {
         await updateEntry(entry.id, { date, status, note });
-        await rerender();
+        await rerender(container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`));
       } catch (err) {
         const errorEl = container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-error]`);
         if (errorEl) errorEl.textContent = '更新失敗，請再試一次';

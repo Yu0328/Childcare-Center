@@ -78,6 +78,23 @@ describe('renderFormEditorView', () => {
     expect(container.textContent).toContain('可以來回穩定行走');
   });
 
+  it('同時打開兩個指標的新增框，存了其中一個，另一個打到一半的內容還在、框也還開著', async () => {
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+    container.querySelector('[data-add-entry-for="Ⅳ-1-1"]').click();
+    container.querySelector('[data-add-entry-for="Ⅳ-1-2"]').click();
+    container.querySelector('[data-entry-field="note"][data-indicator-code="Ⅳ-1-1"]').value = '要存的';
+    container.querySelector('[data-entry-field="note"][data-indicator-code="Ⅳ-1-2"]').value = '還沒存的';
+
+    container.querySelector('[data-entry-save-for="Ⅳ-1-1"]').click();
+    await waitFor(async () => (await listEntriesForForm(form.id)).length === 1);
+    await waitFor(() => container.textContent.includes('要存的'));
+
+    expect(container.querySelector('[data-entry-field="note"][data-indicator-code="Ⅳ-1-2"]').value).toBe('還沒存的');
+    expect(container.querySelector('[data-entry-form-for="Ⅳ-1-2"]').hidden).toBe(false);
+    expect(container.querySelector('[data-entry-field="note"][data-indicator-code="Ⅳ-1-1"]').value).toBe('');
+  });
+
   it('新增觀察紀錄的日期預設在這份總表的月份（不是今天的月份）', async () => {
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} }); // 115年01月, today is later
