@@ -385,6 +385,27 @@ describe('buildHighlightsTable', () => {
     expect(xml.indexOf('家長簽名：')).toBeGreaterThan(xml.indexOf('家長回饋'));
   });
 
+  it('照片比照原本樣本的大小：最寬 5.7 公分、最高 7.6 公分，一張或兩張時也不會撐滿整格', async () => {
+    const EMU_PER_CM = 360000;
+    const sizesCm = async photos => {
+      const xml = await tableToXml(await buildHighlightsTable([{ id: 1, reportId: 1, photos, caption: 'x' }]));
+      return [...xml.matchAll(/<wp:extent cx="(\d+)" cy="(\d+)"/g)].map(m => [Number(m[1]) / EMU_PER_CM, Number(m[2]) / EMU_PER_CM]);
+    };
+    const portrait = { blob: new Blob(['a']), width: 720, height: 960 };
+    const landscape = { blob: new Blob(['a']), width: 960, height: 720 };
+
+    for (const [w, h] of [...await sizesCm([portrait]), ...await sizesCm([landscape, landscape]), ...await sizesCm([portrait, portrait, portrait])]) {
+      expect(w).toBeLessThanOrEqual(5.71);
+      expect(h).toBeLessThanOrEqual(7.61);
+    }
+    const [[pw, ph]] = await sizesCm([portrait]);
+    expect(pw).toBeCloseTo(5.7, 1);
+    expect(ph).toBeCloseTo(7.6, 1);
+    const [[lw, lh]] = await sizesCm([landscape]);
+    expect(lw).toBeCloseTo(5.7, 1);
+    expect(lh).toBeCloseTo(4.3, 1);
+  });
+
   it('falls back to a square aspect ratio when a photo has no known width (e.g. legacy-imported)', async () => {
     const entries = [{ id: 1, reportId: 1, photos: [{ blob: new Blob(['a']), width: 0, height: 0 }], caption: 'x' }];
     const table = await buildHighlightsTable(entries);

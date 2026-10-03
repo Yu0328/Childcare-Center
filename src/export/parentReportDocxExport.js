@@ -356,6 +356,11 @@ const HIGHLIGHT_COLUMN_WIDTHS = (() => {
   return widths;
 })();
 const DXA_PER_PIXEL = 1440 / 96; // 1 inch = 1440 twips = 96 CSS/OOXML reference pixels
+// Every real 適性紀錄 sample prints 點滴分享 photos about 5.7cm wide (portrait ~5.7×7.6cm, landscape
+// ~5.7×4.3cm) whether an entry has one photo or three.
+const PX_PER_CM = 96 / 2.54;
+const PHOTO_MAX_WIDTH_PX = 5.7 * PX_PER_CM;
+const PHOTO_MAX_HEIGHT_PX = 7.6 * PX_PER_CM;
 
 // For an entry with `photoCount` photos (1, 2, or 3), splits the 6-column grid into `photoCount`
 // equal-size groups of adjacent columns and returns each cell's columnSpan plus its width in DXA
@@ -391,12 +396,19 @@ async function highlightPhotoCell(photo, cellWidthDxa, columnSpan) {
     return new TableCell({ width: { size: cellWidthDxa, type: WidthType.DXA }, columnSpan, children: [emptyParagraph()] });
   }
   const data = await blobToArrayBuffer(photo.blob);
-  const displayWidthPx = cellWidthDxa / DXA_PER_PIXEL;
-  const displayHeightPx = photo.width ? displayWidthPx * (photo.height / photo.width) : displayWidthPx;
+  // Fitted inside the real samples' photo size rather than stretched to the cell: filling the cell
+  // made a lone photo the full 19cm page width and a pair ~9.5cm each. A narrower cell (3 photos)
+  // still shrinks it further. Unknown dimensions (legacy import) print square.
+  const aspect = photo.width ? photo.height / photo.width : 1;
+  const maxWidthPx = Math.min(cellWidthDxa / DXA_PER_PIXEL, PHOTO_MAX_WIDTH_PX);
+  const displayWidthPx = Math.min(maxWidthPx, PHOTO_MAX_HEIGHT_PX / aspect);
+  const displayHeightPx = displayWidthPx * aspect;
 
   return new TableCell({
     width: { size: cellWidthDxa, type: WidthType.DXA },
     columnSpan,
+    // A landscape photo next to a portrait one is shorter than its row; keep it mid-cell.
+    verticalAlign: VerticalAlign.CENTER,
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
