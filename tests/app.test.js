@@ -374,3 +374,69 @@ describe('標題列的首頁按鈕', () => {
     await waitFor(() => container.textContent.includes('選擇要填寫的表'));
   });
 });
+
+describe('有沒儲存的內容時離開前先問；手機返回手勢', () => {
+  beforeEach(async () => {
+    await clearAllData();
+    localStorage.clear();
+    unlock();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  async function openChildList() {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    mountApp(container);
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    container.querySelector('[data-type="assessment"]').click();
+    await waitFor(() => container.querySelector('[data-action="add-child"]'));
+    return container;
+  }
+
+  it('打了字還沒存就按返回：先問，按取消留在原畫面，按確定才離開', async () => {
+    const container = await openChildList();
+    container.querySelector('[data-field="name"]').value = '打到一半';
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+
+    container.querySelector('[data-action="back"]').click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[data-field="name"]').value).toBe('打到一半');
+
+    container.querySelector('[data-action="back"]').click();
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    container.remove();
+  });
+
+  it('沒打字時按返回不會多問', async () => {
+    const container = await openChildList();
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    container.querySelector('[data-action="back"]').click();
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    container.remove();
+  });
+
+  it('手機返回手勢：在一般畫面等於按「← 返回」，不會直接離開程式', async () => {
+    const container = await openChildList();
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    container.remove();
+  });
+
+  it('手機返回手勢：有跳出的面板開著時，只關掉面板', async () => {
+    const container = await openChildList();
+    const dialog = document.createElement('dialog');
+    let closed = false;
+    dialog.close = () => { closed = true; dialog.removeAttribute('open'); };
+    dialog.matches = selector => selector === ':modal' || HTMLElement.prototype.matches.call(dialog, selector); // jsdom has no showModal
+    dialog.setAttribute('open', '');
+    container.appendChild(dialog);
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(closed).toBe(true);
+    expect(container.querySelector('[data-action="add-child"]')).not.toBeNull();
+    container.remove();
+  });
+});
