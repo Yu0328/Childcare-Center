@@ -20,7 +20,8 @@ function relink(records, oldEntries, newIdByKey) {
     return {
       record,
       ids: [...new Set(mapped.filter(id => id !== undefined))],
-      lostSome: mapped.some(id => id === undefined),
+      // Dangling ids (rows deleted earlier) are invisible already, so only ticks on current rows count.
+      lostSome: (record.courseEntryIds || []).some(id => keyByOldId.has(id) && !newIdByKey.has(keyByOldId.get(id))),
     };
   });
 }
@@ -54,6 +55,7 @@ export async function planCoursePlanCopy({ targetReportId, sourceReportId }) {
 // Replaces the target report's course plan with a copy of the source's. Copies first and deletes
 // last, so an interruption leaves duplicate rows to tidy up rather than lost ones.
 export async function copyCoursePlan({ targetReportId, sourceReportId }) {
+  if (targetReportId === sourceReportId) return;
   const oldEntries = await listCoursePlanEntriesForReport(targetReportId);
   const sourceEntries = await listCoursePlanEntriesForReport(sourceReportId);
 
@@ -77,7 +79,10 @@ export async function copyCoursePlan({ targetReportId, sourceReportId }) {
 
   const records = await listDevelopmentRecordEntriesForReport(targetReportId);
   for (const { record, ids } of relink(records, oldEntries, newIdByKey)) {
-    if ((record.courseEntryIds || []).length > 0) await updateDevelopmentRecordEntry(record.id, { courseEntryIds: ids });
+    const before = record.courseEntryIds || [];
+    if (before.length !== ids.length || before.some((id, i) => id !== ids[i])) {
+      await updateDevelopmentRecordEntry(record.id, { courseEntryIds: ids });
+    }
   }
 
   for (const entry of oldEntries) await deleteCoursePlanEntry(entry.id);

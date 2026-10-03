@@ -410,4 +410,23 @@ describe('renderCoursePlanTab — 套用其他幼兒課程計畫', () => {
     expect(message).toContain('會套用「林小明」的 1 筆課程計畫。');
     expect((await listCoursePlanEntriesForReport(report.id)).map(e => e.activityName)).toEqual(['畫畫']);
   });
+
+  it('clicking two different candidates back to back runs only one copy', async () => {
+    const third = await addChild({ name: '王小華', birthDate: '2024-05-01' });
+    const thirdReport = await addParentReport({ childId: third.id, tier: 'Ⅴ', period: '115年06月' });
+    await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    await addCoursePlanEntry({ reportId: thirdReport.id, indicatorCode: 'Ⅴ-1-7', activityName: '堆積木' });
+    let changed = false;
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => { changed = true; }, confirmDelete: () => true });
+
+    container.querySelector(`[data-copy-from="${other.id}"]`).click();
+    container.querySelector(`[data-copy-from="${thirdReport.id}"]`).click();
+    await waitFor(() => changed);
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const names = (await listCoursePlanEntriesForReport(report.id)).map(e => e.activityName);
+    expect(names).toHaveLength(1);
+    expect(['畫畫', '堆積木']).toContain(names[0]);
+  });
 });

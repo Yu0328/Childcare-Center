@@ -104,6 +104,16 @@ describe('copyCoursePlan', () => {
     });
   });
 
+  describe('copyCoursePlan guards', () => {
+    it('copying a report onto itself leaves its rows intact', async () => {
+      const entry = await addCoursePlanEntry({ reportId: target.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+
+      await copyCoursePlan({ targetReportId: target.id, sourceReportId: target.id });
+
+      expect((await listCoursePlanEntriesForReport(target.id)).map(e => e.id)).toEqual([entry.id]);
+    });
+  });
+
   describe('planCoursePlanCopy', () => {
     it('counts current rows, source rows, and records that would lose a tick — without writing', async () => {
       const keep = await addCoursePlanEntry({ reportId: target.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
@@ -118,6 +128,16 @@ describe('copyCoursePlan', () => {
 
       expect(plan).toEqual({ currentCount: 2, sourceCount: 3, unlinkedRecordCount: 1 });
       expect(await listCoursePlanEntriesForReport(target.id)).toHaveLength(2);
+    });
+
+    it('ignores dangling ids (rows deleted earlier) when counting records that lose a tick', async () => {
+      const keep = await addCoursePlanEntry({ reportId: target.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+      await addDevelopmentRecordEntry({ reportId: target.id, domain: 1, courseEntryIds: [99999, keep.id], narrative: '甲' });
+      await addCoursePlanEntry({ reportId: source.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+
+      const plan = await planCoursePlanCopy({ targetReportId: target.id, sourceReportId: source.id });
+
+      expect(plan.unlinkedRecordCount).toBe(0);
     });
   });
 });

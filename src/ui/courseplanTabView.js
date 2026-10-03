@@ -291,20 +291,21 @@ export async function renderCoursePlanTab(
     copyPicker.hidden = !copyPicker.hidden;
     copyToggle.setAttribute('aria-expanded', String(!copyPicker.hidden));
   });
-  for (const source of copySources) {
-    container.querySelector(`[data-copy-from="${source.report.id}"]`).addEventListener('click', oneAtATime(async () => {
-      const ids = { targetReportId: report.id, sourceReportId: source.report.id };
-      try {
-        const counts = await planCoursePlanCopy(ids);
-        // confirmDelete is just the tab's injectable confirm(); this replaces (deletes) rows too.
-        if (!confirmDelete(copyConfirmMessage({ childName: source.childName, ...counts }))) return;
-        await copyCoursePlan(ids);
-        onChange();
-      } catch (err) {
-        container.querySelector('[data-error="copy"]').textContent = '套用失敗，請再試一次';
-      }
-    }));
-  }
+  // One shared wrapper so two different candidate buttons can't run overlapping copies.
+  const copyFromSource = oneAtATime(async event => {
+    const source = copySources.find(s => String(s.report.id) === event.currentTarget.dataset.copyFrom);
+    const ids = { targetReportId: report.id, sourceReportId: source.report.id };
+    try {
+      const counts = await planCoursePlanCopy(ids);
+      // confirmDelete is just the tab's injectable confirm(); this replaces (deletes) rows too.
+      if (!confirmDelete(copyConfirmMessage({ childName: source.childName, ...counts }))) return;
+      await copyCoursePlan(ids);
+      onChange();
+    } catch (err) {
+      container.querySelector('[data-error="copy"]').textContent = '套用失敗，請再試一次';
+    }
+  });
+  for (const button of container.querySelectorAll('[data-copy-from]')) button.addEventListener('click', copyFromSource);
 
   container.querySelector('[data-field="indicatorCode"]').addEventListener('change', event => {
     const indicator = getIndicator(event.target.value);
