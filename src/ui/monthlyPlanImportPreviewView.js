@@ -156,6 +156,8 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
       // child's addChild already committed as an orphan, and resubmitting after the fix
       // would create it again as a duplicate.
       const resolutions = [];
+      // A child whose tier wasn't recognized brings its own content for the tier picked for it.
+      const slotsByTier = { ...parsed.slotsByTier };
       for (const index of includedIndexes) {
         const select = container.querySelector(`[data-child-select="${index}"]`);
         const tier = container.querySelector(`[data-child-tier="${index}"]`).value;
@@ -177,7 +179,8 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
         }
 
         if (!tier) throw new Error(`請為「${label}」選擇月齡階段`);
-        if (!(tier in parsed.slotsByTier)) {
+        if (!(tier in slotsByTier) && parsed.children[index].slots?.length) slotsByTier[tier] = parsed.children[index].slots;
+        if (!(tier in slotsByTier)) {
           throw new Error(`找不到「${tier}」的課程內容，請確認「${label}」的階段是否正確`);
         }
 
@@ -199,7 +202,7 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
       const tiersUsed = [...new Set(resolvedChildren.map(rc => rc.tier))];
       const itemIdsBySlotKey = new Map();
       for (const tier of tiersUsed) {
-        for (const slot of parsed.slotsByTier[tier] || []) {
+        for (const slot of slotsByTier[tier] || []) {
           const createdSlot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: slot.weekIndex, weekday: slot.weekday });
           const itemIds = [];
           for (const item of slot.items) {

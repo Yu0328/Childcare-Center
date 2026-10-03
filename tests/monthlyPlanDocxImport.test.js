@@ -366,14 +366,36 @@ describe('buildSlotsAndOverrides', () => {
     ]);
   });
 
-  it('ignores a same-tier child\'s extra items beyond the canonical count, no warning/crash', () => {
+  it('a same-tier child\'s extra item has nothing to attach to: its mark is dropped and the day reported, no crash', () => {
     const children = [
       { name: '甲', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item()] }] },
       { name: '乙', tier: 'Ⅲ', days: [{ weekIndex: 1, weekday: 1, items: [item(), item({ replaced: true })] }] },
     ];
-    const { children: withOverrides } = buildSlotsAndOverrides(children);
+    const { children: withOverrides, mismatches } = buildSlotsAndOverrides(children);
+    expect(withOverrides[1].overrides).toEqual([]);
+    expect(mismatches).toEqual([{ name: '乙', canonicalName: '甲', tier: 'Ⅲ', days: ['第1週星期一'], droppedMarks: 1 }]);
+  });
+
+  it('同階段孩子某天內容順序不同時，請假／未達成標記跟著「同一個項目」走，不是跟著第幾個', () => {
+    const a = item({ activityName: '甲活動' });
+    const b = item({ activityName: '乙活動' });
+    const children = [
+      { name: '甲', tier: 'Ⅲ', days: [{ weekIndex: 2, weekday: 3, items: [a, b] }] },
+      { name: '乙', tier: 'Ⅲ', days: [{ weekIndex: 2, weekday: 3, items: [{ ...b, notAchieved: true }, a] }] },
+    ];
+    const { children: withOverrides, mismatches } = buildSlotsAndOverrides(children);
     expect(withOverrides[1].overrides).toEqual([
-      { weekIndex: 1, weekday: 1, itemIndex: 1, notAchieved: false, replaced: true, replacementText: '' },
+      { weekIndex: 2, weekday: 3, itemIndex: 1, notAchieved: true, replaced: false, replacementText: '' },
+    ]);
+    expect(mismatches).toEqual([{ name: '乙', canonicalName: '甲', tier: 'Ⅲ', days: ['第2週星期三'], droppedMarks: 0 }]);
+  });
+
+  it('認不出階段的孩子，保留他自己格子裡的內容，讓預覽在選好階段後使用', () => {
+    const children = [{ name: '丙', tier: null, days: [{ weekIndex: 1, weekday: 2, items: [item({ activityName: '自己的' })] }] }];
+    const { slotsByTier, children: out } = buildSlotsAndOverrides(children);
+    expect(slotsByTier.size).toBe(0);
+    expect(out[0].slots).toEqual([
+      { weekIndex: 1, weekday: 2, items: [{ indicatorCode: 'Ⅲ-1-2', activityName: '自己的', indicatorText: '文字' }] },
     ]);
   });
 

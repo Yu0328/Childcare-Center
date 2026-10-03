@@ -202,6 +202,27 @@ export function wireNestedEntryForm(trigger, entryForm) {
   dialog.addEventListener('close', unlockBodyScroll);
 }
 
+// For a row's 編輯 form. On a phone it opens as the same popup as the add forms instead of
+// unfolding inside the row (where it pushed the rest of the page around and was easy to lose):
+// the form is moved into a <dialog class="form-popup"> placed where it was, so every existing
+// lookup of its fields inside the container still finds them. Desktop keeps the inline toggle.
+export function wireEditForm(trigger, entryForm, cancelButton) {
+  if (isMobile()) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'form-popup';
+    dialog.innerHTML = '<button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="關閉">×</button>';
+    entryForm.replaceWith(dialog);
+    dialog.appendChild(entryForm);
+    entryForm.hidden = false;
+  }
+  wireNestedEntryForm(trigger, entryForm);
+  cancelButton.addEventListener('click', () => {
+    const dialog = entryForm.closest('dialog.form-popup');
+    if (dialog) dialog.close();
+    else entryForm.hidden = true;
+  });
+}
+
 // Wraps a nested entry-form's markup in the same `<dialog class="form-popup">` chrome as
 // formPopupMarkup, without a FAB (the caller already has its own trigger button). Mobile only by
 // default — desktop passes `entryFormHtml` straight through unchanged. `wrap` lets a caller that

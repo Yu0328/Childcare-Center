@@ -60,10 +60,10 @@ function itemHtml(item, override) {
       : `${escapeHtml(item.indicatorCode)}${escapeHtml(item.indicatorText || '')}`
     : escapeHtml(item.activityName);
 
-  const replacementHtml =
-    override?.replaced && override.replacementText
-      ? `<span class="monthly-calendar__replacement">${escapeHtml(override.replacementText)}</span>`
-      : '';
+  // Same default as the Word export: a struck-out item with nothing typed reads 請假.
+  const replacementHtml = override?.replaced
+    ? `<span class="monthly-calendar__replacement">${escapeHtml(override.replacementText || '請假')}</span>`
+    : '';
 
   return `<div class="${classes.join(' ')}" data-item-id="${escapeHtml(item.id)}">${label}${replacementHtml}</div>`;
 }
@@ -134,7 +134,10 @@ function childSwitchHtml(children, activeId) {
   `;
 }
 
-export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
+export async function renderMonthlyPlanEditorView(
+  container,
+  { plan, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
+) {
   // See formEditorView.js's identical guard: opening the plan clears the 新 badge shown on
   // monthlyPlanListView.js's row, and mutating `plan` (not just the DB) prevents repeating this
   // write on every re-render this view does internally (same `plan` reference each time).
@@ -517,6 +520,13 @@ export async function renderMonthlyPlanEditorView(container, { plan, onBack }) {
         await refreshCellAndPanel();
       }));
       panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
+        // An item is shared by every same-tier child (and takes their 請假／未達成 marks with it),
+        // though the panel shows only the one child that was clicked — say so before deleting.
+        const sharedCount = data.children.filter(c => plan.childTiers[c.id] === selected.tier).length;
+        const sharedNote = sharedCount > 1
+          ? `同階段的 ${sharedCount} 位幼兒都會一起刪除這個項目，以及他們在這個項目上的請假／未達成標記。`
+          : '';
+        if (!confirmDelete(`確定要刪除「${item.activityName || item.indicatorCode}」嗎？${sharedNote}此操作無法復原。`)) return;
         await deletePlanSlotItem(item.id);
         await refreshCellAndPanel();
       }));

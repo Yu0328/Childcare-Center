@@ -6,7 +6,7 @@ import {
 } from '../storage/parentReportDb.js';
 import { escapeHtml } from './escapeHtml.js';
 import { toRocDate } from '../export/docxShared.js';
-import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
+import { formPopupMarkup, wireFormPopup, nestedEntryFormDialog, wireNestedEntryForm, wireEditForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
 
@@ -344,14 +344,11 @@ export async function renderCoursePlanTab(
       }
     }));
 
-    container.querySelector(`[data-edit-entry="${entry.id}"]`).addEventListener('click', () => {
-      const form = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
-      form.hidden = !form.hidden;
-    });
-
-    container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`).addEventListener('click', () => {
-      container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`).hidden = true;
-    });
+    wireEditForm(
+      container.querySelector(`[data-edit-entry="${entry.id}"]`),
+      container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`),
+      container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`)
+    );
 
     container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const indicatorCode = container.querySelector(`[data-entry-edit-field="indicatorCode"][data-entry-id="${entry.id}"]`).value;
@@ -404,14 +401,11 @@ export async function renderCoursePlanTab(
         }
       }));
 
-      container.querySelector(`[data-edit-occurrence="${occurrence.id}"]`).addEventListener('click', () => {
-        const form = container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"]`);
-        form.hidden = !form.hidden;
-      });
-
-      container.querySelector(`[data-occurrence-edit-cancel-for="${occurrence.id}"]`).addEventListener('click', () => {
-        container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"]`).hidden = true;
-      });
+      wireEditForm(
+        container.querySelector(`[data-edit-occurrence="${occurrence.id}"]`),
+        container.querySelector(`[data-occurrence-edit-form-for="${occurrence.id}"]`),
+        container.querySelector(`[data-occurrence-edit-cancel-for="${occurrence.id}"]`)
+      );
 
       wireAbsentCourseChangedExclusion(
         container.querySelector(`[data-occurrence-edit-field="absent"][data-occurrence-id="${occurrence.id}"]`),

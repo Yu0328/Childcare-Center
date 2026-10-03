@@ -6,7 +6,7 @@ import { toRocDate } from '../export/docxShared.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { keepScroll } from './keepScroll.js';
-import { nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
+import { nestedEntryFormDialog, wireNestedEntryForm, wireEditForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
 
@@ -346,14 +346,11 @@ export async function renderFormEditorView(
       }
     }));
 
-    container.querySelector(`[data-edit-remark="${entry.id}"]`).addEventListener('click', () => {
-      const editForm = container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`);
-      editForm.hidden = !editForm.hidden;
-    });
-
-    container.querySelector(`[data-remark-edit-cancel-for="${entry.id}"]`).addEventListener('click', () => {
-      container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`).hidden = true;
-    });
+    wireEditForm(
+      container.querySelector(`[data-edit-remark="${entry.id}"]`),
+      container.querySelector(`[data-remark-edit-form-for="${entry.id}"]`),
+      container.querySelector(`[data-remark-edit-cancel-for="${entry.id}"]`)
+    );
 
     container.querySelector(`[data-remark-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const code = container.querySelector(`[data-remark-edit-field="code"][data-remark-id="${entry.id}"]`).value;
@@ -417,14 +414,11 @@ export async function renderFormEditorView(
       }
     }));
 
-    container.querySelector(`[data-edit-entry="${entry.id}"]`).addEventListener('click', () => {
-      const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
-      editForm.hidden = !editForm.hidden;
-    });
-
-    container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`).addEventListener('click', () => {
-      container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`).hidden = true;
-    });
+    wireEditForm(
+      container.querySelector(`[data-edit-entry="${entry.id}"]`),
+      container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`),
+      container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`)
+    );
 
     container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const date = container.querySelector(`[data-entry-edit-field="date"][data-entry-id="${entry.id}"]`).value;

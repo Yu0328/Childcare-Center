@@ -105,7 +105,7 @@ export async function renderFormListView(
       if (!confirmDelete(`確定要刪除「${form.tier} ${form.period}」這份適性總表嗎？此操作無法復原。`)) return;
       try {
         await deleteForm(form.id);
-        await renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete });
+        await keepScroll(() => renderFormListView(container, { child, onSelectForm, onBack, onAggregate, confirmDelete }));
       } catch (err) {
         container.querySelector('[data-error="delete"]').textContent = '刪除失敗，請再試一次';
       }

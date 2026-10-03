@@ -160,6 +160,27 @@ describe('renderMonthlyPlanImportPreviewView', () => {
     expect(await listChildren()).toEqual([]); // no orphan child left behind either
   });
 
+  it('認不出階段、但檔案裡有自己內容的孩子：老師選好階段後，用他自己的內容匯入', async () => {
+    const container = document.createElement('div');
+    const ownSlots = [{ weekIndex: 1, weekday: 2, items: [{ indicatorCode: null, activityName: '自己的活動', indicatorText: '' }] }];
+    const parsed = buildParsed({ children: [{ name: '丙', tier: null, overrides: [], slots: ownSlots }] });
+    let imported = false;
+    await renderMonthlyPlanImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+
+    container.querySelector('[data-child-new-name="0"]').value = '丙';
+    container.querySelector('[data-child-new-birthDate-year="0"]').value = '2025';
+    container.querySelector('[data-child-new-birthDate-month="0"]').value = '7';
+    container.querySelector('[data-child-new-birthDate-day="0"]').value = '1';
+    container.querySelector('[data-child-tier="0"]').value = 'Ⅰ';
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const [plan] = await listMonthlyCoursePlans();
+    const slots = await listPlanSlotsForPlan(plan.id);
+    expect(slots.map(s => [s.tier, s.weekIndex, s.weekday])).toEqual([['Ⅰ', 1, 2]]);
+    expect((await listPlanSlotItems(slots[0].id)).map(i => i.activityName)).toEqual(['自己的活動']);
+  });
+
   it('validates every included child before writing any of them, so a later failure leaves no orphan and a retry creates no duplicate', async () => {
     const container = document.createElement('div');
     const parsed = buildParsed({

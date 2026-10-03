@@ -3,6 +3,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import { addParentReport, addHighlightEntry, listHighlightEntriesForReport } from '../src/storage/parentReportDb.js';
 import { renderHighlightsTab } from '../src/ui/highlightsTabView.js';
+import { runRequest } from '../src/storage/dbCore.js';
 import { waitFor } from './helpers.js';
 
 // jsdom's Blob polyfill isn't recognized by Node's native structuredClone (used internally by
@@ -217,10 +218,7 @@ describe('renderHighlightsTab', () => {
     expect(inputClickSpy).not.toHaveBeenCalled();
   });
 
-  it('removes a saved photo via its × button: calls updateHighlightEntry with that photo removed, and triggers onChange', async () => {
-    const parentReportDb = await import('../src/storage/parentReportDb.js');
-    const updateSpy = vi.spyOn(parentReportDb, 'updateHighlightEntry');
-
+  it('removes a saved photo via its × button: only that photo is removed, and triggers onChange', async () => {
     const entry = await addHighlightEntry({
       reportId: report.id,
       photos: [
@@ -237,17 +235,31 @@ describe('renderHighlightsTab', () => {
     container.querySelector(`[data-remove-saved-photo="${entry.id}"][data-photo-index="1"]`).click();
     await waitFor(() => changed);
 
-    expect(updateSpy).toHaveBeenCalledTimes(1);
-    const [calledId, calledChanges] = updateSpy.mock.calls[0];
-    expect(calledId).toBe(entry.id);
-    // Compare by the distinguishing width/height rather than blob identity: fake-indexeddb
-    // structured-clones stored Blobs, so the photo object read back for rendering is never
-    // the same reference (or even the same Blob subclass) as the one passed into
-    // addHighlightEntry — asserting index-0's dimensions survived (and index-1's didn't) is
-    // what actually matters here, not object identity.
-    expect(calledChanges.photos).toHaveLength(1);
-    expect(calledChanges.photos[0].width).toBe(10);
-    expect(calledChanges.photos[0].height).toBe(10);
+    const stored = await runRequest('highlightEntries', 'readonly', store => store.get(entry.id));
+    expect(stored.photos.map(p => p.width)).toEqual([10]);
+  });
+
+  it('刪掉一張照片時，同一則裡讀不出來（畫面上看不到）的照片不會被一起刪掉', async () => {
+    const entry = await addHighlightEntry({
+      reportId: report.id,
+      photos: [
+        { blob: { broken: true }, width: 1, height: 1 }, // unreadable: not a Blob, hidden from the list
+        { blob: new Blob(['a']), width: 10, height: 10 },
+        { blob: new Blob(['b']), width: 20, height: 20 },
+      ],
+      caption: '有一張壞掉',
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const container = document.createElement('div');
+    let changed = false;
+    await renderHighlightsTab(container, { report, onChange: () => { changed = true; } });
+
+    // shown: the two readable photos, at display positions 0 and 1 — remove the first one shown
+    container.querySelector(`[data-remove-saved-photo="${entry.id}"][data-photo-index="0"]`).click();
+    await waitFor(() => changed);
+
+    const stored = await runRequest('highlightEntries', 'readonly', store => store.get(entry.id));
+    expect(stored.photos.map(p => p.width)).toEqual([1, 20]);
   });
 
   it('allows removing the last remaining photo from an entry, leaving it with zero photos rather than deleting it', async () => {
@@ -338,6 +350,19 @@ describe('renderHighlightsTab', () => {
     await waitFor(() => changed);
     const [entry] = await listHighlightEntriesForReport(report.id);
     expect(entry.photos).toHaveLength(2);
+  });
+
+  it('一次選超過空格數的照片時，告訴老師多出的幾張沒有加入', async () => {
+    const imagePreprocess = await import('../src/media/imagePreprocess.js');
+    vi.spyOn(imagePreprocess, 'compressImage').mockResolvedValue({ blob: new Blob(['x']), width: 100, height: 80 });
+    const container = document.createElement('div');
+    await renderHighlightsTab(container, { report, onChange: () => {} });
+
+    const input = container.querySelector('[data-photo-slot="0"]');
+    Object.defineProperty(input, 'files', { configurable: true, value: [1, 2, 3, 4, 5].map(n => new File(['x'], `${n}.jpg`)) });
+    input.dispatchEvent(new Event('change'));
+
+    expect(container.querySelector('[data-action="add-highlight"] [data-error]').textContent).toBe('每則最多 3 張照片，多選的 2 張沒有加入');
   });
 
   it('重新顯示時，釋放上一次縮圖佔用的記憶體', async () => {

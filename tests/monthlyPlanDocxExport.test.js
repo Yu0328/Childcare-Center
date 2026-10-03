@@ -33,6 +33,14 @@ describe('buildDayCellRuns', () => {
     expect(runs[0]).toMatchObject({ notAchieved: true, replaced: true, replacementText: '請假' });
   });
 
+  it('勾了請假但沒填替代內容時，畫掉的字後面加上「請假」', () => {
+    const items = [{ id: 7, indicatorCode: null, activityName: '拼拼圖', indicatorText: '' }];
+    const runs = buildDayCellRuns(items, new Map([[7, { notAchieved: false, replaced: true, replacementText: '' }]]));
+    expect(runs[0]).toMatchObject({ replaced: true, replacementText: '請假' });
+    const plain = buildDayCellRuns(items, new Map([[7, { notAchieved: true, replaced: false, replacementText: '' }]]));
+    expect(plain[0].replacementText).toBe('');
+  });
+
   it('preserves item order and handles multiple items in one cell', () => {
     const items = [
       { id: 1, indicatorCode: null, activityName: 'a', indicatorText: '' },
