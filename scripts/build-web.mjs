@@ -14,6 +14,8 @@ const result = await esbuild.build({
   format: 'iife',
   globalName: 'CFormApp',
   write: false,
+  // Phones download this on first open and on every update; minified it's well under half the size.
+  minify: true,
   target: ['chrome100', 'safari15'],
 });
 
