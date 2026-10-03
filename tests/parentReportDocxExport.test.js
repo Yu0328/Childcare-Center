@@ -385,7 +385,7 @@ describe('buildHighlightsTable', () => {
     expect(xml.indexOf('家長簽名：')).toBeGreaterThan(xml.indexOf('家長回饋'));
   });
 
-  it('照片比照原本樣本的大小：最寬 5.7 公分、最高 7.6 公分，一張或兩張時也不會撐滿整格', async () => {
+  it('每張照片都在同一個框裡（5.9×7.8 公分，一頁剛好三則九張），一張或兩張時也一樣大', async () => {
     const EMU_PER_CM = 360000;
     const sizesCm = async photos => {
       const xml = await tableToXml(await buildHighlightsTable([{ id: 1, reportId: 1, photos, caption: 'x' }]));
@@ -394,16 +394,27 @@ describe('buildHighlightsTable', () => {
     const portrait = { blob: new Blob(['a']), width: 720, height: 960 };
     const landscape = { blob: new Blob(['a']), width: 960, height: 720 };
 
-    for (const [w, h] of [...await sizesCm([portrait]), ...await sizesCm([landscape, landscape]), ...await sizesCm([portrait, portrait, portrait])]) {
-      expect(w).toBeLessThanOrEqual(5.71);
-      expect(h).toBeLessThanOrEqual(7.61);
+    const all = [...await sizesCm([portrait]), ...await sizesCm([landscape, landscape]), ...await sizesCm([portrait, portrait, portrait])];
+    for (const [w, h] of all) {
+      expect(w).toBeLessThanOrEqual(5.91);
+      expect(h).toBeLessThanOrEqual(7.81);
     }
-    const [[pw, ph]] = await sizesCm([portrait]);
-    expect(pw).toBeCloseTo(5.7, 1);
-    expect(ph).toBeCloseTo(7.6, 1);
+    // same size whether the entry has one, two or three photos
+    const portraits = [...await sizesCm([portrait]), ...await sizesCm([portrait, portrait, portrait])];
+    for (const [w, h] of portraits) {
+      expect(w).toBeCloseTo(5.85, 1);
+      expect(h).toBeCloseTo(7.8, 1);
+    }
     const [[lw, lh]] = await sizesCm([landscape]);
-    expect(lw).toBeCloseTo(5.7, 1);
-    expect(lh).toBeCloseTo(4.3, 1);
+    expect(lw).toBeCloseTo(5.9, 1);
+    expect(lh).toBeCloseTo(4.4, 1);
+  });
+
+  it('照片列和下面的描述列綁在一起換頁，描述不會單獨跑到下一頁', async () => {
+    const photos = [{ blob: new Blob(['a']), width: 720, height: 960 }];
+    const xml = await tableToXml(await buildHighlightsTable([{ id: 1, reportId: 1, photos, caption: 'x' }]));
+    const photoCell = xml.split('<w:tc>').find(cell => cell.includes('<w:drawing>'));
+    expect(photoCell).toContain('<w:keepNext/>');
   });
 
   it('直橫照片混在同一列時，每張照片在格子裡上下左右都置中（橫的不會貼在上面）', async () => {
