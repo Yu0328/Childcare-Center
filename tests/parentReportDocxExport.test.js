@@ -397,10 +397,10 @@ describe('buildHighlightsTable', () => {
     expect(xml.indexOf('家長簽名：')).toBeGreaterThan(xml.indexOf('家長回饋'));
   });
 
-  it('留 20 個空行給家長手寫回饋，再接家長簽名：', async () => {
+  it('留 15 個空行給家長手寫回饋，再接家長簽名：', async () => {
     const xml = await tableToXml(await buildHighlightsTable([]));
     const feedbackCell = xml.slice(xml.lastIndexOf('<w:tc>', xml.indexOf('家長簽名：')), xml.indexOf('家長簽名：'));
-    expect(feedbackCell.match(/<w:p>|<w:p\/>|<w:p /g)).toHaveLength(21);
+    expect(feedbackCell.match(/<w:p>|<w:p\/>|<w:p /g)).toHaveLength(16);
   });
 
   it('每張照片都在同一個框裡（5.9×7.8 公分，一頁剛好三則九張），一張或兩張時也一樣大', async () => {
