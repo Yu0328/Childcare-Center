@@ -104,6 +104,33 @@ export function newUid() {
   ).join('');
 }
 
+// Blob.prototype.arrayBuffer() is universally supported in real browsers, but jsdom's Blob
+// polyfill (used by this project's test suite) does not implement it — only FileReader works
+// there. Prefer the fast native path and fall back to FileReader so this also works under jsdom.
+export function blobToArrayBuffer(blob) {
+  if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+// Safari 15 cannot store a Blob that IndexedDB itself handed back ("UnknownError: Error preparing
+// Blob/File data to be stored in object store"), so re-putting an existing 點滴分享 entry failed —
+// on a Mac stuck on Safari 15.5 that stopped every sync at the first old photo. A copy backed by
+// freshly read bytes stores fine on every browser.
+export async function withFreshPhotoBlobs(record) {
+  if (!Array.isArray(record.photos)) return record;
+  const photos = await Promise.all(record.photos.map(async photo =>
+    photo && photo.blob instanceof Blob
+      ? { ...photo, blob: new Blob([await blobToArrayBuffer(photo.blob)], { type: photo.blob.type }) }
+      : photo
+  ));
+  return { ...record, photos };
+}
+
 // Every syncable record carries a `uid` (stable across devices — IndexedDB's autoIncrement `id`
 // is not: the same logical child is id 3 on one phone and id 7 on another) and an `updatedAt`.
 // Stamping both here, at the one place every write already passes through, is what keeps the
@@ -137,7 +164,7 @@ export async function addRecord(storeName, record) {
 export async function putRecord(storeName, record) {
   // Unlike addRecord, updatedAt is always overwritten: callers pass a spread of the existing
   // record, which would otherwise carry the old timestamp straight back in.
-  const stamped = { ...record, uid: record.uid || newUid(), updatedAt: new Date().toISOString() };
+  const stamped = await withFreshPhotoBlobs({ ...record, uid: record.uid || newUid(), updatedAt: new Date().toISOString() });
   await runRequest(storeName, 'readwrite', store => store.put(stamped));
   notifyWrite();
   return stamped;

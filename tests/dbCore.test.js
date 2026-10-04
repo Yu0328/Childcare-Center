@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DB_NAME } from '../src/storage/dbCore.js';
+import { DB_NAME, withFreshPhotoBlobs, blobToArrayBuffer } from '../src/storage/dbCore.js';
 
 function deleteDb() {
   return new Promise((resolve, reject) => {
@@ -141,5 +141,23 @@ describe('dbCore 寫入閘門', () => {
     } finally {
       setWriteListener(null);
     }
+  });
+});
+
+describe('withFreshPhotoBlobs', () => {
+  it('swaps each photo blob for a new one with the same bytes and type, leaving the rest alone', async () => {
+    const original = new Blob(['jpeg-bytes'], { type: 'image/jpeg' });
+    const record = { id: 1, caption: 'x', photos: [{ photoUid: 'p1', blob: original }, { photoUid: 'p2' }] };
+    const fresh = await withFreshPhotoBlobs(record);
+    expect(fresh.photos[0].blob).not.toBe(original);
+    expect(fresh.photos[0].blob.type).toBe('image/jpeg');
+    expect(new TextDecoder().decode(await blobToArrayBuffer(fresh.photos[0].blob))).toBe('jpeg-bytes');
+    expect(fresh.photos[1]).toEqual({ photoUid: 'p2' });
+    expect(fresh.caption).toBe('x');
+  });
+
+  it('returns a record without photos untouched', async () => {
+    const record = { id: 1, name: 'a' };
+    expect(await withFreshPhotoBlobs(record)).toBe(record);
   });
 });

@@ -5,6 +5,7 @@ import {
 } from 'docx';
 import { TIERS, DOMAINS, getIndicator, compareIndicatorCodesForTier } from '../data/indicators.js';
 import { downloadBlob } from './downloadBlob.js';
+import { blobToArrayBuffer } from '../storage/dbCore.js';
 import {
   FONT, DEFAULT_TEXT_SIZE, PAGE_SIZE, HEADER_ICON_EMU, EMU_PER_PIXEL,
   textParagraph, textParagraphs, emptyParagraph, headerIconRunBehindText, toRocDate,
@@ -368,18 +369,6 @@ function highlightPhotoCellSpecs(photoCount) {
   });
 }
 
-// Blob.prototype.arrayBuffer() is universally supported in real browsers, but jsdom's Blob
-// polyfill (used by this project's test suite) does not implement it — only FileReader works
-// there. Prefer the fast native path and fall back to FileReader so this also works under jsdom.
-function blobToArrayBuffer(blob) {
-  if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsArrayBuffer(blob);
-  });
-}
 
 // cellWidthDxa is the ACTUAL width this cell will render at for this row (varies by how many
 // photos the entry has - see highlightEntryRows), not always the 3-column width, so the embedded

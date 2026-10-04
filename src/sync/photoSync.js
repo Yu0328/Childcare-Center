@@ -1,4 +1,4 @@
-import { runRequest } from '../storage/dbCore.js';
+import { runRequest, withFreshPhotoBlobs } from '../storage/dbCore.js';
 import { writeSyncState, deleteSyncState } from '../storage/syncStateDb.js';
 import { mapWithConcurrency, MAX_CONCURRENCY, AuthExpiredError } from './driveClient.js';
 import { PHOTO_STORE } from './syncStores.js';
@@ -26,7 +26,8 @@ async function attachDownloadedPhoto(entry, photoUid, blob) {
   );
   // Raw put, not putRecord: filling in bytes the cloud already has is not a local edit, and
   // bumping updatedAt here would schedule a pointless re-upload of the whole record.
-  await runRequest(entry.store, 'readwrite', store => store.put({ ...stored, photos, id: entry.id }));
+  const fresh = await withFreshPhotoBlobs({ ...stored, photos, id: entry.id });
+  await runRequest(entry.store, 'readwrite', store => store.put(fresh));
   entry.record.photos = photos;
 }
 

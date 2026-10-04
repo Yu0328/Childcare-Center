@@ -1,4 +1,4 @@
-import { runRequest, newUid } from '../storage/dbCore.js';
+import { runRequest, newUid, withFreshPhotoBlobs } from '../storage/dbCore.js';
 import { SYNC_STORES, serializeRecord, deserializeRecord, hashPayload, startHashGeneration, PHOTO_STORE } from './syncStores.js';
 
 // Stores whose list views sort by createdAt (added after these stores already existed) rather
@@ -18,8 +18,9 @@ function refKey(store, value) {
 // record the cloud already has must not bump updatedAt (that would make the record look
 // locally-modified and bounce straight back up as a fake change) and must not fire the write
 // listener (that would schedule another sync from inside a sync).
-function rawPut(storeName, record) {
-  return runRequest(storeName, 'readwrite', store => store.put(record));
+async function rawPut(storeName, record) {
+  const fresh = await withFreshPhotoBlobs(record);
+  return runRequest(storeName, 'readwrite', store => store.put(fresh));
 }
 
 export async function readLocalSnapshot() {
