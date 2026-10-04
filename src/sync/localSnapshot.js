@@ -34,7 +34,15 @@ export async function readLocalSnapshot() {
     let all = await runRequest(store, 'readonly', objectStore => objectStore.getAll());
     // Turned into Blobs right away: an old entry's stored Blob can stop being readable in Safari
     // once other async work has run (see listHighlightEntriesForReport), and the loop below awaits plenty.
-    if (store === PHOTO_STORE) all = await Promise.all(all.map(withReadablePhotos));
+    if (store === PHOTO_STORE) {
+      const hasOldBlob = row => (row.photos || []).some(photo => photo && !photo.bytes && photo.blob);
+      const oldFormatIds = new Set(all.filter(hasOldBlob).map(row => row.id));
+      all = await Promise.all(all.map(withReadablePhotos));
+      // Moves every old-format entry to the bytes format here, instead of waiting for an edit that
+      // may never come: a readable photo keeps its bytes, an unreadable one loses its dead Blob, and
+      // photoSync below re-downloads it from the cloud copy.
+      for (const row of all) if (oldFormatIds.has(row.id)) await rawPut(store, row);
+    }
     rows.set(store, all);
 
     for (const row of all) {

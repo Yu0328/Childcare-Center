@@ -181,6 +181,10 @@ describe('stored photo format', () => {
     expect(await text(readable.blob)).toBe('old');
   });
 
+  it('an old Blob that reads back empty counts as lost, not as a photo', async () => {
+    await expect(photoFromStored({ photoUid: 'p1', blob: new Blob([], { type: 'image/jpeg' }) })).rejects.toThrow();
+  });
+
   it('a photo whose bytes are gone keeps its descriptor without bytes instead of throwing', async () => {
     const dead = Object.create(Blob.prototype);
     dead.arrayBuffer = () => Promise.reject(new Error('NotFoundError'));

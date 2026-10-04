@@ -10,6 +10,23 @@ async function clearTombstones() {
 describe('readLocalSnapshot', () => {
   beforeEach(async () => { await clearAllData(); await clearTombstones(); });
 
+  it('舊格式（存成 Blob）的點滴分享照片當場轉成新格式；讀不出來的只留描述子，好讓照片同步從雲端補回', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // fake-indexeddb hands a stored Blob back as a plain object — the same "can't read it" a lost
+    // Blob gives on Safari 15, so this is the unreadable case.
+    const id = await runRequest('highlightEntries', 'readwrite', store => store.add({
+      reportId: 1, caption: '舊', uid: 'h1', updatedAt: '2026-01-01T00:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z',
+      photos: [{ photoUid: 'p1', width: 1, height: 1, blob: new Blob(['x'], { type: 'image/jpeg' }) }],
+    }));
+
+    const snapshot = await readLocalSnapshot();
+    const stored = await runRequest('highlightEntries', 'readonly', store => store.get(id));
+    expect(stored.photos).toEqual([{ photoUid: 'p1', width: 1, height: 1 }]);
+    expect(stored.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(snapshot.records.get('h1').record.photos[0].blob).toBeUndefined();
+    vi.restoreAllMocks();
+  });
+
   it('把每一筆記錄收成 uid 索引的快照，外鍵已換成 uid', async () => {
     const child = await addChild({ name: '測試童', birthDate: '2024-01-01' });
     const form = await addForm({ childId: child.id, tier: 'Ⅳ', period: '115年06月' });

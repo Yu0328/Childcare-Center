@@ -148,7 +148,11 @@ export async function photoFromStored(photo) {
   // An old entry's Blob: read it now, before Safari's staleness window opens (see
   // listHighlightEntriesForReport), into a Blob that isn't backed by IndexedDB.
   if (photo.blob instanceof Blob) {
-    return { ...photo, blob: new Blob([await blobToArrayBuffer(photo.blob)], { type: photo.blob.type }) };
+    const bytes = await blobToArrayBuffer(photo.blob);
+    // Safari 15 can hand back a lost Blob's bytes as empty instead of failing — the Mac's sync
+    // then thought those photos were fine and never re-downloaded them. No real photo is 0 bytes.
+    if (bytes.byteLength === 0) throw new Error('照片內容是空的');
+    return { ...photo, blob: new Blob([bytes], { type: photo.blob.type }) };
   }
   // No bytes at all (or something that isn't a Blob): nothing to show.
   const { blob, ...descriptor } = photo;
