@@ -88,3 +88,20 @@ Exact button labels come from the current source, not memory.
   source (done once by hand during writing, not a test).
 - `npm run build` + Playwright on `dist/TableC.html`: home card at desktop and 390px, open the
   guide, switch chapters, 上一章／下一章, ← 返回, screenshots reviewed for looks.
+
+## Revision — graphical, shorter (2026-10-04, after first use)
+
+Feedback: too wordy to scan, too many 小提醒, should be understandable at a glance.
+
+- **Each task is a picture flow**, not a numbered text list: 2–4 small drawn screens in a row
+  joined by arrows (stacked with ↓ on a phone). Each mini screen is a simplified wireframe of
+  the real screen (title bar, the relevant buttons/fields only) with the button to press ringed
+  in warm orange and a numbered badge. Under it, one caption of at most ~12 characters
+  (「按 管理幼兒」).
+- Mini-screen pieces are tiny helpers in `helpContent.js` (`shot`, `btn`, `field`, …) emitting
+  `help-shot`/`help-ui-*` markup; `flow([...])` lays them out. Still CSS-only, no images.
+- **小提醒 only where data can be lost**: names/birthdates can't be edited; typed text is lost
+  without 新增／儲存; 匯入備份 replaces everything; back up before changing computer. Everything
+  else is cut.
+- Intro sentences shrink to one short line or go away. 常見問題 keeps 4 short Q&A.
+- The numbered text-step and old diagram styles (`help-steps`, `help-diagram`) are removed.
