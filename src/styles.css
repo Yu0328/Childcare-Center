@@ -1442,6 +1442,17 @@ fieldset.panel-form__field.import-preview__child legend {
   order: 1;
 }
 
+/* Grid items default to min-width:auto (their own min-content size), which lets one wide thing
+   force its column — and the whole page — wider than the screen instead of shrinking to fit: a
+   .panel-form(--wide) <select> whose min-content is its widest option text (see .panel-form
+   select's own min-width:0 above), or an inline edit form's field-sizing: content textarea
+   holding an unbreakable run (a long English word, URL, digit string), whose min-content is that
+   whole run unwrapped. Applies at every width, not just mobile — every desktop column template
+   (here and in the media queries below) uses a bare 1fr, which has the same min-content floor. */
+.tab-layout > * {
+  min-width: 0;
+}
+
 /* ---------- Domain grid (form editor) ---------- */
 
 .domain-grid {
@@ -2292,14 +2303,6 @@ fieldset.panel-form__field.import-preview__child legend {
 @media (max-width: 640px) {
   .tab-layout {
     grid-template-columns: 1fr;
-  }
-  /* Grid items default to min-width:auto (their own min-content size) — normally harmless, but
-     a .panel-form(--wide) column can contain a <select> whose min-content is its widest option
-     text (see .panel-form select's own min-width:0 above), and without this that min-content
-     forces .tab-layout's single mobile column — and the whole page — wider than the phone
-     screen instead of just letting the column (and the select inside it) shrink to fit. */
-  .tab-layout > * {
-    min-width: 0;
   }
   .domain-grid--tabbed {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
