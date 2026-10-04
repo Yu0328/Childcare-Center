@@ -1,5 +1,6 @@
 import { escapeHtml } from './escapeHtml.js';
 import { nestedEntryFormDialog, wireNestedEntryForm } from './formPopup.js';
+import { discardInput } from './unsavedInput.js';
 import { oneAtATime } from './oneAtATime.js';
 import { findCopySources, planCoursePlanCopy, copyCoursePlan } from '../domain/copyCoursePlan.js';
 
@@ -46,6 +47,13 @@ export async function renderCopyCoursePlanPanel(
   const dialog = form.closest('dialog');
   wireNestedEntryForm(trigger, form);
   form.querySelector('[data-action="close-copy-plan"]').addEventListener('click', () => dialog.close());
+
+  // However it closes (取消, ×, backdrop, Escape), drop the pick and the old error so a picked-but-not-copied
+  // radio doesn't trip the "還有沒儲存的內容" prompt later.
+  dialog.addEventListener('close', () => {
+    discardInput(form);
+    form.querySelector('[data-error="copy"]').textContent = '';
+  });
 
   const selectedSource = () => {
     const checked = form.querySelector('input[name="copy-plan-source"]:checked');

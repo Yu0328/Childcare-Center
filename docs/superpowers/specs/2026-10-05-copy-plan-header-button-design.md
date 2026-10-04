@@ -23,7 +23,7 @@ should feel like the 課程月計畫 editor's 管理幼兒 panel.
 
 ### Panel (`src/ui/copyCoursePlanPanel.js`, new)
 
-`wireCopyCoursePlanPanel(container, { trigger, report, onChange, confirmCopy })` — renders a
+`renderCopyCoursePlanPanel(host, { trigger, report, onChange, confirmCopy })` — renders a
 `<dialog class="form-popup">` (via `nestedEntryFormDialog(html, true)`, so it pops up centered on
 desktop too — the tab's right column is taken by 新增課程計畫項目) and wires it to `trigger` with
 `wireNestedEntryForm`. `confirmCopy` defaults to `window.confirm` (injectable for tests).

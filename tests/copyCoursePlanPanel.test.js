@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import { addParentReport, addCoursePlanEntry, listCoursePlanEntriesForReport } from '../src/storage/parentReportDb.js';
 import { renderCopyCoursePlanPanel } from '../src/ui/copyCoursePlanPanel.js';
+import { hasUnsavedInput } from '../src/ui/unsavedInput.js';
 import { waitFor } from './helpers.js';
 
 describe('renderCopyCoursePlanPanel', () => {
@@ -144,5 +145,20 @@ describe('renderCopyCoursePlanPanel', () => {
     expect(form.querySelector('[data-error="copy"]').textContent).toBe('套用失敗，請再試一次');
     expect(closed).toBe(0);
     expect(changed).toBe(false);
+
+    form.closest('dialog').close();
+    expect(form.querySelector('[data-error="copy"]').textContent).toBe('');
+  });
+
+  it('closing without copying leaves no unsaved input behind and 套用 disabled again', async () => {
+    await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    const { host, form } = await setup();
+
+    form.querySelector(`input[value="${other.id}"]`).click();
+    expect(hasUnsavedInput(host)).toBe(true);
+    form.querySelector('[data-action="close-copy-plan"]').click();
+
+    expect(hasUnsavedInput(host)).toBe(false);
+    expect(form.querySelector('[type="submit"]').disabled).toBe(true);
   });
 });
