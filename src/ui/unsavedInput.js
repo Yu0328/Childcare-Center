@@ -14,11 +14,37 @@ function isDirty(field) {
   if (field.type === 'checkbox' || field.type === 'radio') return field.checked !== field.defaultChecked;
   if (field.type === 'file') return field.files?.length > 0;
   if (['button', 'submit', 'reset', 'hidden'].includes(field.type)) return false;
-  return field.value !== field.defaultValue;
+  return field.value !== shownDefault(field);
+}
+
+// The drawn value as the field actually shows it. A one-line input drops line breaks (an imported
+// 說明 often has some) and a date input blanks a malformed date, so comparing against the raw HTML
+// value flagged untouched, already-saved fields as unsaved.
+function shownDefault(field) {
+  const probe = document.createElement(field.tagName);
+  if (field.tagName === 'INPUT') probe.type = field.type;
+  probe.value = field.defaultValue;
+  return probe.value;
 }
 
 export function hasUnsavedInput(root) {
   return [...root.querySelectorAll(FIELDS)].some(isDirty);
+}
+
+// 取消 means "throw this away": puts every field back to how it was drawn, so a cancelled edit
+// doesn't linger out of sight and later trigger the "還有沒儲存的內容" prompt. Fires `change` on
+// each field it touches so dependent bits (e.g. a domain picker's checkbox list) follow along.
+export function discardInput(root) {
+  for (const field of root.querySelectorAll(FIELDS)) {
+    if (!isDirty(field)) continue;
+    if (field.tagName === 'SELECT') {
+      const options = [...field.options];
+      if (options.some(o => o.defaultSelected)) options.forEach(o => { o.selected = o.defaultSelected; });
+      else field.selectedIndex = 0;
+    } else if (field.type === 'checkbox' || field.type === 'radio') field.checked = field.defaultChecked;
+    else field.value = field.type === 'file' ? '' : field.defaultValue;
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  }
 }
 
 // Asks before an action that would throw away unsaved typing. True = go ahead.

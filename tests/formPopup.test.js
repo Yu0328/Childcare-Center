@@ -30,10 +30,11 @@ describe('closeOnBackdropClick', () => {
     expect(closed()).toBe(0);
   });
 
-  it('stays open on a click with no press on the backdrop before it', () => {
+  // Some phones don't report the press on the backdrop itself — a backdrop tap must still close.
+  it('closes on a backdrop click even when no press was reported before it', () => {
     const { dialog, closed } = setup();
     dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(closed()).toBe(0);
+    expect(closed()).toBe(1);
   });
 });
 
@@ -109,5 +110,15 @@ describe('wireEditForm', () => {
     expect(form.hidden).toBe(false);
     cancel.click();
     expect(form.hidden).toBe(true);
+  });
+
+  // Otherwise a cancelled edit lingers out of sight and later trips the 「還有沒儲存的內容」 prompt.
+  it('按取消會把改過的內容還原', () => {
+    const { trigger, form, cancel } = setup();
+    wireEditForm(trigger, form, cancel);
+    trigger.click();
+    form.querySelector('[data-field]').value = '改到一半';
+    cancel.click();
+    expect(form.querySelector('[data-field]').value).toBe('原本');
   });
 });

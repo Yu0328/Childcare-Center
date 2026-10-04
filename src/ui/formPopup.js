@@ -1,3 +1,5 @@
+import { discardInput } from './unsavedInput.js';
+
 // On mobile, the 8 "list above / add-form below" screens wrap their add-form in a <dialog> that
 // stays closed until a fixed "+" button opens it, instead of always showing the form inline —
 // see docs/superpowers/specs/2026-09-11-mobile-add-form-popup-design.md. Desktop keeps the form
@@ -152,18 +154,20 @@ export function formPopupMarkup({ formHtml, fabLabel }) {
   `;
 }
 
-// Tapping the backdrop closes the popup — but only when the press both starts and ends there. A
+// Tapping the backdrop closes the popup — unless the press started on something inside it. A
 // click's target is the nearest common ancestor of where the press started and ended, so picking
 // from a phone's native <select> list (press on the field, release over the backdrop) or dragging
 // a text selection off the edge reported the dialog itself and closed the whole popup mid-edit.
+// Keyed on "pressed inside" rather than "pressed on the backdrop": a phone doesn't always report
+// the press on the backdrop itself, and requiring it stopped backdrop taps closing at all.
 export function closeOnBackdropClick(dialog) {
-  let pressedOnBackdrop = false;
+  let pressedInside = false;
   dialog.addEventListener('pointerdown', event => {
-    pressedOnBackdrop = event.target === dialog;
+    pressedInside = event.target !== dialog;
   });
   dialog.addEventListener('click', event => {
-    if (event.target === dialog && pressedOnBackdrop) dialog.close();
-    pressedOnBackdrop = false;
+    if (event.target === dialog && !pressedInside) dialog.close();
+    pressedInside = false;
   });
 }
 
@@ -228,6 +232,7 @@ export function wireEditForm(trigger, entryForm, cancelButton) {
   }
   wireNestedEntryForm(trigger, entryForm);
   cancelButton.addEventListener('click', () => {
+    discardInput(entryForm);
     const dialog = entryForm.closest('dialog.form-popup');
     if (dialog) dialog.close();
     else entryForm.hidden = true;

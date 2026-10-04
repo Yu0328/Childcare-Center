@@ -16,6 +16,7 @@ import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, wire
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 import { downloadBlob } from '../export/downloadBlob.js';
 import { oneAtATime } from './oneAtATime.js';
+import { discardInput } from './unsavedInput.js';
 
 // Loads everything the render pass needs in one pass: the plan's still-existing children (a
 // child deleted elsewhere after being added to this plan is silently skipped rather than
@@ -226,6 +227,7 @@ export async function renderMonthlyPlanEditorView(
   wireNestedEntryForm(container.querySelector('[data-action="manage-children"]'), manageChildrenForm);
 
   container.querySelector('[data-action="cancel-manage-children"]').addEventListener('click', () => {
+    discardInput(manageChildrenForm);
     const dialog = manageChildrenForm.closest('dialog.form-popup');
     if (dialog) dialog.close();
     else manageChildrenForm.hidden = true;
@@ -509,7 +511,9 @@ export async function renderMonthlyPlanEditorView(
         form.hidden = !form.hidden;
       });
       panelItems.querySelector(`[data-item-edit-cancel-for="${item.id}"]`).addEventListener('click', () => {
-        panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`).hidden = true;
+        const form = panelItems.querySelector(`[data-item-edit-form-for="${item.id}"]`);
+        discardInput(form);
+        form.hidden = true;
       });
       panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
         const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value;

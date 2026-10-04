@@ -22,6 +22,21 @@ describe('hasUnsavedInput', () => {
     expect(hasUnsavedInput(view())).toBe(false);
   });
 
+  // A one-line field drops an imported 說明's line breaks the moment it's drawn — that's not typing.
+  it('單行欄位自動拿掉換行、日期格式不對被清空，都不算有未儲存內容', () => {
+    const root = document.createElement('div');
+    const note = document.createElement('input');
+    note.type = 'text';
+    note.setAttribute('value', '第一行\n第二行');
+    const date = document.createElement('input');
+    date.type = 'date';
+    date.setAttribute('value', '115.06.01');
+    root.append(note, date);
+    expect(hasUnsavedInput(root)).toBe(false);
+    note.value = '改過';
+    expect(hasUnsavedInput(root)).toBe(true);
+  });
+
   it('打了字、改了選項、換了選單都算', () => {
     const typed = view();
     typed.querySelector('[data-indicator-code="B"]').value = '寫到一半';
