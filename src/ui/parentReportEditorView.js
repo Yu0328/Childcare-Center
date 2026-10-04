@@ -8,6 +8,8 @@ import { renderBehaviorObservationTab } from './behaviorObservationTabView.js';
 import { renderHighlightsTab } from './highlightsTabView.js';
 import { keepScroll } from './keepScroll.js';
 import { oneAtATime } from './oneAtATime.js';
+import { openTodayWordCheck } from './todayWordCheckPopup.js';
+import { findTodayWords } from '../domain/findTodayWords.js';
 
 const TABS = [
   { key: 'coursePlan', label: '課程計畫表', render: renderCoursePlanTab },
@@ -16,20 +18,18 @@ const TABS = [
   { key: 'highlights', label: '點滴分享', render: renderHighlightsTab },
 ];
 
-async function exportReport(child, report) {
+async function loadReportData(report) {
   const coursePlanEntries = await listCoursePlanEntriesForReport(report.id);
   const courseOccurrencesByEntryId = {};
   for (const entry of coursePlanEntries) {
     courseOccurrencesByEntryId[entry.id] = await listCourseOccurrencesForEntry(entry.id);
   }
-  const developmentRecordEntries = await listDevelopmentRecordEntriesForReport(report.id);
-  const behaviorObservations = await listBehaviorObservationsForReport(report.id);
-  const highlightEntries = await listHighlightEntriesForReport(report.id);
-
-  return generateParentReportDocxBlob({
-    child, report, coursePlanEntries, courseOccurrencesByEntryId,
-    developmentRecordEntries, behaviorObservations, highlightEntries,
-  });
+  return {
+    coursePlanEntries, courseOccurrencesByEntryId,
+    developmentRecordEntries: await listDevelopmentRecordEntriesForReport(report.id),
+    behaviorObservations: await listBehaviorObservationsForReport(report.id),
+    highlightEntries: await listHighlightEntriesForReport(report.id),
+  };
 }
 
 export async function renderParentReportEditorView(container, { child, report, onBack, activeTab = 'coursePlan' }) {
@@ -62,7 +62,17 @@ export async function renderParentReportEditorView(container, { child, report, o
   container.querySelector('[data-action="export"]').addEventListener('click', oneAtATime(async () => {
     const errorEl = container.querySelector('[data-error="export"]');
     try {
-      const blob = await exportReport(child, report);
+      let data = await loadReportData(report);
+      const hits = findTodayWords(data);
+      if (hits.length) {
+        const outcome = await openTodayWordCheck(hits);
+        if (outcome === 'cancel') return;
+        // Re-render so the open tab shows the saved wording.
+        keepScroll(() => renderParentReportEditorView(container, { child, report, onBack, activeTab }));
+        if (outcome === 'saved') return;
+        data = await loadReportData(report);
+      }
+      const blob = await generateParentReportDocxBlob({ child, report, ...data });
       downloadParentReportDocx(blob, `${child.name}-適性紀錄-${report.period}.docx`);
       if (errorEl) errorEl.textContent = '';
     } catch (err) {

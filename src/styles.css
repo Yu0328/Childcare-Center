@@ -1008,6 +1008,33 @@ button {
 .form-popup::backdrop {
   background: rgba(0, 0, 0, 0.4);
 }
+
+/* 匯出前「今天」check popup (todayWordCheckPopup.js) — wider than the add/edit popups because it
+   holds whole narratives; on phones the 90vw side wins, same as every other popup. */
+.form-popup--wide:modal {
+  width: min(90vw, 640px);
+}
+/* .entry-form's overflow-x: hidden would make the card its own scroll box and stop the sticky
+   actions row below from pinning to the popup — there's no date input here to clip. */
+.today-check__body {
+  overflow: visible;
+}
+.today-check__hint {
+  margin: 0;
+  padding-right: 2.2rem; /* clears the × button */
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+/* Pinned to the popup's bottom edge so the buttons stay reachable while a long list scrolls;
+   -0.9rem cancels .entry-form's bottom padding so the row sits flush. */
+.today-check__actions {
+  position: sticky;
+  bottom: -0.9rem;
+  padding-bottom: 0.9rem;
+  background: var(--page-bg);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
 .form-popup__close {
   /* Mobile-only: on mobile this is the modal dialog's only close affordance besides
      backdrop-click/Escape. On desktop the form is meant to stay permanently inline (see
