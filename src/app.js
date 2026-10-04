@@ -7,6 +7,7 @@ import { renderParentReportEditorView } from './ui/parentReportEditorView.js';
 import { renderAggregateCoursePlanView } from './ui/aggregateCoursePlanView.js';
 import { renderMonthlyPlanListView } from './ui/monthlyPlanListView.js';
 import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
+import { renderHelpView } from './ui/helpView.js';
 import { exportBackup, importBackup, importHugeBackupFile, HUGE_IMPORT_THRESHOLD_BYTES } from './storage/backup.js';
 import { downloadBlob } from './export/downloadBlob.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
@@ -58,7 +59,13 @@ export function mountApp(container, { onUnlock, gate } = {}) {
     runView(() => renderReportTypeSelectView(container, {
       onSelectType: type => (type === 'monthly-plan' ? showMonthlyPlanList() : showChildList(type)),
       onManageChildren: showManageChildren,
+      onShowHelp: showHelp,
     }));
+  }
+
+  // `gate` is only passed by the hosted build — that's where web-only features exist.
+  function showHelp() {
+    runView(() => renderHelpView(container, { onBack: showReportTypeSelect, hosted: Boolean(gate) }));
   }
 
   function showMonthlyPlanList() {

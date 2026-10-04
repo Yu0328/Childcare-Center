@@ -2880,3 +2880,113 @@ fieldset.panel-form__field.import-preview__child legend {
   z-index: 30;
   white-space: nowrap;
 }
+
+/* ── 操作說明 ─────────────────────────────────────────────── */
+.help-layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.help-toc {
+  position: sticky;
+  top: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.75rem;
+}
+.help-toc__list, .help-toc__sub { list-style: none; margin: 0; padding: 0; }
+.help-toc__sub { margin: 0.15rem 0 0.35rem 2.1rem; }
+.help-toc__item, .help-toc__subitem {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  border: 0; background: none; font: inherit; color: var(--text-primary);
+  text-align: left; cursor: pointer; border-radius: 10px;
+}
+.help-toc__item { padding: 0.55rem 0.6rem; font-weight: 600; }
+.help-toc__subitem { padding: 0.3rem 0.6rem; font-size: 0.9rem; color: var(--text-secondary); }
+.help-toc__item:hover, .help-toc__subitem:hover { background: var(--warm-tint); }
+.help-toc__item[aria-current='true'] { background: var(--warm-tint); color: var(--warm-accent); }
+/* The number comes from data-num so it stays out of the title's text (see helpView.js). */
+.help-toc__num, .help-chapter__num {
+  display: inline-grid; place-items: center; flex: none;
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  background: var(--warm-tint); color: var(--warm-accent); font-size: 0.85rem; font-weight: 700;
+}
+.help-toc__num::before, .help-chapter__num::before { content: attr(data-num); }
+.help-toc__item[aria-current='true'] .help-toc__num { background: var(--warm-accent); color: #fff; }
+
+.help-chapter {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  animation: help-fade-in 0.25s ease-out;
+}
+@keyframes help-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .help-chapter { animation: none; } }
+.help-chapter__title { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.75rem; font-size: 1.35rem; }
+.help-chapter__num { width: 2rem; height: 2rem; font-size: 1rem; background: var(--warm-accent); color: #fff; }
+.help-section-title { margin: 1.75rem 0 0.6rem; padding-top: 1.25rem; border-top: 1px dashed var(--border); font-size: 1.1rem; scroll-margin-top: 1rem; }
+.help-intro { color: var(--text-secondary); margin: 0 0 1rem; line-height: 1.7; }
+.help-chapter p, .help-chapter li { line-height: 1.75; }
+
+.help-steps { list-style: none; counter-reset: help-step; margin: 0.5rem 0 1rem; padding: 0; display: grid; gap: 0.6rem; }
+.help-steps > li {
+  counter-increment: help-step; position: relative;
+  padding: 0.75rem 1rem 0.75rem 3.25rem;
+  background: var(--page-bg); border-radius: 12px;
+}
+.help-steps > li::before {
+  content: counter(help-step); position: absolute; left: 0.85rem; top: 0.75rem;
+  display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border-radius: 50%;
+  background: var(--brand); color: #fff; font-weight: 700; font-size: 0.9rem;
+}
+
+.help-chip {
+  display: inline-block; padding: 0.05rem 0.6rem; margin: 0 0.1rem;
+  border-radius: 999px; font-size: 0.88em; font-weight: 600; white-space: nowrap;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-primary);
+  vertical-align: 0.05em;
+}
+.help-chip--primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.help-chip--purple { background: var(--edit-tint); border-color: var(--edit-border); color: var(--edit-accent); }
+.help-chip--rose { background: var(--domain-5-tint); border-color: var(--domain-5-tint); color: var(--domain-5-accent); }
+.help-chip--brand { background: var(--brand-tint); border-color: var(--brand-tint); color: var(--brand-dark); }
+.help-chip--green { background: var(--filled-tint); border-color: var(--filled-border); color: var(--filled-accent); }
+.help-chip--danger { background: var(--delete-bg); border-color: var(--delete-bg); color: var(--delete-fg); }
+
+.help-tip {
+  margin: 1rem 0; padding: 0.75rem 1rem 0.75rem 2.6rem; position: relative;
+  background: #fff7dc; border: 1px solid #f1dc9a; border-radius: 12px; color: #6b5310;
+}
+.help-tip::before { content: '💡'; position: absolute; left: 0.85rem; top: 0.7rem; }
+.help-webonly {
+  display: inline-block; margin: 0.25rem 0 0.75rem; padding: 0.2rem 0.7rem;
+  border-radius: 999px; background: var(--neutral-tint); color: var(--text-secondary); font-size: 0.85rem;
+}
+
+.help-diagram {
+  margin: 0.75rem 0 1.25rem; padding: 1rem; border: 1px dashed var(--border-strong);
+  border-radius: 14px; background: var(--page-bg); display: grid; gap: 0.5rem;
+  max-width: 26rem; font-size: 0.85rem;
+}
+.help-diagram__row { display: flex; gap: 0.5rem; }
+.help-diagram__box {
+  flex: 1; padding: 0.5rem 0.6rem; border-radius: 10px; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary);
+}
+.help-diagram__box--hl { outline: 2px solid var(--warm-accent); outline-offset: 2px; color: var(--text-primary); font-weight: 600; }
+.help-diagram__caption { color: var(--text-muted); font-size: 0.8rem; text-align: center; }
+
+.help-chapter__nav { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+.help-faq dt { font-weight: 700; margin-top: 1rem; }
+.help-faq dd { margin: 0.25rem 0 0; color: var(--text-secondary); line-height: 1.75; }
+
+@media (max-width: 640px) {
+  .help-layout { grid-template-columns: 1fr; }
+  .help-toc { position: static; }
+  .help-chapter { padding: 1.1rem 1rem; border-radius: 14px; }
+  .help-steps > li { padding-left: 3rem; }
+}
