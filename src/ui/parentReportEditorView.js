@@ -10,6 +10,7 @@ import { keepScroll } from './keepScroll.js';
 import { oneAtATime } from './oneAtATime.js';
 import { openTodayWordCheck } from './todayWordCheckPopup.js';
 import { findTodayWords } from '../domain/findTodayWords.js';
+import { renderCopyCoursePlanPanel } from './copyCoursePlanPanel.js';
 
 const TABS = [
   { key: 'coursePlan', label: '課程計畫表', render: renderCoursePlanTab },
@@ -41,12 +42,21 @@ export async function renderParentReportEditorView(container, { child, report, o
     report.isNew = false;
   }
 
+  const isCoursePlan = activeTab === 'coursePlan';
+  const exportButton = `<button type="button" class="btn btn--purple" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>`;
+
   container.innerHTML = `
     <div class="page-header page-header--editor">
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回適性紀錄列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(child.name)}　${escapeHtml(report.tier)} 階段<span class="page-header__period">${escapeHtml(report.period)}</span></h2>
-      <button type="button" class="btn btn--purple" data-action="export">${headerButtonLabel('匯出 Word', '匯出')}</button>
+      ${isCoursePlan
+        ? `<div class="page-header__actions">
+            <button type="button" class="btn btn--purple" data-action="copy-course-plan">${headerButtonLabel('套用其他幼兒課程計畫', '套用')}</button>
+            ${exportButton}
+          </div>`
+        : exportButton}
     </div>
+    ${isCoursePlan ? '<div data-copy-plan-host></div>' : ''}
     <p class="field-error field-error--center" data-error="export"></p>
     <div class="tabs" role="tablist">
       ${TABS.map(
@@ -91,5 +101,11 @@ export async function renderParentReportEditorView(container, { child, report, o
   // Wrapped so an add/edit/delete inside a tab (which rebuilds this whole view) doesn't scroll
   // the teacher back to the top of a long tab.
   const onChange = () => keepScroll(() => renderParentReportEditorView(container, { child, report, onBack, activeTab }));
+  if (isCoursePlan) {
+    // Only 課程計畫表 is replaced by 套用, so the button and its panel live on that tab only.
+    await renderCopyCoursePlanPanel(container.querySelector('[data-copy-plan-host]'), {
+      trigger: container.querySelector('[data-action="copy-course-plan"]'), report, onChange,
+    });
+  }
   await activeTabConfig.render(panel, { report, onChange });
 }

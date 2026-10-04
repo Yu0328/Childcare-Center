@@ -17,10 +17,17 @@ vi.mock('../src/export/parentReportDocxExport.js', () => ({
 describe('renderParentReportEditorView', () => {
   let child, report;
 
+  let scrollToSpy;
+
   beforeEach(async () => {
+    scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     await clearAllData();
     child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
     report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+  });
+
+  afterEach(() => {
+    scrollToSpy.mockRestore();
   });
 
   it('clears the imported report\'s isNew flag as soon as it is opened', async () => {
@@ -65,6 +72,28 @@ describe('renderParentReportEditorView', () => {
 
     container.querySelector('[data-action="back"]').click();
     expect(backCalled).toBe(true);
+  });
+
+  it('puts 套用其他幼兒課程計畫 left of 匯出 Word on the 課程計畫表 tab only', async () => {
+    const container = document.createElement('div');
+    await renderParentReportEditorView(container, { child, report, onBack: () => {} });
+
+    const actions = container.querySelector('.page-header .page-header__actions');
+    const [copyButton, exportButton] = actions.querySelectorAll('button');
+    expect(copyButton.dataset.action).toBe('copy-course-plan');
+    expect(copyButton.classList.contains('btn--purple')).toBe(true);
+    expect(copyButton.querySelector('.btn__label-full').textContent).toBe('套用其他幼兒課程計畫');
+    expect(copyButton.querySelector('.btn__label-short').textContent).toBe('套用');
+    expect(exportButton.dataset.action).toBe('export');
+    expect(container.querySelector('[data-copy-plan-form]')).not.toBeNull();
+
+    for (const activeTab of ['developmentRecord', 'behaviorObservation', 'highlights']) {
+      const other = document.createElement('div');
+      await renderParentReportEditorView(other, { child, report, onBack: () => {}, activeTab });
+      expect(other.querySelector('[data-action="copy-course-plan"]')).toBeNull();
+      expect(other.querySelector('[data-copy-plan-form]')).toBeNull();
+      expect(other.querySelector('.page-header [data-action="export"]')).not.toBeNull();
+    }
   });
 });
 
