@@ -3,7 +3,7 @@ import {
   Paragraph, ShadingType, Table, TableCell, TableRow, TableLayoutType, TextRun, TextWrappingSide,
   TextWrappingType, VerticalAlign, VerticalMergeType, VerticalPositionRelativeFrom, WidthType,
 } from 'docx';
-import { TIERS, DOMAINS, getIndicator } from '../data/indicators.js';
+import { TIERS, DOMAINS, getIndicator, compareIndicatorCodesForTier } from '../data/indicators.js';
 import { downloadBlob } from './downloadBlob.js';
 import {
   FONT, DEFAULT_TEXT_SIZE, PAGE_SIZE, HEADER_ICON_EMU, EMU_PER_PIXEL,
@@ -53,27 +53,17 @@ function parentReportTierLabel(tierCode) {
 // can merge across every entry that shares a domain, and the 指標/活動名稱 columns can merge across
 // every occurrence row of one entry. Domain is looked up via the entry's own indicatorCode (not
 // stored redundantly on the entry) so it always reflects the current indicator reference data.
-// Sort key helper for buildCoursePlanRowGroups: entries whose indicator code doesn't resolve
-// (shouldn't normally happen) sort to the end rather than throwing or corrupting the ordering.
-const UNRESOLVED_SORT_KEY = Infinity;
-
-function coursePlanSortKey(entry) {
-  const indicator = getIndicator(entry.indicatorCode);
-  if (!indicator) return { domain: UNRESOLVED_SORT_KEY, index: UNRESOLVED_SORT_KEY };
-  const index = Number(entry.indicatorCode.split('-').pop());
-  return { domain: indicator.domain, index: Number.isNaN(index) ? UNRESOLVED_SORT_KEY : index };
-}
-
-export function buildCoursePlanRowGroups(entries, occurrencesByEntryId) {
+export function buildCoursePlanRowGroups(entries, occurrencesByEntryId, tier) {
   // Fix 3: entries can arrive in arbitrary (e.g. IndexedDB insertion) order with domains
   // interleaved. The vertical-merge grouping below assumes same-domain entries are already
-  // contiguous, so sort a COPY (never mutate the caller's array) by domain, then by indicator
-  // number within the domain, before grouping.
-  const sortedEntries = [...entries].sort((a, b) => {
-    const keyA = coursePlanSortKey(a);
-    const keyB = coursePlanSortKey(b);
-    return keyA.domain !== keyB.domain ? keyA.domain - keyB.domain : keyA.index - keyB.index;
-  });
+  // contiguous, so sort a COPY (never mutate the caller's array) by domain, then within the
+  // domain by compareIndicatorCodesForTier (report tier first, earlier-tier entries after),
+  // before grouping. Unresolvable codes sort to the end.
+  const compareCodes = compareIndicatorCodesForTier(tier);
+  const domainOf = entry => getIndicator(entry.indicatorCode)?.domain ?? Infinity;
+  const sortedEntries = [...entries].sort((a, b) =>
+    domainOf(a) !== domainOf(b) ? domainOf(a) - domainOf(b) : compareCodes(a.indicatorCode, b.indicatorCode)
+  );
 
   let previousDomain = null;
 
@@ -218,8 +208,8 @@ function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }
   });
 }
 
-export function buildCoursePlanTable(entries, occurrencesByEntryId) {
-  const groups = buildCoursePlanRowGroups(entries, occurrencesByEntryId);
+export function buildCoursePlanTable(entries, occurrencesByEntryId, tier) {
+  const groups = buildCoursePlanRowGroups(entries, occurrencesByEntryId, tier);
 
   const bodyRows = groups.flatMap((group, groupIndex) =>
     group.rows.map((row, rowIndex) =>
@@ -568,7 +558,7 @@ export async function generateParentReportDocxBlob({
   child, report, coursePlanEntries, courseOccurrencesByEntryId,
   developmentRecordEntries, behaviorObservations, highlightEntries,
 }) {
-  const coursePlanTable = buildCoursePlanTable(coursePlanEntries, courseOccurrencesByEntryId);
+  const coursePlanTable = buildCoursePlanTable(coursePlanEntries, courseOccurrencesByEntryId, report.tier);
   const developmentRecordTable = buildDevelopmentRecordTable(developmentRecordEntries, behaviorObservations, coursePlanEntries);
   const highlightsTable = await buildHighlightsTable(highlightEntries);
 

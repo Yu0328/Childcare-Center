@@ -53,6 +53,18 @@ describe('buildCoursePlanRowGroups', () => {
     expect(groups.map(g => g.isFirstEntryOfDomain)).toEqual([true, false, true]);
   });
 
+  it('within a domain, puts the report tier first and earlier-tier entries after it', () => {
+    const mixed = [
+      { id: 1, reportId: 1, indicatorCode: 'Ⅲ-1-2', activityName: '舊階段' },
+      { id: 2, reportId: 1, indicatorCode: 'Ⅳ-1-3', activityName: 'b' },
+      { id: 3, reportId: 1, indicatorCode: 'Ⅳ-2-1', activityName: 'c' },
+      { id: 4, reportId: 1, indicatorCode: 'Ⅳ-1-1', activityName: 'a' },
+    ];
+    const groups = buildCoursePlanRowGroups(mixed, {}, 'Ⅳ');
+    expect(groups.map(g => g.entry.indicatorCode)).toEqual(['Ⅳ-1-1', 'Ⅳ-1-3', 'Ⅲ-1-2', 'Ⅳ-2-1']);
+    expect(groups.map(g => g.isFirstEntryOfDomain)).toEqual([true, false, false, true]);
+  });
+
   it('does not mutate the input entries array when sorting', () => {
     const interleavedEntries = [
       { id: 1, reportId: 1, indicatorCode: 'Ⅴ-2-3', activityName: '香蕉鬆餅' },
