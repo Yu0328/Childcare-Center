@@ -121,13 +121,24 @@ export function blobToArrayBuffer(blob) {
 // Blob/File data to be stored in object store"), so re-putting an existing 點滴分享 entry failed —
 // on a Mac stuck on Safari 15.5 that stopped every sync at the first old photo. A copy backed by
 // freshly read bytes stores fine on every browser.
+//
+// The same Safari also loses the file behind a stored Blob ("NotFoundError: The object can not be
+// found here"). Those bytes are gone and the old Blob can't be stored again either, so the photo
+// keeps its descriptor but loses `blob` — the screen already skips it (listHighlightEntriesForReport),
+// and photoSync re-downloads it if another device ever uploaded it. Throwing instead would block
+// every save of that entry and every sync for good.
 export async function withFreshPhotoBlobs(record) {
   if (!Array.isArray(record.photos)) return record;
-  const photos = await Promise.all(record.photos.map(async photo =>
-    photo && photo.blob instanceof Blob
-      ? { ...photo, blob: new Blob([await blobToArrayBuffer(photo.blob)], { type: photo.blob.type }) }
-      : photo
-  ));
+  const photos = await Promise.all(record.photos.map(async photo => {
+    if (!photo || !(photo.blob instanceof Blob)) return photo;
+    try {
+      return { ...photo, blob: new Blob([await blobToArrayBuffer(photo.blob)], { type: photo.blob.type }) };
+    } catch (err) {
+      console.warn('點滴分享照片讀取失敗，已略過照片內容：', photo.photoUid, err);
+      const { blob, ...descriptor } = photo;
+      return descriptor;
+    }
+  }));
   return { ...record, photos };
 }
 

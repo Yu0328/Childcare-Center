@@ -156,6 +156,14 @@ describe('withFreshPhotoBlobs', () => {
     expect(fresh.caption).toBe('x');
   });
 
+  it('keeps an unreadable photo as a descriptor without its blob instead of throwing', async () => {
+    const dead = Object.create(Blob.prototype);
+    dead.arrayBuffer = () => Promise.reject(new Error('NotFoundError'));
+    const record = { id: 1, photos: [{ photoUid: 'p1', width: 0, blob: dead }] };
+    const fresh = await withFreshPhotoBlobs(record);
+    expect(fresh.photos).toEqual([{ photoUid: 'p1', width: 0 }]);
+  });
+
   it('returns a record without photos untouched', async () => {
     const record = { id: 1, name: 'a' };
     expect(await withFreshPhotoBlobs(record)).toBe(record);

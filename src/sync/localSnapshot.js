@@ -31,7 +31,10 @@ export async function readLocalSnapshot() {
 
   const rows = new Map();
   for (const { store } of SYNC_STORES) {
-    const all = await runRequest(store, 'readonly', objectStore => objectStore.getAll());
+    let all = await runRequest(store, 'readonly', objectStore => objectStore.getAll());
+    // Read the photo bytes right away: Safari can stop serving a Blob from IndexedDB once other
+    // async work has run (see listHighlightEntriesForReport), and the loop below awaits plenty.
+    if (store === PHOTO_STORE) all = await Promise.all(all.map(withFreshPhotoBlobs));
     rows.set(store, all);
 
     for (const row of all) {
