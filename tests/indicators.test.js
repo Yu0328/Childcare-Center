@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier, normalizeIndicatorCode, INDICATOR_CODE_PATTERN_SOURCE } from '../src/data/indicators.js';
+import { TIERS, DOMAINS, INDICATORS, getIndicatorsForTier, getIndicator, previousTier, normalizeIndicatorCode, INDICATOR_CODE_PATTERN_SOURCE, compareIndicatorCodesForTier } from '../src/data/indicators.js';
 
 describe('indicator reference data', () => {
   it('has 6 tiers in order Ⅰ through Ⅵ', () => {
@@ -106,5 +106,18 @@ describe('indicator reference data', () => {
 
   it('之前被匯入成「Ⅶ 階段」的舊總表，仍然顯示 25個月以上 的完整指標', () => {
     expect(getIndicatorsForTier('Ⅶ')).toEqual(getIndicatorsForTier('Ⅵ'));
+  });
+});
+
+describe('compareIndicatorCodesForTier', () => {
+  it('puts the given tier first, then other tiers Ⅰ→Ⅵ, then item number, unresolvable last', () => {
+    const codes = ['Ⅲ-1-2', 'XX-1-1', 'Ⅳ-1-3', 'Ⅱ-1-5', 'Ⅳ-1-1', 'Ⅲ-1-1', 'Ⅴ-1-1'];
+    expect([...codes].sort(compareIndicatorCodesForTier('Ⅳ')))
+      .toEqual(['Ⅳ-1-1', 'Ⅳ-1-3', 'Ⅱ-1-5', 'Ⅲ-1-1', 'Ⅲ-1-2', 'Ⅴ-1-1', 'XX-1-1']);
+  });
+
+  it('with no tier given, orders by tier then item number', () => {
+    expect(['Ⅴ-1-2', 'Ⅳ-1-3', 'Ⅴ-1-1'].sort(compareIndicatorCodesForTier(undefined)))
+      .toEqual(['Ⅳ-1-3', 'Ⅴ-1-1', 'Ⅴ-1-2']);
   });
 });

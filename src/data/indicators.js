@@ -411,6 +411,24 @@ export function getIndicator(code) {
   return INDICATORS.find(indicator => indicator.code === normalized);
 }
 
+// Orders codes within one domain of a 適性紀錄 課程計畫表: the report's own tier first, then any
+// earlier/later tier a teacher is still tracking (Ⅰ→Ⅵ), then by item number. Unresolvable codes
+// go last. Shared by the tab view and the Word exporter so screen and file agree.
+export function compareIndicatorCodesForTier(tierCode) {
+  const ownTier = CODE_PREFIX_TIER[tierCode] || tierCode;
+  const key = code => {
+    const indicator = getIndicator(code);
+    if (!indicator) return [TIERS.length, 0];
+    const tierRank = indicator.tier === ownTier ? -1 : TIERS.findIndex(t => t.code === indicator.tier);
+    return [tierRank, Number(indicator.code.split('-').pop())];
+  };
+  return (codeA, codeB) => {
+    const [tierA, numberA] = key(codeA);
+    const [tierB, numberB] = key(codeB);
+    return tierA !== tierB ? tierA - tierB : numberA - numberB;
+  };
+}
+
 // Names the offending codes so the teacher can find them in a 40-row preview (typically a typo in
 // the original Word file, e.g. a "Ⅶ" tier that doesn't exist) instead of scrolling to hunt for them.
 export function unresolvedIndicatorWarning(codes) {
