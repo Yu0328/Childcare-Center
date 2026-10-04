@@ -231,7 +231,7 @@ export function buildCoursePlanTable(entries, occurrencesByEntryId, tier) {
   });
 }
 
-export function groupEntriesByDomainInFirstAppearanceOrder(entries) {
+export function groupEntriesByDomain(entries) {
   const order = [];
   const byDomain = new Map();
   for (const entry of entries) {
@@ -241,7 +241,8 @@ export function groupEntriesByDomainInFirstAppearanceOrder(entries) {
     }
     byDomain.get(entry.domain).push(entry);
   }
-  return order.map(domain => ({ domain, entries: byDomain.get(domain) }));
+  // Domain-number order (身體動作 first), matching the on-screen tab — not the order entries were typed.
+  return order.sort((a, b) => a - b).map(domain => ({ domain, entries: byDomain.get(domain) }));
 }
 
 function fullWidthCell(children, fill) {
@@ -277,7 +278,7 @@ function referencedIndicatorLines(courseEntryIds, coursePlanEntriesById) {
 
 export function buildDevelopmentRecordTable(developmentRecordEntries, behaviorObservations, coursePlanEntries) {
   const coursePlanEntriesById = new Map(coursePlanEntries.map(e => [e.id, e]));
-  const domainGroups = groupEntriesByDomainInFirstAppearanceOrder(developmentRecordEntries);
+  const domainGroups = groupEntriesByDomain(developmentRecordEntries);
 
   const rows = domainGroups.flatMap(({ domain, entries }) => {
     const domainName = DOMAINS.find(d => d.id === domain)?.name;

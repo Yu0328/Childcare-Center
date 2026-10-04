@@ -3,7 +3,7 @@ import { Document, Packer } from 'docx';
 import JSZip from 'jszip';
 import {
   buildCoursePlanRowGroups, buildCoursePlanTable,
-  groupEntriesByDomainInFirstAppearanceOrder, buildDevelopmentRecordTable,
+  groupEntriesByDomain, buildDevelopmentRecordTable,
   buildHighlightsTable, generateParentReportDocxBlob,
 } from '../src/export/parentReportDocxExport.js';
 import { extractHighlightPhotoGroups } from '../src/import/parentReportDocxImport.js';
@@ -225,19 +225,19 @@ describe('buildCoursePlanTable', () => {
   });
 });
 
-describe('groupEntriesByDomainInFirstAppearanceOrder', () => {
-  it('groups entries by domain, in the order each domain first appears', () => {
+describe('groupEntriesByDomain', () => {
+  it('groups entries by domain, in domain-number order regardless of entry order', () => {
     const entries = [
       { id: 1, domain: 2 }, { id: 2, domain: 1 }, { id: 3, domain: 2 }, { id: 4, domain: 1 },
     ];
-    const groups = groupEntriesByDomainInFirstAppearanceOrder(entries);
-    expect(groups.map(g => g.domain)).toEqual([2, 1]);
-    expect(groups[0].entries.map(e => e.id)).toEqual([1, 3]);
-    expect(groups[1].entries.map(e => e.id)).toEqual([2, 4]);
+    const groups = groupEntriesByDomain(entries);
+    expect(groups.map(g => g.domain)).toEqual([1, 2]);
+    expect(groups[0].entries.map(e => e.id)).toEqual([2, 4]);
+    expect(groups[1].entries.map(e => e.id)).toEqual([1, 3]);
   });
 
   it('omits domains with no entries entirely (no empty group)', () => {
-    const groups = groupEntriesByDomainInFirstAppearanceOrder([{ id: 1, domain: 3 }]);
+    const groups = groupEntriesByDomain([{ id: 1, domain: 3 }]);
     expect(groups).toEqual([{ domain: 3, entries: [{ id: 1, domain: 3 }] }]);
   });
 });
