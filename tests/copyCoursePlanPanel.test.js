@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { clearAllData, addChild } from '../src/storage/db.js';
 import { addParentReport, addCoursePlanEntry, listCoursePlanEntriesForReport } from '../src/storage/parentReportDb.js';
 import { renderCopyCoursePlanPanel } from '../src/ui/copyCoursePlanPanel.js';
@@ -11,6 +11,7 @@ describe('renderCopyCoursePlanPanel', () => {
   let closed;
   const originalShowModal = HTMLDialogElement.prototype.showModal;
   const originalClose = HTMLDialogElement.prototype.close;
+  let scrollToSpy;
 
   beforeEach(async () => {
     await clearAllData();
@@ -20,21 +21,23 @@ describe('renderCopyCoursePlanPanel', () => {
     other = await addParentReport({ childId: otherChild.id, tier: 'Ⅴ', period: '115年06月' });
     opened = 0;
     closed = 0;
-    // jsdom has no real modal dialogs — same stubbing as formPopup.test.js.
     HTMLDialogElement.prototype.showModal = function () { opened += 1; this.open = true; };
     HTMLDialogElement.prototype.close = function () { closed += 1; this.open = false; this.dispatchEvent(new Event('close')); };
-    // Mock window.scrollTo for formPopup's body scroll locking
-    window.scrollTo = () => {};
+    scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {
     HTMLDialogElement.prototype.showModal = originalShowModal;
     HTMLDialogElement.prototype.close = originalClose;
+    scrollToSpy.mockRestore();
+    document.body.innerHTML = '';
   });
 
   async function setup(options = {}) {
     const host = document.createElement('div');
     const trigger = document.createElement('button');
+    document.body.appendChild(host);
+    document.body.appendChild(trigger);
     await renderCopyCoursePlanPanel(host, { trigger, report, onChange: () => {}, ...options });
     return { host, trigger, form: host.querySelector('[data-copy-plan-form]') };
   }
@@ -59,8 +62,9 @@ describe('renderCopyCoursePlanPanel', () => {
 
     expect(form.textContent).toContain('沒有同年齡層、同月份的其他幼兒課程計畫可以套用');
     expect(form.querySelector('[type="submit"]')).toBeNull();
-    form.querySelector('[data-action="close-copy-plan"]').click();
-    expect(form.querySelector('[data-action="close-copy-plan"]').textContent).toBe('關閉');
+    const closeBtn = form.querySelector('[data-action="close-copy-plan"]');
+    expect(closeBtn.textContent).toBe('關閉');
+    closeBtn.click();
     expect(closed).toBe(1);
   });
 
@@ -115,7 +119,8 @@ describe('renderCopyCoursePlanPanel', () => {
   it('a double submit runs only one copy', async () => {
     await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
     let changed = false;
-    const { form } = await setup({ onChange: () => { changed = true; }, confirmCopy: () => true });
+    let confirmCopyCallCount = 0;
+    const { form } = await setup({ onChange: () => { changed = true; }, confirmCopy: () => { confirmCopyCallCount += 1; return true; } });
 
     form.querySelector(`input[value="${other.id}"]`).click();
     submit(form);
@@ -123,6 +128,21 @@ describe('renderCopyCoursePlanPanel', () => {
     await waitFor(() => changed);
     await new Promise(resolve => setTimeout(resolve, 50));
 
+    expect(confirmCopyCallCount).toBe(1);
     expect((await listCoursePlanEntriesForReport(report.id)).map(e => e.activityName)).toEqual(['畫畫']);
+  });
+
+  it('displays error message on copy failure', async () => {
+    await addCoursePlanEntry({ reportId: other.id, indicatorCode: 'Ⅴ-1-6', activityName: '畫畫' });
+    let changed = false;
+    const { form } = await setup({ onChange: () => { changed = true; }, confirmCopy: () => { throw new Error('Copy failed'); } });
+
+    form.querySelector(`input[value="${other.id}"]`).click();
+    submit(form);
+    await waitFor(() => form.querySelector('[data-error="copy"]').textContent !== '');
+
+    expect(form.querySelector('[data-error="copy"]').textContent).toBe('套用失敗，請再試一次');
+    expect(closed).toBe(0);
+    expect(changed).toBe(false);
   });
 });

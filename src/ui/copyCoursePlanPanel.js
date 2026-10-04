@@ -57,15 +57,8 @@ export async function renderCopyCoursePlanPanel(
     if (submit) submit.disabled = !selectedSource();
   };
 
-  // Initialize the submit button state
   updateSubmitButton();
-
-  // Listen to changes on the radio inputs
-  const radioInputs = form.querySelectorAll('input[name="copy-plan-source"]');
-  radioInputs.forEach(input => {
-    input.addEventListener('click', updateSubmitButton);
-    input.addEventListener('change', updateSubmitButton);
-  });
+  form.addEventListener('change', updateSubmitButton);
 
   form.addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
@@ -74,7 +67,6 @@ export async function renderCopyCoursePlanPanel(
     const ids = { targetReportId: report.id, sourceReportId: source.report.id };
     try {
       const counts = await planCoursePlanCopy(ids);
-      // Cancel keeps the panel open so another child can be picked.
       if (!confirmCopy(copyConfirmMessage({ childName: source.childName, ...counts }))) return;
       await copyCoursePlan(ids);
     } catch (err) {
