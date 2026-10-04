@@ -1,4 +1,4 @@
-import { runRequest, withFreshPhotoBlobs } from '../storage/dbCore.js';
+import { runRequest, withStoredPhotos } from '../storage/dbCore.js';
 import { writeSyncState, deleteSyncState } from '../storage/syncStateDb.js';
 import { mapWithConcurrency, MAX_CONCURRENCY, AuthExpiredError } from './driveClient.js';
 import { PHOTO_STORE } from './syncStores.js';
@@ -26,8 +26,8 @@ async function attachDownloadedPhoto(entry, photoUid, blob) {
   );
   // Raw put, not putRecord: filling in bytes the cloud already has is not a local edit, and
   // bumping updatedAt here would schedule a pointless re-upload of the whole record.
-  const fresh = await withFreshPhotoBlobs({ ...stored, photos, id: entry.id });
-  await runRequest(entry.store, 'readwrite', store => store.put(fresh));
+  const next = await withStoredPhotos({ ...stored, photos, id: entry.id });
+  await runRequest(entry.store, 'readwrite', store => store.put(next));
   entry.record.photos = photos;
 }
 
@@ -63,9 +63,14 @@ export async function syncPhotos({
     await writeSyncState({ uid: photoUid, store: 'photo', hash: null, fileId, syncedAt: cloudNow });
   });
 
+  // Downloads run in parallel, but attaching is a read-modify-write of the whole entry: two photos
+  // of one entry attached at once would each write back a copy missing the other's bytes.
+  let attachQueue = Promise.resolve();
   const downloads = await mapWithConcurrency(toDownload, concurrency, async ({ photoUid, entry, fileId }) => {
     const blob = await drive.downloadPhoto(fileId);
-    await attachDownloadedPhoto(entry, photoUid, blob);
+    const attached = attachQueue.then(() => attachDownloadedPhoto(entry, photoUid, blob));
+    attachQueue = attached.catch(() => {});
+    await attached;
     await writeSyncState({ uid: photoUid, store: 'photo', hash: null, fileId, syncedAt: cloudNow });
   });
 

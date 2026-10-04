@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DB_NAME, withFreshPhotoBlobs, blobToArrayBuffer } from '../src/storage/dbCore.js';
+import {
+  DB_NAME, blobToArrayBuffer, addRecord, putRecord, runRequest,
+  photoFromStored, withStoredPhotos, withReadablePhotos,
+} from '../src/storage/dbCore.js';
 
 function deleteDb() {
   return new Promise((resolve, reject) => {
@@ -144,28 +147,51 @@ describe('dbCore 寫入閘門', () => {
   });
 });
 
-describe('withFreshPhotoBlobs', () => {
-  it('swaps each photo blob for a new one with the same bytes and type, leaving the rest alone', async () => {
-    const original = new Blob(['jpeg-bytes'], { type: 'image/jpeg' });
-    const record = { id: 1, caption: 'x', photos: [{ photoUid: 'p1', blob: original }, { photoUid: 'p2' }] };
-    const fresh = await withFreshPhotoBlobs(record);
-    expect(fresh.photos[0].blob).not.toBe(original);
-    expect(fresh.photos[0].blob.type).toBe('image/jpeg');
-    expect(new TextDecoder().decode(await blobToArrayBuffer(fresh.photos[0].blob))).toBe('jpeg-bytes');
-    expect(fresh.photos[1]).toEqual({ photoUid: 'p2' });
-    expect(fresh.caption).toBe('x');
+describe('stored photo format', () => {
+  const text = async blob => new TextDecoder().decode(await blobToArrayBuffer(blob));
+
+  it('stores photos as raw bytes, not a Blob, and reads them back as a Blob', async () => {
+    await deleteDb();
+    const { id } = await addRecord('highlightEntries', {
+      reportId: 1, caption: 'x', photos: [{ photoUid: 'p1', width: 9, blob: new Blob(['jpeg-bytes'], { type: 'image/jpeg' }) }],
+    });
+    const raw = await runRequest('highlightEntries', 'readonly', store => store.get(id));
+    expect(raw.photos[0].blob).toBeUndefined();
+    expect(raw.photos[0]).toMatchObject({ photoUid: 'p1', width: 9, type: 'image/jpeg' });
+
+    const readable = await withReadablePhotos(raw);
+    expect(readable.photos[0].bytes).toBeUndefined();
+    expect(readable.photos[0].blob.type).toBe('image/jpeg');
+    expect(await text(readable.photos[0].blob)).toBe('jpeg-bytes');
   });
 
-  it('keeps an unreadable photo as a descriptor without its blob instead of throwing', async () => {
+  it('re-saving an entry read in stored form keeps the bytes', async () => {
+    await deleteDb();
+    const { id } = await addRecord('highlightEntries', {
+      reportId: 1, caption: 'x', photos: [{ photoUid: 'p1', blob: new Blob(['abc'], { type: 'image/png' }) }],
+    });
+    const raw = await runRequest('highlightEntries', 'readonly', store => store.get(id));
+    await putRecord('highlightEntries', { ...raw, caption: 'y' });
+    const again = await withReadablePhotos(await runRequest('highlightEntries', 'readonly', store => store.get(id)));
+    expect(await text(again.photos[0].blob)).toBe('abc');
+  });
+
+  it('an old entry still holding a Blob reads as a fresh Blob', async () => {
+    const readable = await photoFromStored({ photoUid: 'p1', blob: new Blob(['old'], { type: 'image/jpeg' }) });
+    expect(await text(readable.blob)).toBe('old');
+  });
+
+  it('a photo whose bytes are gone keeps its descriptor without bytes instead of throwing', async () => {
     const dead = Object.create(Blob.prototype);
     dead.arrayBuffer = () => Promise.reject(new Error('NotFoundError'));
     const record = { id: 1, photos: [{ photoUid: 'p1', width: 0, blob: dead }] };
-    const fresh = await withFreshPhotoBlobs(record);
-    expect(fresh.photos).toEqual([{ photoUid: 'p1', width: 0 }]);
+    expect((await withStoredPhotos(record)).photos).toEqual([{ photoUid: 'p1', width: 0 }]);
+    expect((await withReadablePhotos(record)).photos).toEqual([{ photoUid: 'p1', width: 0 }]);
   });
 
   it('returns a record without photos untouched', async () => {
     const record = { id: 1, name: 'a' };
-    expect(await withFreshPhotoBlobs(record)).toBe(record);
+    expect(await withStoredPhotos(record)).toBe(record);
+    expect(await withReadablePhotos(record)).toBe(record);
   });
 });

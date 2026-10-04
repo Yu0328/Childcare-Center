@@ -1,4 +1,4 @@
-import { runRequest, newUid, withFreshPhotoBlobs } from '../storage/dbCore.js';
+import { runRequest, newUid, withStoredPhotos, withReadablePhotos } from '../storage/dbCore.js';
 import { SYNC_STORES, serializeRecord, deserializeRecord, hashPayload, startHashGeneration, PHOTO_STORE } from './syncStores.js';
 
 // Stores whose list views sort by createdAt (added after these stores already existed) rather
@@ -19,8 +19,8 @@ function refKey(store, value) {
 // locally-modified and bounce straight back up as a fake change) and must not fire the write
 // listener (that would schedule another sync from inside a sync).
 async function rawPut(storeName, record) {
-  const fresh = await withFreshPhotoBlobs(record);
-  return runRequest(storeName, 'readwrite', store => store.put(fresh));
+  const stored = await withStoredPhotos(record);
+  return runRequest(storeName, 'readwrite', store => store.put(stored));
 }
 
 export async function readLocalSnapshot() {
@@ -32,9 +32,9 @@ export async function readLocalSnapshot() {
   const rows = new Map();
   for (const { store } of SYNC_STORES) {
     let all = await runRequest(store, 'readonly', objectStore => objectStore.getAll());
-    // Read the photo bytes right away: Safari can stop serving a Blob from IndexedDB once other
-    // async work has run (see listHighlightEntriesForReport), and the loop below awaits plenty.
-    if (store === PHOTO_STORE) all = await Promise.all(all.map(withFreshPhotoBlobs));
+    // Turned into Blobs right away: an old entry's stored Blob can stop being readable in Safari
+    // once other async work has run (see listHighlightEntriesForReport), and the loop below awaits plenty.
+    if (store === PHOTO_STORE) all = await Promise.all(all.map(withReadablePhotos));
     rows.set(store, all);
 
     for (const row of all) {
@@ -88,9 +88,10 @@ export async function readLocalSnapshot() {
 export async function applyRemoteRecord({ store, uid, payload }, snapshot) {
   const idOf = (refStore, refUid) => snapshot.idByUid.get(refKey(refStore, refUid));
   const existingId = snapshot.idByUid.get(refKey(store, uid));
+  // Readable form, so deserializeRecord can carry this device's photo bytes over by photoUid.
   const existing = existingId === undefined
     ? undefined
-    : await runRequest(store, 'readonly', objectStore => objectStore.get(existingId));
+    : await withReadablePhotos(await runRequest(store, 'readonly', objectStore => objectStore.get(existingId)));
 
   const record = deserializeRecord(store, payload, idOf, existing && existing.photos);
   if (record === null) return 'deferred';
@@ -98,7 +99,8 @@ export async function applyRemoteRecord({ store, uid, payload }, snapshot) {
   record.uid = uid;
   let finalId = existingId;
   if (existingId === undefined) {
-    finalId = await runRequest(store, 'readwrite', objectStore => objectStore.add(record));
+    const stored = await withStoredPhotos(record);
+    finalId = await runRequest(store, 'readwrite', objectStore => objectStore.add(stored));
   } else {
     await rawPut(store, { ...existing, ...record, id: existingId });
   }

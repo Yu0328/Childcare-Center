@@ -1,4 +1,4 @@
-import { runRequest, addRecord, putRecord, deleteRecord } from './dbCore.js';
+import { runRequest, addRecord, putRecord, deleteRecord, photoFromStored } from './dbCore.js';
 
 export async function addParentReport({ childId, tier, period, isNew = false, uid, updatedAt }) {
   const createdAt = new Date().toISOString();
@@ -184,8 +184,10 @@ export async function listHighlightEntriesForReport(reportId) {
               // storedIndex: where it sits in the stored list, which differs from its position here
               // once an unreadable photo before it has been dropped — see removeHighlightPhoto.
               // Non-enumerable, so it never rides along into a backup file or a saved copy.
+              const readable = await photoFromStored(photo);
+              if (!readable.blob) throw new Error('照片內容已遺失');
               return Object.defineProperty(
-                { ...photo, blob: new Blob([await photo.blob.arrayBuffer()], { type: photo.blob.type }) },
+                readable,
                 'storedIndex',
                 { value: index }
               );

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Blob as NodeBlob } from 'node:buffer';
 import { clearAllData, addChild } from '../src/storage/db.js';
-import { addRecord } from '../src/storage/dbCore.js';
+import { addRecord, runRequest } from '../src/storage/dbCore.js';
 
 // jsdom's Blob polyfill isn't recognized by Node's native structuredClone (used internally by
 // fake-indexeddb to clone stored values), so a Blob round-tripped through IndexedDB in this
@@ -251,7 +251,10 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
   it('adds, lists, updates and deletes a highlight entry', async () => {
     const photo = { blob: new Blob(['x'], { type: 'image/jpeg' }), width: 100, height: 80 };
     const highlight = await addHighlightEntry({ reportId: report.id, photos: [photo], caption: '我最喜歡騎車車了！' });
-    expect(await listHighlightEntriesForReport(report.id)).toEqual([highlight]);
+    // Stored as raw bytes, so the photo comes back carrying its `type` as well.
+    expect(await listHighlightEntriesForReport(report.id)).toEqual([
+      { ...highlight, photos: [{ ...photo, type: 'image/jpeg' }] },
+    ]);
 
     const updated = await updateHighlightEntry(highlight.id, { caption: '新的說明' });
     expect(updated.caption).toBe('新的說明');
@@ -283,21 +286,16 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
     expect(entries.map(e => e.id)).toEqual([legacy.id, fresh.id]);
   });
 
-  it('drops a photo whose blob fails to read instead of throwing and losing the rest', async () => {
-    const goodPhoto = { blob: new Blob(['a'], { type: 'image/jpeg' }), width: 10, height: 10 };
-    const badPhoto = { blob: new Blob(['b'], { type: 'image/jpeg' }), width: 20, height: 20 };
-    await addHighlightEntry({ reportId: report.id, photos: [goodPhoto, badPhoto], caption: '兩張照片' });
-
-    const originalArrayBuffer = Blob.prototype.arrayBuffer;
-    let callCount = 0;
-    vi.spyOn(Blob.prototype, 'arrayBuffer').mockImplementation(function () {
-      callCount += 1;
-      if (callCount === 2) return Promise.reject(new Error('The object can not be found here.'));
-      return originalArrayBuffer.call(this);
-    });
+  it('drops a photo whose bytes are gone instead of throwing and losing the rest', async () => {
+    // Raw add: what Safari leaves behind once it lost a photo — a descriptor with no bytes.
+    await runRequest('highlightEntries', 'readwrite', store => store.add({
+      reportId: report.id, caption: '兩張照片',
+      photos: [{ bytes: new TextEncoder().encode('a').buffer, type: 'image/jpeg', width: 10, height: 10 }, { width: 20, height: 20 }],
+    }));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const [entry] = await listHighlightEntriesForReport(report.id);
-    expect(entry.photos).toHaveLength(1);
+    expect(entry.photos.map(p => p.width)).toEqual([10]);
     expect(entry.caption).toBe('兩張照片');
 
     vi.restoreAllMocks();

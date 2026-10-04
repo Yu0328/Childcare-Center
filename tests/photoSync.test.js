@@ -90,7 +90,7 @@ describe('syncPhotos', () => {
     // fake-indexeddb 無法原樣還原真實 Blob，listHighlightEntriesForReport 會嘗試 .arrayBuffer()
     // 而讀不到，所以這裡直接讀原始紀錄確認 blob 有被補上，而不透過那層 wrapper。
     const stored = await runRequest('highlightEntries', 'readonly', store => store.get(entry.id));
-    expect(stored.photos[0].blob).toBeTruthy();
+    expect(stored.photos[0].bytes).toBeTruthy();
   });
 
   it('本機已刪掉的照片，雲端那份也丟進垃圾桶', async () => {
@@ -146,6 +146,6 @@ describe('syncPhotos', () => {
     expect(result.downloaded).toBe(1);
     // 同上：直接讀原始紀錄，避開 listHighlightEntriesForReport 對假 Blob 的 .arrayBuffer() 限制。
     const stored = await runRequest('highlightEntries', 'readonly', store => store.get(entry.id));
-    expect(stored.photos.find(p => p.photoUid === 'good').blob).toBeTruthy();
+    expect(stored.photos.find(p => p.photoUid === 'good').bytes).toBeTruthy();
   });
 });

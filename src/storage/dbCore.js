@@ -117,28 +117,56 @@ export function blobToArrayBuffer(blob) {
   });
 }
 
-// Safari 15 cannot store a Blob that IndexedDB itself handed back ("UnknownError: Error preparing
-// Blob/File data to be stored in object store"), so re-putting an existing 點滴分享 entry failed —
-// on a Mac stuck on Safari 15.5 that stopped every sync at the first old photo. A copy backed by
-// freshly read bytes stores fine on every browser.
-//
-// The same Safari also loses the file behind a stored Blob ("NotFoundError: The object can not be
-// found here"). Those bytes are gone and the old Blob can't be stored again either, so the photo
-// keeps its descriptor but loses `blob` — the screen already skips it (listHighlightEntriesForReport),
-// and photoSync re-downloads it if another device ever uploaded it. Throwing instead would block
-// every save of that entry and every sync for good.
-export async function withFreshPhotoBlobs(record) {
+// 點滴分享 photos are stored as raw bytes (`bytes` + `type`), never as a Blob. Safari 15 can't
+// be trusted with a Blob in IndexedDB: it refuses to store one IndexedDB itself handed back
+// ("UnknownError: Error preparing Blob/File data..."), and it loses the file behind a stored one
+// ("NotFoundError: The object can not be found here") — on a Mac stuck on Safari 15.5 even photos
+// freshly downloaded by sync were unreadable after a reload. Plain bytes are kept inline and read
+// back fine everywhere. Everything outside storage still sees `photo.blob`; entries saved before
+// this change still hold a Blob and are converted the next time they're written.
+async function photoToStored(photo) {
+  if (!photo || !(photo.blob instanceof Blob)) return photo;
+  const { blob, ...descriptor } = photo;
+  try {
+    return { ...descriptor, type: blob.type || descriptor.type, bytes: await blobToArrayBuffer(blob) };
+  } catch (err) {
+    // A Blob whose bytes Safari already lost can't be stored again either. Keeping the descriptor
+    // without bytes lets the save (and sync) go on; the screen skips it, and photoSync re-downloads
+    // it if another device ever uploaded it.
+    console.warn('點滴分享照片讀取失敗，已略過照片內容：', photo.photoUid, err);
+    return descriptor;
+  }
+}
+
+// Throws when the bytes are gone; callers decide whether that drops the photo or just its bytes.
+export async function photoFromStored(photo) {
+  if (!photo) return photo;
+  if (photo.bytes) {
+    const { bytes, ...descriptor } = photo;
+    return { ...descriptor, blob: new Blob([bytes], { type: descriptor.type || 'image/jpeg' }) };
+  }
+  // An old entry's Blob: read it now, before Safari's staleness window opens (see
+  // listHighlightEntriesForReport), into a Blob that isn't backed by IndexedDB.
+  if (photo.blob instanceof Blob) {
+    return { ...photo, blob: new Blob([await blobToArrayBuffer(photo.blob)], { type: photo.blob.type }) };
+  }
+  // No bytes at all (or something that isn't a Blob): nothing to show.
+  const { blob, ...descriptor } = photo;
+  return descriptor;
+}
+
+export async function withStoredPhotos(record) {
   if (!Array.isArray(record.photos)) return record;
-  const photos = await Promise.all(record.photos.map(async photo => {
-    if (!photo || !(photo.blob instanceof Blob)) return photo;
-    try {
-      return { ...photo, blob: new Blob([await blobToArrayBuffer(photo.blob)], { type: photo.blob.type }) };
-    } catch (err) {
-      console.warn('點滴分享照片讀取失敗，已略過照片內容：', photo.photoUid, err);
-      const { blob, ...descriptor } = photo;
-      return descriptor;
-    }
-  }));
+  return { ...record, photos: await Promise.all(record.photos.map(photoToStored)) };
+}
+
+export async function withReadablePhotos(record) {
+  if (!Array.isArray(record.photos)) return record;
+  const photos = await Promise.all(record.photos.map(photo => photoFromStored(photo).catch(err => {
+    console.warn('點滴分享照片讀取失敗，已略過照片內容：', photo.photoUid, err);
+    const { blob, ...descriptor } = photo;
+    return descriptor;
+  })));
   return { ...record, photos };
 }
 
@@ -167,7 +195,8 @@ export async function addRecord(storeName, record) {
     uid: record.uid || newUid(),
     updatedAt: record.updatedAt || new Date().toISOString(),
   };
-  const id = await runRequest(storeName, 'readwrite', store => store.add(stamped));
+  const stored = await withStoredPhotos(stamped);
+  const id = await runRequest(storeName, 'readwrite', store => store.add(stored));
   notifyWrite();
   return { ...stamped, id };
 }
@@ -175,8 +204,9 @@ export async function addRecord(storeName, record) {
 export async function putRecord(storeName, record) {
   // Unlike addRecord, updatedAt is always overwritten: callers pass a spread of the existing
   // record, which would otherwise carry the old timestamp straight back in.
-  const stamped = await withFreshPhotoBlobs({ ...record, uid: record.uid || newUid(), updatedAt: new Date().toISOString() });
-  await runRequest(storeName, 'readwrite', store => store.put(stamped));
+  const stamped = { ...record, uid: record.uid || newUid(), updatedAt: new Date().toISOString() };
+  const stored = await withStoredPhotos(stamped);
+  await runRequest(storeName, 'readwrite', store => store.put(stored));
   notifyWrite();
   return stamped;
 }
