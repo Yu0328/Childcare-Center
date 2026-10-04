@@ -209,12 +209,21 @@ const CHILDREN_CH = {
 
 const picker = files =>
   modal('選擇檔案', `${muted('可以一次選好幾個')}${files.map(([name, on, hit]) => `<span class="ms-pick${on ? ' on' : ''}"${hit ? ' data-hit' : ''}>${file(name)}</span>`).join('')}`, '');
+// The 確認匯入內容 screen: a 總表 lists its 觀察紀錄; a 適性紀錄 its four parts, each tickable.
+const IMPORT_PARTS = {
+  適性總表: () =>
+    `<span class="ms-group">觀察紀錄（共 2 筆，取消勾選可排除不匯入）</span>${row(`${cb('', true)}${date('115/10/07')}<b>音樂律動</b>${glyph('○')}`)}${row(
+      `${cb('', true)}${date('115/10/14')}<b>積木疊高</b>${glyph('○')}`
+    )}`,
+  適性紀錄: () =>
+    ['課程計畫表（共 5 項）', '適性發展紀錄表（共 2 段）', '行為觀察（共 1 筆）', '點滴分享（共 2 組）'].map(part => cb(part, true)).join(''),
+};
 const confirmImport = (m, kind, { name = '王小明', note = '', extra = '' } = {}) =>
   screen(
-    bar(m, { back: '← 取消匯入', title: `確認匯入內容（${kind}）` }),
-    `<div class="ms-form">${note ? `<span class="ms-note">${note}</span>` : ''}${field('姓名', name)}${field('月齡階段', 'Ⅴ（19-24個月）')}<span class="ms-group">觀察紀錄（共 2 筆，取消勾選可排除不匯入）</span>${row(
-      `${cb('', true)}${date('115/10/07')}<b>音樂律動</b>${glyph('○')}`
-    )}${row(`${cb('', true)}${date('115/10/14')}<b>積木疊高</b>${glyph('○')}`)}${actions(btn('確認匯入', 'primary', true))}</div>`,
+    bar(m, { back: ['← 取消匯入', '← 取消'], title: `確認匯入內容（${kind}）` }),
+    `<div class="ms-form">${note ? `<span class="ms-note">${note}</span>` : ''}${field('姓名', name)}${field('月齡階段', 'Ⅴ（19-24個月）')}${IMPORT_PARTS[kind]()}${actions(
+      btn('確認匯入', 'primary', true)
+    )}</div>`,
     extra
   );
 
@@ -243,6 +252,9 @@ const IMPORT = {
 
 /* ---------- 4 課程月計畫 ---------- */
 
+// 指標所屬年齡層: the tier switch above a 指標 picker (月計畫 and 課程計畫表 share it).
+const tierSwitch = () => `<span class="ms-field ms-field--bare">指標所屬年齡層</span>${tabs(['7-12個月', '13-18個月', '19-24個月'], '19-24個月')}`;
+
 const planListForm = hitSubmit =>
   aside('新增課程月計畫', field('年月', '115年10月'), `<span class="ms-field ms-field--bare">幼兒</span>${cb('王小明', true)}${cb('林小美', true)}`, actions(btn('新增', 'primary', hitSubmit)));
 const planList = (m, { fabHit = false, popup = false, hitSubmit = false } = {}) =>
@@ -264,10 +276,10 @@ const calendar = (m, { hitDay = -1, newItem = false, absent = false } = {}) =>
       }${i === 2 && newItem ? '<em class="ms-fill">Ⅴ-3-2【故事時間】</em>' : ''}</span>`
   ).join('')}</div></div>`;
 const dayPanel = ({ hitAdd = false, hitAbsent = false, absent = false } = {}) =>
-  `<div class="ms-aside"><b>王小明　第2週　10/07</b>${row(
+  `<div class="ms-aside"><b>王小明　第二週　10/07</b>${row(
     `${code('Ⅴ-1-6')}<b>【我愛畫畫】</b>${btn('編輯', 'edit')}${del()}`
   )}<div class="ms-cbline">${cb('未達成')}${cb('請假／其他活動代替', absent, hitAbsent)}</div>${absent ? field('', '戶外教學') : ''}${
-    hitAdd ? `${tabs(['13-18個月', '19-24個月'], '19-24個月')}${field('指標', 'Ⅴ-3-2')}${field('活動名稱', '故事時間')}${actions(btn('新增項目', 'primary', true))}` : ''
+    hitAdd ? `${tierSwitch()}${field('指標', 'Ⅴ-3-2')}${field('活動名稱', '故事時間')}${actions(btn('新增項目', 'primary', true))}` : ''
   }</div>`;
 const planEditor = (m, { hitDay = -1, panel = '', hitExport = false, newItem = false, absent = false } = {}) =>
   screen(
@@ -353,7 +365,7 @@ const coursePlan = ({ items = [['我愛畫畫', 'Ⅴ-1-6', [['115/10/07', '已�
 const coursePlanForm = hitSubmit =>
   aside(
     '新增課程計畫項目',
-    tabs(['13-18個月', '19-24個月'], '19-24個月'),
+    tierSwitch(),
     field('指標', 'Ⅴ-1-6 能用筆畫出…'),
     field('活動名稱', '我愛畫畫'),
     field('日期', '115/10/07'),
@@ -408,7 +420,7 @@ const PARENT_REPORT = {
       note: '要記錄較早年齡層的指標時，先切換「指標所屬年齡層」再選指標。',
       steps: [
         ...addSteps({
-          draw: (m, { fabHit, popup, hitSubmit }) => prEditor(m, { list: muted('目前還沒有課程計畫'), form: coursePlanForm(hitSubmit), fabHit, popup }),
+          draw: (m, { fabHit, popup, hitSubmit }) => prEditor(m, { list: '', form: coursePlanForm(hitSubmit), fabHit, popup }),
           formCap: '選指標（活動名稱會自動帶入），填第一次上課的日期，按「新增」',
         }),
         { cap: '項目依領域分組，按領域標題可以展開或收起', draw: m => prEditor(m, { list: coursePlan({ fill: true }), form: coursePlanForm(false) }) },
@@ -434,7 +446,7 @@ const PARENT_REPORT = {
       steps: [
         { cap: '按「適性發展紀錄表」分頁', draw: m => prEditorTabHit(m, '適性發展紀錄表') },
         ...addSteps({
-          draw: (m, { fabHit, popup, hitSubmit }) => prEditor(m, { tab: '適性發展紀錄表', list: muted('目前還沒有段落'), form: devRecordForm(hitSubmit), fabHit, popup }),
+          draw: (m, { fabHit, popup, hitSubmit }) => prEditor(m, { tab: '適性發展紀錄表', list: '', form: devRecordForm(hitSubmit), fabHit, popup }),
           formCap: '選領域、勾要提到的課程、寫敘述，按「新增」',
         }),
         { cap: '一個領域寫一段', draw: m => prEditor(m, { tab: '適性發展紀錄表', list: row('<b>身體動作<small>能握筆畫出圓形…</small></b>' + del(), { fill: true }), form: devRecordForm(false) }) },
@@ -446,9 +458,10 @@ const PARENT_REPORT = {
       steps: [
         { cap: '按「行為觀察」分頁', draw: m => prEditorTabHit(m, '行為觀察') },
         ...addSteps({
-          draw: (m, { fabHit, popup, hitSubmit }) => prEditor(m, { tab: '行為觀察', list: muted('目前還沒有行為觀察'), form: behaviorForm(hitSubmit), fabHit, popup }),
+          draw: (m, { fabHit, popup, hitSubmit }) => prEditor(m, { tab: '行為觀察', list: '', form: behaviorForm(hitSubmit), fabHit, popup }),
           formCap: '填標題（可以不填）和敘述，按「新增」',
         }),
+        { cap: '行為觀察加上去了', draw: m => prEditor(m, { tab: '行為觀察', list: row('<b>分享玩具<small>主動把積木分給同學…</small></b>' + del(), { fill: true }), form: behaviorForm(false) }) },
       ],
     },
     {
@@ -457,9 +470,14 @@ const PARENT_REPORT = {
       note: '每則最多 3 張照片。存好之後只能刪照片、不能補照片。',
       steps: [
         { cap: '按「點滴分享」分頁', draw: m => prEditorTabHit(m, '點滴分享') },
-        { modes: ['phone'], cap: '按右下角藍色的「＋」', draw: m => prEditor(m, { tab: '點滴分享', list: muted('目前還沒有點滴分享'), form: highlightForm(), fabHit: true }) },
-        { cap: '按照片框選照片，一次可以選好幾張', draw: m => prEditor(m, { tab: '點滴分享', list: muted('目前還沒有點滴分享'), form: highlightForm({ hitPhoto: true }), popup: true }) },
-        { cap: '寫描述，按「新增」', draw: m => prEditor(m, { tab: '點滴分享', list: muted('目前還沒有點滴分享'), form: highlightForm({ filled: true, hitSubmit: true }), popup: true }) },
+        { modes: ['phone'], cap: '按右下角藍色的「＋」', draw: m => prEditor(m, { tab: '點滴分享', form: highlightForm(), fabHit: true }) },
+        { cap: '按照片框選照片，一次可以選好幾張', draw: m => prEditor(m, { tab: '點滴分享', form: highlightForm({ hitPhoto: true }), popup: true }) },
+        { cap: '寫描述，按「新增」', draw: m => prEditor(m, { tab: '點滴分享', form: highlightForm({ filled: true, hitSubmit: true }), popup: true }) },
+        {
+          cap: '照片和描述加上去了',
+          draw: m =>
+            prEditor(m, { tab: '點滴分享', list: row(`<span class="ms-thumbs"><i></i><i></i></span><b>和同學一起蓋城堡</b>${del()}`, { fill: true }), form: highlightForm() }),
+        },
       ],
     },
     {
@@ -474,7 +492,7 @@ const PARENT_REPORT = {
             prEditor(m, {
               list: coursePlan(),
               form: coursePlanForm(false),
-              extra: modal('', `${muted('以下內容含有『今天』或『今日』，可以在這裡修改')}${field('行為觀察｜分享玩具｜內容', '10/14 主動把積木分給同學')}`, btn('取消', 'ghost') + btn('只儲存') + btn('儲存並匯出', 'primary', true)),
+              extra: modal('', `${muted('以下內容含有『今天』或『今日』，可以在這裡修改')}${field('行為觀察｜分享玩具｜內容', '10/14 主動把積木分給同學')}`, btn('儲存並匯出', 'primary', true) + btn('只儲存') + btn('取消', 'ghost')),
             }),
         },
         { cap: 'Word 檔會存到「下載」資料夾', draw: m => screen(bar(m, { title: '下載' }), download('王小明-適性紀錄-115年10月.docx')) },
@@ -537,6 +555,7 @@ const ASSESSMENT = {
         { cap: '按幼兒的名字', draw: m => pickChild(m, '適性總表') },
         ...addSteps({ draw: (m, o) => formList(m, { ...o, rows: muted('目前還沒有適性總表') }), formCap: '確認月齡階段和紀錄年月，按「新增」' }),
         { cap: '按這一份打開', draw: m => formList(m, { hitRow: true }) },
+        { cap: '開始填寫', draw: m => formEditor(m) },
       ],
     },
     {
@@ -567,11 +586,11 @@ const COPIED_PLAN = [
   ['黏土小點心', 'Ⅴ-1-4', [['115/10/09', '已發展○']]],
   ['積木疊高', 'Ⅴ-2-1', [['115/10/14', '已發展○']]],
 ];
-const copyPopup = modal('套用其他幼兒課程計畫', `<span class="ms-field ms-field--bare">幼兒</span>${radio('林小美（3 筆）', true)}`, btn('取消') + btn('套用', 'primary', true));
+const copyPopup = modal('套用其他幼兒課程計畫', `<span class="ms-field ms-field--bare">幼兒</span>${radio('林小美（3 筆）', true)}`, btn('套用', 'primary', true) + btn('取消'));
 const aggregateScreen = (m, { october = false, hitMonth = false, hitGo = false } = {}) =>
   screen(
     bar(m, { back: '← 返回適性總表列表', title: '王小明　從適性紀錄彙整' }),
-    `<div class="ms-form">${field('月齡階段', 'Ⅴ（19-24個月）')}<span class="ms-field ms-field--bare">選擇要彙整的適性紀錄</span>${cb('115年09月', true)}${cb('115年10月', october, hitMonth)}<span class="ms-field ms-field--bare">彙整方式</span><div class="ms-cbline">${radio('建立新總表')}${radio('合併進現有總表', true)}</div>${field('選擇要合併進去的總表', '115年09月')}${actions(btn('合併進總表', 'primary', hitGo))}</div>`
+    `<div class="ms-form">${field('月齡階段', 'Ⅴ 階段')}<span class="ms-field ms-field--bare">選擇要彙整的適性紀錄</span>${cb('115年09月', true)}${cb('115年10月', october, hitMonth)}<span class="ms-field ms-field--bare">彙整方式</span><div class="ms-cbline">${radio('建立新總表')}${radio('合併進現有總表', true)}</div>${field('選擇要合併進去的總表', '115年09月')}${actions(btn('合併進總表', 'primary', hitGo))}</div>`
   );
 const TIPS = {
   id: 'tips',
@@ -627,7 +646,7 @@ const TIPS = {
       id: 'tip-multi',
       title: '一次匯入多個 Word 檔',
       lead: '舊的 Word 檔不用一個一個匯入，可以一次全選。',
-      note: '每個檔案都會先讓你確認；不想匯入的那個，按左上角「← 取消匯入」就會跳過它。',
+      note: '每個檔案都會先讓你確認；不想匯入的那個，按左上角的「← 取消匯入」（手機是「← 取消」）就會跳過它。',
       steps: [
         { cap: '在首頁按「匯入檔案」', draw: () => homeScreen('匯入檔案') },
         { cap: '一次選好幾個 Word 檔', draw: () => homeScreen('', { extra: picker([['王小明-適性紀錄.docx', true], ['林小美-適性紀錄.docx', true, true], ['王小明-適性總表.docx']]) }) },
@@ -666,7 +685,8 @@ const BACKUP = {
       steps: [
         { cap: '按「備份」→「匯入備份」', draw: () => screen(appTop({ menuItems: backupMenu(false, true) }), '<div class="ms-home"></div>') },
         { cap: '選之前存的備份檔', draw: () => homeScreen('', { extra: modal('選擇檔案', `<span class="ms-pick" data-hit>${file('2026-10-04_備份.json')}</span>`, '') }) },
-        { cap: '確認後按「確定」，完成後頁面會自動重新整理', draw: () => homeScreen('', { extra: confirmBox('匯入備份會清除目前所有資料，確定要繼續嗎？') }) },
+        { cap: '確認後按「確定」', draw: () => homeScreen('', { extra: confirmBox('匯入備份會清除目前所有資料，確定要繼續嗎？') }) },
+        { cap: '頁面會自動重新整理，備份裡的資料都回來了', draw: () => homeScreen() },
       ],
     },
     {

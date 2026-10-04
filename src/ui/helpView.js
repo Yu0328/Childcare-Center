@@ -83,7 +83,10 @@ export async function renderHelpView(container, { onBack, hosted = false }) {
     mounted = [];
     view.dataset.mode = mode;
     seg.dataset.on = mode;
-    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+    seg.querySelectorAll('button').forEach(b => {
+      b.setAttribute('aria-checked', String(b.dataset.mode === mode));
+      b.tabIndex = b.dataset.mode === mode ? 0 : -1; // a radio group is one tab stop; arrows move within it
+    });
     container.querySelectorAll('.help-demo').forEach(el => {
       const demo = demosById.get(el.dataset.demo);
       const shown = !demo.modes || demo.modes.includes(mode);
@@ -111,9 +114,10 @@ export async function renderHelpView(container, { onBack, hosted = false }) {
     if (button) setMode(button.dataset.mode);
   });
   seg.addEventListener('keydown', event => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const next = { ArrowLeft: 'phone', ArrowUp: 'phone', ArrowRight: 'desk', ArrowDown: 'desk' }[event.key];
+    if (!next) return;
     event.preventDefault();
-    setMode(event.key === 'ArrowLeft' ? 'phone' : 'desk');
+    setMode(next);
     seg.querySelector(`[data-mode="${mode}"]`).focus();
   });
 
@@ -126,9 +130,12 @@ export async function renderHelpView(container, { onBack, hosted = false }) {
     head.addEventListener('click', () => {
       const section = head.closest('.help-ch');
       const open = !section.classList.contains('is-open');
+      const panel = section.querySelector('.help-ch__panel');
+      // Closing while focus is inside: keep it on the header rather than losing it to the page.
+      if (!open && panel.contains(document.activeElement)) head.focus();
       section.classList.toggle('is-open', open);
       head.setAttribute('aria-expanded', String(open));
-      section.querySelector('.help-ch__panel').inert = !open;
+      panel.inert = !open;
     })
   );
 

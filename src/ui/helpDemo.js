@@ -34,7 +34,7 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
 
   el.dataset.mode = mode;
   el.innerHTML = `
-    <h3 class="help-demo__title">${demo.title}</h3>
+    <h4 class="help-demo__title">${demo.title}</h4>
     ${demo.lead ? `<p class="help-demo__lead">${demo.lead}</p>` : ''}
     <div class="help-demo__grid">
       <div class="help-demo__stagebox">
@@ -64,7 +64,6 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
 
   function syncPlay() {
     playButton.innerHTML = playing ? `${ICON_PAUSE}暫停` : `${ICON_PLAY}播放`;
-    playButton.setAttribute('aria-pressed', String(!playing));
     screenEl.classList.toggle('pulse', !playing);
   }
 
@@ -89,6 +88,9 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
     timers.forEach(clearTimeout);
     timers.clear();
     pointer.classList.remove('show', 'tap');
+    // The cancelled timers would have cleared these: a cross-fading old frame and ripples.
+    screenEl.querySelectorAll('.ms').forEach(frame => frame !== pointer.previousElementSibling && frame.remove());
+    screenEl.querySelectorAll('.help-rip').forEach(ripple => ripple.remove());
   }
 
   async function run() {
@@ -140,10 +142,18 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
         await wait(450);
       }
       if (!live()) return;
+      if (index === steps.length - 1) {
+        // Last step pressed or pointed at: hold the frame a moment before starting over.
+        pointer.classList.remove('show');
+        await wait(2000);
+        if (!live()) return;
+      }
       index = (index + 1) % steps.length;
     }
   }
 
+  // Removed by destroy(): the same <article> is re-mounted on every 手機版／電腦版 switch.
+  const listeners = new AbortController();
   el.addEventListener('click', event => {
     const go = event.target.closest('[data-go]');
     if (go) {
@@ -161,16 +171,16 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
         stop();
       }
     }
-  });
+  }, { signal: listeners.signal });
 
-  // Plays only while on screen (a closed chapter has no height, so it never counts as visible).
+  // Plays only while at least 35% on screen; a closed chapter's demo is clipped to nothing.
   // No IntersectionObserver (jsdom) → never autoplays.
   let observer = null;
   if (typeof IntersectionObserver === 'function') {
     observer = new IntersectionObserver(
       ([entry]) => {
         if (!el.isConnected) return destroy();
-        visible = entry.isIntersecting;
+        visible = entry.isIntersecting && entry.intersectionRatio >= 0.35;
         if (visible) run();
         else stop();
       },
@@ -182,6 +192,7 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
   function destroy() {
     stop();
     observer?.disconnect();
+    listeners.abort();
   }
 
   syncPlay();

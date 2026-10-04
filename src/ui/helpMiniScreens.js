@@ -10,9 +10,12 @@ const cls = (base, mod) => `${base}${mod ? ` ${base}--${mod}` : ''}`;
 
 export const screen = (...parts) => `<div class="ms">${parts.join('')}</div>`;
 
-// Page header: ← back (short on a phone), title, right-hand buttons.
-export const bar = (m, { back = '', title = '', actions = '' } = {}) =>
-  `<div class="ms-bar">${back ? `<span class="ms-back">${pick(m, back, '← 返回')}</span>` : ''}<b class="ms-title">${title}</b><span class="ms-actions">${actions}</span></div>`;
+// Page header: ← back (short on a phone — 「← 返回」 unless `back` is [desktop, phone]), title,
+// right-hand buttons.
+export const bar = (m, { back = '', title = '', actions = '' } = {}) => {
+  const [desk, phone] = Array.isArray(back) ? back : [back, '← 返回'];
+  return `<div class="ms-bar">${back ? `<span class="ms-back">${pick(m, desk, phone)}</span>` : ''}<b class="ms-title">${title}</b><span class="ms-actions">${actions}</span></div>`;
+};
 
 export const btn = (label, kind = '', hit = false) => `<span class="${cls('ms-btn', kind)}"${hitAttr(hit)}>${label}</span>`;
 export const cb = (label, on = false, hit = false) => `<span class="ms-cb${on ? ' on' : ''}"${hitAttr(hit)}><i></i>${label}</span>`;

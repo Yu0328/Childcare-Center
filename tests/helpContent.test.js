@@ -37,6 +37,16 @@ describe('HELP_CHAPTERS', () => {
     }
   });
 
+  it('a task demo ends on its result — a frame with nothing left to press', () => {
+    // The 首頁 tour and the sync demo only point at things, so they have no result frame.
+    const pointingOnly = demo => demo.steps.at(-1).point;
+    for (const demo of demos.filter(d => !pointingOnly(d))) {
+      for (const mode of modesOf(demo)) {
+        expect(stepsFor(demo, mode).at(-1).draw(mode), `${demo.id} ${mode}`).not.toContain('data-hit');
+      }
+    }
+  });
+
   it('has the three 實用技巧 and the corrected 加到主畫面 steps', () => {
     const tips = HELP_CHAPTERS.find(c => c.id === 'tips').demos.map(d => d.title);
     expect(tips).toEqual(['套用其他幼兒的課程計畫', '把適性紀錄彙整成總表', '一次匯入多個 Word 檔']);

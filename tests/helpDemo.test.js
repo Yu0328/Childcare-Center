@@ -53,6 +53,19 @@ describe('mountDemo', () => {
     expect(el.querySelector('.help-demo__play').textContent).toContain('播放');
   });
 
+  it('after destroy, re-mounting on the same element leaves only the new demo answering clicks', () => {
+    const el = document.createElement('article');
+    document.body.append(el);
+    const draw = vi.fn(() => '<div class="ms"><span data-hit>按</span></div>');
+    const demo = { ...DEMO, steps: DEMO.steps.map(step => ({ ...step, draw })) };
+    mountDemo(el, demo, { mode: 'phone' }).destroy();
+    mountDemo(el, demo, { mode: 'desk' });
+    draw.mockClear();
+    el.querySelector('.help-demo__dot[data-go="2"]').click();
+    expect(draw).toHaveBeenCalledTimes(1); // a stale listener from the phone mount would draw again
+    el.remove();
+  });
+
   it('destroy leaves nothing running', () => {
     vi.useFakeTimers();
     const el = document.createElement('article');

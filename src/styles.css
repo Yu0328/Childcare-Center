@@ -3125,6 +3125,8 @@ fieldset.panel-form__field.import-preview__child legend {
 .ms-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35em; }
 .ms-photos span { position: relative; aspect-ratio: 1; display: grid; place-items: center; border: 1px dashed var(--border-strong); border-radius: 0.4em; background: var(--page-bg); color: var(--text-muted); font-size: 0.75em; }
 .ms-photos span.on { border-style: solid; background: linear-gradient(135deg, #f6d7a7, #c9e4c5); }
+.ms-thumbs { flex: none; display: flex; gap: 0.2em; }
+.ms-thumbs i { width: 1.8em; height: 1.8em; border-radius: 0.3em; background: linear-gradient(135deg, #f6d7a7, #c9e4c5); }
 .ms-modal { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 1em; background: rgba(31, 36, 34, 0.2); animation: ms-dim 0.35s ease both; }
 .ms-dialog {
   width: min(100%, 24em); display: grid; gap: 0.55em; padding: 1em; background: var(--surface);
@@ -3182,21 +3184,21 @@ fieldset.panel-form__field.import-preview__child legend {
 @keyframes ms-row-in { from { opacity: 0; transform: translateY(0.6em); } }
 
 /* The thing to press: a ring (::before) plus a soft expanding halo (::after) when paused. */
-.rings [data-hit]::before, .rings [data-hit]::after {
+.help-dev .rings [data-hit]::before, .help-dev .rings [data-hit]::after {
   content: ''; position: absolute; inset: -0.3em; border-radius: 99px; pointer-events: none; border: 0.16em solid var(--help-ring);
 }
-.rings .ms-card[data-hit]::before, .rings .ms-card[data-hit]::after,
-.rings .ms-row[data-hit]::before, .rings .ms-row[data-hit]::after,
-.rings .ms-day[data-hit]::before, .rings .ms-day[data-hit]::after,
-.rings .ms-pick[data-hit]::before, .rings .ms-pick[data-hit]::after,
-.rings .ms-photos [data-hit]::before, .rings .ms-photos [data-hit]::after,
-.rings .ms-menu [data-hit]::before, .rings .ms-menu [data-hit]::after,
-.rings .ms-tabs [data-hit]::before, .rings .ms-tabs [data-hit]::after { border-radius: 0.7em; }
-.rings .ms-cb[data-hit]::before, .rings .ms-cb[data-hit]::after { inset: -0.3em -0.4em; border-radius: 0.5em; }
-.rings [data-hit]::after { opacity: 0; }
-.pulse [data-hit]::after { animation: ms-halo 1.8s var(--help-ease) infinite; }
+.help-dev .rings .ms-card[data-hit]::before, .help-dev .rings .ms-card[data-hit]::after,
+.help-dev .rings .ms-row[data-hit]::before, .help-dev .rings .ms-row[data-hit]::after,
+.help-dev .rings .ms-day[data-hit]::before, .help-dev .rings .ms-day[data-hit]::after,
+.help-dev .rings .ms-pick[data-hit]::before, .help-dev .rings .ms-pick[data-hit]::after,
+.help-dev .rings .ms-photos [data-hit]::before, .help-dev .rings .ms-photos [data-hit]::after,
+.help-dev .rings .ms-menu [data-hit]::before, .help-dev .rings .ms-menu [data-hit]::after,
+.help-dev .rings .ms-tabs [data-hit]::before, .help-dev .rings .ms-tabs [data-hit]::after { border-radius: 0.7em; }
+.help-dev .rings .ms-cb[data-hit]::before, .help-dev .rings .ms-cb[data-hit]::after { inset: -0.3em -0.4em; border-radius: 0.5em; }
+.help-dev .rings [data-hit]::after { opacity: 0; }
+.help-dev .pulse [data-hit]::after { animation: ms-halo 1.8s var(--help-ease) infinite; }
 @keyframes ms-halo { 0% { opacity: 0.7; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(1.35, 1.6); } }
-[data-hit].is-pressed { transform: scale(0.94); filter: brightness(0.93); }
+.help-dev [data-hit].is-pressed { transform: scale(0.94); filter: brightness(0.93); }
 
 /* Tips, notes, 常見問題 */
 .help-tip {
