@@ -67,6 +67,29 @@ Reuses the existing `<dialog class="form-popup">` look and `lockBodyScroll`/`unl
 
 Because edits are saved back, an already-fixed field won't come up again on the next export.
 
+### Look and feel
+
+Must read as part of the same app, built only from existing classes and color tokens. No new
+colors, no new button styles.
+
+- **Window**: the existing `.form-popup` modal (same backdrop, rounded corners, × close button,
+  85vh max height with its own scroll, body scroll locked). It's wider than the add-form popups,
+  `min(92vw, 640px)` through one modifier class, because narratives are long. Phones keep the
+  same 90vw width as the other popups.
+- **Top line**: same size and color as the existing hint text (`--text-secondary`), not an
+  error red. Nothing is wrong; the teacher is just being offered a fix.
+- **Each hit**: one `.entry-form` card (light background, border, 10px radius), same as the tabs'
+  編輯 forms. Inside it, `label` uses the `.panel-form__field` label style the edit forms already
+  use, and the input or textarea inherits the existing focus style.
+- **Buttons**, right-aligned in an `.entry-form__actions` row pinned to the bottom of the window
+  so they stay reachable while the list scrolls:
+  - 儲存並匯出: `btn btn--primary` (main action, same as every 儲存)
+  - 只儲存: `btn btn--outline`
+  - 取消: `btn btn--ghost`
+  On phones the row wraps, and 儲存並匯出 stays first.
+- **Check**: Playwright screenshots at desktop (1280px) and phone (390px) widths, compared side by
+  side with an existing 編輯 popup. Shown to the user for approval before merging.
+
 ## Not doing
 
 - Extra words (昨天, 明天, 剛剛…). Add them to the word list later if teachers ask.
