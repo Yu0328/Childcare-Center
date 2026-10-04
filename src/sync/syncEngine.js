@@ -255,6 +255,11 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     if (photoResult.authExpired || textResults.some(result => result.error instanceof AuthExpiredError)) {
       throw new AuthExpiredError('AUTH_EXPIRED');
     }
+    // The header only ever says "同步失敗"; the console is the one place the real cause shows up
+    // when a single browser fails and the others don't. uid/store only — the payload is PII.
+    for (const result of textResults) {
+      if (!result.ok) console.error('sync record failed', result.item.store, result.item.uid, result.error);
+    }
 
     return setStatus({
       phase: 'done',
@@ -276,6 +281,7 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
       } catch (err) {
         if (err instanceof AuthExpiredError) return setStatus({ phase: 'auth', error: 'AUTH_EXPIRED' });
         if (err instanceof DriveFormatError) return setStatus({ phase: 'format', error: 'FORMAT' });
+        console.error('sync failed', err);
         return setStatus({ phase: 'error', error: 'NETWORK' });
       } finally {
         running = null;
