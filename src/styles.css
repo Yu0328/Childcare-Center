@@ -1333,7 +1333,7 @@ fieldset.panel-form__field.import-preview__child legend {
    viewport — same gotcha #app:has(.monthly-calendar-list) further down is guarded against. Also
    keeps the panel in view while scrolling past a long domain list, instead of the "新增..."
    controls scrolling out of reach — the same sticky technique .monthly-plan-side uses further
-   down, but directly on the panel-form itself since it's the only element in its grid column here
+   down, but directly on the panel's .form-popup since it's the only element in its grid column here
    (unlike .monthly-plan-side, which wraps a second card below it — a sticky element's "stuck"
    screen position doesn't push normal-flow siblings down, so a direct sibling could overlap a
    stuck panel; there's no such sibling in this column). */
@@ -1365,11 +1365,14 @@ fieldset.panel-form__field.import-preview__child legend {
     justify-self: end;
   }
 
-  .panel-form--wide {
+  /* On the .form-popup wrapping the panel, not the panel itself: inside that wrapper the panel's
+     own sticky had nothing to stick within, and its own scroll nested inside the wrapper's 85vh
+     one — two scrollbars, and the form's bottom (說明內容, 新增) cut off. One scroller, as tall
+     as the screen allows. */
+  .tab-layout > .form-popup:has(.panel-form--wide) {
     position: sticky;
     top: 1.5rem;
     max-height: calc(100vh - 3rem);
-    overflow-y: auto;
   }
 }
 
