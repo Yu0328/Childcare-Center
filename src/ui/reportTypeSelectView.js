@@ -31,9 +31,12 @@ const UTIL_ICONS = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>',
   'import-any-docx':
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>',
+  // open book with a question mark
+  'show-help':
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4H9a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5h-6A1.5 1.5 0 0 1 2 16Z"/><path d="M22 5.5A1.5 1.5 0 0 0 20.5 4H15a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5h6A1.5 1.5 0 0 0 22 16Z"/><path d="M15.6 8.6a1.4 1.4 0 1 1 2 1.3c-.4.2-.6.5-.6.9v.3"/><path d="M17 13.4h.01"/></svg>',
 };
 
-export async function renderReportTypeSelectView(container, { onSelectType, onManageChildren }) {
+export async function renderReportTypeSelectView(container, { onSelectType, onManageChildren, onShowHelp }) {
   const CHEVRON =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 
@@ -66,11 +69,20 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
             </button>
           `
         ).join('')}
+        <button type="button" class="type-select__option type-select__option--warm" data-action="show-help">
+          <span class="type-select__icon">${UTIL_ICONS['show-help']}</span>
+          <span class="type-select__text">
+            <span class="type-select__title">操作說明</span>
+            <span class="type-select__desc">一步一步教你使用本系統</span>
+          </span>
+          <span class="type-select__go" aria-hidden="true">${CHEVRON}</span>
+        </button>
       </div>
     </div>
   `;
 
   container.querySelector('[data-action="manage-children"]').addEventListener('click', onManageChildren);
+  container.querySelector('[data-action="show-help"]').addEventListener('click', () => onShowHelp?.());
 
   container.querySelector('[data-type="assessment"]').addEventListener('click', () => onSelectType('assessment'));
   container.querySelector('[data-type="parent-report"]').addEventListener('click', () => onSelectType('parent-report'));
@@ -86,7 +98,7 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
       renderPreview: (container, { parsed: { type, parsed }, onCancel, onImported }) =>
         IMPORT_PREVIEW_BY_TYPE[type](container, { parsed, onCancel, onImported }),
       container,
-      backToList: () => renderReportTypeSelectView(container, { onSelectType, onManageChildren }),
+      backToList: () => renderReportTypeSelectView(container, { onSelectType, onManageChildren, onShowHelp }),
     });
   });
 }

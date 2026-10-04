@@ -748,6 +748,23 @@ button {
   color: var(--neutral-accent);
 }
 
+/* 操作說明 — the warm accent, a hue none of the form cards use. */
+.type-select__option--warm {
+  background: var(--warm-tint);
+  border-color: var(--warm-tint);
+}
+.type-select__option--warm .type-select__icon {
+  background: var(--surface);
+  color: var(--warm-accent);
+}
+.type-select__option--warm:hover {
+  border-color: var(--warm-accent);
+  box-shadow: 0 12px 26px rgba(181, 105, 27, 0.22);
+}
+.type-select__option--warm:hover .type-select__go {
+  color: var(--warm-accent);
+}
+
 /* 管理幼兒 / 匯入檔案 — same option-card style as the five form choices, in a soft rose (a 4th
    hue, distinct from the blue/purple/green forms). Borrows the domain-5 colour tokens for their
    verified contrast; no 發展領域 card is on this screen so there's no collision.

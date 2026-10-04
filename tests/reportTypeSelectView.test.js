@@ -100,6 +100,20 @@ describe('renderReportTypeSelectView', () => {
     expect(selected).toBe('monthly-plan');
   });
 
+  it('shows a 操作說明 card after 課程月計畫 that calls onShowHelp', async () => {
+    const container = document.createElement('div');
+    let called = false;
+    await renderReportTypeSelectView(container, { onSelectType: () => {}, onShowHelp: () => { called = true; } });
+
+    const cards = [...container.querySelectorAll('.type-select > button')];
+    expect(cards.map(card => card.dataset.type || card.dataset.action)).toEqual([
+      'assessment', 'parent-report', 'monthly-plan', 'show-help',
+    ]);
+    expect(cards[3].textContent).toContain('操作說明');
+    cards[3].click();
+    expect(called).toBe(true);
+  });
+
   describe('unified 匯入檔案 button', () => {
     beforeEach(async () => {
       await clearAllData();
