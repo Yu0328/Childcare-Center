@@ -32,7 +32,7 @@ export function hasUnsavedInput(root) {
 }
 
 // 取消 means "throw this away": puts every field back to how it was drawn, so a cancelled edit
-// doesn't linger out of sight and later trigger the "還有沒儲存的內容" prompt. Fires `change` on
+// doesn't linger out of sight and reappear the next time the form opens. Fires `change` on
 // each field it touches so dependent bits (e.g. a domain picker's checkbox list) follow along.
 export function discardInput(root) {
   for (const field of root.querySelectorAll(FIELDS)) {
@@ -45,11 +45,6 @@ export function discardInput(root) {
     else field.value = field.type === 'file' ? '' : field.defaultValue;
     field.dispatchEvent(new Event('change', { bubbles: true }));
   }
-}
-
-// Asks before an action that would throw away unsaved typing. True = go ahead.
-export function confirmLeaveIfUnsaved(root, confirmFn = message => (typeof confirm === 'function' ? confirm(message) : false)) {
-  return !hasUnsavedInput(root) || Boolean(confirmFn('還有沒儲存的內容，確定要離開嗎？離開後這些內容不會保留。'));
 }
 
 const quote = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;

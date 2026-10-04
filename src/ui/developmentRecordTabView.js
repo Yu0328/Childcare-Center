@@ -17,16 +17,21 @@ function indicatorItemNumber(code) {
   return match ? Number(match[1]) : Infinity;
 }
 
-// A reference checkbox reflects the 課程計畫表 entry it's tied to: if ANY of its occurrences was
-// 請假 or 更換課程, the checkbox reads struck-through and red (courseChanged wins if somehow both
-// occur across different dates, matching aggregateCoursePlan.js's own absent/courseChanged
-// precedent); a 發展中-only entry reads red without the strikethrough. This is scoped to the
-// checkbox picker only — the saved record's own referenced-indicator display (existingRecordCard's
-// entry-list) and the Word export are untouched by design.
+// A reference checkbox reflects the 課程計畫表 entry it's tied to: only when EVERY one of its
+// occurrences was 請假 or 更換課程 (the activity never actually happened) does the checkbox read
+// struck-through and red (courseChanged wins if both occur across different dates, matching
+// aggregateCoursePlan.js's own absent/courseChanged precedent). Otherwise the 請假/更換課程 dates
+// are ignored, and the entry reads red without the strikethrough if a remaining date was 發展中.
+// This is scoped to the checkbox picker only — the saved record's own referenced-indicator display
+// (existingRecordCard's entry-list) and the Word export are untouched by design.
 function checkboxFlagClass(occurrences) {
-  if (occurrences.some(o => o.courseChanged)) return ' panel-form__checkbox-row--flag panel-form__checkbox-row--course-changed';
-  if (occurrences.some(o => o.absent)) return ' panel-form__checkbox-row--flag panel-form__checkbox-row--absent';
-  if (occurrences.some(o => o.status === 'developing')) return ' panel-form__checkbox-row--flag';
+  const held = occurrences.filter(o => !o.absent && !o.courseChanged);
+  if (occurrences.length > 0 && held.length === 0) {
+    return occurrences.some(o => o.courseChanged)
+      ? ' panel-form__checkbox-row--flag panel-form__checkbox-row--course-changed'
+      : ' panel-form__checkbox-row--flag panel-form__checkbox-row--absent';
+  }
+  if (held.some(o => o.status === 'developing')) return ' panel-form__checkbox-row--flag';
   return '';
 }
 

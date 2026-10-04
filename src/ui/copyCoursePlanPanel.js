@@ -48,8 +48,8 @@ export async function renderCopyCoursePlanPanel(
   wireNestedEntryForm(trigger, form);
   form.querySelector('[data-action="close-copy-plan"]').addEventListener('click', () => dialog.close());
 
-  // However it closes (取消, ×, backdrop, Escape), drop the pick and the old error so a picked-but-not-copied
-  // radio doesn't trip the "還有沒儲存的內容" prompt later.
+  // However it closes (取消, ×, backdrop, Escape), drop the pick and the old error so reopening starts
+  // clean instead of showing a picked-but-not-copied radio.
   dialog.addEventListener('close', () => {
     discardInput(form);
     form.querySelector('[data-error="copy"]').textContent = '';

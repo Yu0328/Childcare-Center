@@ -12,7 +12,6 @@ import { downloadBlob } from './export/downloadBlob.js';
 import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 import { todayIsoDate } from './domain/ageTier.js';
 import { oneAtATime } from './ui/oneAtATime.js';
-import { hasUnsavedInput, confirmLeaveIfUnsaved } from './ui/unsavedInput.js';
 
 const RENDER_FAILED_MESSAGE = '載入失敗，請重新整理頁面';
 const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
@@ -126,35 +125,13 @@ export function mountApp(container, { onUnlock, gate } = {}) {
   if (homeButton) {
     homeButton.addEventListener('click', () => {
       if (!entered || container.querySelector('.conflict-view')) return;
-      if (!confirmLeaveIfUnsaved(container)) return;
       showReportTypeSelect();
     });
   }
 
-  // Every screen's ← 返回 and the 適性紀錄 tabs redraw the screen, dropping whatever was typed but
-  // not saved. Checked here once, ahead of each button's own handler (capture phase), instead of
-  // in each of the many views.
-  container.addEventListener(
-    'click',
-    event => {
-      const trigger = event.target.closest?.('[data-action="back"], [data-tab]');
-      if (!trigger || !entered || confirmLeaveIfUnsaved(container)) return;
-      event.stopImmediatePropagation();
-      event.preventDefault();
-    },
-    true
-  );
-
-  // Closing or reloading the tab with unsaved typing: the browser's own "leave this site?" prompt.
-  window.addEventListener('beforeunload', event => {
-    if (!entered || !hasUnsavedInput(container)) return;
-    event.preventDefault();
-    event.returnValue = '';
-  });
-
   // A phone's back gesture used to leave the app altogether, since the app never adds browser
   // history. One extra history entry is kept at all times: the gesture uses it up, and is turned
-  // into closing the open popup, or into the screen's own ← 返回 (which asks first if needed) —
+  // into closing the open popup, or into the screen's own ← 返回 —
   // then the entry is put back. On the home screen (no ← 返回) it isn't, so the next back leaves.
   let historyWired = false;
   function wireBackGesture() {

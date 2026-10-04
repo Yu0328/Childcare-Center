@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasUnsavedInput, confirmLeaveIfUnsaved, captureDrafts, restoreDrafts } from '../src/ui/unsavedInput.js';
+import { hasUnsavedInput, captureDrafts, restoreDrafts } from '../src/ui/unsavedInput.js';
 
 function view() {
   const root = document.createElement('div');
@@ -51,14 +51,6 @@ describe('hasUnsavedInput', () => {
     expect(hasUnsavedInput(select)).toBe(true);
   });
 
-  it('有未儲存內容時先問，按取消就不離開', () => {
-    const root = view();
-    root.querySelector('textarea').value = 'x';
-    const asked = [];
-    expect(confirmLeaveIfUnsaved(root, m => { asked.push(m); return false; })).toBe(false);
-    expect(asked[0]).toContain('還有沒儲存的內容');
-    expect(confirmLeaveIfUnsaved(view(), () => { throw new Error('不該問'); })).toBe(true);
-  });
 });
 
 describe('captureDrafts / restoreDrafts', () => {

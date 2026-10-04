@@ -80,6 +80,30 @@ describe('renderDevelopmentRecordTab', () => {
     expect(label.classList.contains('panel-form__checkbox-row--absent')).toBe(false);
   });
 
+  it('leaves a reference checkbox unmarked when only some of its dates were 請假 and the rest were a normal 已發展', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-04', status: 'developed', absent: true, courseChanged: false, note: '' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developed', absent: false, courseChanged: false, note: '' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).closest('label');
+    expect(label.classList.contains('panel-form__checkbox-row--flag')).toBe(false);
+    expect(label.classList.contains('panel-form__checkbox-row--absent')).toBe(false);
+  });
+
+  it('marks a reference checkbox red but not struck-through when a 更換課程 date sits beside a 發展中 date', async () => {
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-04', status: 'developed', absent: false, courseChanged: true, note: '' });
+    await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developing', absent: false, courseChanged: false, note: '' });
+
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+
+    const label = container.querySelector(`[data-course-entry-checkbox="${entry.id}"]`).closest('label');
+    expect(label.classList.contains('panel-form__checkbox-row--flag')).toBe(true);
+    expect(label.classList.contains('panel-form__checkbox-row--course-changed')).toBe(false);
+  });
+
   it('marks a reference checkbox red but not struck-through when its entry only has a 發展中 occurrence', async () => {
     await addCourseOccurrence({ entryId: entry.id, date: '2026-06-11', status: 'developing', absent: false, courseChanged: false, note: '' });
 

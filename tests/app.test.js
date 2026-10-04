@@ -375,7 +375,7 @@ describe('標題列的首頁按鈕', () => {
   });
 });
 
-describe('有沒儲存的內容時離開前先問；手機返回手勢', () => {
+describe('離開不再提醒沒儲存；手機返回手勢', () => {
   beforeEach(async () => {
     await clearAllData();
     localStorage.clear();
@@ -393,23 +393,9 @@ describe('有沒儲存的內容時離開前先問；手機返回手勢', () => {
     return container;
   }
 
-  it('打了字還沒存就按返回：先問，按取消留在原畫面，按確定才離開', async () => {
+  it('打了字還沒存就按返回：不問，直接離開', async () => {
     const container = await openChildList();
     container.querySelector('[data-field="name"]').value = '打到一半';
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
-
-    container.querySelector('[data-action="back"]').click();
-    await new Promise(resolve => setTimeout(resolve, 250));
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    expect(container.querySelector('[data-field="name"]').value).toBe('打到一半');
-
-    container.querySelector('[data-action="back"]').click();
-    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
-    container.remove();
-  });
-
-  it('沒打字時按返回不會多問', async () => {
-    const container = await openChildList();
     const confirmSpy = vi.spyOn(window, 'confirm');
     container.querySelector('[data-action="back"]').click();
     await waitFor(() => container.textContent.includes('選擇要填寫的表'));
