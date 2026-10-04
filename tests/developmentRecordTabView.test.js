@@ -23,6 +23,14 @@ describe('renderDevelopmentRecordTab', () => {
     expect(container.querySelector('[data-action="add-record"]').classList.contains('panel-form--wide')).toBe(true);
   });
 
+  it("lists an earlier-tier entry's checkbox after the report tier's, same order as the 課程計畫表 tab", async () => {
+    const earlier = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-1', activityName: '舊' }); // domain 1
+    const container = document.createElement('div');
+    await renderDevelopmentRecordTab(container, { report, onChange: () => {}, selectedDomain: 1 });
+    const ids = [...container.querySelectorAll('[data-course-entry-checkbox]')].map(el => Number(el.dataset.courseEntryCheckbox));
+    expect(ids).toEqual([entry.id, earlier.id]);
+  });
+
   it('stacks domain cards in a single full-width column instead of side by side', async () => {
     const container = document.createElement('div');
     await renderDevelopmentRecordTab(container, { report, onChange: () => {} });

@@ -1,5 +1,5 @@
 import { showToast } from './toast.js';
-import { DOMAINS, getIndicator } from '../data/indicators.js';
+import { DOMAINS, getIndicator, compareIndicatorCodesForTier } from '../data/indicators.js';
 import {
   listCoursePlanEntriesForReport, listCourseOccurrencesForEntry, addDevelopmentRecordEntry,
   listDevelopmentRecordEntriesForReport, deleteDevelopmentRecordEntry, updateDevelopmentRecordEntry,
@@ -8,14 +8,6 @@ import { escapeHtml } from './escapeHtml.js';
 import { formPopupMarkup, wireFormPopup, wireEditForm } from './formPopup.js';
 import { wireRowClickEdit } from './rowClickEdit.js';
 import { oneAtATime } from './oneAtATime.js';
-
-// "Ⅳ-2-4" -> 4 (the item number within its domain) — see courseplanTabView.js's identical helper
-// for why: sorts the reference checkboxes in the indicator picker's own order regardless of the
-// order entries were added in (insertion/id order otherwise, unrelated to indicator numbering).
-function indicatorItemNumber(code) {
-  const match = /-(\d+)$/.exec(String(code ?? ''));
-  return match ? Number(match[1]) : Infinity;
-}
 
 // A reference checkbox reflects the 課程計畫表 entry it's tied to: only when EVERY one of its
 // occurrences was 請假 or 更換課程 (the activity never actually happened) does the checkbox read
@@ -123,13 +115,15 @@ export async function renderDevelopmentRecordTab(
     byDomain.get(record.domain).push(record);
   }
 
+  const compareCodes = compareIndicatorCodesForTier(report.tier);
   const entriesByDomainNumber = domainNumber =>
     allEntries
       .filter(entry => {
         const indicator = getIndicator(entry.indicatorCode);
         return indicator && indicator.domain === Number(domainNumber);
       })
-      .sort((a, b) => indicatorItemNumber(a.indicatorCode) - indicatorItemNumber(b.indicatorCode));
+      // Same order as the 課程計畫表 tab and the Word: the report's tier first, earlier-tier entries after.
+      .sort((a, b) => compareCodes(a.indicatorCode, b.indicatorCode));
 
   // See courseplanTabView.js's identical block for why reading the container's existing
   // <details> state (before overwriting it) is what lets collapse/expand survive re-renders.

@@ -319,11 +319,19 @@ export async function renderCoursePlanTab(
 
   // In the edit form, switching tier keeps the entry's current code selected (shown as
   // 「（目前的指標）」 when it isn't in that tier) and never touches the text the teacher wrote.
+  // Every relist keeps the saved code listed as the select's "as drawn" value, so a different pick
+  // still counts as unsaved and 取消 can put the saved one back.
   for (const entry of entries) {
     const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
+    const select = editForm.querySelector('[data-entry-edit-field="indicatorCode"]');
     wireTierSwitch(editForm, tierCode => {
-      const select = editForm.querySelector('[data-entry-edit-field="indicatorCode"]');
-      select.innerHTML = indicatorOptionsHtml(tierCode, select.value);
+      const current = select.value;
+      select.innerHTML = indicatorOptionsHtml(tierCode, entry.indicatorCode);
+      if (![...select.options].some(o => o.value === current)) {
+        const indicator = getIndicator(current);
+        select.add(new Option(indicator ? `${current} ${indicator.description}` : current, current), 0);
+      }
+      select.value = current;
     });
   }
 
@@ -381,11 +389,17 @@ export async function renderCoursePlanTab(
       }
     }));
 
+    const entryCancel = container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`);
     wireEditForm(
       container.querySelector(`[data-edit-entry="${entry.id}"]`),
       container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`),
-      container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`)
+      entryCancel
     );
+    // wireEditForm's reset puts the fields back; the tier switch goes back to the entry's own tier.
+    entryCancel.addEventListener('click', () => {
+      const ownTier = getIndicator(entry.indicatorCode)?.tier || report.tier;
+      container.querySelector(`[data-entry-edit-form-for="${entry.id}"] [data-indicator-tier="${ownTier}"]`)?.click();
+    });
 
     container.querySelector(`[data-entry-edit-save-for="${entry.id}"]`).addEventListener('click', oneAtATime(async () => {
       const indicatorCode = container.querySelector(`[data-entry-edit-field="indicatorCode"][data-entry-id="${entry.id}"]`).value;

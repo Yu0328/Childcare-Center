@@ -377,6 +377,8 @@ describe('標題列的首頁按鈕', () => {
 
 describe('離開不再提醒沒儲存；手機返回手勢', () => {
   beforeEach(async () => {
+    // Apps mounted by earlier tests and never removed would answer the same popstate too.
+    document.body.replaceChildren();
     await clearAllData();
     localStorage.clear();
     unlock();
@@ -423,6 +425,40 @@ describe('離開不再提醒沒儲存；手機返回手勢', () => {
     await new Promise(resolve => setTimeout(resolve, 250));
     expect(closed).toBe(true);
     expect(container.querySelector('[data-action="add-child"]')).not.toBeNull();
+    container.remove();
+  });
+
+  it('手機返回手勢：開在頁面最外層的跳出視窗（匯出前的今天檢查）也只關掉視窗', async () => {
+    const container = await openChildList();
+    const dialog = document.createElement('dialog');
+    let closed = false;
+    dialog.close = () => { closed = true; dialog.removeAttribute('open'); };
+    dialog.matches = selector => selector === ':modal' || HTMLElement.prototype.matches.call(dialog, selector);
+    dialog.setAttribute('open', '');
+    document.body.appendChild(dialog);
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await new Promise(resolve => setTimeout(resolve, 250));
+    expect(closed).toBe(true);
+    expect(container.querySelector('[data-action="add-child"]')).not.toBeNull();
+    dialog.remove();
+    container.remove();
+  });
+
+  it('手機返回手勢：在主選單用掉那一步後，再點進畫面會補回來，下一次返回不會直接離開程式', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    mountApp(container);
+    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
+    const pushSpy = vi.spyOn(history, 'pushState');
+
+    window.dispatchEvent(new PopStateEvent('popstate')); // home screen: nothing to go back to
+    expect(pushSpy).not.toHaveBeenCalled();
+
+    container.querySelector('[data-type="assessment"]').click();
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    container.querySelector('[data-type="assessment"]')?.click(); // further taps don't stack entries
+    expect(pushSpy).toHaveBeenCalledTimes(1);
     container.remove();
   });
 });

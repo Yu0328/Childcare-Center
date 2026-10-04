@@ -174,4 +174,13 @@ describe('匯出: 今天/今日 check', () => {
     expect((await listCourseOccurrencesForEntry(entry.id))[0].note).toBe('今天很專心');
     expect(vi.mocked(downloadParentReportDocx)).not.toHaveBeenCalled();
   });
+
+  it('keeps unsaved typing elsewhere on the tab through the redraw after 只儲存', async () => {
+    container.querySelector('[data-field="activityName"]').value = '打到一半';
+    const dialog = await openCheck();
+    dialog.querySelectorAll('[data-today-field]')[0].value = '6/3很專心';
+    dialog.querySelector('[data-today-action="save"]').click();
+    await waitFor(() => container.textContent.includes('6/3很專心'));
+    expect(container.querySelector('[data-field="activityName"]').value).toBe('打到一半');
+  });
 });

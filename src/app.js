@@ -131,26 +131,37 @@ export function mountApp(container, { onUnlock, gate } = {}) {
 
   // A phone's back gesture used to leave the app altogether, since the app never adds browser
   // history. One extra history entry is kept at all times: the gesture uses it up, and is turned
-  // into closing the open popup, or into the screen's own ← 返回 —
-  // then the entry is put back. On the home screen (no ← 返回) it isn't, so the next back leaves.
+  // into closing the open popup, or into the screen's own ← 返回 — then the entry is put back. On
+  // the home screen (no ← 返回) it isn't, so the next back leaves — until the teacher taps into the
+  // app again, which puts it back.
+  container.addEventListener('click', () => armBackGesture(), true);
   let historyWired = false;
+  let historyArmed = false;
+  function armBackGesture() {
+    if (!historyWired || historyArmed) return;
+    historyArmed = true;
+    history.pushState({ cform: true }, '');
+  }
   function wireBackGesture() {
     if (historyWired || typeof history === 'undefined') return;
     historyWired = true;
-    history.pushState({ cform: true }, '');
+    armBackGesture();
     window.addEventListener('popstate', () => {
+      if (!container.isConnected) return;
+      historyArmed = false;
       // Only a popup covering the screen — desktop shows the add form as an always-open,
-      // non-modal <dialog open> panel, which must stay put.
+      // non-modal <dialog open> panel, which must stay put. Searched page-wide: the 匯出 今天
+      // check popup sits outside the app container.
       const isModal = dialog => { try { return dialog.matches(':modal'); } catch { return false; } };
-      const openDialog = [...container.querySelectorAll('dialog[open]')].find(isModal);
+      const openDialog = [...document.querySelectorAll('dialog[open]')].find(isModal);
       if (openDialog) {
-        history.pushState({ cform: true }, '');
+        armBackGesture();
         openDialog.close();
         return;
       }
       const back = container.querySelector('[data-action="back"]');
       if (!back) return;
-      history.pushState({ cform: true }, '');
+      armBackGesture();
       back.click();
     });
   }

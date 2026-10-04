@@ -8,6 +8,7 @@ import { renderBehaviorObservationTab } from './behaviorObservationTabView.js';
 import { renderHighlightsTab } from './highlightsTabView.js';
 import { keepScroll } from './keepScroll.js';
 import { oneAtATime } from './oneAtATime.js';
+import { captureDrafts, restoreDrafts } from './unsavedInput.js';
 import { openTodayWordCheck } from './todayWordCheckPopup.js';
 import { findTodayWords } from '../domain/findTodayWords.js';
 import { renderCopyCoursePlanPanel } from './copyCoursePlanPanel.js';
@@ -76,10 +77,13 @@ export async function renderParentReportEditorView(container, { child, report, o
       const hits = findTodayWords(data);
       if (hits.length) {
         const outcome = await openTodayWordCheck(hits);
-        if (outcome === 'cancel') return;
-        // Re-render so the open tab shows the saved wording.
-        keepScroll(() => renderParentReportEditorView(container, { child, report, onBack, activeTab }));
-        if (outcome === 'saved') return;
+        // Re-render so the open tab shows the saved wording — after 取消 too, since a save that
+        // failed partway may still have stored some fields. Anything typed elsewhere on the tab but
+        // not saved yet is carried over instead of silently wiped by the redraw.
+        const drafts = captureDrafts(container);
+        await keepScroll(() => renderParentReportEditorView(container, { child, report, onBack, activeTab }));
+        restoreDrafts(container, drafts);
+        if (outcome !== 'export') return;
         data = await loadReportData(report);
       }
       const blob = await generateParentReportDocxBlob({ child, report, ...data });

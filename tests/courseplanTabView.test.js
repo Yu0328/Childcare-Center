@@ -7,6 +7,7 @@ import {
 import { renderCoursePlanTab } from '../src/ui/courseplanTabView.js';
 import { waitFor } from './helpers.js';
 import { getIndicatorsForTier } from '../src/data/indicators.js';
+import { hasUnsavedInput } from '../src/ui/unsavedInput.js';
 
 describe('renderCoursePlanTab', () => {
   let report;
@@ -395,6 +396,25 @@ describe('renderCoursePlanTab', () => {
     expect(select.value).toBe('Ⅳ-1-2');
     expect([...select.options].some(o => o.value === 'Ⅴ-1-1')).toBe(true);
     expect(editForm.querySelector('[data-entry-edit-field="indicatorText"]').value).toBe('老師寫的');
+  });
+
+  it('edit form: a different 指標 picked before switching tiers still counts as unsaved, and 取消 puts the saved one and its tier back', async () => {
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-2', activityName: '舊活動' });
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+    const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
+    const select = editForm.querySelector('[data-entry-edit-field="indicatorCode"]');
+
+    editForm.querySelector('[data-indicator-tier="Ⅴ"]').click();
+    select.value = 'Ⅴ-1-1';
+    editForm.querySelector('[data-indicator-tier="Ⅲ"]').click();
+    expect(select.value).toBe('Ⅴ-1-1');
+    expect(hasUnsavedInput(editForm)).toBe(true);
+
+    container.querySelector(`[data-entry-edit-cancel-for="${entry.id}"]`).click();
+    expect(select.value).toBe('Ⅳ-1-2');
+    expect(editForm.querySelector('.tier-switch__btn--active').dataset.indicatorTier).toBe('Ⅳ');
+    expect(hasUnsavedInput(editForm)).toBe(false);
   });
 
   it('opens the domain a new entry was added to, without collapsing a domain the user already had open', async () => {
