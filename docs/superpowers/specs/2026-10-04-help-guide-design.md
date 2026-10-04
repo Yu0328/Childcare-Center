@@ -105,3 +105,40 @@ Feedback: too wordy to scan, too many 小提醒, should be understandable at a g
   else is cut.
 - Intro sentences shrink to one short line or go away. 常見問題 keeps 4 short Q&A.
 - The numbered text-step and old diagram styles (`help-steps`, `help-diagram`) are removed.
+
+## Revision 2 — animated demos (2026-10-04, user picked prototype "A 動態示範")
+
+Three prototypes were compared (A 動態示範 / B 步驟卡片輪播 / C 捲動時間軸); the user chose A.
+
+- **Layout:** header row ← 返回首頁 · 操作說明 · a 手機版／電腦版 switch. Below it, every chapter
+  is a collapsible card (icon + title + one-line desc + chevron); several may be open at once so
+  the page never jumps while a demo plays. The left table of contents is gone. The first chapter
+  starts open.
+- **Chapter icons are the app's own** home-screen icons/colours (適性總表 clipboard/blue,
+  適性紀錄 two people/purple, 課程月計畫 calendar/green, 管理幼兒 baby/rose, 匯入 download/rose),
+  so a chapter looks like the card that leads to it.
+- **Each task is a demo:** one device frame (a phone, or a browser window) that plays the steps
+  on a loop — a finger dot (phone) or arrow (computer) moves to the ringed button, taps with a
+  ripple, and the screen cross-fades to the next state. A numbered step list beside it (below on
+  narrow screens) highlights in sync; 暫停／播放 and step dots jump to any step. Demos only play
+  while on screen and stop when the guide is left. `prefers-reduced-motion`: starts paused on a
+  still frame with the ring shown.
+- **手機版 vs 電腦版** draw different screens and captions where the app differs: short header
+  labels (「套用」「匯出」「彙整」「← 返回」), add forms behind the round blue ＋ that open as a
+  popup vs the always-open right panel, 月計畫 double-tap vs click. Default = the device being
+  used; the choice is remembered (localStorage).
+- **Phone frame on a computer is big enough to read** (the frame is sized by height, not squeezed
+  into a narrow grid column); on a phone the frame fills most of the width.
+- **New chapter 實用技巧** (before 資料保存): 套用其他幼兒課程計畫, 從適性紀錄彙整到總表,
+  一次匯入多個 Word 檔.
+- **加到主畫面 corrected:** iPhone (iOS 26 Safari) 「⋯」→「分享」→「加入主畫面」→ keep
+  「以網頁 App 打開」 on →「加入」; Android Chrome 「⋮」→「加到主畫面」→「安裝」; computer Chrome
+  「⋮」→「投放、儲存及分享」→「將網頁安裝為應用程式」→「安裝」 (Edge: 「…」→「應用程式」→
+  「將此網站安裝為應用程式」). Web-only, as before.
+- Mini screens use the app's real labels (checked against the source), never invented ones.
+- Kept: 3 data-loss tips, 4-question 常見問題 (plain text), 「此功能僅網頁版提供」 note in the offline build.
+
+Code: `helpMiniScreens.js` (drawing pieces + device frames), `helpDemo.js` (the player),
+`helpContent.js` (chapters → demos → steps, each step `{ cap: string | { phone, desk }, draw(mode) }`,
+optional `modes` to show a demo in one mode only), `helpView.js` (header, switch, accordion,
+mounting/stopping demos). `reportTypeSelectView.js` exports its icon map for reuse.
