@@ -189,9 +189,21 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
     observer.observe(el);
   }
 
+  // Safari before 16 (the center's MacBook runs 15.5) has no container units, so .ms's
+  // calc(100cqw / n) font-size is dropped; size the drawing from the frame's width here instead.
+  let resizer = null;
+  if (typeof CSS !== 'undefined' && !CSS.supports('width', '1cqw') && typeof ResizeObserver === 'function') {
+    const perWidth = mode === 'desk' ? 46 : 22; // same divisors as .ms in styles.css
+    resizer = new ResizeObserver(([entry]) => {
+      screenEl.style.fontSize = `${entry.contentRect.width / perWidth}px`;
+    });
+    resizer.observe(screenEl);
+  }
+
   function destroy() {
     stop();
     observer?.disconnect();
+    resizer?.disconnect();
     listeners.abort();
   }
 
