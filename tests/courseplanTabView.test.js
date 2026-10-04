@@ -6,6 +6,7 @@ import {
 } from '../src/storage/parentReportDb.js';
 import { renderCoursePlanTab } from '../src/ui/courseplanTabView.js';
 import { waitFor } from './helpers.js';
+import { getIndicatorsForTier } from '../src/data/indicators.js';
 
 describe('renderCoursePlanTab', () => {
   let report;
@@ -345,6 +346,55 @@ describe('renderCoursePlanTab', () => {
 
     const codes = [...container.querySelectorAll('.indicator-block__code')].map(el => el.textContent);
     expect(codes.indexOf('Ⅴ-1-1')).toBeLessThan(codes.indexOf('Ⅴ-1-6'));
+  });
+
+  it('add form: tier switch starts on the report tier; picking Ⅳ lists Ⅳ indicators, prefills, and saves a Ⅳ code', async () => {
+    const container = document.createElement('div');
+    let changed = false;
+    await renderCoursePlanTab(container, { report, onChange: () => { changed = true; } });
+    const form = container.querySelector('[data-action="add-entry"]');
+    expect(form.querySelector('.tier-switch__btn--active').dataset.indicatorTier).toBe('Ⅴ');
+
+    form.querySelector('[data-indicator-tier="Ⅳ"]').click();
+    expect(form.querySelector('.tier-switch__btn--active').dataset.indicatorTier).toBe('Ⅳ');
+    const select = form.querySelector('[data-field="indicatorCode"]');
+    expect([...select.options].every(o => o.value.startsWith('Ⅳ-'))).toBe(true);
+    const first = getIndicatorsForTier('Ⅳ')[0];
+    expect(select.value).toBe(first.code);
+    expect(form.querySelector('[data-field="activityName"]').value).toBe(first.activityName);
+    expect(form.querySelector('[data-field="indicatorText"]').value).toBe(first.description);
+
+    select.value = 'Ⅳ-1-2';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => changed);
+    const [entry] = await listCoursePlanEntriesForReport(report.id);
+    expect(entry.indicatorCode).toBe('Ⅳ-1-2');
+  });
+
+  it("lists an earlier-tier entry after the report tier's entries in its domain", async () => {
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-2', activityName: '舊' });
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-6', activityName: 'b' });
+    await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅴ-1-1', activityName: 'a' });
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+    const codes = [...container.querySelectorAll('.indicator-block__code')].map(el => el.textContent);
+    expect(codes).toEqual(['Ⅴ-1-1', 'Ⅴ-1-6', 'Ⅳ-1-2']);
+  });
+
+  it("edit form: starts on the entry's own tier with its code selected; switching tiers keeps the code", async () => {
+    const entry = await addCoursePlanEntry({ reportId: report.id, indicatorCode: 'Ⅳ-1-2', activityName: '舊活動', indicatorText: '老師寫的' });
+    const container = document.createElement('div');
+    await renderCoursePlanTab(container, { report, onChange: () => {} });
+    const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
+    const select = editForm.querySelector('[data-entry-edit-field="indicatorCode"]');
+    expect(editForm.querySelector('.tier-switch__btn--active').dataset.indicatorTier).toBe('Ⅳ');
+    expect(select.value).toBe('Ⅳ-1-2');
+    expect(select.innerHTML).not.toContain('目前的指標');
+
+    editForm.querySelector('[data-indicator-tier="Ⅴ"]').click();
+    expect(select.value).toBe('Ⅳ-1-2');
+    expect([...select.options].some(o => o.value === 'Ⅴ-1-1')).toBe(true);
+    expect(editForm.querySelector('[data-entry-edit-field="indicatorText"]').value).toBe('老師寫的');
   });
 
   it('opens the domain a new entry was added to, without collapsing a domain the user already had open', async () => {

@@ -1,5 +1,5 @@
 import { defaultDateInPeriod, periodDateBounds } from './periodFields.js';
-import { DOMAINS, getIndicatorsForTier, getIndicator } from '../data/indicators.js';
+import { TIERS, DOMAINS, getIndicatorsForTier, getIndicator, compareIndicatorCodesForTier } from '../data/indicators.js';
 import {
   addCoursePlanEntry, listCoursePlanEntriesForReport, deleteCoursePlanEntry, updateCoursePlanEntry,
   addCourseOccurrence, listCourseOccurrencesForEntry, deleteCourseOccurrence, updateCourseOccurrence,
@@ -17,14 +17,6 @@ import { oneAtATime } from './oneAtATime.js';
 // only its first domain open (the general default); an id already in the map keeps whatever set of
 // domains the user has toggled since.
 const openDomainsByReportId = new Map();
-
-// "Ⅳ-2-4" -> 4 (the item number within its domain) — used to sort entries within a domain card in
-// the same order the indicator picker itself lists them, regardless of the order they were added
-// in (insertion/id order otherwise, which has no relation to the indicator's own numbering).
-function indicatorItemNumber(code) {
-  const match = /-(\d+)$/.exec(String(code ?? ''));
-  return match ? Number(match[1]) : Infinity; // unparsable codes sort last rather than first
-}
 
 function statusRadios(id, { namePrefix, fieldAttr, idAttr, checkedStatus }) {
   return `
@@ -103,9 +95,10 @@ function entryCard(entry, indicator, occurrences, tier, period) {
         </span>
       </h4>
       <div class="entry-form" data-entry-edit-form-for="${escapeHtml(entry.id)}" hidden>
+        ${tierSwitchHtml(indicator ? indicator.tier : tier)}
         <label class="panel-form__field">
           指標
-          <select data-entry-edit-field="indicatorCode" data-entry-id="${escapeHtml(entry.id)}">${indicatorOptionsHtml(tier, entry.indicatorCode)}</select>
+          <select data-entry-edit-field="indicatorCode" data-entry-id="${escapeHtml(entry.id)}">${indicatorOptionsHtml(indicator ? indicator.tier : tier, entry.indicatorCode)}</select>
         </label>
         <label class="panel-form__field">活動名稱 <input data-entry-edit-field="activityName" data-entry-id="${escapeHtml(entry.id)}" value="${escapeHtml(entry.activityName)}"></label>
         <label class="panel-form__field">能力指標內容 <textarea data-entry-edit-field="indicatorText" data-entry-id="${escapeHtml(entry.id)}" rows="3">${escapeHtml(entry.indicatorText || '')}</textarea></label>
@@ -150,6 +143,30 @@ function entryCard(entry, indicator, occurrences, tier, period) {
 function dateBoundsAttrs(period) {
   const bounds = periodDateBounds(period);
   return bounds ? ` min="${bounds.min}" max="${bounds.max}"` : '';
+}
+
+// Same 指標所屬年齡層 row as the 月計畫 panel: a teacher may still be tracking an earlier tier's
+// indicator, so the 指標 select can list any tier. Only changes what the select lists.
+function tierSwitchHtml(activeTier) {
+  return `
+    <div class="panel-form__field">
+      指標所屬年齡層
+      <div class="tier-switch">
+        ${TIERS.map(
+          t => `<button type="button" class="tier-switch__btn${t.code === activeTier ? ' tier-switch__btn--active' : ''}" data-indicator-tier="${escapeHtml(t.code)}">${escapeHtml(t.label)}</button>`
+        ).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function wireTierSwitch(scope, onSwitch) {
+  scope.querySelectorAll('[data-indicator-tier]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      scope.querySelectorAll('[data-indicator-tier]').forEach(b => b.classList.toggle('tier-switch__btn--active', b === btn));
+      onSwitch(btn.dataset.indicatorTier);
+    });
+  });
 }
 
 function indicatorOptionsHtml(tier, selectedCode = null) {
@@ -198,11 +215,11 @@ export async function renderCoursePlanTab(
     if (!byDomain.has(domainId)) byDomain.set(domainId, []);
     byDomain.get(domainId).push({ entry, indicator });
   }
-  // Sorted by the indicator's own item number within the domain (same order the 指標 picker itself
-  // lists them), not by insertion/id order — so a newly added entry lands where its indicator
-  // belongs rather than always at the end of the card.
+  // Report tier first, then any earlier-tier indicator the teacher is still tracking, each by item
+  // number — same order as the exported Word (compareIndicatorCodesForTier), not insertion order.
+  const compareCodes = compareIndicatorCodesForTier(report.tier);
   for (const group of byDomain.values()) {
-    group.sort((a, b) => indicatorItemNumber(a.entry.indicatorCode) - indicatorItemNumber(b.entry.indicatorCode));
+    group.sort((a, b) => compareCodes(a.entry.indicatorCode, b.entry.indicatorCode));
   }
   const domainGroups = [
     ...DOMAINS.filter(d => byDomain.has(d.id)).map(d => [d.id, d.name, byDomain.get(d.id)]),
@@ -229,6 +246,7 @@ export async function renderCoursePlanTab(
         formHtml: `
           <form class="panel-form panel-form--wide" data-action="add-entry">
             <h3 class="panel-form__title">新增課程計畫項目</h3>
+            ${tierSwitchHtml(report.tier)}
             <label class="panel-form__field">
               指標
               <select data-field="indicatorCode">${indicatorOptionsHtml(report.tier)}</select>
@@ -289,6 +307,25 @@ export async function renderCoursePlanTab(
     container.querySelector('[data-field="activityName"]').value = indicator.activityName;
     container.querySelector('[data-field="indicatorText"]').value = indicator.description;
   });
+
+  // Switching tier relists the select and refires its change handler, so 活動名稱/能力指標內容
+  // follow the newly selected first indicator instead of describing one no longer selected.
+  const addForm = container.querySelector('[data-action="add-entry"]');
+  wireTierSwitch(addForm, tierCode => {
+    const select = addForm.querySelector('[data-field="indicatorCode"]');
+    select.innerHTML = indicatorOptionsHtml(tierCode);
+    select.dispatchEvent(new Event('change'));
+  });
+
+  // In the edit form, switching tier keeps the entry's current code selected (shown as
+  // 「（目前的指標）」 when it isn't in that tier) and never touches the text the teacher wrote.
+  for (const entry of entries) {
+    const editForm = container.querySelector(`[data-entry-edit-form-for="${entry.id}"]`);
+    wireTierSwitch(editForm, tierCode => {
+      const select = editForm.querySelector('[data-entry-edit-field="indicatorCode"]');
+      select.innerHTML = indicatorOptionsHtml(tierCode, select.value);
+    });
+  }
 
   container.querySelector('[data-action="add-entry"]').addEventListener('submit', oneAtATime(async event => {
     event.preventDefault();
