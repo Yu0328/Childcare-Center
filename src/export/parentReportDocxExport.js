@@ -459,8 +459,9 @@ async function highlightEntryRows(entry) {
 
 // The design spec requires a 家長回饋／簽名欄 block ("簽名欄留空白，供列印後手寫"). In both real
 // samples it is the tail of the SAME table as 點滴分享: an F7CAAC bar reading 家長回饋, then one
-// full-width cell holding five empty paragraphs (the blank handwriting area — this is what gives
-// the cell its height; the samples set no explicit trHeight) closed by a 家長簽名： line.
+// full-width cell holding empty paragraphs (the blank handwriting area — this is what gives
+// the cell its height; the samples set no explicit trHeight) closed by a 家長簽名： line. The
+// samples have five; we print 15 so parents have more room to write.
 export function parentFeedbackRows() {
   return [
     new TableRow({
@@ -479,7 +480,7 @@ export function parentFeedbackRows() {
           columnSpan: HIGHLIGHT_GRID_COLUMN_COUNT,
           width: { size: COURSE_PLAN_TABLE_WIDTH_DXA, type: WidthType.DXA },
           children: [
-            ...Array.from({ length: 5 }, () => emptyParagraph()),
+            ...Array.from({ length: 15 }, () => emptyParagraph()),
             textParagraph('家長簽名：', { bold: true }),
           ],
         }),
