@@ -12,7 +12,7 @@ import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../dat
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
-import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, wireFabDrag, lockBodyScroll, unlockBodyScroll } from './formPopup.js';
+import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, wireFabDrag, lockBodyScroll, unlockBodyScroll, closeOnBackdropClick } from './formPopup.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
 import { downloadBlob } from '../export/downloadBlob.js';
 import { oneAtATime } from './oneAtATime.js';
@@ -238,9 +238,7 @@ export async function renderMonthlyPlanEditorView(
   if (panelDialog) {
     unlockBodyScroll(); // see formPopup.js's wireFormPopup — a fresh render's dialog starts closed
     panelDialog.querySelector('[data-action="close-form-popup"]').addEventListener('click', () => panelDialog.close());
-    panelDialog.addEventListener('click', event => {
-      if (event.target === panelDialog) panelDialog.close();
-    });
+    closeOnBackdropClick(panelDialog);
     panelDialog.addEventListener('close', unlockBodyScroll);
   }
 

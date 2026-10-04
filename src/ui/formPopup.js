@@ -152,6 +152,21 @@ export function formPopupMarkup({ formHtml, fabLabel }) {
   `;
 }
 
+// Tapping the backdrop closes the popup — but only when the press both starts and ends there. A
+// click's target is the nearest common ancestor of where the press started and ended, so picking
+// from a phone's native <select> list (press on the field, release over the backdrop) or dragging
+// a text selection off the edge reported the dialog itself and closed the whole popup mid-edit.
+export function closeOnBackdropClick(dialog) {
+  let pressedOnBackdrop = false;
+  dialog.addEventListener('pointerdown', event => {
+    pressedOnBackdrop = event.target === dialog;
+  });
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog && pressedOnBackdrop) dialog.close();
+    pressedOnBackdrop = false;
+  });
+}
+
 export function wireFormPopup(container) {
   const dialog = container.querySelector('.form-popup');
   // A fresh render's dialog always starts closed, even if the previous one was open when it got
@@ -167,9 +182,7 @@ export function wireFormPopup(container) {
     });
   }
   container.querySelector('[data-action="close-form-popup"]')?.addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', event => {
-    if (event.target === dialog) dialog.close();
-  });
+  closeOnBackdropClick(dialog);
   // Covers every way the dialog can close — the button above, backdrop click, and the Escape key.
   dialog.addEventListener('close', unlockBodyScroll);
 }
@@ -196,9 +209,7 @@ export function wireNestedEntryForm(trigger, entryForm) {
     lockBodyScroll();
   });
   dialog.querySelector('[data-action="close-form-popup"]').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', event => {
-    if (event.target === dialog) dialog.close();
-  });
+  closeOnBackdropClick(dialog);
   dialog.addEventListener('close', unlockBodyScroll);
 }
 

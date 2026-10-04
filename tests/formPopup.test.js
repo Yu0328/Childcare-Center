@@ -1,5 +1,41 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { lockBodyScroll, unlockBodyScroll, wireEditForm } from '../src/ui/formPopup.js';
+import { lockBodyScroll, unlockBodyScroll, wireEditForm, closeOnBackdropClick } from '../src/ui/formPopup.js';
+
+describe('closeOnBackdropClick', () => {
+  function setup() {
+    const dialog = document.createElement('dialog');
+    dialog.innerHTML = '<select data-field><option>1</option><option>2</option></select>';
+    document.body.appendChild(dialog);
+    let closed = 0;
+    dialog.close = () => { closed += 1; };
+    closeOnBackdropClick(dialog);
+    const press = (downOn, clickOn) => {
+      downOn.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      clickOn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    return { dialog, select: dialog.querySelector('[data-field]'), press, closed: () => closed };
+  }
+
+  it('closes when the press starts and ends on the backdrop', () => {
+    const { dialog, press, closed } = setup();
+    press(dialog, dialog);
+    expect(closed()).toBe(1);
+  });
+
+  // Picking from a phone's native <select> list: the press starts on the field and is released
+  // over the backdrop, so the click is reported on the dialog itself.
+  it('stays open when the press started on a field inside the popup', () => {
+    const { dialog, select, press, closed } = setup();
+    press(select, dialog);
+    expect(closed()).toBe(0);
+  });
+
+  it('stays open on a click with no press on the backdrop before it', () => {
+    const { dialog, closed } = setup();
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(closed()).toBe(0);
+  });
+});
 
 describe('lockBodyScroll / unlockBodyScroll', () => {
   afterEach(() => {
