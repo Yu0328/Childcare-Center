@@ -7,7 +7,7 @@ import {
 import { addParentReport, listParentReportsForChild } from '../src/storage/parentReportDb.js';
 import {
   addMonthlyCoursePlan, getMonthlyCoursePlan, getOrCreatePlanSlot, addPlanSlotItem,
-  setChildItemOverride, listChildItemOverridesForPlan,
+  setChildItemOverride, listChildItemOverridesForPlan, listPlanSlotItems,
 } from '../src/storage/monthlyPlanDb.js';
 import { runRequest } from '../src/storage/dbCore.js';
 
@@ -88,6 +88,25 @@ describe('children storage', () => {
     const remainingOverrides = await listChildItemOverridesForPlan(plan.id);
     expect(remainingOverrides).toHaveLength(1);
     expect(remainingOverrides[0].childId).toBe(otherChild.id);
+  });
+
+  it("deleting a child also deletes their 個別項目 on monthly plans, leaving shared and other children's items", async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const otherChild = await addChild({ name: '林小晴', birthDate: '2024-07-19' });
+    const plan = await addMonthlyCoursePlan({
+      period: '115年06月',
+      childIds: [child.id, otherChild.id],
+      childTiers: { [child.id]: 'Ⅴ', [otherChild.id]: 'Ⅴ' },
+    });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '共用' });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: child.id });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: otherChild.id });
+
+    await deleteChild(child.id);
+
+    const remaining = await listPlanSlotItems(slot.id);
+    expect(remaining.map(i => i.childId)).toEqual([undefined, otherChild.id]);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   listPlanSlotsForPlan, getOrCreatePlanSlot, deletePlanSlot,
   listPlanSlotItems, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem,
   listChildItemOverridesForPlan, setChildItemOverride, deleteChildItemOverridesForChild,
+  itemVisibleToChild, deleteChildOnlyItemsForChild,
 } from '../src/storage/monthlyPlanDb.js';
 
 describe('monthlyPlanDb: MonthlyCoursePlan', () => {
@@ -179,5 +180,41 @@ describe('monthlyPlanDb: ChildItemOverride', () => {
     const remaining = await listChildItemOverridesForPlan(plan.id);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].childId).toBe(2);
+  });
+});
+
+describe('monthlyPlanDb: child-only (個別) items', () => {
+  beforeEach(async () => {
+    await clearAllData();
+  });
+
+  it('stores no childId field at all for a shared item, and the given one for a child-only item', async () => {
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [1, 2], childTiers: { 1: 'Ⅴ', 2: 'Ⅴ' } });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const shared = await addPlanSlotItem({ slotId: slot.id, activityName: '共用' });
+    const own = await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: 1 });
+    expect('childId' in shared).toBe(false);
+    expect(own.childId).toBe(1);
+  });
+
+  it('itemVisibleToChild: shared items show for everyone, child-only items only for their child', () => {
+    expect(itemVisibleToChild({ activityName: '共用' }, 1)).toBe(true);
+    expect(itemVisibleToChild({ activityName: '補課', childId: 1 }, 1)).toBe(true);
+    expect(itemVisibleToChild({ activityName: '補課', childId: 1 }, 2)).toBe(false);
+  });
+
+  it("deleteChildOnlyItemsForChild removes only that child's own items and their overrides", async () => {
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [1, 2], childTiers: { 1: 'Ⅴ', 2: 'Ⅴ' } });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const shared = await addPlanSlotItem({ slotId: slot.id, activityName: '共用' });
+    const mine = await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: 1 });
+    const theirs = await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: 2 });
+    await setChildItemOverride({ planId: plan.id, childId: 1, itemId: mine.id, notAchieved: true, replaced: false });
+    await setChildItemOverride({ planId: plan.id, childId: 1, itemId: shared.id, notAchieved: true, replaced: false });
+
+    await deleteChildOnlyItemsForChild(plan.id, 1);
+
+    expect((await listPlanSlotItems(slot.id)).map(i => i.id).sort()).toEqual([shared.id, theirs.id].sort());
+    expect((await listChildItemOverridesForPlan(plan.id)).map(o => o.itemId)).toEqual([shared.id]);
   });
 });

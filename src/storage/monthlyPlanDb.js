@@ -84,8 +84,18 @@ export async function listPlanSlotItems(slotId) {
   return runRequest('planSlotItems', 'readonly', store => store.index('by_slotId').getAll(slotId));
 }
 
-export async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = '', uid, updatedAt }) {
-  return addRecord('planSlotItems', { slotId, indicatorCode, activityName, indicatorText, uid, updatedAt });
+// `childId` makes a 個別項目 — an item only that one child sees (e.g. a make-up lesson), still filed
+// under the shared same-tier slot. A shared item has no `childId` field at all rather than
+// `childId: null`: sync's deserializeRecord treats a child ref it can't resolve as "parent not
+// arrived yet" and skips the whole record, which a null would trip on every pull.
+export async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = '', childId, uid, updatedAt }) {
+  const record = { slotId, indicatorCode, activityName, indicatorText, uid, updatedAt };
+  if (childId !== undefined) record.childId = childId;
+  return addRecord('planSlotItems', record);
+}
+
+export function itemVisibleToChild(item, childId) {
+  return item.childId === undefined || item.childId === childId;
 }
 
 export async function updatePlanSlotItem(id, changes) {
@@ -141,6 +151,16 @@ async function writeChildItemOverride({ planId, childId, itemId, notAchieved, re
   return addRecord('childItemOverrides', {
     planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt,
   });
+}
+
+// For a child leaving the plan (or deleted outright): their 個別項目 would otherwise linger, shown
+// to nobody but still exported nowhere and carried along in every backup.
+export async function deleteChildOnlyItemsForChild(planId, childId) {
+  for (const slot of await listPlanSlotsForPlan(planId)) {
+    for (const item of await listPlanSlotItems(slot.id)) {
+      if (item.childId === childId) await deletePlanSlotItem(item.id);
+    }
+  }
 }
 
 export async function deleteChildItemOverridesForChild(planId, childId) {

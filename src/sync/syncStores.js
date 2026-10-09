@@ -55,8 +55,9 @@ export const SYNC_STORES = [
   },
   {
     store: 'planSlotItems',
-    refs: { slotId: { store: 'planSlots', kind: 'id' } },
-    naturalKey: r => `${r.slotId}|${r.activityName}`,
+    // A 個別項目 carries childId; a shared one has no such field, so its key stays what it always was.
+    refs: { slotId: { store: 'planSlots', kind: 'id' }, childId: CHILD_REF },
+    naturalKey: r => (r.childId === undefined ? `${r.slotId}|${r.activityName}` : `${r.slotId}|${r.activityName}|${r.childId}`),
   },
   {
     store: 'childItemOverrides',

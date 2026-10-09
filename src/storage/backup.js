@@ -313,9 +313,13 @@ async function importMonthlyCoursePlans(data, childIdMap) {
 
   const itemIdMap = new Map();
   for (const item of data.planSlotItems ?? []) {
+    // A 個別項目 whose child isn't in this backup belongs to nobody — drop it (same dead-child
+    // guard as childIds/childTiers above). A shared item has no childId and passes straight through.
+    const childId = item.childId === undefined ? undefined : childIdMap.get(item.childId);
+    if (item.childId !== undefined && childId === undefined) continue;
     const created = await addPlanSlotItem({
       slotId: slotIdMap.get(item.slotId), indicatorCode: item.indicatorCode, activityName: item.activityName, indicatorText: item.indicatorText,
-      uid: item.uid, updatedAt: item.updatedAt,
+      childId, uid: item.uid, updatedAt: item.updatedAt,
     });
     itemIdMap.set(item.id, created.id);
   }
@@ -323,6 +327,7 @@ async function importMonthlyCoursePlans(data, childIdMap) {
   for (const override of data.childItemOverrides ?? []) {
     const childId = childIdMap.get(override.childId);
     if (childId === undefined) continue; // same dead-child guard as childIds/childTiers above
+    if (!itemIdMap.has(override.itemId)) continue; // its 個別項目 was dropped just above
     await setChildItemOverride({
       planId: planIdMap.get(override.planId),
       childId,

@@ -7,6 +7,7 @@ import { DEFAULT_TEXT_SIZE, FONT, PAGE_SIZE, emptyParagraph, headerIconRunInFron
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { parsePeriod } from '../ui/periodFields.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { itemVisibleToChild } from '../storage/monthlyPlanDb.js';
 
 // This document's local textParagraph-equivalent helpers are kept separate from docxShared.js's
 // (rather than importing those directly) purely because this file's cell-shading/border logic
@@ -245,7 +246,7 @@ function dateRow(weeks, weekday, widths, nameContent, isFirstBodyRow) {
   });
 }
 
-function contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId) {
+function contentRow(weeks, weekday, widths, tier, childId, slots, itemsBySlotId, overrideByItemId) {
   const cells = weeks.map((week, index) => {
     const day = week.days.find(d => d.weekday === weekday);
     if (!day) {
@@ -257,7 +258,7 @@ function contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, override
       });
     }
     const slot = findSlot(slots, tier, week.weekIndex, weekday);
-    const items = slot ? itemsBySlotId[slot.id] || [] : [];
+    const items = (slot ? itemsBySlotId[slot.id] || [] : []).filter(item => itemVisibleToChild(item, childId));
     const runs = buildDayCellRuns(items, overrideByItemId);
     return new TableCell({
       width: cellWidth(widths, index + 1),
@@ -300,7 +301,7 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
 
   const bodyRows = WEEKDAYS.flatMap((weekday, weekdayIndex) => [
     dateRow(weeks, weekday, widths, nameContent, weekdayIndex === 0),
-    contentRow(weeks, weekday, widths, tier, slots, itemsBySlotId, overrideByItemId),
+    contentRow(weeks, weekday, widths, tier, child.id, slots, itemsBySlotId, overrideByItemId),
   ]);
 
   return new Table({

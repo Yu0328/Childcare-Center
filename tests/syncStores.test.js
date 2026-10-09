@@ -104,3 +104,24 @@ describe('deserializeRecord', () => {
     expect(deserializeRecord('forms', { uid: 'x', childId: 'children-uid-nope' }, () => undefined)).toBe(null);
   });
 });
+
+describe('planSlotItems 的 個別項目 childId', () => {
+  const planSlotItemsSpec = SYNC_STORES.find(s => s.store === 'planSlotItems');
+
+  it('個別項目的 childId 換成 uid 再換回來；共用項目不會多出 childId', () => {
+    const own = serializeRecord('planSlotItems', { id: 1, uid: 'i', slotId: 2, activityName: '補課', childId: 3 }, uidOf);
+    expect(own.childId).toBe('children-uid-3');
+    expect(deserializeRecord('planSlotItems', own, (store, uid) => idOf(uid)).childId).toBe(3);
+
+    const shared = serializeRecord('planSlotItems', { id: 1, uid: 'i', slotId: 2, activityName: '共用' }, uidOf);
+    expect(shared).not.toHaveProperty('childId');
+    expect(deserializeRecord('planSlotItems', shared, (store, uid) => idOf(uid))).not.toHaveProperty('childId');
+  });
+
+  it('兩位幼兒同一天同名的個別項目 naturalKey 不同；共用項目的 naturalKey 跟以前一樣', () => {
+    const a = planSlotItemsSpec.naturalKey({ slotId: 's', activityName: '補課', childId: 'c1' });
+    const b = planSlotItemsSpec.naturalKey({ slotId: 's', activityName: '補課', childId: 'c2' });
+    expect(a).not.toBe(b);
+    expect(planSlotItemsSpec.naturalKey({ slotId: 's', activityName: '共用' })).toBe('s|共用');
+  });
+});

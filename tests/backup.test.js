@@ -240,6 +240,46 @@ describe('backup export/import', () => {
     expect(restoredOverrides[0]).toMatchObject({ childId: restoredChild.id, itemId: restoredItems[0].id, notAchieved: true });
   });
 
+  it("round-trips a monthly plan's 個別項目 onto the restored child's new id, keeping shared items childId-free", async () => {
+    await addChild({ name: '佔位', birthDate: '2024-01-01' }); // so the restored ids shift
+    const child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 5 });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '共用' });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: child.id });
+
+    const parts = await exportBackup();
+    const data = JSON.parse(parts.join(''));
+    data.children = data.children.filter(c => c.name !== '佔位');
+    await clearAllData();
+    await importBackup(JSON.stringify(data));
+
+    const [restoredChild] = await listChildren();
+    const [restoredPlan] = await listMonthlyCoursePlans();
+    const [restoredSlot] = await listPlanSlotsForPlan(restoredPlan.id);
+    const items = await listPlanSlotItems(restoredSlot.id);
+    expect(items.find(i => i.activityName === '共用')).not.toHaveProperty('childId');
+    expect(items.find(i => i.activityName === '補課').childId).toBe(restoredChild.id);
+  });
+
+  it("drops a 個別項目 (and its overrides) whose child isn't in the backup", async () => {
+    const child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 5 });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '共用' });
+    const ghostItem = await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: 999999 });
+    await setChildItemOverride({ planId: plan.id, childId: child.id, itemId: ghostItem.id, notAchieved: true, replaced: false });
+
+    const parts = await exportBackup();
+    await clearAllData();
+    await importBackup(parts.join(''));
+
+    const [restoredPlan] = await listMonthlyCoursePlans();
+    const [restoredSlot] = await listPlanSlotsForPlan(restoredPlan.id);
+    expect((await listPlanSlotItems(restoredSlot.id)).map(i => i.activityName)).toEqual(['共用']);
+    expect(await listChildItemOverridesForPlan(restoredPlan.id)).toEqual([]);
+  });
+
   it('drops a monthly-plan childId that has no matching child in the backup, instead of restoring a null/undefined reference', async () => {
     const child = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
     await addMonthlyCoursePlan({ period: '115年06月', childIds: [child.id], childTiers: { [child.id]: 'Ⅴ' } });

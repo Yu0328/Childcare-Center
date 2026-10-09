@@ -3,7 +3,7 @@ import { getChild, listChildren } from '../storage/db.js';
 import {
   listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
   getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem, setChildItemOverride,
-  updateMonthlyCoursePlan, deleteChildItemOverridesForChild,
+  updateMonthlyCoursePlan, deleteChildItemOverridesForChild, deleteChildOnlyItemsForChild, itemVisibleToChild,
 } from '../storage/monthlyPlanDb.js';
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
@@ -66,12 +66,14 @@ function itemHtml(item, override) {
     ? `<span class="monthly-calendar__replacement">${escapeHtml(override.replacementText || '請假')}</span>`
     : '';
 
-  return `<div class="${classes.join(' ')}" data-item-id="${escapeHtml(item.id)}">${label}${replacementHtml}</div>`;
+  const tagHtml = item.childId !== undefined ? '<span class="monthly-calendar__item-tag">個別</span>' : '';
+
+  return `<div class="${classes.join(' ')}" data-item-id="${escapeHtml(item.id)}">${tagHtml}${label}${replacementHtml}</div>`;
 }
 
 function dayCellHtml(child, tier, week, day, data) {
   const slot = findSlot(data.slots, tier, week.weekIndex, day.weekday);
-  const items = slot ? data.itemsBySlotId[slot.id] || [] : [];
+  const items = (slot ? data.itemsBySlotId[slot.id] || [] : []).filter(item => itemVisibleToChild(item, child.id));
   const itemsHtml = items
     .map(item => itemHtml(item, data.overrideByKey.get(`${child.id}:${item.id}`)))
     .join('');
@@ -320,6 +322,7 @@ export async function renderMonthlyPlanEditorView(
 
       for (const childId of removedChildIds) {
         await deleteChildItemOverridesForChild(plan.id, childId);
+        await deleteChildOnlyItemsForChild(plan.id, childId);
       }
 
       await renderMonthlyPlanEditorView(container, { plan: updatedPlan, onBack });
@@ -381,6 +384,7 @@ export async function renderMonthlyPlanEditorView(
     return `
       <div class="indicator-block" data-panel-item="${item.id}">
         <h4 class="indicator-block__title">
+          ${item.childId !== undefined ? '<span class="indicator-block__code">個別</span>' : ''}
           ${item.indicatorCode ? `<span class="indicator-block__code">${escapeHtml(item.indicatorCode)}</span>` : ''}
           ${summaryText}
           <span class="indicator-block__actions">
@@ -431,7 +435,7 @@ export async function renderMonthlyPlanEditorView(
     const loadingFor = selected;
     const { child, tier, week, day } = selected;
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: week.weekIndex, weekday: day.weekday });
-    const items = await listPlanSlotItems(slot.id);
+    const items = (await listPlanSlotItems(slot.id)).filter(item => itemVisibleToChild(item, child.id));
     const allOverrides = await listChildItemOverridesForPlan(plan.id);
     // Another day was clicked while this one loaded: its own load paints the panel, not this stale one.
     if (selected !== loadingFor) return;
@@ -444,9 +448,33 @@ export async function renderMonthlyPlanEditorView(
     // its indicator came from.
     let indicatorTier = tier;
 
+    // 適用幼兒: a new item is shared by the whole tier (the default) or a 個別項目 for this child only
+    // — e.g. a make-up lesson after a 請假 day. 同時新增給 hands same-tier classmates their own
+    // separate copy (not one item shared between them), so editing or deleting one child's copy
+    // never touches another's.
+    let childOnly = false;
+    const classmates = data.children.filter(c => c.id !== child.id && plan.childTiers[c.id] === tier);
+
     panelItems.innerHTML = `
       ${items.map(item => panelItemRowHtml(item, overrideByItemId.get(item.id))).join('')}
       <form class="entry-form" data-action="add-item">
+        <div class="panel-form__field">
+          適用幼兒
+          <div class="tier-switch">
+            <button type="button" class="tier-switch__btn tier-switch__btn--active" data-item-scope="shared">同階段共用</button>
+            <button type="button" class="tier-switch__btn" data-item-scope="child">僅限${escapeHtml(child.name)}</button>
+          </div>
+        </div>
+        ${classmates.length
+          ? `<div class="panel-form__field" data-also-add hidden>
+              同時新增給：
+              <div class="panel-form__checkbox-list">
+                ${classmates
+                  .map(c => `<label class="panel-form__checkbox"><input type="checkbox" data-also-add-child="${escapeHtml(c.id)}"> ${escapeHtml(c.name)}</label>`)
+                  .join('')}
+              </div>
+            </div>`
+          : ''}
         <div class="panel-form__field">
           指標所屬年齡層
           <div class="tier-switch">
@@ -466,6 +494,18 @@ export async function renderMonthlyPlanEditorView(
         <p class="field-error" data-error></p>
       </form>
     `;
+
+    panelItems.querySelectorAll('[data-item-scope]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        childOnly = btn.dataset.itemScope === 'child';
+        panelItems.querySelectorAll('[data-item-scope]').forEach(b => b.classList.toggle('tier-switch__btn--active', b === btn));
+        const alsoAdd = panelItems.querySelector('[data-also-add]');
+        if (!alsoAdd) return;
+        alsoAdd.hidden = !childOnly;
+        // A tick left behind out of sight would still copy the item to that child.
+        if (!childOnly) alsoAdd.querySelectorAll('input').forEach(box => { box.checked = false; });
+      });
+    });
 
     panelItems.querySelectorAll('[data-indicator-tier]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -498,7 +538,16 @@ export async function renderMonthlyPlanEditorView(
         return;
       }
       try {
-        await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
+        if (childOnly) {
+          const extraIds = classmates
+            .filter(c => panelItems.querySelector(`[data-also-add-child="${c.id}"]`).checked)
+            .map(c => c.id);
+          for (const childId of [child.id, ...extraIds]) {
+            await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText, childId });
+          }
+        } else {
+          await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
+        }
         await refreshCellAndPanel();
       } catch (err) {
         panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = '新增失敗，請再試一次';
@@ -524,11 +573,15 @@ export async function renderMonthlyPlanEditorView(
       panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
         // An item is shared by every same-tier child (and takes their 請假／未達成 marks with it),
         // though the panel shows only the one child that was clicked — say so before deleting.
+        const name = item.activityName || item.indicatorCode;
         const sharedCount = data.children.filter(c => plan.childTiers[c.id] === selected.tier).length;
         const sharedNote = sharedCount > 1
           ? `同階段的 ${sharedCount} 位幼兒都會一起刪除這個項目，以及他們在這個項目上的請假／未達成標記。`
           : '';
-        if (!confirmDelete(`確定要刪除「${item.activityName || item.indicatorCode}」嗎？${sharedNote}此操作無法復原。`)) return;
+        const message = item.childId !== undefined
+          ? `確定要刪除${child.name}的個別項目「${name}」嗎？此操作無法復原。`
+          : `確定要刪除「${name}」嗎？${sharedNote}此操作無法復原。`;
+        if (!confirmDelete(message)) return;
         await deletePlanSlotItem(item.id);
         await refreshCellAndPanel();
       }));

@@ -392,6 +392,97 @@ describe('monthlyPlanEditorView: per-child overrides', () => {
 // override), which would pass even if child B's cell never re-rendered at all. This asserts the
 // feature's headline positive behavior — editing a slot's items via one child's panel must reach
 // EVERY same-tier child's calendar, including one that was never clicked.
+describe('monthlyPlanEditorView: 個別項目 (child-only items)', () => {
+  let container, childA, childB, childC, plan, confirmMessages;
+  const cell = id => container.querySelector(`.monthly-calendar__day[data-child-id="${id}"][data-week-index="1"][data-weekday="5"]`);
+  const field = name => container.querySelector(`[data-field="${name}"]`);
+  const submit = () => container.querySelector('[data-action="add-item"]').dispatchEvent(new Event('submit', { cancelable: true }));
+  const allItems = async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 5 });
+    return listPlanSlotItems(slot.id);
+  };
+
+  beforeEach(async () => {
+    await clearAllData();
+    container = document.createElement('div');
+    childA = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    childB = await addChild({ name: '鍾晴妍', birthDate: '2024-08-01' });
+    childC = await addChild({ name: '林小美', birthDate: '2025-01-01' });
+    plan = await addMonthlyCoursePlan({
+      period: '115年06月',
+      childIds: [childA.id, childB.id, childC.id],
+      childTiers: { [childA.id]: 'Ⅴ', [childB.id]: 'Ⅴ', [childC.id]: 'Ⅳ' },
+    });
+    confirmMessages = [];
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn(), confirmDelete: m => { confirmMessages.push(m); return true; } });
+    cell(childA.id).click();
+    await waitFor(() => field('new-item-indicator'));
+  });
+
+  it('offers 同階段共用／僅限<child>, defaulting to shared, with 同時新增給 hidden and listing only other same-tier children', () => {
+    const scopes = [...container.querySelectorAll('[data-item-scope]')];
+    expect(scopes.map(b => b.textContent.trim())).toEqual(['同階段共用', '僅限趙萬竑']);
+    expect(scopes[0].classList.contains('tier-switch__btn--active')).toBe(true);
+    const alsoAdd = container.querySelector('[data-also-add]');
+    expect(alsoAdd.hidden).toBe(true);
+    expect(alsoAdd.textContent).toContain('同時新增給：');
+    expect([...alsoAdd.querySelectorAll('[data-also-add-child]')].map(i => i.dataset.alsoAddChild)).toEqual([String(childB.id)]);
+  });
+
+  it('僅限 adds an item only this child sees, tagged 個別 in the cell and the panel', async () => {
+    container.querySelector('[data-item-scope="child"]').click();
+    expect(container.querySelector('[data-also-add]').hidden).toBe(false);
+    field('new-item-activity-name').value = '補課：積木';
+    submit();
+    await waitFor(() => cell(childA.id).textContent.includes('補課：積木'));
+
+    expect(cell(childA.id).querySelector('.monthly-calendar__item-tag').textContent).toBe('個別');
+    expect(cell(childB.id).textContent).not.toContain('補課：積木');
+    const [own] = (await allItems()).filter(i => i.activityName === '補課：積木');
+    expect(own.childId).toBe(childA.id);
+    expect(container.querySelector(`[data-panel-item="${own.id}"] .indicator-block__title`).textContent).toContain('個別');
+  });
+
+  it('同時新增給 gives a ticked child their own separate copy; deleting one copy leaves the other', async () => {
+    container.querySelector('[data-item-scope="child"]').click();
+    container.querySelector(`[data-also-add-child="${childB.id}"]`).checked = true;
+    field('new-item-activity-name').value = '補課：積木';
+    submit();
+    await waitFor(() => cell(childB.id).textContent.includes('補課：積木'));
+
+    const copies = (await allItems()).filter(i => i.activityName === '補課：積木');
+    expect(copies.map(i => i.childId).sort()).toEqual([childA.id, childB.id].sort());
+
+    const mine = copies.find(i => i.childId === childA.id);
+    container.querySelector(`[data-delete-item="${mine.id}"]`).click();
+    await waitFor(() => !cell(childA.id).textContent.includes('補課：積木'));
+    expect(confirmMessages[0]).toBe('確定要刪除趙萬竑的個別項目「補課：積木」嗎？此操作無法復原。');
+    expect(cell(childB.id).textContent).toContain('補課：積木');
+  });
+
+  it('switching back to 同階段共用 hides 同時新增給 and clears its ticks, and adds a shared item', async () => {
+    container.querySelector('[data-item-scope="child"]').click();
+    container.querySelector(`[data-also-add-child="${childB.id}"]`).checked = true;
+    container.querySelector('[data-item-scope="shared"]').click();
+    expect(container.querySelector('[data-also-add]').hidden).toBe(true);
+    expect(container.querySelector(`[data-also-add-child="${childB.id}"]`).checked).toBe(false);
+
+    field('new-item-activity-name').value = '共用活動';
+    submit();
+    await waitFor(() => cell(childB.id).textContent.includes('共用活動'));
+    const [shared] = (await allItems()).filter(i => i.activityName === '共用活動');
+    expect(shared).not.toHaveProperty('childId');
+  });
+
+  it('leaves out 同時新增給 entirely when no other child shares the tier', async () => {
+    container.querySelector(`[data-switch-child="${childC.id}"]`).click();
+    cell(childC.id).click();
+    await waitFor(() => container.querySelector('[data-panel-header]').textContent.includes('林小美') && field('new-item-indicator'));
+    expect(container.querySelector('[data-item-scope="child"]').textContent.trim()).toBe('僅限林小美');
+    expect(container.querySelector('[data-also-add]')).toBeNull();
+  });
+});
+
 describe('monthlyPlanEditorView: shared-per-tier update reaches a second, never-clicked child', () => {
   it('adding an item via child A\'s panel shows it in child B\'s (same-tier, never-selected) cell too', async () => {
     await clearAllData();
@@ -451,9 +542,10 @@ describe('monthlyPlanEditorView: manage children', () => {
     expect(container.querySelector(`.monthly-calendar[data-child-id="${childB.id}"]`)).not.toBeNull();
   });
 
-  it('removing a child clears their overrides for this plan and their calendar block', async () => {
+  it('removing a child clears their overrides and 個別項目 for this plan and their calendar block', async () => {
     const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
     const item = await addPlanSlotItem({ slotId: slot.id, activityName: 'x' });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: childA.id });
     await setChildItemOverride({ planId: plan.id, childId: childA.id, itemId: item.id, notAchieved: true, replaced: false });
 
     container.querySelector('[data-action="manage-children"]').click();
@@ -467,6 +559,7 @@ describe('monthlyPlanEditorView: manage children', () => {
     const updated = await getMonthlyCoursePlan(plan.id);
     expect(updated.childIds).toEqual([]);
     expect(await listChildItemOverridesForPlan(plan.id)).toEqual([]);
+    expect((await listPlanSlotItems(slot.id)).map(i => i.activityName)).toEqual(['x']);
     expect(container.querySelector(`.monthly-calendar[data-child-id="${childA.id}"]`)).toBeNull();
   });
 });

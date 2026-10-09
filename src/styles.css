@@ -2712,6 +2712,18 @@ fieldset.panel-form__field.import-preview__child legend {
   word-break: break-word;
 }
 
+/* 個別項目's tag: .indicator-block__code's look, scaled down to the calendar cell's smaller text. */
+.monthly-calendar__item-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: var(--page-bg);
+  border-radius: 6px;
+  padding: 0 0.4em;
+  margin-right: 0.35em;
+}
+
 .monthly-calendar__item--not-achieved {
   color: var(--danger);
   background: var(--danger-bg);

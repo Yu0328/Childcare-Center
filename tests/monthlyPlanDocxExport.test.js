@@ -52,6 +52,24 @@ describe('buildDayCellRuns', () => {
 });
 
 describe('generateMonthlyPlanDocxBlob', () => {
+  it("puts a 個別項目 only in its own child's table, while a shared item appears in both", async () => {
+    const plan = { id: 1, period: '115年06月', childIds: [10, 11], childTiers: { 10: 'Ⅴ', 11: 'Ⅴ' } };
+    const children = [{ id: 10, name: '趙萬竑', birthDate: '2024-07-01' }, { id: 11, name: '林小美', birthDate: '2024-07-01' }];
+    const slots = [{ id: 5, planId: 1, tier: 'Ⅴ', weekIndex: 1, weekday: 3 }];
+    const itemsBySlotId = { 5: [{ id: 1, slotId: 5, activityName: '共用活動' }, { id: 2, slotId: 5, activityName: '補課活動', childId: 11 }] };
+
+    const blob = await generateMonthlyPlanDocxBlob({ plan, children, slots, itemsBySlotId, overrides: [] });
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer())); // see the 4-week test below for why
+    const documentXml = await zip.file('word/document.xml').async('text');
+    const tables = documentXml.split('<w:tbl>').slice(1);
+
+    expect(tables).toHaveLength(2);
+    expect(tables[0]).toContain('共用活動');
+    expect(tables[0]).not.toContain('補課活動');
+    expect(tables[1]).toContain('共用活動');
+    expect(tables[1]).toContain('補課活動');
+  });
+
   it('generates a non-empty docx Blob for a plan with one child and no items', async () => {
     const plan = { id: 1, period: '115年06月', childIds: [10], childTiers: { 10: 'Ⅴ' } };
     const children = [{ id: 10, name: '趙萬竑', birthDate: '2024-07-01' }];

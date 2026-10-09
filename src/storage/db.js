@@ -1,6 +1,6 @@
 import { DB_NAME, runRequest, addRecord, putRecord, deleteRecord } from './dbCore.js';
 import { deleteParentReport, listParentReportsForChild } from './parentReportDb.js';
-import { listMonthlyCoursePlans, updateMonthlyCoursePlan, deleteChildItemOverridesForChild } from './monthlyPlanDb.js';
+import { listMonthlyCoursePlans, updateMonthlyCoursePlan, deleteChildItemOverridesForChild, deleteChildOnlyItemsForChild } from './monthlyPlanDb.js';
 
 export async function addChild({ name, birthDate, uid, updatedAt }) {
   return addRecord('children', { name, birthDate, uid, updatedAt });
@@ -16,7 +16,8 @@ export async function getChild(id) {
 
 // Cascades: deleting a child also deletes all of their forms (and, via deleteForm, those
 // forms' entries), their parent reports, and — for every monthly course plan that includes
-// them — removes them from that plan's childIds/childTiers and deletes their overrides on it.
+// them — removes them from that plan's childIds/childTiers and deletes their overrides and
+// 個別項目 on it.
 // Without this last part, a plan would keep referencing a dead childId forever: harmless until
 // an export/import backup round-trip serializes that dead reference as `null`/`undefined`,
 // which then crashes the editor view's IndexedDB lookups on open (see monthlyPlanEditorView.js
@@ -38,6 +39,7 @@ export async function deleteChild(id) {
     delete childTiers[id];
     await updateMonthlyCoursePlan(plan.id, { childIds, childTiers });
     await deleteChildItemOverridesForChild(plan.id, id);
+    await deleteChildOnlyItemsForChild(plan.id, id);
   }
   await deleteRecord('children', id);
 }
