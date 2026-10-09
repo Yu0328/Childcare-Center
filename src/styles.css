@@ -2608,7 +2608,7 @@ fieldset.panel-form__field.import-preview__child legend {
   font-weight: 600;
 }
 
-/* Child picker + 個別新增 toggle (+ its hint) on one row on a computer; see the phone layout below. */
+/* Child picker + 指定新增 toggle (+ its hint) on one row on a computer; see the phone layout below. */
 .monthly-plan-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2636,7 +2636,7 @@ fieldset.panel-form__field.import-preview__child legend {
   display: none;
 }
 
-/* 個別新增 on: tapped classmates (同時新增) take the edit accent with a ✓; other-tier children
+/* 指定新增 on: tapped classmates (同時新增) take the edit accent with a ✓; other-tier children
    can't be picked, so they fade. */
 .child-switch__button--also {
   background: var(--edit-tint);
@@ -2654,7 +2654,7 @@ fieldset.panel-form__field.import-preview__child legend {
 
 /* Phone: a class can run to a dozen-plus children, and wrapped pills would push the calendar
    several rows down. So the names fold behind one 「name ▾」 button beside the toggle; opened,
-   they drop into an even 3-column grid (the hint above it while 個別新增 is on). */
+   they drop into an even 3-column grid (the hint above it while 指定新增 is on). */
 @media (max-width: 640px) {
   .monthly-plan-toolbar {
     display: grid;
@@ -2726,7 +2726,7 @@ fieldset.panel-form__field.import-preview__child legend {
   accent-color: var(--edit-accent);
 }
 
-/* 個別新增 on: the shown calendar and the edit panel take the edit accent, so the mode can't go
+/* 指定新增 on: the shown calendar and the edit panel take the edit accent, so the mode can't go
    unnoticed, and shared items lose 編輯/× (the 未達成/請假 boxes stay — they're per-child anyway). */
 .tab-layout--individual .monthly-calendar:not([hidden]),
 .tab-layout--individual [data-panel] {

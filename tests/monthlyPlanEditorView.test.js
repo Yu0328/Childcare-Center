@@ -425,7 +425,7 @@ describe('monthlyPlanEditorView: 個別項目 (child-only items)', () => {
   const nameButton = id => container.querySelector(`[data-switch-child="${id}"]`);
   const note = () => container.querySelector('[data-individual-note]');
 
-  it('with 個別新增 off, adds a shared item as before, the button just reads 新增', async () => {
+  it('with 指定新增 off, adds a shared item as before, the button just reads 新增', async () => {
     expect(toggle().checked).toBe(false);
     expect(note().hidden).toBe(true);
     expect(container.querySelector('[data-add-submit]').textContent).toBe('新增');
@@ -436,7 +436,7 @@ describe('monthlyPlanEditorView: 個別項目 (child-only items)', () => {
     expect(shared).not.toHaveProperty('childId');
   });
 
-  it('個別新增 adds an item only this child sees, tagged 個別, keeping text typed before switching it on', async () => {
+  it('指定新增 adds an item only this child sees, tagged 個別, keeping text typed before switching it on', async () => {
     field('new-item-activity-name').value = '補課：積木';
     turnOn();
     expect(note().hidden).toBe(false);

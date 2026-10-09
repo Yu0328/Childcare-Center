@@ -126,7 +126,7 @@ const activeChildByPlan = new Map();
 const PANEL_POPUP_QUERY = '(max-width: 1279px)';
 const IDLE_PANEL_HINT = '點選左側日期格子開始規劃';
 
-// The child picker plus the 個別新增 toggle, which sits beside it (or alone, for a one-child plan).
+// The child picker plus the 指定新增 toggle, which sits beside it (or alone, for a one-child plan).
 // On a phone the names fold behind a single 「name ▾」 button (styles.css), so a class of many
 // children still takes one line until it's opened.
 function planToolbarHtml(children, activeId) {
@@ -147,9 +147,9 @@ function planToolbarHtml(children, activeId) {
       ${switchHtml}
       <div class="monthly-plan-toolbar__mode">
         <label class="panel-form__checkbox monthly-plan-toolbar__individual">
-          <input type="checkbox" data-individual-add> 個別新增
+          <input type="checkbox" data-individual-add> 指定新增
         </label>
-        <span class="monthly-plan-toolbar__hint" data-individual-hint hidden>點姓名可同時新增</span>
+        <span class="monthly-plan-toolbar__hint" data-individual-hint hidden>點姓名加選幼兒</span>
       </div>
     </div>
   `;
@@ -226,7 +226,7 @@ export async function renderMonthlyPlanEditorView(
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
-  // 個別新增: while on, a new item goes only to the shown child — plus any same-tier classmates
+  // 指定新增: while on, a new item goes only to the shown child — plus any same-tier classmates
   // picked by tapping their names, each getting their own separate copy — as a 個別項目, for a run
   // of make-up lessons without re-choosing each time. Shared items are locked meanwhile, so
   // nothing done in this mode reaches the rest of the tier. The names pick classmates instead of
@@ -237,7 +237,7 @@ export async function renderMonthlyPlanEditorView(
   const currentChild = () => data.children.find(c => c.id === currentChildId);
   const isClassmate = c => c.id !== currentChildId && plan.childTiers[c.id] === plan.childTiers[currentChildId];
 
-  // Phone only (styles.css): the folded name list. Opened when 個別新增 turns on, since picking
+  // Phone only (styles.css): the folded name list. Opened when 指定新增 turns on, since picking
   // classmates means tapping their names.
   function setNamesOpen(open) {
     const toolbar = container.querySelector('.monthly-plan-toolbar');
@@ -620,7 +620,7 @@ export async function renderMonthlyPlanEditorView(
         discardInput(form);
         form.hidden = true;
       });
-      // 個別新增 hides a shared item's 編輯/× (styles.css); this backs that up.
+      // 指定新增 hides a shared item's 編輯/× (styles.css); this backs that up.
       const lockedNow = () => individualAdd && item.childId === undefined;
       panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
         if (lockedNow()) return;

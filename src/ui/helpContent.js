@@ -268,11 +268,11 @@ const planList = (m, { fabHit = false, popup = false, hitSubmit = false } = {}) 
 
 // The month calendar: one child at a time, a week of day cells.
 const DAYS = [['10/06', ''], ['10/07', 'Ⅴ-1-6【我愛畫畫】'], ['10/08', ''], ['10/09', 'Ⅴ-2-1【積木疊高】'], ['10/10', '']];
-// The child picker + 個別新增 toggle. On a phone the names fold behind one 「王小明 ▾」 button and
-// open (namesOpen) into the list; while 個別新增 is on, a tapped classmate reads 「✓ 林小美」.
+// The child picker + 指定新增 toggle. On a phone the names fold behind one 「王小明 ▾」 button and
+// open (namesOpen) into the list; while 指定新增 is on, a tapped classmate reads 「✓ 林小美」.
 const kidsRow = (m, { individual = false, hitToggle = false, picked = false, hitKid = false, namesOpen = false } = {}) => {
   const kid = btn(picked ? '✓ 林小美' : '林小美', picked ? 'edit' : '', hitKid);
-  const toggle = cb('個別新增', individual || hitToggle, hitToggle);
+  const toggle = cb('指定新增', individual || hitToggle, hitToggle);
   if (m === 'desk') return `<div class="ms-cal__kids">${btn('王小明', 'brand')}${kid}${toggle}</div>`;
   const folded = `<div class="ms-cal__kids">${btn(picked ? '王小明 ＋1 ▾' : '王小明 ▾', 'brand')}${toggle}</div>`;
   return namesOpen ? `${folded}<div class="ms-cal__kids">${btn('王小明', 'brand')}${kid}</div>` : folded;
@@ -292,7 +292,7 @@ const dayPanel = ({ hitAdd = false, hitAbsent = false, absent = false } = {}) =>
   )}<div class="ms-cbline">${cb('未達成')}${cb('請假／其他活動代替', absent, hitAbsent)}</div>${absent ? field('', '戶外教學') : ''}${
     hitAdd ? `${tierSwitch()}${field('指標', 'Ⅴ-3-2')}${field('活動名稱', '故事時間')}${actions(btn('新增', 'primary', true))}` : ''
   }</div>`;
-// 個別新增 on: the panel's note names who gets the new item.
+// 指定新增 on: the panel's note names who gets the new item.
 const makeupPanel = () =>
   `<div class="ms-aside"><b>王小明　第二週　10/10</b><span class="ms-field ms-field--bare">新增項目只給王小明、林小美；共用項目暫停編輯、刪除。</span>${field('指標', 'Ⅴ-2-1')}${field('活動名稱', '積木疊高')}${actions(btn('新增', 'primary', true))}</div>`;
 const planEditor = (m, { hitDay = -1, panel = '', hitExport = false, newItem = false, absent = false, makeup = false, kids = {} } = {}) =>
@@ -343,9 +343,9 @@ const MONTHLY = {
     {
       id: 'plan-makeup',
       title: '幫一位幼兒補課',
-      note: '個別新增開著時，共用項目暫停編輯、刪除；切換幼兒前先把它關掉。',
+      note: '指定新增開著時，共用項目暫停編輯、刪除；切換幼兒前先把它關掉。',
       steps: [
-        { cap: '在王小明的月曆勾「個別新增」', draw: m => planEditor(m, { kids: { hitToggle: true } }) },
+        { cap: '在王小明的月曆勾「指定新增」', draw: m => planEditor(m, { kids: { hitToggle: true } }) },
         {
           cap: '同階段還有人要一起補課，就點他的名字（不用就跳過）',
           draw: m => planEditor(m, { kids: { individual: true, hitKid: true, namesOpen: true } }),
