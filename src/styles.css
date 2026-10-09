@@ -2608,7 +2608,7 @@ fieldset.panel-form__field.import-preview__child legend {
   font-weight: 600;
 }
 
-/* Child picker + 個別新增 toggle on one row; wraps the toggle onto its own line on a phone. */
+/* Child picker + 個別新增 toggle (+ its hint) on one row on a computer; see the phone layout below. */
 .monthly-plan-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2618,6 +2618,103 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 .monthly-plan-toolbar .child-switch {
   margin: 0;
+}
+.monthly-plan-toolbar__mode {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.monthly-plan-toolbar__hint {
+  font-size: 0.85rem;
+  color: var(--edit-accent);
+}
+.monthly-plan-toolbar__hint[hidden] {
+  display: none;
+}
+/* The phone-only folded picker button; computers always show every name. */
+.child-switch__current {
+  display: none;
+}
+
+/* 個別新增 on: tapped classmates (同時新增) take the edit accent with a ✓; other-tier children
+   can't be picked, so they fade. */
+.child-switch__button--also {
+  background: var(--edit-tint);
+  border-color: var(--edit-accent);
+  color: var(--edit-accent);
+  font-weight: 600;
+}
+.child-switch__button--also::before {
+  content: '✓ ';
+}
+.child-switch__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Phone: a class can run to a dozen-plus children, and wrapped pills would push the calendar
+   several rows down. So the names fold behind one 「name ▾」 button beside the toggle; opened,
+   they drop into an even 3-column grid (the hint above it while 個別新增 is on). */
+@media (max-width: 640px) {
+  .monthly-plan-toolbar {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.6rem;
+  }
+  .monthly-plan-toolbar__mode {
+    display: contents;
+  }
+  .monthly-plan-toolbar__individual {
+    grid-row: 1;
+    grid-column: 2;
+    justify-self: end;
+  }
+  .child-switch__current {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    grid-row: 1;
+    grid-column: 1;
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--brand);
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .monthly-plan-toolbar__hint {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+  /* Folded, there are no names on screen to tap — the 「＋2」 on the button carries the picks instead. */
+  .monthly-plan-toolbar:not(.monthly-plan-toolbar--open) .monthly-plan-toolbar__hint {
+    display: none;
+  }
+  .monthly-plan-toolbar .child-switch {
+    display: none;
+    grid-row: 3;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.45rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+  .monthly-plan-toolbar--individual .child-switch {
+    border-color: var(--edit-accent);
+  }
+  .monthly-plan-toolbar--open .child-switch {
+    display: grid;
+  }
+  .monthly-plan-toolbar .child-switch__button {
+    padding: 0.45rem 0.3rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
 }
 .monthly-plan-toolbar__individual:has(input:checked) {
   border-color: var(--edit-accent);

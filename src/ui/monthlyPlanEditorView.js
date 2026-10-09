@@ -127,9 +127,15 @@ const PANEL_POPUP_QUERY = '(max-width: 1279px)';
 const IDLE_PANEL_HINT = '點選左側日期格子開始規劃';
 
 // The child picker plus the 個別新增 toggle, which sits beside it (or alone, for a one-child plan).
+// On a phone the names fold behind a single 「name ▾」 button (styles.css), so a class of many
+// children still takes one line until it's opened.
 function planToolbarHtml(children, activeId) {
   if (children.length === 0) return '';
+  const activeName = children.find(c => c.id === activeId)?.name ?? '';
   const switchHtml = children.length < 2 ? '' : `
+    <button type="button" class="child-switch__current" data-child-switch-toggle aria-expanded="false">
+      <span data-child-switch-current>${escapeHtml(activeName)}</span> ▾
+    </button>
     <div class="child-switch" role="group" aria-label="選擇幼兒">
       ${children
         .map(c => `<button type="button" class="child-switch__button" data-switch-child="${escapeHtml(c.id)}" aria-pressed="${c.id === activeId}">${escapeHtml(c.name)}</button>`)
@@ -139,9 +145,12 @@ function planToolbarHtml(children, activeId) {
   return `
     <div class="monthly-plan-toolbar">
       ${switchHtml}
-      <label class="panel-form__checkbox monthly-plan-toolbar__individual">
-        <input type="checkbox" data-individual-add> 個別新增
-      </label>
+      <div class="monthly-plan-toolbar__mode">
+        <label class="panel-form__checkbox monthly-plan-toolbar__individual">
+          <input type="checkbox" data-individual-add> 個別新增
+        </label>
+        <span class="monthly-plan-toolbar__hint" data-individual-hint hidden>點姓名可同時新增</span>
+      </div>
     </div>
   `;
 }
@@ -217,13 +226,28 @@ export async function renderMonthlyPlanEditorView(
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
-  // 個別新增: while on, a new item goes only to the shown child (plus any 同時新增給 classmates) as
-  // a 個別項目 — for a run of make-up lessons without re-choosing each time. Shared items are
-  // locked meanwhile, so nothing done in this mode reaches the rest of the tier. Switching child
-  // or leaving the plan turns it off: a mode silently left on is the mistake it guards against.
+  // 個別新增: while on, a new item goes only to the shown child — plus any same-tier classmates
+  // picked by tapping their names, each getting their own separate copy — as a 個別項目, for a run
+  // of make-up lessons without re-choosing each time. Shared items are locked meanwhile, so
+  // nothing done in this mode reaches the rest of the tier. The names pick classmates instead of
+  // switching child while it's on; leaving the plan turns it off.
   let individualAdd = false;
+  let currentChildId = activeChildId;
   const alsoAddIds = new Set(); // kept across adds while the mode stays on
-  let panelClassmates = []; // same-tier classmates of the open cell's child
+  const currentChild = () => data.children.find(c => c.id === currentChildId);
+  const isClassmate = c => c.id !== currentChildId && plan.childTiers[c.id] === plan.childTiers[currentChildId];
+
+  // Phone only (styles.css): the folded name list. Opened when 個別新增 turns on, since picking
+  // classmates means tapping their names.
+  function setNamesOpen(open) {
+    const toolbar = container.querySelector('.monthly-plan-toolbar');
+    toolbar?.classList.toggle('monthly-plan-toolbar--open', open);
+    container.querySelector('[data-child-switch-toggle]')?.setAttribute('aria-expanded', String(open));
+  }
+
+  container.querySelector('[data-child-switch-toggle]')?.addEventListener('click', () => {
+    setNamesOpen(!container.querySelector('.monthly-plan-toolbar').classList.contains('monthly-plan-toolbar--open'));
+  });
 
   function setIndividualAdd(on) {
     individualAdd = on;
@@ -231,30 +255,39 @@ export async function renderMonthlyPlanEditorView(
     const toggle = container.querySelector('[data-individual-add]');
     if (toggle) toggle.checked = on;
     container.querySelector('.tab-layout').classList.toggle('tab-layout--individual', on);
+    container.querySelector('.monthly-plan-toolbar')?.classList.toggle('monthly-plan-toolbar--individual', on);
+    if (on) setNamesOpen(true);
     syncIndividualUi();
+  }
+
+  function individualNames() {
+    return [currentChild(), ...data.children.filter(c => alsoAddIds.has(c.id))].map(c => c.name).join('、');
   }
 
   function addButtonLabel() {
     if (!selected) return '新增項目';
-    if (individualAdd) {
-      const names = [selected.child, ...panelClassmates.filter(c => alsoAddIds.has(c.id))].map(c => c.name);
-      return `新增給${names.join('、')}`;
-    }
+    if (individualAdd) return `新增給${individualNames()}`;
     const count = data.children.filter(c => plan.childTiers[c.id] === selected.tier).length;
     return count > 1 ? `新增給同階段 ${count} 位` : '新增項目';
   }
 
-  // Updates the open panel in place (no re-render), so text already typed into the add form survives a toggle.
+  // Updates the toolbar and the open panel in place (no re-render), so text already typed into
+  // the add form survives a toggle or a name tap.
   function syncIndividualUi() {
+    container.querySelectorAll('[data-switch-child]').forEach(button => {
+      const child = data.children.find(c => String(c.id) === button.dataset.switchChild);
+      button.classList.toggle('child-switch__button--also', alsoAddIds.has(child.id));
+      button.disabled = individualAdd && child.id !== currentChildId && !isClassmate(child);
+    });
+    const hint = container.querySelector('[data-individual-hint]');
+    if (hint) hint.hidden = !individualAdd || !data.children.some(isClassmate);
+    const current = container.querySelector('[data-child-switch-current]');
+    if (current) current.textContent = currentChild().name + (individualAdd && alsoAddIds.size ? ` ＋${alsoAddIds.size}` : '');
     const panelItems = container.querySelector('[data-panel-items]');
     const note = panelItems.querySelector('[data-individual-note]');
-    if (note) note.hidden = !individualAdd;
-    const alsoAdd = panelItems.querySelector('[data-also-add]');
-    if (alsoAdd) {
-      alsoAdd.hidden = !individualAdd;
-      alsoAdd.querySelectorAll('[data-also-add-child]').forEach(box => {
-        box.checked = alsoAddIds.has(panelClassmates.find(c => String(c.id) === box.dataset.alsoAddChild)?.id);
-      });
+    if (note) {
+      note.hidden = !individualAdd;
+      note.textContent = `新增項目只給${individualNames()}；共用項目暫停編輯、刪除。`;
     }
     const submit = panelItems.querySelector('[data-add-submit]');
     if (submit) submit.textContent = addButtonLabel();
@@ -264,7 +297,17 @@ export async function renderMonthlyPlanEditorView(
 
   container.querySelectorAll('[data-switch-child]').forEach(button => {
     button.addEventListener('click', () => {
-      setIndividualAdd(false);
+      const tapped = data.children.find(c => String(c.id) === button.dataset.switchChild);
+      if (individualAdd) {
+        if (!isClassmate(tapped)) return;
+        if (alsoAddIds.has(tapped.id)) alsoAddIds.delete(tapped.id);
+        else alsoAddIds.add(tapped.id);
+        syncIndividualUi();
+        return;
+      }
+      currentChildId = tapped.id;
+      setNamesOpen(false);
+      syncIndividualUi();
       const childId = button.dataset.switchChild; // a string, while child ids may be numbers
       activeChildByPlan.set(plan.id, data.children.find(c => String(c.id) === childId)?.id);
       container.querySelectorAll('[data-switch-child]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
@@ -503,13 +546,8 @@ export async function renderMonthlyPlanEditorView(
     // its indicator came from.
     let indicatorTier = tier;
 
-    // 同時新增給 (個別新增 only) hands same-tier classmates their own separate copy, not one item
-    // shared between them, so editing or deleting one child's copy never touches another's.
-    const classmates = data.children.filter(c => c.id !== child.id && plan.childTiers[c.id] === tier);
-    panelClassmates = classmates;
-
     panelItems.innerHTML = `
-      <p class="individual-add-note" data-individual-note hidden>新增項目只給${escapeHtml(child.name)}；共用項目暫停編輯、刪除。</p>
+      <p class="individual-add-note" data-individual-note hidden></p>
       ${items.map(item => panelItemRowHtml(item, overrideByItemId.get(item.id))).join('')}
       <form class="entry-form" data-action="add-item">
         <div class="panel-form__field">
@@ -527,29 +565,11 @@ export async function renderMonthlyPlanEditorView(
         </label>
         <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name"></label>
         <label class="panel-form__field">指標內容 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
-        ${classmates.length
-          ? `<div class="panel-form__field" data-also-add hidden>
-              同時新增給：
-              <div class="panel-form__checkbox-list">
-                ${classmates
-                  .map(c => `<label class="panel-form__checkbox"><input type="checkbox" data-also-add-child="${escapeHtml(c.id)}"> ${escapeHtml(c.name)}</label>`)
-                  .join('')}
-              </div>
-            </div>`
-          : ''}
         <button type="submit" class="btn btn--primary btn--small" data-add-submit>新增項目</button>
         <p class="field-error" data-error></p>
       </form>
     `;
 
-    panelItems.querySelectorAll('[data-also-add-child]').forEach(box => {
-      box.addEventListener('change', () => {
-        const id = classmates.find(c => String(c.id) === box.dataset.alsoAddChild).id;
-        if (box.checked) alsoAddIds.add(id);
-        else alsoAddIds.delete(id);
-        syncIndividualUi();
-      });
-    });
     syncIndividualUi();
 
     panelItems.querySelectorAll('[data-indicator-tier]').forEach(btn => {
@@ -584,7 +604,9 @@ export async function renderMonthlyPlanEditorView(
       }
       try {
         if (individualAdd) {
-          const extraIds = classmates.filter(c => alsoAddIds.has(c.id)).map(c => c.id);
+          // Each picked classmate gets their own separate copy, so editing or deleting one child's
+          // copy never touches another's.
+          const extraIds = data.children.filter(c => alsoAddIds.has(c.id) && plan.childTiers[c.id] === tier).map(c => c.id);
           for (const childId of [child.id, ...extraIds]) {
             await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText, childId });
           }
