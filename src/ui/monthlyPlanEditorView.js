@@ -264,13 +264,6 @@ export async function renderMonthlyPlanEditorView(
     return [currentChild(), ...data.children.filter(c => alsoAddIds.has(c.id))].map(c => c.name).join('、');
   }
 
-  function addButtonLabel() {
-    if (!selected) return '新增項目';
-    if (individualAdd) return `新增給${individualNames()}`;
-    const count = data.children.filter(c => plan.childTiers[c.id] === selected.tier).length;
-    return count > 1 ? `新增給同階段 ${count} 位` : '新增項目';
-  }
-
   // Updates the toolbar and the open panel in place (no re-render), so text already typed into
   // the add form survives a toggle or a name tap.
   function syncIndividualUi() {
@@ -289,8 +282,6 @@ export async function renderMonthlyPlanEditorView(
       note.hidden = !individualAdd;
       note.textContent = `新增項目只給${individualNames()}；共用項目暫停編輯、刪除。`;
     }
-    const submit = panelItems.querySelector('[data-add-submit]');
-    if (submit) submit.textContent = addButtonLabel();
   }
 
   container.querySelector('[data-individual-add]')?.addEventListener('change', event => setIndividualAdd(event.target.checked));
@@ -565,7 +556,7 @@ export async function renderMonthlyPlanEditorView(
         </label>
         <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name"></label>
         <label class="panel-form__field">指標內容 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
-        <button type="submit" class="btn btn--primary btn--small" data-add-submit>新增項目</button>
+        <button type="submit" class="btn btn--primary btn--small" data-add-submit>新增</button>
         <p class="field-error" data-error></p>
       </form>
     `;

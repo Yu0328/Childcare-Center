@@ -419,20 +419,30 @@ describe('monthlyPlanEditorView: 個別項目 (child-only items)', () => {
     await waitFor(() => field('new-item-indicator'));
   });
 
-  it('offers 同階段共用／僅限<child>, defaulting to shared, with 同時新增給 hidden and listing only other same-tier children', () => {
-    const scopes = [...container.querySelectorAll('[data-item-scope]')];
-    expect(scopes.map(b => b.textContent.trim())).toEqual(['同階段共用', '僅限趙萬竑']);
-    expect(scopes[0].classList.contains('tier-switch__btn--active')).toBe(true);
-    const alsoAdd = container.querySelector('[data-also-add]');
-    expect(alsoAdd.hidden).toBe(true);
-    expect(alsoAdd.textContent).toContain('同時新增給：');
-    expect([...alsoAdd.querySelectorAll('[data-also-add-child]')].map(i => i.dataset.alsoAddChild)).toEqual([String(childB.id)]);
+  const toggle = () => container.querySelector('[data-individual-add]');
+  const turnOn = () => { toggle().checked = true; toggle().dispatchEvent(new Event('change')); };
+  const turnOff = () => { toggle().checked = false; toggle().dispatchEvent(new Event('change')); };
+  const nameButton = id => container.querySelector(`[data-switch-child="${id}"]`);
+  const note = () => container.querySelector('[data-individual-note]');
+
+  it('with 個別新增 off, adds a shared item as before, the button just reads 新增', async () => {
+    expect(toggle().checked).toBe(false);
+    expect(note().hidden).toBe(true);
+    expect(container.querySelector('[data-add-submit]').textContent).toBe('新增');
+    field('new-item-activity-name').value = '共用活動';
+    submit();
+    await waitFor(() => cell(childB.id).textContent.includes('共用活動'));
+    const [shared] = (await allItems()).filter(i => i.activityName === '共用活動');
+    expect(shared).not.toHaveProperty('childId');
   });
 
-  it('僅限 adds an item only this child sees, tagged 個別 in the cell and the panel', async () => {
-    container.querySelector('[data-item-scope="child"]').click();
-    expect(container.querySelector('[data-also-add]').hidden).toBe(false);
+  it('個別新增 adds an item only this child sees, tagged 個別, keeping text typed before switching it on', async () => {
     field('new-item-activity-name').value = '補課：積木';
+    turnOn();
+    expect(note().hidden).toBe(false);
+    expect(note().textContent).toBe('新增項目只給趙萬竑；共用項目暫停編輯、刪除。');
+    expect(container.querySelector('.tab-layout').classList.contains('tab-layout--individual')).toBe(true);
+    expect(field('new-item-activity-name').value).toBe('補課：積木');
     submit();
     await waitFor(() => cell(childA.id).textContent.includes('補課：積木'));
 
@@ -443,15 +453,21 @@ describe('monthlyPlanEditorView: 個別項目 (child-only items)', () => {
     expect(container.querySelector(`[data-panel-item="${own.id}"] .indicator-block__title`).textContent).toContain('個別');
   });
 
-  it('同時新增給 gives a ticked child their own separate copy; deleting one copy leaves the other', async () => {
-    container.querySelector('[data-item-scope="child"]').click();
-    container.querySelector(`[data-also-add-child="${childB.id}"]`).checked = true;
+  it('while on, tapping a same-tier name picks them for 同時新增 (each gets their own copy) instead of switching child; other tiers are disabled', async () => {
+    turnOn();
+    expect(nameButton(childC.id).disabled).toBe(true);
+    nameButton(childB.id).click();
+    expect(nameButton(childB.id).classList.contains('child-switch__button--also')).toBe(true);
+    expect(nameButton(childA.id).getAttribute('aria-pressed')).toBe('true'); // still on childA
+    expect(note().textContent).toBe('新增項目只給趙萬竑、鍾晴妍；共用項目暫停編輯、刪除。');
+    expect(container.querySelector('[data-child-switch-current]').textContent).toBe('趙萬竑 ＋1');
+
     field('new-item-activity-name').value = '補課：積木';
     submit();
     await waitFor(() => cell(childB.id).textContent.includes('補課：積木'));
-
     const copies = (await allItems()).filter(i => i.activityName === '補課：積木');
     expect(copies.map(i => i.childId).sort()).toEqual([childA.id, childB.id].sort());
+    expect(nameButton(childB.id).classList.contains('child-switch__button--also')).toBe(true); // kept for the next add
 
     const mine = copies.find(i => i.childId === childA.id);
     container.querySelector(`[data-delete-item="${mine.id}"]`).click();
@@ -460,26 +476,36 @@ describe('monthlyPlanEditorView: 個別項目 (child-only items)', () => {
     expect(cell(childB.id).textContent).toContain('補課：積木');
   });
 
-  it('switching back to 同階段共用 hides 同時新增給 and clears its ticks, and adds a shared item', async () => {
-    container.querySelector('[data-item-scope="child"]').click();
-    container.querySelector(`[data-also-add-child="${childB.id}"]`).checked = true;
-    container.querySelector('[data-item-scope="shared"]').click();
-    expect(container.querySelector('[data-also-add]').hidden).toBe(true);
-    expect(container.querySelector(`[data-also-add-child="${childB.id}"]`).checked).toBe(false);
-
-    field('new-item-activity-name').value = '共用活動';
-    submit();
-    await waitFor(() => cell(childB.id).textContent.includes('共用活動'));
-    const [shared] = (await allItems()).filter(i => i.activityName === '共用活動');
-    expect(shared).not.toHaveProperty('childId');
+  it('tapping a picked name again un-picks it; turning the mode off clears picks and names switch child again', async () => {
+    turnOn();
+    nameButton(childB.id).click();
+    nameButton(childB.id).click();
+    expect(nameButton(childB.id).classList.contains('child-switch__button--also')).toBe(false);
+    nameButton(childB.id).click();
+    turnOff();
+    expect(nameButton(childB.id).classList.contains('child-switch__button--also')).toBe(false);
+    expect(nameButton(childC.id).disabled).toBe(false);
+    expect(container.querySelector('.tab-layout').classList.contains('tab-layout--individual')).toBe(false);
+    nameButton(childB.id).click();
+    expect(nameButton(childB.id).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('leaves out 同時新增給 entirely when no other child shares the tier', async () => {
-    container.querySelector(`[data-switch-child="${childC.id}"]`).click();
-    cell(childC.id).click();
-    await waitFor(() => container.querySelector('[data-panel-header]').textContent.includes('林小美') && field('new-item-indicator'));
-    expect(container.querySelector('[data-item-scope="child"]').textContent.trim()).toBe('僅限林小美');
-    expect(container.querySelector('[data-also-add]')).toBeNull();
+  it('locks shared items while on: their save and delete do nothing', async () => {
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 5 });
+    const shared = await addPlanSlotItem({ slotId: slot.id, activityName: '共用活動' });
+    cell(childB.id).click(); // reopen a cell so the panel picks the new item up
+    cell(childA.id).click();
+    await waitFor(() => container.querySelector(`[data-panel-item="${shared.id}"]`));
+    turnOn();
+    expect(container.querySelector(`[data-panel-item="${shared.id}"]`).hasAttribute('data-shared-item')).toBe(true);
+
+    container.querySelector(`[data-delete-item="${shared.id}"]`).click();
+    container.querySelector(`[data-item-edit-field="activityName"][data-item-id="${shared.id}"]`).value = '改掉';
+    container.querySelector(`[data-item-edit-save-for="${shared.id}"]`).click();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(confirmMessages).toEqual([]);
+    expect((await allItems()).find(i => i.id === shared.id).activityName).toBe('共用活動');
   });
 });
 
