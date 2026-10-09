@@ -2608,6 +2608,48 @@ fieldset.panel-form__field.import-preview__child legend {
   font-weight: 600;
 }
 
+/* Child picker + 個別新增 toggle on one row; wraps the toggle onto its own line on a phone. */
+.monthly-plan-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.9rem;
+  margin: 0 0 0.9rem;
+}
+.monthly-plan-toolbar .child-switch {
+  margin: 0;
+}
+.monthly-plan-toolbar__individual:has(input:checked) {
+  border-color: var(--edit-accent);
+  background: var(--edit-tint);
+  color: var(--edit-accent);
+  font-weight: 600;
+}
+.monthly-plan-toolbar__individual input[type="checkbox"] {
+  accent-color: var(--edit-accent);
+}
+
+/* 個別新增 on: the shown calendar and the edit panel take the edit accent, so the mode can't go
+   unnoticed, and shared items lose 編輯/× (the 未達成/請假 boxes stay — they're per-child anyway). */
+.tab-layout--individual .monthly-calendar:not([hidden]),
+.tab-layout--individual [data-panel] {
+  border-color: var(--edit-accent);
+  box-shadow: 0 0 0 1px var(--edit-accent);
+}
+.tab-layout--individual [data-shared-item] .indicator-block__actions,
+.tab-layout--individual [data-shared-item] [data-item-edit-form-for] {
+  display: none;
+}
+.individual-add-note {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  background: var(--edit-tint);
+  color: var(--edit-accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .monthly-calendar__title {
   margin: 0 0 0.9rem;
   font-size: 1.05rem;
