@@ -62,7 +62,7 @@ function entryRow(entry) {
   return `
     <li class="entry-row${rowClass}" data-click-edit data-entry="${escapeHtml(entry.id)}">
       <div class="entry-row__top">
-        <span class="entry-row__date"><span class="entry-row__mark entry-row__mark--${entry.status}">${mark}</span>${rocDateHtml(entry.date)}</span>
+        <span class="entry-row__date"><span class="entry-row__mark entry-row__mark--${escapeHtml(entry.status)}">${mark}</span>${rocDateHtml(entry.date)}</span>
         <div class="entry-row__actions">
           <button type="button" class="btn btn--edit btn--small" data-row-edit data-edit-entry="${escapeHtml(entry.id)}" aria-label="編輯觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">編輯</button>
           <button type="button" class="btn--delete-circle" data-delete-entry="${escapeHtml(entry.id)}" aria-label="刪除觀察紀錄：${escapeHtml(entry.indicatorCode)} ${escapeHtml(entry.date)}">×</button>
@@ -126,7 +126,7 @@ function remarkBlock(entry) {
             : ''
         }
       </div>
-      <p class="entry-row__date"><span class="entry-row__mark entry-row__mark--${entry.status}">${mark}</span>${rocDateHtml(entry.date)}</p>
+      <p class="entry-row__date"><span class="entry-row__mark entry-row__mark--${escapeHtml(entry.status)}">${mark}</span>${rocDateHtml(entry.date)}</p>
       <p class="entry-row__note">${noteLineHtml(entry)}</p>
       ${
         entry.isLocal

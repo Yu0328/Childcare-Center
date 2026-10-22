@@ -100,6 +100,14 @@ describe('deserializeRecord', () => {
     expect(record.photos[1].photoUid).toBe('p2');
   });
 
+  // 雲端檔案可被人改過：帶進來的 id 會變成本機主鍵，字串 id 又會被放進 HTML 屬性與 querySelector。
+  it('不帶出雲端紀錄裡的 id，本機 id 一律由 IndexedDB 編號', () => {
+    const record = deserializeRecord('children', {
+      uid: 'c', id: '1" autofocus onfocus=alert(1) x="', name: '王小明', birthDate: '2024-01-01',
+    }, () => undefined);
+    expect(record).not.toHaveProperty('id');
+  });
+
   it('外鍵指向還沒下載到本機的父記錄時回傳 null', () => {
     expect(deserializeRecord('forms', { uid: 'x', childId: 'children-uid-nope' }, () => undefined)).toBe(null);
   });

@@ -75,6 +75,25 @@ describe('backup export/import', () => {
     expect(entries[0].note).toBe('可以來回穩定行走');
   });
 
+  // Import wipes everything first, so a file whose shape would only fail mid-write has to be
+  // turned away before that — otherwise a bad file costs every existing record.
+  it.each([
+    ['missing forms', data => { delete data.forms; }],
+    ['a null child', data => { data.children.push(null); }],
+    ['courseEntryIds not an array', data => { data.developmentRecordEntries = [{ reportId: 1, courseEntryIds: null }]; }],
+    ['highlight photos not an array', data => { data.highlightEntries = [{ reportId: 1, photos: 'x' }]; }],
+    ['empty photo', data => { data.highlightEntries = [{ reportId: 1, photos: [{ base64: '', type: 'image/jpeg' }] }]; }],
+    ['photo not base64', data => { data.highlightEntries = [{ reportId: 1, photos: [{ base64: '%%%', type: 'image/jpeg' }] }]; }],
+    ['plan childTiers null', data => { data.monthlyCoursePlans = [{ id: 1, period: '115年01月', childIds: [], childTiers: null }]; }],
+  ])('rejects a backup with %s and keeps the existing data', async (_, corrupt) => {
+    await addChild({ name: '陳小安', birthDate: '2024-11-01' });
+    const data = JSON.parse((await exportBackup()).join(''));
+    corrupt(data);
+
+    await expect(importBackup(JSON.stringify(data))).rejects.toThrow('目前資料沒有被動到');
+    expect((await listChildren()).map(c => c.name)).toEqual(['陳小安']);
+  });
+
   it('rejects an unsupported backup version', async () => {
     await expect(importBackup(JSON.stringify({ version: 4, children: [], forms: [], entries: [] })))
       .rejects.toThrow('Unsupported backup version: 4');

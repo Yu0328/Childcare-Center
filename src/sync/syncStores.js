@@ -164,6 +164,9 @@ export function deserializeRecord(storeName, payload, idOf, existingPhotos) {
   const record = {};
 
   for (const [key, value] of Object.entries(payload)) {
+    // serializeRecord never uploads `id`; one found here was planted by hand. Kept out so IndexedDB
+    // assigns the local key — a string id would otherwise land in HTML attributes and selectors.
+    if (key === 'id') continue;
     const ref = refs[key];
     if (!ref) {
       record[key] = value;

@@ -471,41 +471,41 @@ export async function renderMonthlyPlanEditorView(
       : escapeHtml(item.activityName);
 
     return `
-      <div class="indicator-block" data-panel-item="${item.id}" ${item.childId === undefined ? 'data-shared-item' : ''}>
+      <div class="indicator-block" data-panel-item="${escapeHtml(item.id)}" ${item.childId === undefined ? 'data-shared-item' : ''}>
         <h4 class="indicator-block__title">
           ${item.childId !== undefined ? '<span class="indicator-block__code">個別</span>' : ''}
           ${item.indicatorCode ? `<span class="indicator-block__code">${escapeHtml(item.indicatorCode)}</span>` : ''}
           ${summaryText}
           <span class="indicator-block__actions">
-            <button type="button" class="btn btn--edit btn--small" data-edit-item="${item.id}" aria-label="編輯${escapeHtml(item.activityName)}">編輯</button>
-            <button type="button" class="btn--delete-circle" data-delete-item="${item.id}" aria-label="刪除${escapeHtml(item.activityName)}">×</button>
+            <button type="button" class="btn btn--edit btn--small" data-edit-item="${escapeHtml(item.id)}" aria-label="編輯${escapeHtml(item.activityName)}">編輯</button>
+            <button type="button" class="btn--delete-circle" data-delete-item="${escapeHtml(item.id)}" aria-label="刪除${escapeHtml(item.activityName)}">×</button>
           </span>
         </h4>
-        <div class="entry-form" data-item-edit-form-for="${item.id}" hidden>
+        <div class="entry-form" data-item-edit-form-for="${escapeHtml(item.id)}" hidden>
           <label class="panel-form__field">
             活動名稱
-            <input data-item-edit-field="activityName" data-item-id="${item.id}" value="${escapeHtml(item.activityName)}">
+            <input data-item-edit-field="activityName" data-item-id="${escapeHtml(item.id)}" value="${escapeHtml(item.activityName)}">
           </label>
           <label class="panel-form__field">
             指標內容／說明
-            <textarea data-item-edit-field="indicatorText" data-item-id="${item.id}" rows="2">${escapeHtml(item.indicatorText || '')}</textarea>
+            <textarea data-item-edit-field="indicatorText" data-item-id="${escapeHtml(item.id)}" rows="2">${escapeHtml(item.indicatorText || '')}</textarea>
           </label>
           <div class="entry-form__actions">
-            <button type="button" class="btn btn--primary btn--small" data-item-edit-save-for="${item.id}">儲存</button>
-            <button type="button" class="btn btn--outline btn--small" data-item-edit-cancel-for="${item.id}">取消</button>
+            <button type="button" class="btn btn--primary btn--small" data-item-edit-save-for="${escapeHtml(item.id)}">儲存</button>
+            <button type="button" class="btn btn--outline btn--small" data-item-edit-cancel-for="${escapeHtml(item.id)}">取消</button>
           </div>
         </div>
         <div class="entry-form__checkbox-row">
           <label class="entry-form__checkbox">
-            <input type="checkbox" data-override-field="notAchieved" data-item-id="${item.id}" ${override?.notAchieved ? 'checked' : ''}> 未達成
+            <input type="checkbox" data-override-field="notAchieved" data-item-id="${escapeHtml(item.id)}" ${override?.notAchieved ? 'checked' : ''}> 未達成
           </label>
           <label class="entry-form__checkbox">
-            <input type="checkbox" data-override-field="replaced" data-item-id="${item.id}" ${override?.replaced ? 'checked' : ''}> 請假／其他活動代替
+            <input type="checkbox" data-override-field="replaced" data-item-id="${escapeHtml(item.id)}" ${override?.replaced ? 'checked' : ''}> 請假／其他活動代替
           </label>
           <input
             type="text"
             data-override-field="replacementText"
-            data-item-id="${item.id}"
+            data-item-id="${escapeHtml(item.id)}"
             placeholder="替代活動內容"
             value="${escapeHtml(override?.replacementText || '')}"
             ${override?.replaced ? '' : 'disabled'}
@@ -624,8 +624,8 @@ export async function renderMonthlyPlanEditorView(
       const lockedNow = () => individualAdd && item.childId === undefined;
       panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
         if (lockedNow()) return;
-        const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${item.id}"]`).value;
-        const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${item.id}"]`).value;
+        const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${escapeHtml(item.id)}"]`).value;
+        const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${escapeHtml(item.id)}"]`).value;
         await updatePlanSlotItem(item.id, { activityName, indicatorText });
         await refreshCellAndPanel();
       }));
@@ -646,9 +646,9 @@ export async function renderMonthlyPlanEditorView(
         await refreshCellAndPanel();
       }));
 
-      const notAchievedBox = panelItems.querySelector(`[data-override-field="notAchieved"][data-item-id="${item.id}"]`);
-      const replacedBox = panelItems.querySelector(`[data-override-field="replaced"][data-item-id="${item.id}"]`);
-      const replacementInput = panelItems.querySelector(`[data-override-field="replacementText"][data-item-id="${item.id}"]`);
+      const notAchievedBox = panelItems.querySelector(`[data-override-field="notAchieved"][data-item-id="${escapeHtml(item.id)}"]`);
+      const replacedBox = panelItems.querySelector(`[data-override-field="replaced"][data-item-id="${escapeHtml(item.id)}"]`);
+      const replacementInput = panelItems.querySelector(`[data-override-field="replacementText"][data-item-id="${escapeHtml(item.id)}"]`);
 
       async function saveOverride() {
         try {

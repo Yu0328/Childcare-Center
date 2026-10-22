@@ -47,6 +47,16 @@ describe('renderFormEditorView', () => {
     expect(noteEl.textContent).toBe('請假　生病請假');
   });
 
+  // status 來自備份檔或雲端同步，可以是任意字串。
+  it('狀態值裡的 HTML 不會變成畫面元素', async () => {
+    await addEntry({ formId: form.id, indicatorCode: 'Ⅳ-1-1', date: '2026-01-07', status: 'x"><img src=x data-injected>', note: '' });
+
+    const container = document.createElement('div');
+    await renderFormEditorView(container, { child, form, onBack: () => {} });
+
+    expect(container.querySelector('[data-injected]')).toBe(null);
+  });
+
   it('領域分頁：預設第一個領域，點別的分頁就換成那張卡片（並展開），重畫後仍停在同一頁', async () => {
     const container = document.createElement('div');
     await renderFormEditorView(container, { child, form, onBack: () => {} });

@@ -341,10 +341,44 @@ async function importMonthlyCoursePlans(data, childIdMap) {
   }
 }
 
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+// Import clears every store before writing, so anything that would only throw mid-write (a missing
+// array, a non-array where .map runs, a photo that won't decode) is caught here, while the old
+// data is still there. Dangling foreign keys are deliberately not checked: the importers already
+// tolerate them, and rejecting them would block restoring older backups that import fine today.
+function validateBackupShape(data) {
+  const fail = key => { throw new Error(`備份檔內容不完整（${key}），目前資料沒有被動到`); };
+  const records = (key, required = false) => {
+    const value = data[key] ?? (required ? undefined : []);
+    if (!Array.isArray(value) || value.some(record => record === null || typeof record !== 'object')) fail(key);
+    return value;
+  };
+
+  for (const key of ['children', 'forms', 'entries']) records(key, true);
+  for (const key of ['parentReports', 'coursePlanEntries', 'courseOccurrences', 'behaviorObservations',
+    'planSlots', 'planSlotItems', 'childItemOverrides']) records(key);
+  for (const record of records('developmentRecordEntries')) {
+    if (!Array.isArray(record.courseEntryIds)) fail('developmentRecordEntries');
+  }
+  for (const record of records('highlightEntries')) {
+    if (!Array.isArray(record.photos)
+      || record.photos.some(photo => !photo || typeof photo.base64 !== 'string' || !BASE64.test(photo.base64))) {
+      fail('highlightEntries');
+    }
+  }
+  for (const record of records('monthlyCoursePlans')) {
+    if (!Array.isArray(record.childIds) || !record.childTiers || typeof record.childTiers !== 'object') {
+      fail('monthlyCoursePlans');
+    }
+  }
+}
+
 async function importParsedBackup(data) {
   if (data.version !== 1 && data.version !== 2 && data.version !== 3) {
     throw new Error(`Unsupported backup version: ${data.version}`);
   }
+  validateBackupShape(data);
 
   await clearAllData();
 
