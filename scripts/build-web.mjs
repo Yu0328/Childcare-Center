@@ -32,30 +32,7 @@ const cacheName = `c-form-cache-${buildHash}`;
 // doesn't use one: GIS's token flow doesn't need it).
 const GOOGLE_CLIENT_ID = '841383586205-ohr1uhsrii1tg3oevtcacimc4sviekcr.apps.googleusercontent.com';
 
-const html = `<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#2a78d6">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'none';">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>屏東縣內埔鄉育英公托填表系統</title>
-<style>
-${css}
-</style>
-</head>
-<body>
-<header class="app-header">
-  <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
-  <div class="app-header__actions">
-    <div class="sync-header" id="sync-slot"></div>
-  </div>
-</header>
-<main id="app"></main>
-<script>
+const script = `
 ${js}
 document.addEventListener('DOMContentLoaded', () => {
   const syncControls = CFormApp.wireSyncControls({
@@ -73,7 +50,35 @@ document.addEventListener('DOMContentLoaded', () => {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => CFormApp.wireUpdatePrompt());
 }
-</script>
+`;
+// Allow exactly this one inline script by hash instead of 'unsafe-inline', so markup that ever
+// slips past escapeHtml can't run script of its own. accounts.google.com stays for Google sign-in.
+const scriptHash = `sha256-${createHash('sha256').update(script).digest('base64')}`;
+
+const html = `<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2a78d6">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' '${scriptHash}' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'none';">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>屏東縣內埔鄉育英公托填表系統</title>
+<style>
+${css}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
+  <div class="app-header__actions">
+    <div class="sync-header" id="sync-slot"></div>
+  </div>
+</header>
+<main id="app"></main>
+<script>${script}</script>
 </body>
 </html>
 `;

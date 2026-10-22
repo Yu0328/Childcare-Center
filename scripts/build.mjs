@@ -1,4 +1,5 @@
 import esbuild from 'esbuild';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 mkdirSync('dist', { recursive: true });
@@ -19,12 +20,26 @@ const css = readFileSync('src/styles.css', 'utf-8');
 // file), so the header icon/favicon has to be inlined as a data URI rather than a normal <img src>.
 const iconDataUri = `data:image/png;base64,${readFileSync('assets/icons/icon-192.png').toString('base64')}`;
 
+const script = `
+${js}
+document.addEventListener('DOMContentLoaded', () => {
+  const backupControls = CFormApp.wireBackupControls({
+    exportButton: document.getElementById('export-backup'),
+    importInput: document.getElementById('import-backup'),
+  });
+  CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
+});
+`;
+// Allow exactly this one script by hash instead of 'unsafe-inline', so markup that ever slips past
+// escapeHtml can't run script of its own.
+const scriptHash = `sha256-${createHash('sha256').update(script).digest('base64')}`;
+
 const html = `<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '${scriptHash}'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'; form-action 'none';">
 <link rel="icon" href="${iconDataUri}">
 <title>屏東縣內埔鄉育英公托填表系統</title>
 <style>
@@ -45,16 +60,7 @@ ${css}
   </div>
 </header>
 <main id="app"></main>
-<script>
-${js}
-document.addEventListener('DOMContentLoaded', () => {
-  const backupControls = CFormApp.wireBackupControls({
-    exportButton: document.getElementById('export-backup'),
-    importInput: document.getElementById('import-backup'),
-  });
-  CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
-});
-</script>
+<script>${script}</script>
 </body>
 </html>
 `;
