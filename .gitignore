@@ -21,3 +21,7 @@ site/
 # Local code-index tool output.
 .codegraph/
 graphify-out/
+
+# Demo-video outputs and licensed music (YouTube Audio Library: use in videos, not redistribution).
+video/out/
+video/assets/
