@@ -61,7 +61,7 @@ const html = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#2a78d6">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' '${scriptHash}' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' '${scriptHash}' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com https://www.youtube-nocookie.com; base-uri 'none'; form-action 'none';">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">

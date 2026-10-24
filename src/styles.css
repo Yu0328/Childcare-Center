@@ -3066,6 +3066,46 @@ fieldset.panel-form__field.import-preview__child legend {
 .help-seg button[aria-checked='true'] { color: var(--brand-dark); }
 .help-seg svg { width: 1.05em; height: 1.05em; }
 
+/* 影片教學 — the main way in: the player beside its chapter list. The cover is the landscape
+   thumbnail in both modes; 手機版's video is vertical, so its frame turns once it plays. */
+.help-video {
+  display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 1rem 1.5rem; align-items: start;
+  padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--help-shadow-1);
+}
+.help-video.is-playing[data-mode='phone'] { grid-template-columns: auto minmax(0, 1fr); }
+.help-video__player { aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #1f2422; }
+.help-video.is-playing[data-mode='phone'] .help-video__player { aspect-ratio: 9 / 16; height: min(75vh, 640px); justify-self: center; }
+.help-video__player iframe { display: block; width: 100%; height: 100%; border: 0; }
+.help-video__cover {
+  position: relative; display: grid; place-items: center; width: 100%; height: 100%;
+  background: #1f2422 center / cover no-repeat; color: #fff; text-decoration: none;
+}
+.help-video__play {
+  display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border-radius: 50%;
+  background: rgba(15, 23, 20, 0.62); transition: background 0.3s, transform 0.4s var(--help-ease);
+}
+.help-video__play svg { width: 2.2rem; height: 2.2rem; margin-left: 0.2rem; }
+.help-video__cover:hover .help-video__play, .help-video__cover:focus-visible .help-video__play { background: var(--brand); transform: scale(1.06); }
+.help-video__cta {
+  position: absolute; left: 0.75rem; bottom: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 999px;
+  background: rgba(15, 23, 20, 0.62); font-size: 0.9rem; font-weight: 600;
+}
+.help-video__title { margin: 0.25rem 0 0; font-size: 1.15rem; }
+.help-video__name { margin: 0.1rem 0 0.75rem; color: var(--text-secondary); font-size: 0.9rem; }
+.help-video__chapters { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+.help-video__chapters a {
+  display: flex; gap: 0.75rem; padding: 0.45rem 0.6rem; border-radius: 10px; color: var(--text-primary); text-decoration: none;
+}
+.help-video__chapters a:hover, .help-video__chapters a:focus-visible { background: var(--page-bg); }
+.help-video__chapters span { min-width: 2.6em; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--brand-dark); }
+.help-video__jump {
+  justify-self: start; display: inline-flex; align-items: center; gap: 0.35em; padding: 0.4rem 0.9rem; border-radius: 999px;
+  background: var(--brand-tint); color: var(--brand-dark); font-weight: 600; text-decoration: none;
+}
+.help-video__jump svg { width: 1em; height: 1em; }
+.help-section-title { margin: 1.75rem 0 0.6rem; font-size: 1.05rem; }
+.help-section-title small { display: block; margin-top: 0.15rem; font-weight: 400; font-size: 0.85rem; color: var(--text-secondary); }
+
 /* Chapters: cards that open and close. grid-template-rows 0fr→1fr animates the height. */
 .help-chapters { display: grid; gap: 0.6rem; }
 .help-ch { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; transition: box-shadow 0.4s var(--help-ease); }
@@ -3377,6 +3417,10 @@ fieldset.panel-form__field.import-preview__child legend {
   .help-ch__body { padding: 0.25rem 0.5rem 1rem; }
   .help-ch__intro { margin-left: 0.5rem; }
   .help-demo__steps button { padding: 0.55rem 0.6rem; }
+}
+@media (max-width: 760px) {
+  .help-video, .help-video.is-playing[data-mode='phone'] { grid-template-columns: minmax(0, 1fr); padding: 0.75rem; }
+  .help-video.is-playing[data-mode='phone'] .help-video__player { height: min(70vh, 560px); }
 }
 @media (max-width: 640px) {
   .help-seg button { padding: 0.4em 0.8em; }

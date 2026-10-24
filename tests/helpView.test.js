@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHelpView } from '../src/ui/helpView.js';
-import { HELP_CHAPTERS } from '../src/ui/helpContent.js';
+import { HELP_CHAPTERS, HELP_VIDEOS } from '../src/ui/helpContent.js';
 
 const phone = () => vi.stubGlobal('matchMedia', query => ({ matches: query.includes('max-width') }));
 const heads = container => [...container.querySelectorAll('.help-ch__head')];
@@ -10,21 +10,24 @@ beforeEach(() => localStorage.clear());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('renderHelpView', () => {
-  it('shows every chapter, only the first one open', async () => {
+  it('shows every chapter, all closed — the video comes first', async () => {
     const container = document.createElement('div');
     await renderHelpView(container, { onBack: () => {} });
     expect(heads(container).map(h => h.querySelector('.help-ch__title').firstChild.textContent)).toEqual(
       HELP_CHAPTERS.map(c => c.title)
     );
     expect(heads(container).map(h => h.getAttribute('aria-expanded'))).toEqual(
-      HELP_CHAPTERS.map((_, i) => String(i === 0))
+      HELP_CHAPTERS.map(() => 'false')
     );
+    expect(container.querySelector('.help-video').compareDocumentPosition(container.querySelector('.help-chapters')))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('opens and closes a chapter from its header, leaving the others alone', async () => {
     const container = document.createElement('div');
     await renderHelpView(container, { onBack: () => {} });
     const [first, second] = heads(container);
+    first.click();
     second.click();
     expect(second.getAttribute('aria-expanded')).toBe('true');
     expect(first.getAttribute('aria-expanded')).toBe('true');
@@ -91,5 +94,41 @@ describe('renderHelpView', () => {
     const hosted = document.createElement('div');
     await renderHelpView(hosted, { onBack: () => {}, hosted: true });
     expect(hosted.textContent).not.toContain('此功能僅網頁版提供');
+  });
+
+  it('shows the video for the chosen 手機版／電腦版, with its chapter list', async () => {
+    const container = document.createElement('div');
+    await renderHelpView(container, { onBack: () => {} });
+    const cover = () => container.querySelector('.help-video__cover');
+    expect(cover().href).toBe(`https://youtu.be/${HELP_VIDEOS.desk.id}`);
+    expect(container.querySelector('.help-video__chapters').textContent).toContain('1:37管理幼兒');
+
+    container.querySelector('.help-seg [data-mode="phone"]').click();
+    expect(cover().href).toBe(`https://youtu.be/${HELP_VIDEOS.phone.id}`);
+    expect(container.querySelector('.help-video__chapters').textContent).toContain('1:43管理幼兒');
+  });
+
+  it('offline: the video and every 看影片的這一段 open YouTube in a new tab at that time', async () => {
+    const container = document.createElement('div');
+    await renderHelpView(container, { onBack: () => {} });
+    const jump = container.querySelector('#help-panel-children .help-video__jump');
+    expect(jump.href).toBe(`https://youtu.be/${HELP_VIDEOS.desk.id}?t=97`);
+    expect(jump.target).toBe('_blank');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    container.querySelector('.help-video__cover').dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(false);
+    expect(container.querySelector('.help-video iframe')).toBeNull();
+  });
+
+  it('on the web: plays in the page, and 看影片的這一段 jumps the player to that chapter', async () => {
+    const container = document.createElement('div');
+    await renderHelpView(container, { onBack: () => {}, hosted: true });
+    container.querySelector('.help-video__cover').click();
+    const src = () => container.querySelector('.help-video iframe').src;
+    expect(src()).toContain(`https://www.youtube-nocookie.com/embed/${HELP_VIDEOS.desk.id}?`);
+    expect(src()).toContain('autoplay=1');
+
+    container.querySelector('#help-panel-children .help-video__jump').click();
+    expect(src()).toContain('start=97');
   });
 });
