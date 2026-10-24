@@ -4,14 +4,12 @@ import * as db from '../src/storage/db.js';
 import * as backup from '../src/storage/backup.js';
 import * as downloadBlobModule from '../src/export/downloadBlob.js';
 import { mountApp, wireBackupControls } from '../src/app.js';
-import { unlock } from '../src/auth/passwordGate.js';
 import { waitFor } from './helpers.js';
 
 describe('mountApp navigation', () => {
   beforeEach(async () => {
     await clearAllData();
     localStorage.clear();
-    unlock();
   });
 
   it('starts on the report type select screen, then reaches the child list after choosing 適性總表', async () => {
@@ -110,40 +108,9 @@ describe('mountApp navigation', () => {
   });
 });
 
-describe('mountApp password gate', () => {
-  beforeEach(async () => {
-    await clearAllData();
-    localStorage.clear();
-  });
-
-  it('shows the password gate instead of the child list when locked', async () => {
-    const container = document.createElement('div');
-    mountApp(container);
-    await waitFor(() => container.textContent.includes('請輸入密碼'));
-
-    expect(container.textContent).toContain('請輸入密碼');
-    expect(container.textContent).not.toContain('幼兒列表');
-  });
-
-  it('proceeds to the child list after entering the correct password', async () => {
-    const container = document.createElement('div');
-    mountApp(container);
-    await waitFor(() => container.querySelector('[data-field="password"]'));
-
-    container.querySelector('[data-field="password"]').value = 'pdnpyycctbs588';
-    container.querySelector('[data-action="unlock"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-
-    await waitFor(() => container.textContent.includes('選擇要填寫的表'));
-    container.querySelector('[data-type="assessment"]').click();
-    await waitFor(() => container.textContent.includes('幼兒列表'));
-    expect(container.textContent).toContain('幼兒列表');
-  });
-});
-
 describe('mountApp render failures', () => {
   beforeEach(() => {
     localStorage.clear();
-    unlock();
   });
 
   afterEach(() => {
@@ -291,8 +258,7 @@ describe('wireBackupControls', () => {
 });
 
 describe('mountApp 的 gate hook', () => {
-  it('密碼過關後先跑 gate，gate 完成才進主畫面', async () => {
-    await unlock('0975248749');
+  it('先跑 gate，gate 完成才進主畫面', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
 
@@ -311,7 +277,6 @@ describe('mountApp 的 gate hook', () => {
   });
 
   it('沒給 gate 時行為不變（離線版走這條路）', async () => {
-    await unlock('0975248749');
     const container = document.createElement('div');
     document.body.appendChild(container);
     mountApp(container);
@@ -329,19 +294,7 @@ describe('標題列的首頁按鈕', () => {
   });
   afterEach(() => homeButton.remove());
 
-  it('還在密碼頁時點首頁，停在密碼頁，不會直接跳過密碼進到主畫面', async () => {
-    const container = document.createElement('div');
-    mountApp(container);
-    expect(container.querySelector('[data-action="unlock"]')).toBeTruthy();
-
-    homeButton.click();
-    await new Promise(resolve => setTimeout(resolve, 250));
-    expect(container.querySelector('[data-action="unlock"]')).toBeTruthy();
-    expect(container.textContent).not.toContain('選擇要填寫的表');
-  });
-
   it('還在登入選擇畫面（gate）時點首頁，不會跳過登入選擇', async () => {
-    unlock();
     const container = document.createElement('div');
     mountApp(container, { gate: gateContainer => { gateContainer.textContent = 'gate'; } });
 
@@ -351,7 +304,6 @@ describe('標題列的首頁按鈕', () => {
   });
 
   it('同步衝突畫面顯示中點首頁不會離開（否則那次同步會永遠等不到答案）', async () => {
-    unlock();
     const container = document.createElement('div');
     mountApp(container);
     await waitFor(() => container.textContent.includes('選擇要填寫的表'));
@@ -363,7 +315,6 @@ describe('標題列的首頁按鈕', () => {
   });
 
   it('進到主畫面後點首頁會回到主選單', async () => {
-    unlock();
     const container = document.createElement('div');
     mountApp(container);
     await waitFor(() => container.textContent.includes('選擇要填寫的表'));
@@ -381,7 +332,6 @@ describe('離開不再提醒沒儲存；手機返回手勢', () => {
     document.body.replaceChildren();
     await clearAllData();
     localStorage.clear();
-    unlock();
   });
   afterEach(() => vi.restoreAllMocks());
 

@@ -1,6 +1,6 @@
 // GIS's *token* flow (not the One Tap ID-token flow): all this app needs is an access token for
 // Drive plus a display name for the greeting. The token lives in memory only and is never
-// persisted — the password gate is a soft deterrent, so anything on disk is readable by whoever
+// persisted — the app has no lock of its own, so anything on disk is readable by whoever
 // has the device, and a Drive-scoped token is worth far more than the local copy of the data.
 import { AuthExpiredError } from './driveClient.js';
 

@@ -22,7 +22,7 @@ const GUEST_ICON =
 const CHEVRON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 
-// Shown once, right after the password gate, and never again — the answer is remembered in
+// Shown once, on first open, and never again — the answer is remembered in
 // localStorage. Guest is a first-class choice here, not a fallback: the app has always worked
 // offline with manual backups and must keep doing so. Styled as the same .type-select__option
 // cards as the form-select screen (just 2 cards instead of 5) so the two screens read as one

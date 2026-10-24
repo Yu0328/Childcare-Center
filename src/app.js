@@ -10,7 +10,6 @@ import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
 import { renderHelpView } from './ui/helpView.js';
 import { exportBackup, importBackup, importHugeBackupFile, HUGE_IMPORT_THRESHOLD_BYTES } from './storage/backup.js';
 import { downloadBlob } from './export/downloadBlob.js';
-import { isUnlocked, renderPasswordGate } from './auth/passwordGate.js';
 import { todayIsoDate } from './domain/ageTier.js';
 import { oneAtATime } from './ui/oneAtATime.js';
 
@@ -19,7 +18,7 @@ const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
 const IMPORT_FAILED_MESSAGE = '匯入失敗，請再試一次';
 const IMPORT_CONFIRM_MESSAGE = '匯入備份會清除目前所有資料，確定要繼續嗎？';
 
-export function mountApp(container, { onUnlock, gate } = {}) {
+export function mountApp(container, { gate } = {}) {
   function showRenderError(err) {
     container.textContent = '';
     const message = document.createElement('p');
@@ -124,9 +123,8 @@ export function mountApp(container, { onUnlock, gate } = {}) {
     runView(() => renderParentReportEditorView(container, { child, report, onBack: () => showParentReportList(child) }));
   }
 
-  // Only live once the app proper has been entered: on the password screen (or the hosted
-  // build's sign-in choice screen) it would jump straight past them, and on the sync conflict
-  // screen it would strand the sync waiting on an answer that can never come.
+  // Only live once the app proper has been entered: on the hosted build's sign-in choice screen
+  // it would jump straight past it, and on the sync conflict screen it would strand the sync waiting on an answer that can never come.
   let entered = false;
   const homeButton = document.getElementById('home-button');
   if (homeButton) {
@@ -173,8 +171,8 @@ export function mountApp(container, { onUnlock, gate } = {}) {
     });
   }
 
-  // The hosted build passes a `gate` so the sign-in choice screen can run between the password
-  // gate and the app. Kept as an injected hook rather than an import so the offline build's
+  // The hosted build passes a `gate` so the sign-in choice screen can run before the app. Kept
+  // as an injected hook rather than an import so the offline build's
   // bundle contains no login or sync code at all.
   function enter() {
     entered = true;
@@ -182,24 +180,8 @@ export function mountApp(container, { onUnlock, gate } = {}) {
     showReportTypeSelect();
   }
 
-  function start() {
-    if (gate) {
-      gate(container, { onDone: enter });
-      return;
-    }
-    enter();
-  }
-
-  function handleUnlock() {
-    start();
-    if (onUnlock) onUnlock();
-  }
-
-  if (isUnlocked()) {
-    start();
-  } else {
-    renderPasswordGate(container, { onUnlock: handleUnlock });
-  }
+  if (gate) gate(container, { onDone: enter });
+  else enter();
 }
 
 // The hosted build re-wires the backup controls on every guest header repaint, so this document
@@ -227,20 +209,6 @@ export function wireBackupControls({
   confirmImport = message => (typeof confirm === 'function' ? confirm(message) : false),
   reload = () => window.location.reload(),
 }) {
-  // Bug fix (Critical): these controls live in the page header, outside mountApp's
-  // password-gated container, and used to be wired unconditionally on page load — anyone who
-  // opened the page, locked or not, could export every child's data or wipe it via import with
-  // no password. Gated two ways: disabled by default and re-checked on every click/change (so a
-  // host page that forgets to call updateLockState() after unlock still can't be tricked by
-  // re-enabling the button via devtools — the handler itself refuses), AND kept disabled until
-  // updateLockState() is called (wire this to mountApp's onUnlock hook).
-  function updateLockState() {
-    const locked = !isUnlocked();
-    exportButton.disabled = locked;
-    importInput.disabled = locked;
-  }
-  updateLockState();
-
   const menu = exportButton.closest('details');
   if (menu) {
     exportButton.addEventListener('click', () => { menu.open = false; });
@@ -288,7 +256,6 @@ export function wireBackupControls({
   }
 
   exportButton.addEventListener('click', oneAtATime(async () => {
-    if (!isUnlocked()) return; // belt-and-suspenders: the button should already be disabled
     try {
       const parts = await exportBackup(showProgress);
       const blob = new Blob(parts, { type: 'application/json' });
@@ -307,7 +274,6 @@ export function wireBackupControls({
   importInput.addEventListener('change', async () => {
     const file = importInput.files[0];
     if (!file) return;
-    if (!isUnlocked()) { importInput.value = ''; return; } // belt-and-suspenders: see updateLockState above
 
     // Importing wipes every existing record, so always ask first.
     if (!confirmImport(IMPORT_CONFIRM_MESSAGE)) {
@@ -336,5 +302,4 @@ export function wireBackupControls({
     reload();
   });
 
-  return { updateLockState };
 }

@@ -23,11 +23,11 @@ const iconDataUri = `data:image/png;base64,${readFileSync('assets/icons/icon-192
 const script = `
 ${js}
 document.addEventListener('DOMContentLoaded', () => {
-  const backupControls = CFormApp.wireBackupControls({
+  CFormApp.wireBackupControls({
     exportButton: document.getElementById('export-backup'),
     importInput: document.getElementById('import-backup'),
   });
-  CFormApp.mountApp(document.getElementById('app'), { onUnlock: backupControls.updateLockState });
+  CFormApp.mountApp(document.getElementById('app'));
 });
 `;
 // Allow exactly this one script by hash instead of 'unsafe-inline', so markup that ever slips past
@@ -39,7 +39,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '${scriptHash}'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '${scriptHash}'; style-src 'unsafe-inline'; img-src data: blob: https://i.ytimg.com; base-uri 'none'; form-action 'none';">
 <link rel="icon" href="${iconDataUri}">
 <title>屏東縣內埔鄉育英公托填表系統</title>
 <style>
