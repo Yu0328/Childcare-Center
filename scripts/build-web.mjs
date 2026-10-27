@@ -52,8 +52,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 if ('serviceWorker' in navigator) {
+  // An open popup (e.g. the 安裝到主畫面 one, whose 立即安裝 / 用瀏覽器開啟 send the page to the
+  // background) means she's mid-task even on the home screen.
   window.addEventListener('load', () => CFormApp.wireAutoUpdate({
     isSafe: () => CFormApp.isAtHome(document.getElementById('app'))
+      && !document.querySelector('dialog[open]')
       && !CFormApp.hasUnsavedInput(document.body)
       && !(syncControls?.isBusy() ?? true),
     beforeReload: () => syncControls.prepareReload(),
