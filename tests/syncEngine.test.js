@@ -307,6 +307,14 @@ describe('runSync', () => {
     await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1), { timeout: 500 });
   });
 
+  it('isBusy：排隊等同步或同步進行中為真，結束後為假', async () => {
+    const engine = createSyncEngine({ drive: fakeDrive(), resolveConflicts: async () => [], debounceMs: 10 });
+    expect(engine.isBusy()).toBe(false);
+    engine.scheduleSync();
+    expect(engine.isBusy()).toBe(true);
+    await vi.waitFor(() => expect(engine.isBusy()).toBe(false), { timeout: 1000 });
+  });
+
   it('這台裝置的第一次同步用比較高的並行數，一次搬完既有的大量資料', async () => {
     const drive = fakeDrive();
     let inFlight = 0;

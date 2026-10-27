@@ -2,11 +2,14 @@
 // Drive plus a display name for the greeting. The token lives in memory only and is never
 // persisted — the app has no lock of its own, so anything on disk is readable by whoever
 // has the device, and a Drive-scoped token is worth far more than the local copy of the data.
+// The one exception is the silent auto-update's reload — see stashForReload.
 import { AuthExpiredError } from './driveClient.js';
 
 export const SCOPES = 'openid profile https://www.googleapis.com/auth/drive.file';
 export const SYNC_MODE_KEY = 'c-form-sync-mode';
 export const SYNC_NAME_KEY = 'c-form-sync-name';
+export const RELOAD_TOKEN_KEY = 'c-form-reload-token';
+const HANDOVER_MIN_LEFT_MS = 5 * 60000;
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
@@ -56,6 +59,19 @@ export function createGoogleAuth({
   let tokenClient = null;
   let pending = null;
   let inFlight = null;
+
+  // Picked up and deleted in the same breath, so the token sits in storage only across the reload.
+  let carriedOver = false;
+  try {
+    const raw = sessionStorage.getItem(RELOAD_TOKEN_KEY);
+    sessionStorage.removeItem(RELOAD_TOKEN_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    if (saved && saved.token && saved.expiresAtMs > Date.now()) {
+      token = saved.token;
+      expiresAtMs = saved.expiresAtMs;
+      carriedOver = true;
+    }
+  } catch { /* storage blocked or garbled: start signed out, as before */ }
 
   async function ensureClient() {
     if (tokenClient) return tokenClient;
@@ -146,5 +162,20 @@ export function createGoogleAuth({
     clearSyncMode();
   }
 
-  return { signIn, getAccessToken, signOut, isSignedIn: () => Boolean(token) };
+  // The silent auto-update (src/pwa/updatePrompt.js) reloads the page, which would otherwise drop a
+  // Google teacher onto the sign-in choice screen. Called only right before that reload; this
+  // tab's sessionStorage, read and deleted by the next page at once. Too close to expiry isn't
+  // worth carrying — the header would be asking to sign in again within minutes anyway.
+  function stashForReload() {
+    if (!token || expiresAtMs - Date.now() < HANDOVER_MIN_LEFT_MS) return;
+    try {
+      sessionStorage.setItem(RELOAD_TOKEN_KEY, JSON.stringify({ token, expiresAtMs }));
+    } catch { /* storage blocked: the teacher just sees the choice screen */ }
+  }
+
+  return {
+    signIn, getAccessToken, signOut, stashForReload,
+    isSignedIn: () => Boolean(token),
+    carriedOverReload: () => carriedOver,
+  };
 }

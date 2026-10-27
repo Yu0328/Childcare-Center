@@ -140,6 +140,14 @@ export function wireSyncControls({
       return;
     }
 
+    // The silent auto-update's reload carried this tab's sign-in over (googleAuth's
+    // stashForReload) — no popup risk, the token is already in hand.
+    if (readSyncMode() === 'google' && auth.carriedOverReload?.()) {
+      startSyncing();
+      onDone();
+      return;
+    }
+
     if (readSyncMode() === 'google') {
       if (isOffline()) {
         // Starting offline is normal, not an error: the app is local-first and will sync when the
@@ -161,5 +169,5 @@ export function wireSyncControls({
     onDone();
   }
 
-  return { gate };
+  return { gate, isBusy: () => engine.isBusy(), prepareReload: () => auth.stashForReload() };
 }

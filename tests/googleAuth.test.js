@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  createGoogleAuth, readSyncMode, writeSyncMode, clearSyncMode, readDisplayName, SCOPES,
+  createGoogleAuth, readSyncMode, writeSyncMode, clearSyncMode, readDisplayName, SCOPES, RELOAD_TOKEN_KEY,
 } from '../src/sync/googleAuth.js';
 import { AuthExpiredError } from '../src/sync/driveClient.js';
 
@@ -151,5 +151,52 @@ describe('createGoogleAuth', () => {
     auth.signOut();
     expect(auth.isSignedIn()).toBe(false);
     expect(readSyncMode()).toBe(null);
+  });
+});
+
+describe('自動更新的登入接續', () => {
+  beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+
+  async function signedIn(expiresIn = 3600) {
+    const gis = fakeGis();
+    const auth = createGoogleAuth({ clientId: 'c', loadGis: gis.loadGis, fetchUserInfo: async () => ({ given_name: '美' }) });
+    const signing = auth.signIn();
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
+    gis.respond({ access_token: 'tok-1', expires_in: expiresIn });
+    await signing;
+    return auth;
+  }
+
+  it('有效通行證交給下一頁，下一頁讀出後立刻刪掉', async () => {
+    const auth = await signedIn();
+    auth.stashForReload();
+    expect(sessionStorage.getItem(RELOAD_TOKEN_KEY)).not.toBe(null);
+
+    const next = createGoogleAuth({ clientId: 'c', loadGis: fakeGis().loadGis });
+    expect(sessionStorage.getItem(RELOAD_TOKEN_KEY)).toBe(null);
+    expect(next.carriedOverReload()).toBe(true);
+    expect(next.isSignedIn()).toBe(true);
+    await expect(next.getAccessToken()).resolves.toBe('tok-1');
+  });
+
+  it('剩不到 5 分鐘就不交接', async () => {
+    const auth = await signedIn(300); // 300s − 提早 60s = 剩 4 分鐘
+    auth.stashForReload();
+    expect(sessionStorage.getItem(RELOAD_TOKEN_KEY)).toBe(null);
+  });
+
+  it('沒登入時不寫任何東西；沒有交接資料時一切照舊', () => {
+    const auth = createGoogleAuth({ clientId: 'c', loadGis: fakeGis().loadGis });
+    auth.stashForReload();
+    expect(sessionStorage.getItem(RELOAD_TOKEN_KEY)).toBe(null);
+    expect(auth.carriedOverReload()).toBe(false);
+    expect(auth.isSignedIn()).toBe(false);
+  });
+
+  it('暫存裡的通行證已過期就不採用，但一樣刪掉', () => {
+    sessionStorage.setItem(RELOAD_TOKEN_KEY, JSON.stringify({ token: 'old', expiresAtMs: Date.now() - 1 }));
+    const auth = createGoogleAuth({ clientId: 'c', loadGis: fakeGis().loadGis });
+    expect(auth.carriedOverReload()).toBe(false);
+    expect(sessionStorage.getItem(RELOAD_TOKEN_KEY)).toBe(null);
   });
 });

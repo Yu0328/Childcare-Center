@@ -262,4 +262,34 @@ describe('wireSyncControls', () => {
 
     expect(scheduleSync).not.toHaveBeenCalled();
   });
+
+  it('自動更新接續了登入：直接進 App 並開始同步，不顯示選擇畫面', async () => {
+    writeSyncMode('google');
+    const runSync = vi.fn(async () => idleStatus);
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: () => ({ ...fakeAuthFactory()(), carriedOverReload: () => true }),
+      createDrive: () => ({}),
+      createEngine: () => fakeEngine({ runSync }),
+    });
+    const onDone = vi.fn();
+    await controls.gate(container, { onDone });
+    expect(onDone).toHaveBeenCalled();
+    expect(container.querySelector('[data-action="sign-in-google"]')).toBe(null);
+    expect(runSync).toHaveBeenCalled();
+    expect(syncSlot.querySelector('[data-action="sync-sign-out"]')).toBeTruthy();
+  });
+
+  it('isBusy／prepareReload 轉給同步引擎／登入', () => {
+    const stashForReload = vi.fn();
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: () => ({ ...fakeAuthFactory()(), stashForReload }),
+      createDrive: () => ({}),
+      createEngine: () => ({ ...fakeEngine(), isBusy: () => true }),
+    });
+    expect(controls.isBusy()).toBe(true);
+    controls.prepareReload();
+    expect(stashForReload).toHaveBeenCalled();
+  });
 });

@@ -299,5 +299,6 @@ export function createSyncEngine({ drive, resolveConflicts, onStatus = () => {},
     }, debounceMs);
   }
 
-  return { runSync, scheduleSync, getStatus: () => status };
+  // The silent auto-update holds off while this is true, so a reload never cuts a Drive upload short.
+  return { runSync, scheduleSync, getStatus: () => status, isBusy: () => Boolean(running || debounceTimer) };
 }
