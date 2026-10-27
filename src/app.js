@@ -18,6 +18,13 @@ const EXPORT_FAILED_MESSAGE = '匯出失敗，請再試一次';
 const IMPORT_FAILED_MESSAGE = '匯入失敗，請再試一次';
 const IMPORT_CONFIRM_MESSAGE = '匯入備份會清除目前所有資料，確定要繼續嗎？';
 
+// The silent auto-update (src/pwa/updatePrompt.js) reloads only here: a reload always lands on
+// the home screen, so nothing visible changes. Read off the screen itself, so the sign-in choice,
+// the sync conflict screen and the loading placeholder all count as "not home".
+export function isAtHome(container) {
+  return Boolean(container.querySelector(':scope > .type-select-home'));
+}
+
 export function mountApp(container, { gate } = {}) {
   function showRenderError(err) {
     container.textContent = '';

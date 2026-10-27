@@ -1,41 +1,54 @@
-// A redeploy used to take over and reload the page on its own, throwing away whatever a teacher
-// had typed but not saved. Now the new version waits until they press 更新 on a small banner —
-// see docs/superpowers/specs/2026-09-25-update-prompt-design.md.
-export async function wireUpdatePrompt({
+// Swaps in a redeploy without the teacher noticing — and never mid-form. A reload always lands on
+// the home screen, so it only happens when `isSafe()` says she's already there with nothing
+// unsaved and no sync running: when she leaves the app, or the moment she's back (some phones
+// freeze a hidden page before it can act). Replaces the 2026-09-25 「有新版本［更新］」 banner —
+// see docs/superpowers/specs/2026-10-27-silent-auto-update-design.md.
+export async function wireAutoUpdate({
   serviceWorker = navigator.serviceWorker,
-  host = document.body,
+  isSafe = () => false,
+  beforeReload = () => {},
   reload = () => location.reload(),
+  doc = document,
+  checkEveryMs = 30 * 60 * 1000,
 } = {}) {
-  let updateRequested = false;
-  // Only a takeover the teacher asked for reloads — not the first install's clients.claim(), and
-  // not another tab pressing 更新 (this tab keeps its banner and can reload when it's ready).
+  // No controller yet means the first install, whose clients.claim() is not an update.
+  let hadController = Boolean(serviceWorker.controller);
+  // The new version controls this page but the page still runs the old code — reload at the next
+  // safe moment without waiting on anything else.
+  let takenOver = false;
+  let reloading = false;
+
+  function reloadNow() {
+    if (reloading) return;
+    reloading = true;
+    beforeReload();
+    reload();
+  }
+
+  // Re-checked here, right before reloading: between asking the new version to take over and it
+  // doing so, she may have tapped into a form. Also covers another tab's takeover.
   serviceWorker.addEventListener('controllerchange', () => {
-    if (updateRequested) reload();
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    takenOver = true;
+    if (isSafe()) reloadNow();
   });
 
   const registration = await serviceWorker.register('sw.js');
+  const checkForUpdate = () => registration.update().catch(() => {});
 
-  function offer() {
-    // No controller means this is the very first install, not an update.
-    if (!serviceWorker.controller || host.querySelector('.update-banner')) return;
-    host.insertAdjacentHTML(
-      'beforeend',
-      '<div class="update-banner" role="status">有新版本<button type="button" class="btn btn--primary btn--small">更新</button></div>'
-    );
-    host.querySelector('.update-banner button').addEventListener('click', () => {
-      const waiting = registration.waiting;
-      if (!waiting) return reload();
-      updateRequested = true;
-      waiting.postMessage('SKIP_WAITING');
-    });
+  function trySwitch() {
+    if (!isSafe()) return;
+    if (takenOver) return reloadNow();
+    if (registration.waiting && serviceWorker.controller) registration.waiting.postMessage('SKIP_WAITING');
   }
 
-  if (registration.waiting) offer();
-  registration.addEventListener('updatefound', () => {
-    const worker = registration.installing;
-    worker?.addEventListener('statechange', () => {
-      if (worker.state === 'installed') offer();
-    });
+  doc.addEventListener('visibilitychange', () => {
+    if (!doc.hidden) checkForUpdate();
+    trySwitch();
   });
+  setInterval(checkForUpdate, checkEveryMs);
   return registration;
 }

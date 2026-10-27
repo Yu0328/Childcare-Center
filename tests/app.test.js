@@ -3,8 +3,20 @@ import { clearAllData, addChild } from '../src/storage/db.js';
 import * as db from '../src/storage/db.js';
 import * as backup from '../src/storage/backup.js';
 import * as downloadBlobModule from '../src/export/downloadBlob.js';
-import { mountApp, wireBackupControls } from '../src/app.js';
+import { mountApp, wireBackupControls, isAtHome } from '../src/app.js';
 import { waitFor } from './helpers.js';
+
+describe('isAtHome', () => {
+  it('首頁為真，進入其他畫面為假', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    mountApp(container);
+    await waitFor(() => isAtHome(container));
+    container.querySelector('[data-type="assessment"]').click();
+    await waitFor(() => !isAtHome(container));
+    container.remove();
+  });
+});
 
 describe('mountApp navigation', () => {
   beforeEach(async () => {

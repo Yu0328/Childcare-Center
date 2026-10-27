@@ -36,8 +36,9 @@ const script = `
 ${js}
 // Created right away: the browser's install offer (beforeinstallprompt) can arrive before the page is ready.
 const install = CFormApp.createInstall();
+let syncControls;
 document.addEventListener('DOMContentLoaded', () => {
-  const syncControls = CFormApp.wireSyncControls({
+  syncControls = CFormApp.wireSyncControls({
     clientId: '${GOOGLE_CLIENT_ID}',
     syncSlot: document.getElementById('sync-slot'),
     // Guest mode is the only mode with backup buttons (see renderSyncHeader) — they're created
@@ -51,7 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => CFormApp.wireUpdatePrompt());
+  window.addEventListener('load', () => CFormApp.wireAutoUpdate({
+    isSafe: () => CFormApp.isAtHome(document.getElementById('app'))
+      && !CFormApp.hasUnsavedInput(document.body)
+      && !syncControls.isBusy(),
+    beforeReload: () => syncControls.prepareReload(),
+  }));
 }
 `;
 // Allow exactly this one inline script by hash instead of 'unsafe-inline', so markup that ever
@@ -108,8 +114,8 @@ self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
 });
 
-// A new version waits for the page's 更新 button (src/pwa/updatePrompt.js) instead of taking
-// over mid-edit on its own.
+// A new version waits until the page says it's a safe moment (src/pwa/updatePrompt.js) instead of
+// taking over mid-edit on its own.
 self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
