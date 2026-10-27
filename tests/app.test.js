@@ -4,6 +4,7 @@ import * as db from '../src/storage/db.js';
 import * as backup from '../src/storage/backup.js';
 import * as downloadBlobModule from '../src/export/downloadBlob.js';
 import { mountApp, wireBackupControls, isAtHome } from '../src/app.js';
+import { renderSignInChoiceView } from '../src/ui/signInChoiceView.js';
 import { waitFor } from './helpers.js';
 
 describe('isAtHome', () => {
@@ -15,6 +16,13 @@ describe('isAtHome', () => {
     container.querySelector('[data-type="assessment"]').click();
     await waitFor(() => !isAtHome(container));
     container.remove();
+  });
+
+  it('登入選擇畫面不算首頁（重新載入會切斷 Google 登入）', () => {
+    const container = document.createElement('div');
+    renderSignInChoiceView(container, { onGoogle() {}, onGuest() {} });
+    expect(container.querySelector('.type-select-home')).not.toBeNull();
+    expect(isAtHome(container)).toBe(false);
   });
 });
 

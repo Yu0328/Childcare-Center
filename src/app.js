@@ -19,10 +19,12 @@ const IMPORT_FAILED_MESSAGE = '匯入失敗，請再試一次';
 const IMPORT_CONFIRM_MESSAGE = '匯入備份會清除目前所有資料，確定要繼續嗎？';
 
 // The silent auto-update (src/pwa/updatePrompt.js) reloads only here: a reload always lands on
-// the home screen, so nothing visible changes. Read off the screen itself, so the sign-in choice,
-// the sync conflict screen and the loading placeholder all count as "not home".
+// the home screen, so nothing visible changes. Read off the screen itself via its own marker (the
+// sign-in choice shares the .type-select-home styling but must not count: a reload there would cut
+// off an open Google sign-in window), so the sync conflict screen and loading placeholder are
+// "not home" too.
 export function isAtHome(container) {
-  return Boolean(container.querySelector(':scope > .type-select-home'));
+  return Boolean(container.querySelector(':scope > [data-screen="home"]'));
 }
 
 export function mountApp(container, { gate } = {}) {

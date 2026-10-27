@@ -41,7 +41,7 @@ export async function renderReportTypeSelectView(container, { onSelectType, onMa
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
 
   container.innerHTML = `
-    <div class="type-select-home">
+    <div class="type-select-home" data-screen="home">
       <h2 class="type-select-home__title">請選擇要填寫的表單</h2>
       <hr class="type-select-home__divider">
       <div class="type-select-home__utils">
