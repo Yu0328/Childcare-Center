@@ -51,7 +51,7 @@ describe('HELP_CHAPTERS', () => {
     const tips = HELP_CHAPTERS.find(c => c.id === 'tips').demos.map(d => d.title);
     expect(tips).toEqual(['套用其他幼兒的課程計畫', '把適性紀錄彙整成總表', '一次匯入多個 Word 檔']);
     const iphone = demos.find(d => d.id === 'install-iphone');
-    expect(iphone.steps.map(s => s.cap).join()).toMatch(/⋯.*分享.*加入主畫面.*以網頁 App 打開/);
+    expect(iphone.steps.map(s => s.cap).join()).toMatch(/選單圖示.*分享.*加入主畫面.*以網頁 App 打開/);
     const desk = demos.find(d => d.id === 'install-desk');
     expect(desk.steps.map(s => s.cap).join()).toMatch(/加入主畫面.*立即安裝/);
     expect(desk.note).toMatch(/投放、儲存及分享.*將網頁安裝為應用程式/);

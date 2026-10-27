@@ -3380,6 +3380,24 @@ fieldset.panel-form__field.import-preview__child legend {
 .ms-browserbar > span:not(.ms-url) { position: relative; padding: 0 0.3em; font-weight: 700; color: var(--text-secondary); }
 .ms-browserbar--bottom { order: 9; margin-top: auto; padding-bottom: 1em; }
 .ms-url { flex: 1; min-width: 0; padding: 0.25em 0.7em; border-radius: 99px; background: var(--surface); color: var(--text-muted); font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-browserbar > .ms-ios-pill { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.6em; padding: 0.3em 0.7em; border-radius: 99px; background: var(--surface); font-weight: 400; }
+.ms-ios-pill > span { position: relative; display: flex; }
+.ms-ios-pill > .ms-ios-url { flex: 1; min-width: 0; display: block; color: var(--text-muted); font-size: 0.85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-ios-icon { width: 1.1em; height: 1.1em; margin-right: 0.5em; vertical-align: -0.2em; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.ms-share { gap: 0.7em; font-size: 0.8em; }
+.ms-share__head { display: flex; align-items: center; gap: 0.6em; }
+.ms-share__head i { width: 2.4em; height: 2.4em; border-radius: 0.6em; background: var(--brand-tint); flex: none; }
+.ms-share__head b { display: grid; min-width: 0; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-share__head small { color: var(--text-muted); font-weight: 400; }
+.ms-share__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.4em; text-align: center; font-size: 0.8em; }
+.ms-share__row span { display: grid; justify-items: center; gap: 0.25em; white-space: nowrap; }
+.ms-share__row i { width: 2.6em; height: 2.6em; border-radius: 50%; background: var(--neutral-tint); }
+.ms-share__app0, .ms-share__app2 { border-radius: 0.7em !important; background: #2f86f0 !important; }
+.ms-share__app1 { border-radius: 0.7em !important; background: #3cc85a !important; }
+.ms-share__app3 { border-radius: 0.7em !important; background: #f6d24a !important; }
+.ms-share__list { display: grid; padding: 0.2em 0.4em; border-radius: 0.8em; background: var(--page-bg); }
+.ms-share__list span { position: relative; padding: 0.5em 0.4em; border-bottom: 1px solid var(--border); }
+.ms-share__list span:last-child { border-bottom: 0; }
 .ms-page { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .ms-page > .ms { position: absolute; padding-top: 0; }
 .ms-toggle { display: flex; align-items: center; justify-content: space-between; padding: 0.5em 0.7em; background: var(--surface); border-radius: 0.6em; font-size: 0.85em; }
@@ -3409,6 +3427,7 @@ fieldset.panel-form__field.import-preview__child legend {
 .help-dev .rings .ms-pick[data-hit]::before, .help-dev .rings .ms-pick[data-hit]::after,
 .help-dev .rings .ms-photos [data-hit]::before, .help-dev .rings .ms-photos [data-hit]::after,
 .help-dev .rings .ms-menu [data-hit]::before, .help-dev .rings .ms-menu [data-hit]::after,
+.help-dev .rings .ms-share__list [data-hit]::before, .help-dev .rings .ms-share__list [data-hit]::after,
 .help-dev .rings .ms-tabs [data-hit]::before, .help-dev .rings .ms-tabs [data-hit]::after { border-radius: 0.7em; }
 .help-dev .rings .ms-cb[data-hit]::before, .help-dev .rings .ms-cb[data-hit]::after { inset: -0.3em -0.4em; border-radius: 0.5em; }
 .help-dev .rings [data-hit]::after { opacity: 0; }

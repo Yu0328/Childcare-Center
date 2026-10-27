@@ -71,8 +71,24 @@ const addSteps = ({ draw, fabCap, formCap }) => [
 
 /* ---------- 1 開始使用 ---------- */
 
+// iOS 26 Safari: ‹, then one pill holding the page-menu icon, the address and reload, then tabs.
+const IOS_PAGE_MENU = '<svg viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true"><path d="M2 4h5M2 8h12M2 12h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const iosIcon = paths => `<svg class="ms-ios-icon" viewBox="0 0 16 16" aria-hidden="true">${paths}</svg>`;
+const IOS_SHARE = iosIcon('<path d="M5 6H3.5v8.5h9V6H11M8 1.5v8M5.5 4 8 1.5 10.5 4"/>');
+const IOS_ADD_HOME = iosIcon('<rect x="2" y="2" width="12" height="12" rx="3"/><path d="M8 5v6M5 8h6"/>');
 const safari = (content, { hitMore = false, sheet = '' } = {}) =>
-  screen(content, `<div class="ms-browserbar ms-browserbar--bottom"><span>‹</span><span class="ms-url">yucare.github.io</span><span${hitMore ? ' data-hit' : ''}>⋯</span></div>`, sheet);
+  screen(
+    content,
+    `<div class="ms-browserbar ms-browserbar--bottom"><span>‹</span><span class="ms-ios-pill"><span${hitMore ? ' data-hit' : ''}>${IOS_PAGE_MENU}</span><span class="ms-ios-url">yucare.github.io</span><span>↻</span></span><span>⧉</span></div>`,
+    sheet
+  );
+// Safari's share sheet: the page, a row of apps, a row of round buttons, then a list with 加入主畫面.
+const iosShareSheet = () =>
+  `<div class="ms-modal"><div class="ms-dialog ms-share"><div class="ms-share__head"><i></i><b>${APP_NAME}<small>yucare.github.io</small></b></div><div class="ms-share__row">${[
+    'AirDrop', '訊息', '郵件', '備忘錄',
+  ].map((label, k) => `<span><i class="ms-share__app${k}"></i>${label}</span>`).join('')}</div><div class="ms-share__row">${[
+    '拷貝', '加入「書籤」', '加入閱讀列表', '檢視較少',
+  ].map(label => `<span><i></i>${label}</span>`).join('')}</div><div class="ms-share__list"><span>加入喜好項目</span><span>在網頁中尋找</span><span data-hit>${IOS_ADD_HOME}加入主畫面</span><span>列印</span></div></div></div>`;
 const chromePhone = (content, { hitMore = false, sheet = '' } = {}) =>
   screen(`<div class="ms-browserbar"><span class="ms-url">yucare.github.io</span><span${hitMore ? ' data-hit' : ''}>⋮</span></div>`, content, sheet);
 const chromeDesk = (content, { hitMore = false, menus = '' } = {}) =>
@@ -94,12 +110,12 @@ export const INSTALL_IPHONE_DEMO = {
   webOnly: true,
   note: '按系統上方的「安裝」，也會跳出這些步驟。iPhone 上安裝後的 App 和 Safari 是分開存資料的：已用 Google 登入的話，裝好後再登入一次就好；訪客模式請先「匯出備份」，裝好後再「匯入備份」。另外，Safari 可能會清掉 7 天沒打開的網站資料，安裝後就不會。',
   steps: [
-    { cap: '點 Safari 右下角的「⋯」（下方直接有分享圖示 ⬆️ 的話，點它就好；iPad 的分享圖示在畫面右上角）', draw: () => safari(pageInside(), { hitMore: true }) },
-    { cap: '點「分享」', draw: () => safari(pageInside(), { sheet: menu([['分享', true], ['加入書籤'], ['新增分頁']], { at: 'bottom' }) }) },
+    { cap: '點 Safari 下方網址列最左邊的選單圖示（網址旁邊三條線的那個）', draw: () => safari(pageInside(), { hitMore: true }) },
     {
-      cap: '在跳出的選單往下滑，點「加入主畫面」',
-      draw: () => safari(pageInside(), { sheet: menu([['拷貝'], ['加入書籤'], ['加入主畫面', true], ['列印']], { at: 'bottom' }) }),
+      cap: '點最上面的「分享」',
+      draw: () => safari(pageInside(), { sheet: menu([[`${IOS_SHARE}分享`, true], ['加入書籤'], ['將書籤加入檔案夾…'], ['在網頁中尋找'], ['網頁縮放']], { at: 'bottom' }) }),
     },
+    { cap: '往下滑，點「加入主畫面」（前面是一個方框裡有＋的圖示）', draw: () => safari(pageInside(), { sheet: iosShareSheet() }) },
     {
       cap: '名稱會自動填好「育英公托填表」，確認「以網頁 App 打開」是開著的，點右上角的「加入」',
       draw: () =>
