@@ -69,7 +69,8 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
 
   function show(i, fade = true) {
     index = i;
-    const old = [...screenEl.querySelectorAll('.ms')];
+    // Only whole frames — an install demo nests the app's own drawing (.ms) inside a browser frame.
+    const old = [...screenEl.querySelectorAll(':scope > .ms')];
     pointer.insertAdjacentHTML('beforebegin', steps[i].draw(mode));
     const frame = pointer.previousElementSibling;
     if (fade && old.length) {
@@ -89,7 +90,7 @@ export function mountDemo(el, demo, { mode, reduced = false }) {
     timers.clear();
     pointer.classList.remove('show', 'tap');
     // The cancelled timers would have cleared these: a cross-fading old frame and ripples.
-    screenEl.querySelectorAll('.ms').forEach(frame => frame !== pointer.previousElementSibling && frame.remove());
+    screenEl.querySelectorAll(':scope > .ms').forEach(frame => frame !== pointer.previousElementSibling && frame.remove());
     screenEl.querySelectorAll('.help-rip').forEach(ripple => ripple.remove());
   }
 

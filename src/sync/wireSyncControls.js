@@ -19,6 +19,8 @@ export function wireSyncControls({
   // paintHeader('guest') replaces them. Optional so tests that don't care about backup wiring
   // don't need to pass a no-op.
   wireBackup,
+  // Same story for the 加入主畫面 button, which both modes' headers create afresh.
+  wireInstall,
 }) {
   const auth = createAuth({ clientId });
   const drive = createDrive({ auth });
@@ -78,6 +80,7 @@ export function wireSyncControls({
     if (mode === 'guest' && wireBackup) {
       wireBackup(syncSlot.querySelector('#export-backup'), syncSlot.querySelector('#import-backup'));
     }
+    if (wireInstall) wireInstall(syncSlot.querySelector('[data-action="install"]'), mode);
   }
 
   // Registered once and left in place for the page's lifetime; the `syncing` guard (not

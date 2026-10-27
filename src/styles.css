@@ -1052,6 +1052,50 @@ button {
   justify-content: flex-end;
   flex-wrap: wrap;
 }
+/* 加入主畫面 popup (installDialog.js) — the iPhone one holds the 操作說明's install demo, so it
+   gets the wide popup and stacks the demo's phone above its step list. */
+/* .btn's display would otherwise beat the hidden attribute and show the button everywhere. */
+.btn[data-action='install'][hidden] {
+  display: none;
+}
+.install-dialog__body {
+  overflow: visible;
+}
+.install-dialog__body p {
+  margin: 0;
+  line-height: 1.6;
+}
+.install-dialog__title {
+  margin: 0;
+  padding-right: 2.2rem; /* clears the × button */
+  font-size: 1.15rem;
+}
+.install-dialog__note {
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: var(--warm-tint);
+}
+.install-dialog__hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.install-dialog .help-demo {
+  padding: 0.75rem;
+}
+.install-dialog .help-demo[data-mode='phone'] .help-demo__grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.install-dialog .help-demo[data-mode='phone'] .help-demo__stage {
+  padding: 0.75rem;
+}
+/* Small enough that the drawing and its step list fit a phone screen with little scrolling. */
+.install-dialog .help-dev--phone {
+  width: 190px;
+}
+.install-dialog__actions {
+  justify-content: flex-end;
+}
+
 .form-popup__close {
   /* Mobile-only: on mobile this is the modal dialog's only close affordance besides
      backdrop-click/Escape. On desktop the form is meant to stay permanently inline (see

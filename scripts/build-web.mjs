@@ -34,6 +34,8 @@ const GOOGLE_CLIENT_ID = '841383586205-ohr1uhsrii1tg3oevtcacimc4sviekcr.apps.goo
 
 const script = `
 ${js}
+// Created right away: the browser's install offer (beforeinstallprompt) can arrive before the page is ready.
+const install = CFormApp.createInstall();
 document.addEventListener('DOMContentLoaded', () => {
   const syncControls = CFormApp.wireSyncControls({
     clientId: '${GOOGLE_CLIENT_ID}',
@@ -42,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // fresh every time the header repaints as guest, so this has to (re-)wire them each time
     // rather than once at load like the offline build does.
     wireBackup: (exportButton, importInput) => CFormApp.wireBackupControls({ exportButton, importInput }),
+    wireInstall: (button, mode) => install.wireButton(button, mode),
   });
   CFormApp.mountApp(document.getElementById('app'), {
     gate: syncControls.gate,
@@ -65,6 +68,7 @@ const html = `<!DOCTYPE html>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="育英公托填表">
 <title>屏東縣內埔鄉育英公托填表系統</title>
 <style>
 ${css}

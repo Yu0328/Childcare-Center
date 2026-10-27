@@ -16,6 +16,14 @@ const DEMO = {
 afterEach(() => vi.useRealTimers());
 
 describe('mountDemo', () => {
+  it('pausing keeps a drawing nested inside the current frame (the install demos draw the app inside a browser)', () => {
+    const el = document.createElement('article');
+    const nested = { ...DEMO, steps: [{ cap: '一', draw: () => '<div class="ms"><div class="ms-page"><div class="ms" data-inner>頁面</div></div><span data-hit>按</span></div>' }, DEMO.steps[2]] };
+    mountDemo(el, nested, { mode: 'phone' });
+    el.querySelector('.help-demo__play').click(); // pause → stop()
+    expect(el.querySelector('[data-inner]')).not.toBeNull();
+  });
+
   it('lists one caption per step for the mode and shows the first frame', () => {
     const el = document.createElement('article');
     mountDemo(el, DEMO, { mode: 'phone' });

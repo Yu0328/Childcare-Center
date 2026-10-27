@@ -210,6 +210,20 @@ describe('wireSyncControls', () => {
     expect(importInput).toBe(syncSlot.querySelector('#import-backup'));
   });
 
+  it('每次畫頂端列都用新的「加入主畫面」按鈕和目前模式呼叫 wireInstall', async () => {
+    const wireInstall = vi.fn();
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: fakeAuthFactory(), createDrive: () => ({}), createEngine: () => fakeEngine(),
+      wireInstall,
+    });
+
+    await controls.gate(container, { onDone: () => {} });
+    container.querySelector('[data-action="continue-guest"]').click();
+    await vi.waitFor(() => expect(wireInstall).toHaveBeenCalled());
+    expect(wireInstall).toHaveBeenCalledWith(syncSlot.querySelector('[data-action="install"]'), 'guest');
+  });
+
   it('登出回到訪客模式時，也會用新畫出來的按鈕重新呼叫 wireBackup', async () => {
     writeSyncMode('google');
     localStorage.setItem('c-form-sync-name', '小美');

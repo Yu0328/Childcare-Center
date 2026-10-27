@@ -71,6 +71,16 @@ describe('renderSyncHeader', () => {
 
   const idle = { phase: 'idle', textSyncedAt: null, photoSyncedAt: null, photoPending: 0, needsReview: 0, error: null };
 
+  it('兩種模式都有先藏起來的「加入主畫面」按鈕，夾在登入／同步和備份／登出中間', () => {
+    const order = () => [...slot.querySelectorAll('.sync-header__actions > *')].map(el => el.dataset.action || el.className);
+    renderSyncHeader(slot, { mode: 'guest', status: idle, onSignIn: () => {}, onSignOut: () => {} });
+    expect(order()).toEqual(['sync-sign-in', 'install', 'backup-menu']);
+    expect(slot.querySelector('[data-action="install"]').hidden).toBe(true);
+    renderSyncHeader(slot, { mode: 'google', name: '小美', status: idle, onSignIn: () => {}, onSignOut: () => {} });
+    expect(order()).toEqual(['sync-now', 'install', 'sync-sign-out']);
+    expect(slot.querySelector('[data-action="install"]').textContent).toBe('加入主畫面安裝');
+  });
+
   it('登入後顯示問候語 + 名字', () => {
     renderSyncHeader(slot, {
       mode: 'google', name: '小美', status: idle,

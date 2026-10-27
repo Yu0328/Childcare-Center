@@ -5,3 +5,4 @@
 export { mountApp, wireBackupControls } from './app.js';
 export { wireSyncControls } from './sync/wireSyncControls.js';
 export { wireUpdatePrompt } from './pwa/updatePrompt.js';
+export { createInstall } from './pwa/installPrompt.js';

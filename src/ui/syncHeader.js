@@ -1,6 +1,7 @@
 import { isOffline } from '../sync/googleAuth.js';
 import { escapeHtml } from './escapeHtml.js';
 import { oneAtATime } from './oneAtATime.js';
+import { headerButtonLabel } from './headerButtonLabel.js';
 
 export function greetingFor(date) {
   const hour = date.getHours();
@@ -35,6 +36,10 @@ export function formatSyncStatus(status) {
   return '';
 }
 
+// Starts hidden: createInstall().wireButton (src/pwa/installPrompt.js) shows it only where this
+// browser can actually install the app.
+const INSTALL_BUTTON = `<button type="button" class="btn btn--header" data-action="install" hidden>${headerButtonLabel('加入主畫面', '安裝')}</button>`;
+
 const PERSISTENT_ERRORS = new Set(['AUTH_EXPIRED', 'FORMAT']);
 
 // Drives the status light and text color: orange while syncing, red on any failure (including
@@ -61,6 +66,7 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
         ${greeting}
         <div class="sync-header__actions">
           <button type="button" class="btn btn--header btn--ghost" data-action="sync-now" title="檢查另一台裝置是否有新資料">立即同步</button>
+          ${INSTALL_BUTTON}
           <button type="button" class="btn btn--header btn--ghost" data-action="sync-sign-out">登出</button>
         </div>
       </div>
@@ -79,6 +85,7 @@ export function renderSyncHeader(slot, { mode, name, status, onSignIn, onSignOut
         ${greeting}
         <div class="sync-header__actions">
           <button type="button" class="btn btn--header" data-action="sync-sign-in">使用 Google 登入</button>
+          ${INSTALL_BUTTON}
           <details class="backup-menu">
             <summary class="btn btn--header">備份</summary>
             <div class="backup-menu__list">

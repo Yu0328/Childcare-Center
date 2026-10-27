@@ -24,8 +24,9 @@ const chip = (label, kind) => `<span class="help-chip${kind ? ` help-chip--${kin
 /* ---------- screens shared by several demos ---------- */
 
 const APP_NAME = '屏東縣內埔鄉育英公托填表系統';
-const appTop = ({ hitName = false, hitBackup = false, menuItems = null } = {}) =>
-  `<div class="ms-apptop"><b${hitName ? ' data-hit' : ''}><span>${APP_NAME}</span></b>${btn('備份 ▾', 'header', hitBackup)}</div>${
+// `install`: the 加入主畫面／安裝 button's label, drawn only in the install demos.
+const appTop = ({ hitName = false, hitBackup = false, install = '', hitInstall = false, menuItems = null } = {}) =>
+  `<div class="ms-apptop"><b${hitName ? ' data-hit' : ''}><span>${APP_NAME}</span></b>${install ? btn(install, 'header', hitInstall) : ''}${btn('備份 ▾', 'header', hitBackup)}</div>${
     menuItems ? menu(menuItems) : ''
   }`;
 
@@ -36,9 +37,9 @@ const HOME_CARDS = [
   ['適性紀錄(家長版)', 'purple', TYPE_SELECT_ICONS['parent-report']],
   ['課程月計畫', 'green', TYPE_SELECT_ICONS['monthly-plan']],
 ];
-const homeScreen = (ring = '', { hitName = false, hitBackup = false, extra = '' } = {}) =>
+const homeScreen = (ring = '', { hitName = false, hitBackup = false, install = '', hitInstall = false, extra = '' } = {}) =>
   screen(
-    appTop({ hitName, hitBackup }),
+    appTop({ hitName, hitBackup, install, hitInstall }),
     `<div class="ms-home"><span class="ms-home__title">請選擇要填寫的表單</span><div class="ms-home__utils">${HOME_CARDS.slice(0, 2)
       .map(([title, tone, icon]) => card(title, { tone, icon, hit: ring === title }))
       .join('')}</div>${HOME_CARDS.slice(2)
@@ -76,11 +77,40 @@ const chromePhone = (content, { hitMore = false, sheet = '' } = {}) =>
   screen(`<div class="ms-browserbar"><span class="ms-url">yucare.github.io</span><span${hitMore ? ' data-hit' : ''}>⋮</span></div>`, content, sheet);
 const chromeDesk = (content, { hitMore = false, menus = '' } = {}) =>
   screen(`<div class="ms-browserbar"><span>←</span><span class="ms-url">yucare.github.io</span><span${hitMore ? ' data-hit' : ''}>⋮</span></div>`, content, menus);
-const pageInside = () => `<div class="ms-page">${homeScreen()}</div>`;
+const pageInside = (top = {}) => `<div class="ms-page">${homeScreen('', top)}</div>`;
+// What the header's install button opens (src/ui/installDialog.js), on Android and computers.
+const installDialog = () => modal('安裝到主畫面', muted('點圖示就能直接打開，畫面也比較大'), btn('取消') + btn('立即安裝', 'primary', true));
 const osHome = m =>
   screen(
     `<div class="ms-os${m === 'desk' ? ' ms-os--desk' : ''}">${'<span></span>'.repeat(m === 'desk' ? 3 : 7)}<span class="ms-os__app ms-fill"><i></i>育英公托填表</span></div>`
   );
+
+// Also played inside the header's 安裝 popup on an iPhone (src/ui/installDialog.js), so these
+// captions are that popup's instructions too.
+export const INSTALL_IPHONE_DEMO = {
+  id: 'install-iphone',
+  title: '加到主畫面（iPhone）',
+  modes: ['phone'],
+  webOnly: true,
+  note: '按系統上方的「安裝」，也會跳出這些步驟。iPhone 上安裝後的 App 和 Safari 是分開存資料的：已用 Google 登入的話，裝好後再登入一次就好；訪客模式請先「匯出備份」，裝好後再「匯入備份」。另外，Safari 可能會清掉 7 天沒打開的網站資料，安裝後就不會。',
+  steps: [
+    { cap: '點 Safari 右下角的「⋯」（下方直接有分享圖示 ⬆️ 的話，點它就好；iPad 的分享圖示在畫面右上角）', draw: () => safari(pageInside(), { hitMore: true }) },
+    { cap: '點「分享」', draw: () => safari(pageInside(), { sheet: menu([['分享', true], ['加入書籤'], ['新增分頁']], { at: 'bottom' }) }) },
+    {
+      cap: '在跳出的選單往下滑，點「加入主畫面」',
+      draw: () => safari(pageInside(), { sheet: menu([['拷貝'], ['加入書籤'], ['加入主畫面', true], ['列印']], { at: 'bottom' }) }),
+    },
+    {
+      cap: '名稱會自動填好「育英公托填表」，確認「以網頁 App 打開」是開著的，點右上角的「加入」',
+      draw: () =>
+        screen(
+          `<div class="ms-bar"><span class="ms-back">取消</span><b class="ms-title">加入主畫面</b><span class="ms-actions">${btn('加入', 'link', true)}</span></div>`,
+          `<div class="ms-form">${field('名稱', '育英公托填表')}<span class="ms-toggle on">以網頁 App 打開<i></i></span></div>`
+        ),
+    },
+    { cap: '回到手機主畫面，之後點育英公托的圖示就能打開', draw: () => osHome('phone') },
+  ],
+};
 
 const START = {
   id: 'start',
@@ -101,37 +131,16 @@ const START = {
         { point: true, cap: '在任何畫面按最上方的系統名稱，就回到首頁', draw: () => homeScreen('', { hitName: true }) },
       ],
     },
-    {
-      id: 'install-iphone',
-      title: '加到主畫面（iPhone）',
-      modes: ['phone'],
-      webOnly: true,
-      steps: [
-        { cap: '用 Safari 打開系統，按右下角的「⋯」', draw: () => safari(pageInside(), { hitMore: true }) },
-        { cap: '按「分享」', draw: () => safari(pageInside(), { sheet: menu([['分享', true], ['加入書籤'], ['新增分頁']], { at: 'bottom' }) }) },
-        {
-          cap: '往下滑，按「加入主畫面」',
-          draw: () => safari(pageInside(), { sheet: menu([['拷貝'], ['加入書籤'], ['加入主畫面', true], ['列印']], { at: 'bottom' }) }),
-        },
-        {
-          cap: '確認「以網頁 App 打開」是開著的，按右上角「加入」',
-          draw: () =>
-            screen(
-              `<div class="ms-bar"><span class="ms-back">取消</span><b class="ms-title">加入主畫面</b><span class="ms-actions">${btn('加入', 'link', true)}</span></div>`,
-              `<div class="ms-form">${field('名稱', '育英公托填表')}<span class="ms-toggle on">以網頁 App 打開<i></i></span></div>`
-            ),
-        },
-        { cap: '主畫面多了一個圖示，之後按它就能打開', draw: () => osHome('phone') },
-      ],
-    },
+    INSTALL_IPHONE_DEMO,
     {
       id: 'install-android',
       title: '加到主畫面（Android）',
       modes: ['phone'],
       webOnly: true,
+      note: '沒看到「安裝」按鈕的話：用 Chrome 打開系統，按右上角的「⋮」→「加到主畫面」→「安裝」。',
       steps: [
-        { cap: '用 Chrome 打開系統，按右上角的「⋮」', draw: () => chromePhone(pageInside(), { hitMore: true }) },
-        { cap: '按「加到主畫面」', draw: () => chromePhone(pageInside(), { sheet: menu([['新增分頁'], ['書籤'], ['加到主畫面', true], ['設定']]) }) },
+        { cap: '用 Chrome 打開系統，按上方的「安裝」', draw: () => chromePhone(pageInside({ install: '安裝', hitInstall: true })) },
+        { cap: '看完說明，按「立即安裝」', draw: () => chromePhone(pageInside({ install: '安裝' }), { sheet: installDialog() }) },
         { cap: '按「安裝」', draw: () => chromePhone(pageInside(), { sheet: modal('加到主畫面', muted('育英公托填表'), btn('安裝', 'primary', true)) }) },
         { cap: '主畫面多了一個圖示，之後按它就能打開', draw: () => osHome('phone') },
       ],
@@ -141,17 +150,10 @@ const START = {
       title: '安裝到電腦（Chrome）',
       modes: ['desk'],
       webOnly: true,
-      note: 'Edge 的話：按右上角「…」→「應用程式」→「將此網站安裝為應用程式」。',
+      note: '沒看到「加入主畫面」按鈕的話：Chrome 按右上角「⋮」→「投放、儲存及分享」→「將網頁安裝為應用程式…」；Edge 按右上角「…」→「應用程式」→「將此網站安裝為應用程式」。',
       steps: [
-        { cap: '用 Chrome 打開系統，按右上角的「⋮」', draw: () => chromeDesk(pageInside(), { hitMore: true }) },
-        { cap: '按「投放、儲存及分享」', draw: () => chromeDesk(pageInside(), { menus: menu([['新增分頁'], ['書籤和清單'], ['投放、儲存及分享', true], ['設定']]) }) },
-        {
-          cap: '按「將網頁安裝為應用程式…」',
-          draw: () =>
-            chromeDesk(pageInside(), {
-              menus: menu([['新增分頁'], ['書籤和清單'], ['投放、儲存及分享'], ['設定']]) + menu([['投放…'], ['將網頁安裝為應用程式…', true], ['建立 QR 圖碼']], { at: 'sub' }),
-            }),
-        },
+        { cap: '用 Chrome 打開系統，按上方的「加入主畫面」', draw: () => chromeDesk(pageInside({ install: '加入主畫面', hitInstall: true })) },
+        { cap: '看完說明，按「立即安裝」', draw: () => chromeDesk(pageInside({ install: '加入主畫面' }), { menus: installDialog() }) },
         { cap: '按「安裝」', draw: () => chromeDesk(pageInside(), { menus: modal('要安裝應用程式嗎？', muted('育英公托填表'), btn('取消') + btn('安裝', 'primary', true)) }) },
         { cap: '桌面和開始功能表多了一個圖示，之後按它就能打開', draw: () => osHome('desk') },
       ],
