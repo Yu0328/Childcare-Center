@@ -17,6 +17,15 @@ export async function wireAutoUpdate({
   // safe moment without waiting on anything else.
   let takenOver = false;
   let reloading = false;
+  // A file chooser (匯入) can hide the page before anything is picked, and on return the page turns
+  // visible before `change` arrives — so it counts as "still in the app" until the pick lands or,
+  // for a cancel older Safari never reports, a second after she's back.
+  let picking = false;
+  const isFileInput = event => event.target?.type === 'file';
+  doc.addEventListener('click', event => { if (isFileInput(event)) picking = true; }, true);
+  for (const type of ['change', 'cancel']) {
+    doc.addEventListener(type, event => { if (isFileInput(event)) picking = false; }, true);
+  }
 
   function reloadNow() {
     if (reloading) return;
@@ -33,20 +42,23 @@ export async function wireAutoUpdate({
       return;
     }
     takenOver = true;
-    if (isSafe()) reloadNow();
+    if (isSafe() && !picking) reloadNow();
   });
 
   const registration = await serviceWorker.register('sw.js');
   const checkForUpdate = () => registration.update().catch(() => {});
 
   function trySwitch() {
-    if (!isSafe()) return;
+    if (!isSafe() || picking) return;
     if (takenOver) return reloadNow();
     if (registration.waiting && serviceWorker.controller) registration.waiting.postMessage('SKIP_WAITING');
   }
 
   doc.addEventListener('visibilitychange', () => {
-    if (!doc.hidden) checkForUpdate();
+    if (!doc.hidden) {
+      checkForUpdate();
+      if (picking) setTimeout(() => { picking = false; }, 1000);
+    }
     trySwitch();
   });
   setInterval(checkForUpdate, checkEveryMs);

@@ -176,6 +176,8 @@ export function createGoogleAuth({
   return {
     signIn, getAccessToken, signOut, stashForReload,
     isSignedIn: () => Boolean(token),
+    // The popup hides the page; the auto-update must not reload underneath it.
+    isSigningIn: () => Boolean(inFlight),
     carriedOverReload: () => carriedOver,
   };
 }

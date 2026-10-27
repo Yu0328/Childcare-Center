@@ -55,7 +55,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => CFormApp.wireAutoUpdate({
     isSafe: () => CFormApp.isAtHome(document.getElementById('app'))
       && !CFormApp.hasUnsavedInput(document.body)
-      && !syncControls.isBusy(),
+      && !(syncControls?.isBusy() ?? true),
     beforeReload: () => syncControls.prepareReload(),
   }));
 }

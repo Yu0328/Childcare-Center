@@ -280,6 +280,34 @@ describe('wireSyncControls', () => {
     expect(syncSlot.querySelector('[data-action="sync-sign-out"]')).toBeTruthy();
   });
 
+  it('離線時接續了登入：走離線分支（進 App、不同步、不顯示選擇畫面）', async () => {
+    writeSyncMode('google');
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    const runSync = vi.fn(async () => idleStatus);
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: () => ({ ...fakeAuthFactory()(), carriedOverReload: () => true }),
+      createDrive: () => ({}),
+      createEngine: () => fakeEngine({ runSync }),
+    });
+    const onDone = vi.fn();
+    await controls.gate(container, { onDone });
+    onLine.mockRestore();
+    expect(onDone).toHaveBeenCalled();
+    expect(runSync).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-action="sign-in-google"]')).toBe(null);
+  });
+
+  it('Google 登入視窗開著時 isBusy 為真（即使同步引擎閒置）', () => {
+    const controls = wireSyncControls({
+      clientId: 'test', syncSlot,
+      createAuth: () => ({ ...fakeAuthFactory()(), isSigningIn: () => true }),
+      createDrive: () => ({}),
+      createEngine: () => ({ ...fakeEngine(), isBusy: () => false }),
+    });
+    expect(controls.isBusy()).toBe(true);
+  });
+
   it('isBusy／prepareReload 轉給同步引擎／登入', () => {
     const stashForReload = vi.fn();
     const controls = wireSyncControls({

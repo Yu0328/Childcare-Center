@@ -142,7 +142,7 @@ export function wireSyncControls({
 
     // The silent auto-update's reload carried this tab's sign-in over (googleAuth's
     // stashForReload) — no popup risk, the token is already in hand.
-    if (readSyncMode() === 'google' && auth.carriedOverReload?.()) {
+    if (readSyncMode() === 'google' && auth.carriedOverReload?.() && !isOffline()) {
       startSyncing();
       onDone();
       return;
@@ -169,5 +169,5 @@ export function wireSyncControls({
     onDone();
   }
 
-  return { gate, isBusy: () => engine.isBusy(), prepareReload: () => auth.stashForReload() };
+  return { gate, isBusy: () => engine.isBusy() || Boolean(auth.isSigningIn?.()), prepareReload: () => auth.stashForReload() };
 }

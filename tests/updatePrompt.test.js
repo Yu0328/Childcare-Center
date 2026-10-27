@@ -16,7 +16,8 @@ function setup({ controller = {}, waiting = fakeWorker(), safe = true } = {}) {
   const serviceWorker = new EventTarget();
   serviceWorker.controller = controller;
   serviceWorker.register = vi.fn(async () => registration);
-  const doc = new EventTarget();
+  // A real element, so a file input inside it reaches the capture-phase listeners like in a page.
+  const doc = document.createElement('div');
   doc.hidden = false;
   const ctx = {
     registration, serviceWorker, doc, safe,
@@ -33,6 +34,46 @@ const takeOver = ctx => ctx.serviceWorker.dispatchEvent(new Event('controllercha
 
 describe('wireAutoUpdate', () => {
   afterEach(() => vi.useRealTimers());
+
+  function addFileInput(ctx) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    ctx.doc.appendChild(input);
+    return input;
+  }
+
+  it('檔案選擇視窗開著時離開，不換版；選好檔案後才換', async () => {
+    const ctx = setup();
+    await wire(ctx);
+    const input = addFileInput(ctx);
+    input.dispatchEvent(new Event('click'));
+    leave(ctx);
+    expect(ctx.registration.waiting.postMessage).not.toHaveBeenCalled();
+    comeBack(ctx);
+    input.dispatchEvent(new Event('change'));
+    leave(ctx);
+    expect(ctx.registration.waiting.postMessage).toHaveBeenCalledWith('SKIP_WAITING');
+  });
+
+  it('檔案選擇視窗開著時別的分頁換版：接手也不重新載入', async () => {
+    const ctx = setup();
+    await wire(ctx);
+    addFileInput(ctx).dispatchEvent(new Event('click'));
+    takeOver(ctx);
+    expect(ctx.reload).not.toHaveBeenCalled();
+  });
+
+  it('回到前景後 1 秒內沒等到 change（取消選檔）：之後離開就換版', async () => {
+    vi.useFakeTimers();
+    const ctx = setup();
+    await wire(ctx);
+    addFileInput(ctx).dispatchEvent(new Event('click'));
+    leave(ctx);
+    comeBack(ctx);
+    vi.advanceTimersByTime(1000);
+    leave(ctx);
+    expect(ctx.registration.waiting.postMessage).toHaveBeenCalledWith('SKIP_WAITING');
+  });
 
   it('在安全狀態離開 App：通知新版接手，接手後先交接登入再重新載入', async () => {
     const ctx = setup();

@@ -154,6 +154,22 @@ describe('createGoogleAuth', () => {
   });
 });
 
+describe('isSigningIn', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('等 Google 彈出視窗回應時為真，回應後為假', async () => {
+    const gis = fakeGis();
+    const auth = createGoogleAuth({ clientId: 'c', loadGis: gis.loadGis, fetchUserInfo: async () => ({ given_name: '美' }) });
+    expect(auth.isSigningIn()).toBe(false);
+    const signing = auth.signIn();
+    await vi.waitFor(() => expect(gis.calls).toHaveLength(1));
+    expect(auth.isSigningIn()).toBe(true);
+    gis.respond({ access_token: 't', expires_in: 3600 });
+    await signing;
+    expect(auth.isSigningIn()).toBe(false);
+  });
+});
+
 describe('自動更新的登入接續', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
 
