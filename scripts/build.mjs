@@ -18,7 +18,7 @@ const css = readFileSync('src/styles.css', 'utf-8');
 
 // This build has no external files at all (the whole point is one self-contained offline HTML
 // file), so the header icon/favicon has to be inlined as a data URI rather than a normal <img src>.
-const iconDataUri = `data:image/png;base64,${readFileSync('assets/icons/icon-192.png').toString('base64')}`;
+const iconDataUri = `data:image/png;base64,${readFileSync('assets/centers/yuying/icon-192.png').toString('base64')}`;
 
 const script = `
 ${js}

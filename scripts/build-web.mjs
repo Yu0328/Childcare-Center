@@ -153,7 +153,7 @@ self.addEventListener('fetch', event => {
 writeFileSync('site/index.html', html);
 writeFileSync('site/manifest.json', JSON.stringify(manifest, null, 2));
 writeFileSync('site/sw.js', serviceWorker);
-copyFileSync('assets/icons/icon-192.png', 'site/icons/icon-192.png');
-copyFileSync('assets/icons/icon-512.png', 'site/icons/icon-512.png');
+copyFileSync('assets/centers/yuying/icon-192.png', 'site/icons/icon-192.png');
+copyFileSync('assets/centers/yuying/icon-512.png', 'site/icons/icon-512.png');
 
 console.log('Built site/ (cache %s)', cacheName);
