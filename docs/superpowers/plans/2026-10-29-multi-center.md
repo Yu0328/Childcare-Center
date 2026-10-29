@@ -101,12 +101,10 @@ export const CENTERS = [
 ];
 
 // scripts/build-web.mjs sets __CENTER_ID__ per centre; the offline build and the tests don't.
-// eslint-disable-next-line no-undef
 const id = typeof __CENTER_ID__ === 'undefined' ? 'yuying' : __CENTER_ID__;
 export const CENTER = CENTERS.find(c => c.id === id);
 ```
 
-（專案沒有 eslint 的話，拿掉 `eslint-disable` 那行。先 `ls .eslintrc* eslint.config.* 2>/dev/null` 確認。）
 
 - [ ] **Step 4: 搬 logo、改兩個建置腳本的路徑**
 
