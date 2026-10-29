@@ -1042,6 +1042,46 @@ button {
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
+/* Each field is see-through over a copy of its own text (.today-check__marks) whose text is
+   invisible but whose 今天／今日 carry a red background — a textarea can't color part of its
+   text. The copy must lay text out exactly like the field: same padding, border, font, wrapping. */
+.today-check__field {
+  position: relative;
+  display: block;
+  border-radius: 10px;
+  background: var(--page-bg);
+}
+.today-check__field:focus-within {
+  background: var(--surface);
+}
+.today-check .entry-form .today-check__field > [data-today-field] {
+  position: relative; /* above the marks */
+  display: block;
+  line-height: 1.5;
+  background: transparent;
+}
+.today-check__marks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 0.55em 0.75em;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+}
+.today-check__field:has(> input) .today-check__marks {
+  white-space: pre;
+}
+.today-check__marks mark {
+  color: transparent;
+  background: rgba(208, 59, 59, 0.3); /* --danger, see-through so the field's text stays black */
+  border-radius: 3px;
+}
+
 /* Pinned to the popup's bottom edge so the buttons stay reachable while a long list scrolls;
    -0.9rem cancels .entry-form's bottom padding so the row sits flush. */
 .today-check__actions {

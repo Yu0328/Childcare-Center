@@ -3,7 +3,7 @@ import { toRocDate } from '../export/docxShared.js';
 
 // Words a parent reading the exported file at month's end can't pin to a date — see
 // docs/superpowers/specs/2026-10-04-today-word-check-design.md.
-const TODAY_WORDS = ['今天', '今日'];
+export const TODAY_WORDS = ['今天', '今日'];
 const hasTodayWord = text => typeof text === 'string' && TODAY_WORDS.some(word => text.includes(word));
 
 export function findTodayWords({

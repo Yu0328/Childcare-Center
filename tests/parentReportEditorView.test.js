@@ -145,6 +145,19 @@ describe('匯出: 今天/今日 check', () => {
     expect(vi.mocked(downloadParentReportDocx)).not.toHaveBeenCalled();
   });
 
+  it('marks each 今天/今日 in red, and drops a mark once it is reworded', async () => {
+    const dialog = await openCheck();
+    const marksOf = index => [...dialog.querySelectorAll('.today-check__marks')[index].querySelectorAll('mark')]
+      .map(mark => mark.textContent);
+    expect(marksOf(0)).toEqual(['今天']);
+    expect(marksOf(1)).toEqual(['今日']);
+    const field = dialog.querySelectorAll('[data-today-field]')[0];
+    field.value = '6/3很專心';
+    field.dispatchEvent(new Event('input'));
+    expect(marksOf(0)).toEqual([]);
+    expect(marksOf(1)).toEqual(['今日']);
+  });
+
   it('只儲存 saves only changed fields and does not export', async () => {
     const dialog = await openCheck();
     dialog.querySelectorAll('[data-today-field]')[0].value = '6/3很專心';

@@ -4,6 +4,7 @@ import { lockBodyScroll, unlockBodyScroll, closeOnBackdropClick } from './formPo
 import {
   updateCourseOccurrence, updateDevelopmentRecordEntry, updateBehaviorObservation, updateHighlightEntry,
 } from '../storage/parentReportDb.js';
+import { TODAY_WORDS } from '../domain/findTodayWords.js';
 
 const SAVE = {
   occurrence: (id, text) => updateCourseOccurrence(id, { note: text }),
@@ -12,6 +13,10 @@ const SAVE = {
   observationNarrative: (id, text) => updateBehaviorObservation(id, { narrative: text }),
   highlight: (id, text) => updateHighlightEntry(id, { caption: text }),
 };
+
+const TODAY_WORD_PATTERN = new RegExp(TODAY_WORDS.join('|'), 'g');
+// The trailing space keeps a final line break from collapsing, so the layer stays as tall as the field.
+const markTodayWords = text => `${escapeHtml(text).replace(TODAY_WORD_PATTERN, '<mark>$&</mark>')} `;
 
 // Shown by the 適性紀錄 匯出 button when findTodayWords() finds anything — lets the teacher reword
 // each 今天/今日 before a parent reads it out of context. Edits are saved back to the records.
@@ -25,9 +30,12 @@ export function openTodayWordCheck(hits) {
       <p class="today-check__hint">以下內容含有『今天』或『今日』，可以在這裡修改</p>
       ${hits.map((hit, index) => `
         <label class="panel-form__field">${escapeHtml(hit.label)}
-          ${hit.kind === 'observationTitle'
-            ? `<input data-today-field="${index}" value="${escapeHtml(hit.text)}">`
-            : `<textarea data-today-field="${index}">${escapeHtml(hit.text)}</textarea>`}
+          <span class="today-check__field">
+            <span class="today-check__marks" aria-hidden="true">${markTodayWords(hit.text)}</span>
+            ${hit.kind === 'observationTitle'
+              ? `<input data-today-field="${index}" value="${escapeHtml(hit.text)}">`
+              : `<textarea data-today-field="${index}">${escapeHtml(hit.text)}</textarea>`}
+          </span>
         </label>
       `).join('')}
       <p class="field-error" data-error></p>
@@ -39,6 +47,13 @@ export function openTodayWordCheck(hits) {
     </div>
   `;
   document.body.appendChild(dialog);
+  // The marks layer sits under its see-through field, so it has to follow the field's text and scroll.
+  for (const field of dialog.querySelectorAll('[data-today-field]')) {
+    const marks = field.previousElementSibling;
+    const follow = () => { marks.scrollTop = field.scrollTop; marks.scrollLeft = field.scrollLeft; };
+    field.addEventListener('input', () => { marks.innerHTML = markTodayWords(field.value); follow(); });
+    field.addEventListener('scroll', follow);
+  }
 
   return new Promise(resolve => {
     let result = 'cancel';
