@@ -1,13 +1,22 @@
 import esbuild from 'esbuild';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { CENTERS } from '../src/centers.js';
+import { rootIndexHtml, rootServiceWorker } from './rootPage.mjs';
 
 // This builds the hosted (GitHub Pages) version — a small set of files instead of the desktop
 // build's single self-contained TableC.html, because a Service Worker (needed for offline/PWA
 // use, since mobile browsers won't open a local file directly) has to be its own fetchable file,
 // not something inlined into the page.
-mkdirSync('site/icons', { recursive: true });
+rmSync('site', { recursive: true, force: true });
 
+// Public by design — an OAuth Client ID is not a secret (the client secret is, and this app
+// doesn't use one: GIS's token flow doesn't need it).
+const GOOGLE_CLIENT_ID = '841383586205-ohr1uhsrii1tg3oevtcacimc4sviekcr.apps.googleusercontent.com';
+
+const css = readFileSync('src/styles.css', 'utf-8');
+
+async function buildCenter(center) {
 const result = await esbuild.build({
   entryPoints: ['src/webEntry.js'],
   bundle: true,
@@ -17,20 +26,15 @@ const result = await esbuild.build({
   // Phones download this on first open and on every update; minified it's well under half the size.
   minify: true,
   target: ['chrome100', 'safari15'],
+  define: { __CENTER_ID__: JSON.stringify(center.id) },
 });
 
 const js = result.outputFiles[0].text;
-const css = readFileSync('src/styles.css', 'utf-8');
-
 // Every rebuild gets a fresh cache name derived from the bundle's own content, so a redeploy
 // reliably invalidates old clients' cached copy instead of a cache-first Service Worker serving
 // a stale version forever.
 const buildHash = createHash('sha256').update(js).digest('hex').slice(0, 12);
-const cacheName = `c-form-cache-${buildHash}`;
-
-// Public by design — an OAuth Client ID is not a secret (the client secret is, and this app
-// doesn't use one: GIS's token flow doesn't need it).
-const GOOGLE_CLIENT_ID = '841383586205-ohr1uhsrii1tg3oevtcacimc4sviekcr.apps.googleusercontent.com';
+const cacheName = `c-form-site-${center.id}-${buildHash}`;
 
 const script = `
 ${js}
@@ -77,15 +81,15 @@ const html = `<!DOCTYPE html>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<meta name="apple-mobile-web-app-title" content="育英公托填表">
-<title>屏東縣內埔鄉育英公托填表系統</title>
+<meta name="apple-mobile-web-app-title" content="${center.shortName}">
+<title>${center.title}</title>
 <style>
 ${css}
 </style>
 </head>
 <body>
 <header class="app-header">
-  <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">屏東縣內埔鄉育英公托填表系統</button>
+  <button type="button" class="app-header__brand" id="home-button"><img src="icons/icon-192.png" alt="" class="app-header__brand-icon">${center.title}</button>
   <div class="app-header__actions">
     <div class="sync-header" id="sync-slot"></div>
   </div>
@@ -97,8 +101,8 @@ ${css}
 `;
 
 const manifest = {
-  name: '屏東縣內埔鄉育英公托填表系統',
-  short_name: '育英公托填表',
+  name: center.title,
+  short_name: center.shortName,
   start_url: './index.html',
   scope: './',
   display: 'standalone',
@@ -123,9 +127,10 @@ self.addEventListener('message', event => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// Several centres share this origin's cache storage — clear only this centre's old versions.
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('c-form-site-${center.id}-') && key !== CACHE_NAME).map(key => caches.delete(key))))
   );
   self.clients.claim();
 });
@@ -150,10 +155,22 @@ self.addEventListener('fetch', event => {
 });
 `;
 
-writeFileSync('site/index.html', html);
-writeFileSync('site/manifest.json', JSON.stringify(manifest, null, 2));
-writeFileSync('site/sw.js', serviceWorker);
-copyFileSync('assets/centers/yuying/icon-192.png', 'site/icons/icon-192.png');
-copyFileSync('assets/centers/yuying/icon-512.png', 'site/icons/icon-512.png');
+const dir = `site/${center.id}`;
+mkdirSync(`${dir}/icons`, { recursive: true });
+writeFileSync(`${dir}/index.html`, html);
+writeFileSync(`${dir}/manifest.json`, JSON.stringify(manifest, null, 2));
+writeFileSync(`${dir}/sw.js`, serviceWorker);
+copyFileSync(`assets/centers/${center.id}/icon-192.png`, `${dir}/icons/icon-192.png`);
+copyFileSync(`assets/centers/${center.id}/icon-512.png`, `${dir}/icons/icon-512.png`);
 
-console.log('Built site/ (cache %s)', cacheName);
+console.log('Built site/%s/ (cache %s)', center.id, cacheName);
+}
+
+for (const center of CENTERS) await buildCenter(center);
+
+// The old URL: 育英 lived at the site root before every centre got its own folder.
+const rootHtml = rootIndexHtml('yuying');
+const rootCache = `c-form-root-${createHash('sha256').update(rootHtml).digest('hex').slice(0, 12)}`;
+writeFileSync('site/index.html', rootHtml);
+writeFileSync('site/sw.js', rootServiceWorker(rootCache));
+console.log('Built site/ move notice (cache %s)', rootCache);
