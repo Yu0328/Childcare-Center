@@ -36,6 +36,7 @@ describe('centers', () => {
       }
       expect(existsSync(`assets/centers/${c.id}/icon-192.png`)).toBe(true);
       expect(existsSync(`assets/centers/${c.id}/icon-512.png`)).toBe(true);
+      expect(existsSync(`assets/centers/${c.id}/apple-touch-icon.png`)).toBe(true);
       expect(existsSync(`assets/centers/${c.id}/word-badge.png`)).toBe(true);
     }
   });

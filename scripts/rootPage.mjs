@@ -69,7 +69,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 export function rootServiceWorker(cacheName, targetId) {
   return `const CACHE_NAME = '${cacheName}';
 const ASSETS = ['./', './index.html'];
-const TARGET_ASSETS = ['${targetId}/', '${targetId}/index.html', '${targetId}/manifest.json', '${targetId}/icons/icon-192.png', '${targetId}/icons/icon-512.png'];
+const TARGET_ASSETS = ['${targetId}/', '${targetId}/index.html', '${targetId}/manifest.json', '${targetId}/icons/icon-192.png', '${targetId}/icons/icon-512.png', '${targetId}/icons/apple-touch-icon.png'];
 const PAGES = ASSETS.map(path => new URL(path, self.location).pathname);
 const TARGET_PATHS = TARGET_ASSETS.map(path => new URL(path, self.location).pathname);
 

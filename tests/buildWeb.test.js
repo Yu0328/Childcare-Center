@@ -20,6 +20,9 @@ describe('build-web', () => {
       expect(manifest.short_name).toBe(c.shortName);
       expect(manifest.scope).toBe('./');
       expect(existsSync(`site/${c.id}/icons/icon-512.png`)).toBe(true);
+      // iPhone rounds its home-screen icon itself and fills transparent corners black, so it gets a square one.
+      expect(html).toContain('<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">');
+      expect(existsSync(`site/${c.id}/icons/apple-touch-icon.png`)).toBe(true);
       expect(html).toContain(readFileSync(`assets/centers/${c.id}/word-badge.png`).toString('base64'));
     }
   });

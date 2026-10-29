@@ -83,7 +83,7 @@ const html = `<!DOCTYPE html>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' '${scriptHash}' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com https://www.youtube-nocookie.com; base-uri 'none'; form-action 'none';">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="${center.shortName}">
 <title>${center.title}</title>
 <style>
@@ -118,7 +118,7 @@ const manifest = {
 };
 
 const serviceWorker = `const CACHE_NAME = '${cacheName}';
-const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', event => {
   // cache: 'reload' skips the HTTP cache (Pages sends max-age=600) so precache never stores a stale copy.
@@ -166,6 +166,9 @@ writeFileSync(`${dir}/manifest.json`, JSON.stringify(manifest, null, 2));
 writeFileSync(`${dir}/sw.js`, serviceWorker);
 copyFileSync(`assets/centers/${center.id}/icon-192.png`, `${dir}/icons/icon-192.png`);
 copyFileSync(`assets/centers/${center.id}/icon-512.png`, `${dir}/icons/icon-512.png`);
+// Square on purpose: iPhone rounds its home-screen icon itself and would fill icon-192/512's
+// transparent rounded corners with black.
+copyFileSync(`assets/centers/${center.id}/apple-touch-icon.png`, `${dir}/icons/apple-touch-icon.png`);
 
 console.log('Built site/%s/ (cache %s)', center.id, cacheName);
 }
