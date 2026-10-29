@@ -118,7 +118,8 @@ const serviceWorker = `const CACHE_NAME = '${cacheName}';
 const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+  // cache: 'reload' skips the HTTP cache (Pages sends max-age=600) so precache never stores a stale copy.
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' })))));
 });
 
 // A new version waits until the page says it's a safe moment (src/pwa/updatePrompt.js) instead of
@@ -172,5 +173,5 @@ for (const center of CENTERS) await buildCenter(center);
 const rootHtml = rootIndexHtml('yuying');
 const rootCache = `c-form-root-${createHash('sha256').update(rootHtml).digest('hex').slice(0, 12)}`;
 writeFileSync('site/index.html', rootHtml);
-writeFileSync('site/sw.js', rootServiceWorker(rootCache));
+writeFileSync('site/sw.js', rootServiceWorker(rootCache, 'yuying'));
 console.log('Built site/ move notice (cache %s)', rootCache);

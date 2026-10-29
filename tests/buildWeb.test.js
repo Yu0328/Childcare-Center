@@ -28,6 +28,7 @@ describe('build-web', () => {
       const sw = readFileSync(`site/${c.id}/sw.js`, 'utf-8');
       expect(sw).toMatch(new RegExp(`const CACHE_NAME = 'c-form-site-${c.id}-[0-9a-f]{12}'`));
       expect(sw).toContain(`key.startsWith('c-form-site-${c.id}-')`);
+      expect(sw).toContain("cache: 'reload'");
     }
   });
 
@@ -38,5 +39,9 @@ describe('build-web', () => {
     const sw = readFileSync('site/sw.js', 'utf-8');
     expect(sw).toMatch(/const CACHE_NAME = 'c-form-root-[0-9a-f]{12}'/);
     expect(sw).toContain("key.startsWith('c-form-cache-')");
+    // Opens offline before yuying's own service worker ever installed, and never stores a stale HTTP-cache copy.
+    expect(sw).toContain("'yuying/index.html'");
+    expect(sw).toContain("'yuying/icons/icon-512.png'");
+    expect(sw).toContain("cache: 'reload'");
   });
 });

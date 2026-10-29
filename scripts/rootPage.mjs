@@ -63,14 +63,20 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 // Replaces the pre-move service worker at the old URL. It waits for SKIP_WAITING like every
 // centre's does, so a teacher's open old copy only switches over at a safe moment
 // (src/pwa/updatePrompt.js) — then reloads into the notice above. It answers only for this page:
-// requests under a centre's folder belong to that folder's own service worker.
-export function rootServiceWorker(cacheName) {
+// requests under a centre's folder belong to that folder's own service worker — except that it also
+// precaches the target centre's page, so the first open after the move works offline before that
+// centre's own worker has ever installed (the app's JS and CSS are inline in index.html).
+export function rootServiceWorker(cacheName, targetId) {
   return `const CACHE_NAME = '${cacheName}';
 const ASSETS = ['./', './index.html'];
+const TARGET_ASSETS = ['${targetId}/', '${targetId}/index.html', '${targetId}/manifest.json', '${targetId}/icons/icon-192.png', '${targetId}/icons/icon-512.png'];
 const PAGES = ASSETS.map(path => new URL(path, self.location).pathname);
+const TARGET_PATHS = TARGET_ASSETS.map(path => new URL(path, self.location).pathname);
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+  // cache: 'reload' skips the HTTP cache (Pages sends max-age=600) so precache never stores a stale copy.
+  event.waitUntil(caches.open(CACHE_NAME).then(cache =>
+    cache.addAll([...ASSETS, ...TARGET_ASSETS].map(url => new Request(url, { cache: 'reload' })))));
 });
 
 self.addEventListener('message', event => {
@@ -89,7 +95,14 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin || !PAGES.includes(url.pathname)) return;
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Once the centre's own worker is installed it controls its folder (narrower scope wins), so the
+  // root worker only sees these requests before that. It keeps no fresh copy of them: that worker owns them.
+  if (TARGET_PATHS.includes(url.pathname)) {
+    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+    return;
+  }
+  if (!PAGES.includes(url.pathname)) return;
   event.respondWith(
     fetch(event.request)
       .then(response => {

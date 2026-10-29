@@ -98,3 +98,4 @@ export const CENTER = CENTERS.find(c => c.id === (typeof __CENTER_ID__ === 'unde
 1. `src/centers.js` 加一組設定。
 2. `assets/centers/<id>/` 放兩張正方形 logo（192、512）。
 3. 推上 `main`，網址就是 `/Childcare-Center/<id>/`。
+4. Word 匯出的頁首徽章（`src/export/docxShared.js` 的 `HEADER_ICON_BASE64`）目前仍是育英寫死的圖；第一間別的公托上線前，必須先改成每間公托各用自己的。
