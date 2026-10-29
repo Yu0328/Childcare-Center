@@ -96,6 +96,10 @@ export const CENTER = CENTERS.find(c => c.id === (typeof __CENTER_ID__ === 'unde
 
 ## 之後新增一間公托
 1. `src/centers.js` 加一組設定。
-2. `assets/centers/<id>/` 放兩張正方形 logo（192、512）。
+2. `assets/centers/<id>/` 放三張圖：方形 `icon-192.png`、`icon-512.png`（填表系統頂端與主畫面 App），以及圓形 `word-badge.png`（四角透明，Word 匯出頁首用；建置時以 `__CENTER_BADGE__` 傳入 `src/export/docxShared.js`）。原始圖只有方形時，從中間切正方形再切圓即可。
 3. 推上 `main`，網址就是 `/Childcare-Center/<id>/`。
-4. Word 匯出的頁首徽章（`src/export/docxShared.js` 的 `HEADER_ICON_BASE64`）目前仍是育英寫死的圖；第一間別的公托上線前，必須先改成每間公托各用自己的。
+
+## 2026-10-29 補充：第一批三間
+- 萬丹 `wandan`、公正 `gongzheng`、岡山壽天 `shoutian`。主畫面名稱取短名（「壽天公托填表」，避免 iPhone 截字）。
+- 月計畫那行：萬丹、公正比照育英（機構名稱＋「-屏東縣政府委託中華頭心手希望教育協會辦理」）；壽天是「高雄市政府社會局委託高雄市嬰幼兒托育協會辦理高雄市岡山壽天公共托嬰中心」。
+- 圖：育英 App 圖示改成方形，Word 徽章維持原本的圓形圖（逐位元相同）；萬丹的 Word 徽章把圖縮小一點再切圓，以免小櫻桃被切到；公正還沒有 logo，先用建築照片。

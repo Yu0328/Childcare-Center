@@ -26,7 +26,10 @@ const result = await esbuild.build({
   // Phones download this on first open and on every update; minified it's well under half the size.
   minify: true,
   target: ['chrome100', 'safari15'],
-  define: { __CENTER_ID__: JSON.stringify(center.id) },
+  define: {
+    __CENTER_ID__: JSON.stringify(center.id),
+    __CENTER_BADGE__: JSON.stringify(readFileSync(`assets/centers/${center.id}/word-badge.png`).toString('base64')),
+  },
 });
 
 const js = result.outputFiles[0].text;

@@ -20,6 +20,7 @@ describe('build-web', () => {
       expect(manifest.short_name).toBe(c.shortName);
       expect(manifest.scope).toBe('./');
       expect(existsSync(`site/${c.id}/icons/icon-512.png`)).toBe(true);
+      expect(html).toContain(readFileSync(`assets/centers/${c.id}/word-badge.png`).toString('base64'));
     }
   });
 

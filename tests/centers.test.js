@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { CENTERS, CENTER } from '../src/centers.js';
 import { DB_NAME } from '../src/storage/dbCore.js';
 import { SYNC_MODE_KEY, SYNC_NAME_KEY, RELOAD_TOKEN_KEY } from '../src/sync/googleAuth.js';
 import { SYNC_FOLDER_KEY } from '../src/storage/syncStateDb.js';
 import { FOLDER_NAME } from '../src/sync/driveClient.js';
+import { HEADER_ICON_BASE64 } from '../src/export/docxShared.js';
 
 describe('centers', () => {
   it('defaults to 育英 when no build passes __CENTER_ID__ (offline build, tests)', () => {
@@ -35,6 +36,7 @@ describe('centers', () => {
       }
       expect(existsSync(`assets/centers/${c.id}/icon-192.png`)).toBe(true);
       expect(existsSync(`assets/centers/${c.id}/icon-512.png`)).toBe(true);
+      expect(existsSync(`assets/centers/${c.id}/word-badge.png`)).toBe(true);
     }
   });
 });
@@ -47,5 +49,11 @@ describe('storage names read from CENTER', () => {
     expect(RELOAD_TOKEN_KEY).toBe('c-form-reload-token');
     expect(SYNC_FOLDER_KEY).toBe('c-form-sync-folder-id');
     expect(FOLDER_NAME).toBe('育英公托填表系統');
+  });
+});
+
+describe('Word header badge', () => {
+  it("is 育英's original round badge when no build passes one (offline build, tests)", () => {
+    expect(readFileSync('assets/centers/yuying/word-badge.png').toString('base64')).toBe(HEADER_ICON_BASE64);
   });
 });
