@@ -4,11 +4,12 @@
 // has the device, and a Drive-scoped token is worth far more than the local copy of the data.
 // The one exception is the silent auto-update's reload — see stashForReload.
 import { AuthExpiredError } from './driveClient.js';
+import { CENTER } from '../centers.js';
 
 export const SCOPES = 'openid profile https://www.googleapis.com/auth/drive.file';
-export const SYNC_MODE_KEY = 'c-form-sync-mode';
-export const SYNC_NAME_KEY = 'c-form-sync-name';
-export const RELOAD_TOKEN_KEY = 'c-form-reload-token';
+export const SYNC_MODE_KEY = `${CENTER.storagePrefix}-sync-mode`;
+export const SYNC_NAME_KEY = `${CENTER.storagePrefix}-sync-name`;
+export const RELOAD_TOKEN_KEY = `${CENTER.storagePrefix}-reload-token`;
 const HANDOVER_MIN_LEFT_MS = 5 * 60000;
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';

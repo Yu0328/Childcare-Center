@@ -11,10 +11,12 @@ import {
   textParagraph, textParagraphs, emptyParagraph, headerIconRunBehindText, toRocDate,
 } from './docxShared.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { CENTER } from '../centers.js';
 
 // This document type ("每月課程計畫表" / "每月嬰幼兒適性發展紀錄表") is issued under a different
 // institution name than 適性總表's C表 sample — copied verbatim from the real reference PDF header.
-const INSTITUTION_NAME = '屏東縣內埔鄉育英公設民營托嬰中心';
+// Per 公托, from src/centers.js.
+const INSTITUTION_NAME = CENTER.institution;
 
 // Page margins in twips, copied from the real reference sample's <w:pgMar> — narrower and uniform
 // on all four sides, unlike 適性總表's C表 margins. Do not reuse docxExport.js's PAGE_MARGIN.

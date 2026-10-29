@@ -1,7 +1,8 @@
+import { CENTER } from '../centers.js';
 // A plain, visible folder in My Drive rather than appDataFolder: the design asks for a folder the
 // teacher can open in the Drive web UI and copy for herself. The drive.file scope still limits
 // this app to files it created, so nothing else in her Drive is reachable.
-export const FOLDER_NAME = '育英公托填表系統';
+export const FOLDER_NAME = CENTER.driveFolderName;
 export const MANIFEST_NAME = 'sync-manifest.json';
 export const FORMAT_VERSION = 1;
 // Google's per-user Drive API quota has plenty of headroom above this; concurrency is bounded by

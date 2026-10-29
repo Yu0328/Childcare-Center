@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync } from 'node:fs';
 import { CENTERS, CENTER } from '../src/centers.js';
+import { DB_NAME } from '../src/storage/dbCore.js';
+import { SYNC_MODE_KEY, SYNC_NAME_KEY, RELOAD_TOKEN_KEY } from '../src/sync/googleAuth.js';
+import { SYNC_FOLDER_KEY } from '../src/storage/syncStateDb.js';
+import { FOLDER_NAME } from '../src/sync/driveClient.js';
 
 describe('centers', () => {
   it('defaults to 育英 when no build passes __CENTER_ID__ (offline build, tests)', () => {
@@ -32,5 +36,16 @@ describe('centers', () => {
       expect(existsSync(`assets/centers/${c.id}/icon-192.png`)).toBe(true);
       expect(existsSync(`assets/centers/${c.id}/icon-512.png`)).toBe(true);
     }
+  });
+});
+
+describe('storage names read from CENTER', () => {
+  it('resolve to the exact pre-move names for 育英', () => {
+    expect(DB_NAME).toBe('c-form-db');
+    expect(SYNC_MODE_KEY).toBe('c-form-sync-mode');
+    expect(SYNC_NAME_KEY).toBe('c-form-sync-name');
+    expect(RELOAD_TOKEN_KEY).toBe('c-form-reload-token');
+    expect(SYNC_FOLDER_KEY).toBe('c-form-sync-folder-id');
+    expect(FOLDER_NAME).toBe('育英公托填表系統');
   });
 });

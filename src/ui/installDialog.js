@@ -1,4 +1,5 @@
 import { lockBodyScroll, unlockBodyScroll, closeOnBackdropClick } from './formPopup.js';
+import { CENTER } from '../centers.js';
 import { mountDemo } from './helpDemo.js';
 import { INSTALL_IPHONE_DEMO } from './helpContent.js';
 
@@ -15,7 +16,7 @@ export function openInstallDialog({ kind, guest, device, onInstall, lineUrl }) {
     <button type="button" class="form-popup__close" data-action="close-form-popup" aria-label="關閉">×</button>
     <div class="entry-form install-dialog__body">
       <h3 class="install-dialog__title">安裝到主畫面</h3>
-      <p>安裝後，育英公托填表系統會像一般 App 一樣出現在${onPhone ? '手機主畫面' : '電腦桌面'}。點圖示就能直接打開，不用再開瀏覽器找網址，畫面也會${onPhone ? '用滿整個螢幕' : '比較大'}，填表時看得更清楚。</p>
+      <p>安裝後，${CENTER.title}會像一般 App 一樣出現在${onPhone ? '手機主畫面' : '電腦桌面'}。點圖示就能直接打開，不用再開瀏覽器找網址，畫面也會${onPhone ? '用滿整個螢幕' : '比較大'}，填表時看得更清楚。</p>
       <p>這不是${STORE[device]}的程式，而是把這個網站加到${onPhone ? '主畫面' : '電腦'}上。它幾乎不佔空間，也不會要求任何額外的權限。</p>
       ${kind === 'ios'
         ? `<p class="install-dialog__note">${guest

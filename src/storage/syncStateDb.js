@@ -1,4 +1,5 @@
 import { runRequest } from './dbCore.js';
+import { CENTER } from '../centers.js';
 
 // One syncState row per synced thing, keyed by uid: { uid, store, hash, fileId, syncedAt }.
 // `hash` is the content hash of the version both sides agreed on at the last successful sync —
@@ -46,7 +47,7 @@ export async function purgeExpiredTombstones(nowMs) {
 
 // Every syncState row describes agreement with one specific cloud folder. Kept in localStorage
 // (not the syncState store) so readSyncState's "empty means first sync" check stays exact.
-const SYNC_FOLDER_KEY = 'c-form-sync-folder-id';
+export const SYNC_FOLDER_KEY = `${CENTER.storagePrefix}-sync-folder-id`;
 
 // A different folder than last time — another Google account signed in on this device, or the
 // folder was deleted from Drive and recreated — makes every stored base meaningless. Keeping them

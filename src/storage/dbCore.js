@@ -1,4 +1,6 @@
-export const DB_NAME = 'c-form-db';
+import { CENTER } from '../centers.js';
+
+export const DB_NAME = CENTER.dbName;
 export const DB_VERSION = 4;
 
 export function openDatabase() {

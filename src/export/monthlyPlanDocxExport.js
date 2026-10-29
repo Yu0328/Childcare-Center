@@ -8,6 +8,7 @@ import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.
 import { parsePeriod } from '../ui/periodFields.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
 import { itemVisibleToChild } from '../storage/monthlyPlanDb.js';
+import { CENTER } from '../centers.js';
 
 // This document's local textParagraph-equivalent helpers are kept separate from docxShared.js's
 // (rather than importing those directly) purely because this file's cell-shading/border logic
@@ -20,8 +21,8 @@ const PAGE_MARGIN = { top: 1134, right: 567, bottom: 1134, left: 567, header: 68
 
 // The real sample's header carries this full institution + commissioning-agency line, longer than
 // parentReportDocxExport.js's INSTITUTION_NAME — a different (longer) string for this document
-// type, not a typo of that one.
-const INSTITUTION_NAME = '屏東縣內埔鄉育英公設民營托嬰中心-屏東縣政府委託中華頭心手希望教育協會辦理';
+// type, not a typo of that one. Per 公托, from src/centers.js.
+const INSTITUTION_NAME = CENTER.monthlyPlanInstitution;
 
 // Title size in half-points: 32 = 16pt, copied from the real sample's <w:sz w:val="32"/> on the
 // "{period}課程計畫" title run (適性總表 uses 34, 適性紀錄 uses 36 — different documents,
@@ -77,6 +78,7 @@ const CONTENT_CELL_SHADING = { type: ShadingType.CLEAR, color: 'auto', fill: 'FF
 // true left margin; the offset's magnitude is reduced accordingly so the icon doesn't overlap the
 // text. Best-effort estimate — not visually verified in real Word, since this environment has no
 // way to render/screenshot docx output. Confirm and re-tune against an actual export if it's off.
+// (育英's length; another centre's may sit differently.)
 const HEADER_ICON_OFFSET_EMU = { horizontal: 60000, vertical: -40000 };
 
 const WEEKDAYS = [1, 2, 3, 4, 5];

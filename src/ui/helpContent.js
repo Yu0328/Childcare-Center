@@ -8,6 +8,7 @@ import {
   group, main, aside, fab, card, modal, confirmBox, toast, file, download, menu,
 } from './helpMiniScreens.js';
 import { TYPE_SELECT_ICONS, UTIL_ICONS } from './reportTypeSelectView.js';
+import { CENTER } from '../centers.js';
 
 const svg = paths =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -23,7 +24,7 @@ const chip = (label, kind) => `<span class="help-chip${kind ? ` help-chip--${kin
 
 /* ---------- screens shared by several demos ---------- */
 
-const APP_NAME = '屏東縣內埔鄉育英公托填表系統';
+const APP_NAME = CENTER.title;
 // `install`: the 加入主畫面／安裝 button's label, drawn only in the install demos.
 const appTop = ({ hitName = false, hitBackup = false, install = '', hitInstall = false, menuItems = null } = {}) =>
   `<div class="ms-apptop"><b${hitName ? ' data-hit' : ''}><span>${APP_NAME}</span></b>${install ? btn(install, 'header', hitInstall) : ''}${btn('備份 ▾', 'header', hitBackup)}</div>${
@@ -98,7 +99,7 @@ const pageInside = (top = {}) => `<div class="ms-page">${homeScreen('', top)}</d
 const installDialog = () => modal('安裝到主畫面', muted('點圖示就能直接打開，畫面也比較大'), btn('取消') + btn('立即安裝', 'primary', true));
 const osHome = m =>
   screen(
-    `<div class="ms-os${m === 'desk' ? ' ms-os--desk' : ''}">${'<span></span>'.repeat(m === 'desk' ? 3 : 7)}<span class="ms-os__app ms-fill"><i></i>育英公托填表</span></div>`
+    `<div class="ms-os${m === 'desk' ? ' ms-os--desk' : ''}">${'<span></span>'.repeat(m === 'desk' ? 3 : 7)}<span class="ms-os__app ms-fill"><i></i>${CENTER.shortName}</span></div>`
   );
 
 // Also played inside the header's 安裝 popup on an iPhone (src/ui/installDialog.js), so these
@@ -117,14 +118,14 @@ export const INSTALL_IPHONE_DEMO = {
     },
     { cap: '往下滑，點「加入主畫面」（前面是一個方框裡有＋的圖示）', draw: () => safari(pageInside(), { sheet: iosShareSheet() }) },
     {
-      cap: '名稱會自動填好「育英公托填表」，確認「以網頁 App 打開」是開著的，點右上角的「加入」',
+      cap: `名稱會自動填好「${CENTER.shortName}」，確認「以網頁 App 打開」是開著的，點右上角的「加入」`,
       draw: () =>
         screen(
           `<div class="ms-bar"><span class="ms-back">取消</span><b class="ms-title">加入主畫面</b><span class="ms-actions">${btn('加入', 'link', true)}</span></div>`,
-          `<div class="ms-form">${field('名稱', '育英公托填表')}<span class="ms-toggle on">以網頁 App 打開<i></i></span></div>`
+          `<div class="ms-form">${field('名稱', CENTER.shortName)}<span class="ms-toggle on">以網頁 App 打開<i></i></span></div>`
         ),
     },
-    { cap: '回到手機主畫面，之後點育英公托的圖示就能打開', draw: () => osHome('phone') },
+    { cap: `回到手機主畫面，之後點「${CENTER.shortName}」的圖示就能打開`, draw: () => osHome('phone') },
   ],
 };
 
@@ -157,7 +158,7 @@ const START = {
       steps: [
         { cap: '用 Chrome 打開系統，按上方的「安裝」', draw: () => chromePhone(pageInside({ install: '安裝', hitInstall: true })) },
         { cap: '看完說明，按「立即安裝」', draw: () => chromePhone(pageInside({ install: '安裝' }), { sheet: installDialog() }) },
-        { cap: '按「安裝」', draw: () => chromePhone(pageInside(), { sheet: modal('加到主畫面', muted('育英公托填表'), btn('安裝', 'primary', true)) }) },
+        { cap: '按「安裝」', draw: () => chromePhone(pageInside(), { sheet: modal('加到主畫面', muted(CENTER.shortName), btn('安裝', 'primary', true)) }) },
         { cap: '主畫面多了一個圖示，之後按它就能打開', draw: () => osHome('phone') },
       ],
     },
@@ -170,7 +171,7 @@ const START = {
       steps: [
         { cap: '用 Chrome 打開系統，按上方的「加入主畫面」', draw: () => chromeDesk(pageInside({ install: '加入主畫面', hitInstall: true })) },
         { cap: '看完說明，按「立即安裝」', draw: () => chromeDesk(pageInside({ install: '加入主畫面' }), { menus: installDialog() }) },
-        { cap: '按「安裝」', draw: () => chromeDesk(pageInside(), { menus: modal('要安裝應用程式嗎？', muted('育英公托填表'), btn('取消') + btn('安裝', 'primary', true)) }) },
+        { cap: '按「安裝」', draw: () => chromeDesk(pageInside(), { menus: modal('要安裝應用程式嗎？', muted(CENTER.shortName), btn('取消') + btn('安裝', 'primary', true)) }) },
         { cap: '桌面和開始功能表多了一個圖示，之後按它就能打開', draw: () => osHome('desk') },
       ],
     },
