@@ -1,6 +1,8 @@
 import { getOrCreatePlanSlot, listPlanSlotItems, addPlanSlotItem } from '../storage/monthlyPlanDb.js';
+import { CENTER } from '../centers.js';
 
-const DEFAULTS = [
+// A centre can name its own fixed days (src/centers.js `monthlyPlanDefaults`); Wed/Thu stay open for 適性.
+const DEFAULTS = CENTER.monthlyPlanDefaults ?? [
   [1, '大團體活動'],
   [2, '節氣'],
   [5, '大團體活動'],

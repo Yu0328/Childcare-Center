@@ -22,6 +22,9 @@ export const CENTERS = [
     shortName: '萬丹公托填表',
     institution: '屏東縣萬丹鄉公設民營托嬰中心',
     monthlyPlanInstitution: '屏東縣萬丹鄉公設民營托嬰中心-屏東縣政府委託中華頭心手希望教育協會辦理',
+    // 月計畫's pre-filled days ([weekday, activity]); without this a centre gets 育英's
+    // 大團體活動 (Mon, Fri) and 節氣 (Tue) — see src/domain/monthlyCoursePlan.js.
+    monthlyPlanDefaults: [[1, '戶外活動日'], [2, '節氣'], [5, '團體課']],
     driveFolderName: '屏東縣萬丹鄉公托填表系統',
     dbName: 'c-form-wandan-db',
     storagePrefix: 'c-form-wandan',
