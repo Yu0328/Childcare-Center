@@ -38,3 +38,18 @@ describe('findTodayWords', () => {
     ]);
   });
 });
+
+describe('findTodayWords：點滴分享分開描述', () => {
+  it('一段一段找，標出是哪幾張照片的說明', () => {
+    const hits = findTodayWords({
+      ...empty,
+      highlightEntries: [{
+        id: 'h1', photos: [{}, {}, {}], caption: '蓋城堡\n今天去公園',
+        captionGroups: [{ size: 2, text: '蓋城堡' }, { size: 1, text: '今天去公園' }],
+      }],
+    });
+    expect(hits).toEqual([
+      { kind: 'highlightPart', id: 'h1', partIndex: 1, label: '點滴分享｜照片說明（第 3 張）', text: '今天去公園' },
+    ]);
+  });
+});

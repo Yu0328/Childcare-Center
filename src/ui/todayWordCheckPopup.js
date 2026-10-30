@@ -2,7 +2,7 @@ import { escapeHtml } from './escapeHtml.js';
 import { oneAtATime } from './oneAtATime.js';
 import { lockBodyScroll, unlockBodyScroll, closeOnBackdropClick } from './formPopup.js';
 import {
-  updateCourseOccurrence, updateDevelopmentRecordEntry, updateBehaviorObservation, updateHighlightEntry,
+  updateCourseOccurrence, updateDevelopmentRecordEntry, updateBehaviorObservation, updateHighlightEntry, updateHighlightCaptionPart,
 } from '../storage/parentReportDb.js';
 import { TODAY_WORDS } from '../domain/findTodayWords.js';
 
@@ -12,6 +12,7 @@ const SAVE = {
   observationTitle: (id, text) => updateBehaviorObservation(id, { title: text }),
   observationNarrative: (id, text) => updateBehaviorObservation(id, { narrative: text }),
   highlight: (id, text) => updateHighlightEntry(id, { caption: text }),
+  highlightPart: (id, text, hit) => updateHighlightCaptionPart(id, hit.partIndex, text),
 };
 
 const TODAY_WORD_PATTERN = new RegExp(TODAY_WORDS.join('|'), 'g');
@@ -61,7 +62,7 @@ export function openTodayWordCheck(hits) {
       try {
         for (const field of dialog.querySelectorAll('[data-today-field]')) {
           const hit = hits[Number(field.dataset.todayField)];
-          if (field.value !== hit.text) await SAVE[hit.kind](hit.id, field.value);
+          if (field.value !== hit.text) await SAVE[hit.kind](hit.id, field.value, hit);
         }
       } catch {
         dialog.querySelector('[data-error]').textContent = '儲存失敗，請再試一次';

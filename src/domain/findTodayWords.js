@@ -1,5 +1,6 @@
 import { DOMAINS } from '../data/indicators.js';
 import { toRocDate } from '../export/docxShared.js';
+import { validCaptionGroups, groupPhotoLabels } from './highlightCaptions.js';
 
 // Words a parent reading the exported file at month's end can't pin to a date — see
 // docs/superpowers/specs/2026-10-04-today-word-check-design.md.
@@ -25,7 +26,18 @@ export function findTodayWords({
     add('observationNarrative', observation.id, `行為觀察｜${observation.title}｜內容`, observation.narrative);
   }
   for (const highlight of highlightEntries) {
-    add('highlight', highlight.id, '點滴分享｜照片說明', highlight.caption);
+    const groups = validCaptionGroups(highlight);
+    if (!groups) {
+      add('highlight', highlight.id, '點滴分享｜照片說明', highlight.caption);
+      continue;
+    }
+    // 分開描述: each part is its own field, named by its photos.
+    const labels = groupPhotoLabels(groups.map(g => g.size));
+    groups.forEach((group, partIndex) => {
+      if (hasTodayWord(group.text)) {
+        hits.push({ kind: 'highlightPart', id: highlight.id, partIndex, label: `點滴分享｜照片說明（${labels[partIndex]}）`, text: group.text });
+      }
+    });
   }
   return hits;
 }

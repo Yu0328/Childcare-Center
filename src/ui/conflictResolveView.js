@@ -20,11 +20,15 @@ const FIELD_LABELS = {
   name: '姓名', birthDate: '出生日期', tier: '月齡階段', period: '紀錄年月',
   indicatorCode: '指標代碼', activityName: '活動名稱', indicatorText: '指標內容',
   date: '日期', status: '狀態', note: '備註', narrative: '文字紀錄', domain: '領域',
-  title: '標題', caption: '描述', photos: '照片', replacementText: '替代活動',
+  title: '標題', caption: '描述', captionGroups: '分開描述', photos: '照片', replacementText: '替代活動',
 };
 
 function valueText(value) {
   if (value === undefined || value === null || value === '') return '（空白）';
+  // 點滴分享's 分開描述: the parts' own words say more than a count would.
+  if (Array.isArray(value) && value.length && value.every(v => v && typeof v.text === 'string')) {
+    return value.map(v => v.text).join(' ／ ');
+  }
   if (Array.isArray(value)) return `${value.length} 項`;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);

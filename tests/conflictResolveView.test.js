@@ -25,6 +25,23 @@ describe('renderConflictResolveView', () => {
     expect(container.querySelector('[data-choice="both"][data-uid="u1"]')).toBeTruthy();
   });
 
+  it('點滴分享的分開描述顯示每一段的文字，不是「2 項」', () => {
+    renderConflictResolveView(container, {
+      conflicts: [{
+        uid: 'h1', store: 'highlightEntries',
+        fields: [{
+          field: 'captionGroups',
+          local: [{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }],
+          cloud: [{ size: 1, text: '第一張' }, { size: 2, text: '後兩張' }],
+        }],
+        localPayload: {}, cloudPayload: {},
+      }],
+    });
+    expect(container.textContent).toContain('分開描述');
+    expect(container.textContent).toContain('前兩張 ／ 第三張');
+    expect(container.textContent).toContain('第一張 ／ 後兩張');
+  });
+
   it('資料表與欄位名稱用中文顯示', () => {
     renderConflictResolveView(container, { conflicts });
     expect(container.textContent).toContain('行為觀察');
