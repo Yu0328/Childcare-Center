@@ -34,6 +34,9 @@ import {
   listHighlightEntriesForReport,
   updateHighlightEntry,
   deleteHighlightEntry,
+  saveHighlightEdit,
+  updateHighlightCaptionPart,
+  removeHighlightPhoto,
 } from '../src/storage/parentReportDb.js';
 
 describe('parentReportDb: ParentReport', () => {
@@ -299,5 +302,66 @@ describe('parentReportDb: DevelopmentRecordEntry, BehaviorObservationEntry, High
     expect(entry.caption).toBe('兩張照片');
 
     vi.restoreAllMocks();
+  });
+
+  describe('分開描述', () => {
+    const photo = name => ({ blob: new Blob([name], { type: 'image/jpeg' }), width: 10, height: 10, photoUid: name });
+    const split = [{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }];
+    const stored = id => runRequest('highlightEntries', 'readonly', store => store.get(id));
+
+    it('只有分開描述時才存 captionGroups，一段描述的不會多一個欄位', async () => {
+      const one = await addHighlightEntry({ reportId: report.id, photos: [photo('a')], caption: '一段' });
+      const two = await addHighlightEntry({
+        reportId: report.id, photos: [photo('a'), photo('b'), photo('c')], caption: '前兩張\n第三張', captionGroups: split,
+      });
+      expect('captionGroups' in (await stored(one.id))).toBe(false);
+      expect((await stored(two.id)).captionGroups).toEqual(split);
+    });
+
+    it('編輯儲存：照片換成新順序，改回一段描述就拿掉 captionGroups', async () => {
+      const entry = await addHighlightEntry({
+        reportId: report.id, photos: [photo('a'), photo('b'), photo('c')], caption: '前兩張\n第三張', captionGroups: split,
+      });
+      await saveHighlightEdit(entry.id, { photoOrder: [2, 0, 1], fields: { caption: '合在一起' } });
+      const saved = await stored(entry.id);
+      expect(saved.photos.map(p => p.photoUid)).toEqual(['c', 'a', 'b']);
+      expect(saved.caption).toBe('合在一起');
+      expect('captionGroups' in saved).toBe(false);
+    });
+
+    it('編輯儲存：讀不出來、畫面上沒有的照片留在最後，不會被丟掉', async () => {
+      const entry = await addHighlightEntry({ reportId: report.id, photos: [photo('a'), photo('b'), photo('c')], caption: 'x' });
+      await saveHighlightEdit(entry.id, { photoOrder: [2, 0], fields: { caption: 'x' } });
+      expect((await stored(entry.id)).photos.map(p => p.photoUid)).toEqual(['c', 'a', 'b']);
+    });
+
+    it('改其中一段描述時，合起來的 caption 也跟著更新', async () => {
+      const entry = await addHighlightEntry({
+        reportId: report.id, photos: [photo('a'), photo('b'), photo('c')], caption: '前兩張\n第三張', captionGroups: split,
+      });
+      await updateHighlightCaptionPart(entry.id, 1, '改過的第三張');
+      const saved = await stored(entry.id);
+      expect(saved.captionGroups).toEqual([{ size: 2, text: '前兩張' }, { size: 1, text: '改過的第三張' }]);
+      expect(saved.caption).toBe('前兩張\n改過的第三張');
+    });
+
+    it('刪掉第三張照片：那一段的字併到前一段，只剩一段就變回一段描述', async () => {
+      const entry = await addHighlightEntry({
+        reportId: report.id, photos: [photo('a'), photo('b'), photo('c')], caption: '前兩張\n第三張', captionGroups: split,
+      });
+      await removeHighlightPhoto(entry.id, 2);
+      const saved = await stored(entry.id);
+      expect(saved.photos.map(p => p.photoUid)).toEqual(['a', 'b']);
+      expect(saved.caption).toBe('前兩張\n第三張');
+      expect('captionGroups' in saved).toBe(false);
+    });
+
+    it('刪掉前兩張其中一張：那一組少一張，分開描述還在', async () => {
+      const entry = await addHighlightEntry({
+        reportId: report.id, photos: [photo('a'), photo('b'), photo('c')], caption: '前兩張\n第三張', captionGroups: split,
+      });
+      await removeHighlightPhoto(entry.id, 0);
+      expect((await stored(entry.id)).captionGroups).toEqual([{ size: 1, text: '前兩張' }, { size: 1, text: '第三張' }]);
+    });
   });
 });

@@ -141,6 +141,23 @@ describe('backup export/import', () => {
     expect(restoredHighlight.photos[0].width).toBe(100);
   });
 
+  it('點滴分享的分開描述備份還原後還在', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+    const photo = () => ({ blob: new Blob([new Uint8Array([1])], { type: 'image/jpeg' }), width: 1, height: 1 });
+    const captionGroups = [{ size: 1, text: '第一張' }, { size: 1, text: '第二張' }];
+    await addHighlightEntry({ reportId: report.id, photos: [photo(), photo()], caption: '第一張\n第二張', captionGroups });
+
+    const parts = await exportBackup();
+    await clearAllData();
+    await importBackup(parts.join(''));
+
+    const [restoredChild] = await listChildren();
+    const [restoredReport] = await listParentReportsForChild(restoredChild.id);
+    const [restoredHighlight] = await listHighlightEntriesForReport(restoredReport.id);
+    expect(restoredHighlight.captionGroups).toEqual(captionGroups);
+  });
+
   it('keeps each highlight entry as its own export part, so no single JSON.stringify call ever spans the whole photo payload', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });

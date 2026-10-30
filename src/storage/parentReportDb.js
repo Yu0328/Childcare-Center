@@ -1,4 +1,5 @@
 import { runRequest, addRecord, putRecord, deleteRecord, photoFromStored } from './dbCore.js';
+import { validCaptionGroups, captionFields, captionGroupsAfterRemovingPhoto } from '../domain/highlightCaptions.js';
 
 export async function addParentReport({ childId, tier, period, isNew = false, uid, updatedAt }) {
   const createdAt = new Date().toISOString();
@@ -141,13 +142,14 @@ export async function deleteBehaviorObservation(id) {
   await deleteRecord('behaviorObservations', id);
 }
 
-export async function addHighlightEntry({ reportId, photos, caption, uid, updatedAt, createdAt }) {
+export async function addHighlightEntry({ reportId, photos, caption, captionGroups, uid, updatedAt, createdAt }) {
   // A dedicated, never-touched-again field: updatedAt moves every time the caption is edited, so
   // it can't double as "which one was added first" — but sync order isn't the point here either.
   // The point is that this value travels with the record to every device via the normal sync
   // payload, so every device sorts by the same number and lands on the same order.
   return addRecord('highlightEntries', {
-    reportId, photos, caption, uid, updatedAt, createdAt: createdAt || new Date().toISOString(),
+    reportId, photos, caption, ...(captionGroups && { captionGroups }), uid, updatedAt,
+    createdAt: createdAt || new Date().toISOString(),
   });
 }
 
@@ -210,10 +212,49 @@ export async function updateHighlightEntry(id, changes) {
 
 // Removes one photo by its position in the STORED list. Writing back the displayed list instead
 // would also drop every photo that failed to read (hidden from the screen, still in the database).
-export async function removeHighlightPhoto(id, storedIndex) {
+// captionGroups is dropped, never nulled, when an entry goes back to one description — see
+// src/domain/highlightCaptions.js.
+function withCaptionFields(record, fields) {
+  const { captionGroups, ...rest } = record;
+  return { ...rest, ...fields };
+}
+
+async function getHighlightEntry(id) {
   const existing = await runRequest('highlightEntries', 'readonly', store => store.get(id));
   if (!existing) throw new Error(`HighlightEntry ${id} not found`);
-  return putRecord('highlightEntries', { ...existing, photos: existing.photos.filter((_, i) => i !== storedIndex), id });
+  return existing;
+}
+
+export async function removeHighlightPhoto(id, storedIndex) {
+  const existing = await getHighlightEntry(id);
+  const groups = validCaptionGroups(existing);
+  const record = { ...existing, photos: existing.photos.filter((_, i) => i !== storedIndex), id };
+  return putRecord(
+    'highlightEntries',
+    groups ? withCaptionFields(record, captionFields(captionGroupsAfterRemovingPhoto(groups, storedIndex))) : record
+  );
+}
+
+// The 編輯 form's 儲存: photos in their dragged order (photoOrder holds stored indexes) plus the
+// descriptions from captionFields(). A stored photo the form never showed (unreadable on this
+// device) stays, after the others, rather than being dropped.
+export async function saveHighlightEdit(id, { photoOrder, fields }) {
+  const existing = await getHighlightEntry(id);
+  const photos = [
+    ...photoOrder.map(i => existing.photos[i]),
+    ...existing.photos.filter((_, i) => !photoOrder.includes(i)),
+  ];
+  return putRecord('highlightEntries', withCaptionFields({ ...existing, photos, id }, fields));
+}
+
+// The 今天 check rewording one part of a split description; caption follows along.
+export async function updateHighlightCaptionPart(id, partIndex, text) {
+  const existing = await getHighlightEntry(id);
+  const groups = validCaptionGroups(existing);
+  const fields = groups
+    ? captionFields(groups.map((g, i) => (i === partIndex ? { ...g, text } : g)))
+    : { caption: text };
+  return putRecord('highlightEntries', withCaptionFields({ ...existing, id }, fields));
 }
 
 export async function deleteHighlightEntry(id) {

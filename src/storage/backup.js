@@ -277,7 +277,7 @@ async function importParentReports(data, childIdMap) {
       height: photo.height,
     }));
     await addHighlightEntry({
-      reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption,
+      reportId: reportIdMap.get(highlight.reportId), photos, caption: highlight.caption, captionGroups: highlight.captionGroups,
       uid: highlight.uid, updatedAt: highlight.updatedAt, createdAt: highlight.createdAt,
     });
   }
