@@ -233,9 +233,34 @@ export function extractHighlightPhotoGroups(highlightsTableXml) {
     const photoCount = (photoRow.match(/<w:drawing\s*\/>|<w:drawing>/g) || []).length;
     const embedIds = [...photoRow.matchAll(/<a:blip\b[^>]*\br:embed="([^"]+)"/g)].map(m => m[1]);
     const caption = linesOf(paragraphsOf(captionRow));
-    if (photoCount > 0 && caption) groups.push({ photoCount, embedIds, caption });
+    const captionGroups = captionGroupsOf(photoRow, captionRow);
+    if (photoCount > 0 && caption) groups.push({ photoCount, embedIds, caption, ...(captionGroups && { captionGroups }) });
   }
   return groups;
+}
+
+const gridSpanOf = cellXml => Number((/<w:gridSpan w:val="(\d+)"/.exec(cellXml) || [])[1] || 1);
+
+// A caption row this app split (分開描述) has one text cell per photo group, each spanning exactly
+// its photos' cells. Anything that doesn't line up that way reads as one caption, as before.
+function captionGroupsOf(photoRow, captionRow) {
+  const captionCells = cellsForRow(captionRow);
+  const photoCells = cellsForRow(photoRow);
+  if (captionCells.length < 2 || !photoCells.every(cell => /<w:drawing[\s/>]/.test(cell))) return undefined;
+  const groups = [];
+  let photoIndex = 0;
+  for (const cell of captionCells) {
+    const text = linesOf(paragraphsOf(cell));
+    let span = gridSpanOf(cell);
+    let size = 0;
+    while (span > 0 && photoIndex < photoCells.length) {
+      span -= gridSpanOf(photoCells[photoIndex++]);
+      size++;
+    }
+    if (span !== 0 || size === 0 || !text) return undefined;
+    groups.push({ size, text });
+  }
+  return photoIndex === photoCells.length ? groups : undefined;
 }
 
 // This document type's badge/logo images precede the body/highlight photos in the imageN numeric
@@ -464,14 +489,16 @@ export async function parseParentReportDocxImport(data) {
   const embeddedPhotos = await resolveEmbeddedPhotos(zip, photoGroups);
   let highlightEntries;
   if (embeddedPhotos) {
-    highlightEntries = photoGroups.map((group, i) => ({ photos: embeddedPhotos[i], caption: group.caption }));
+    highlightEntries = photoGroups.map((group, i) => ({
+      photos: embeddedPhotos[i], caption: group.caption, ...(group.captionGroups && { captionGroups: group.captionGroups }),
+    }));
   } else {
     const mediaImages = await extractSortedMediaImages(zip, documentXml);
     let mediaCursor = 0;
     highlightEntries = photoGroups.map(group => {
       const photos = mediaImages.slice(mediaCursor, mediaCursor + group.photoCount);
       mediaCursor += group.photoCount;
-      return { photos, caption: group.caption };
+      return { photos, caption: group.caption, ...(group.captionGroups && { captionGroups: group.captionGroups }) };
     });
     if (mediaImages.length > mediaCursor) {
       warnings.push('偵測到的照片數量多於點滴分享區塊，部分照片可能未正確歸類，請於預覽畫面確認');

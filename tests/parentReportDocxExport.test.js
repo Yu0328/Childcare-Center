@@ -341,6 +341,17 @@ describe('buildHighlightsTable', () => {
       expect(spansOf(two)).toEqual([3, 3]);
     });
 
+    it('匯出後再用匯入讀回來，每種分法都一樣', async () => {
+      const arrangements = [[[2, 1], 3], [[1, 2], 3], [[1, 1, 1], 3], [[1, 1], 2]];
+      for (const [sizes, count] of arrangements) {
+        const captionGroups = sizes.map((size, i) => ({ size, text: `第${i + 1}段\n第二行` }));
+        const xml = await tableToXml(await buildHighlightsTable([
+          { photos: photosOf(count), caption: captionGroups.map(g => g.text).join('\n'), captionGroups },
+        ]));
+        expect(extractHighlightPhotoGroups(xml)[0].captionGroups).toEqual(captionGroups);
+      }
+    });
+
     it('對不上照片數量的分組就照舊印成一整格', async () => {
       const row = await captionRowOf({
         photos: photosOf(2), caption: '前兩張\n第三張',

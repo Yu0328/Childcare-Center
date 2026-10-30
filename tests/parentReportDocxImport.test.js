@@ -152,6 +152,28 @@ describe('extractHighlightPhotoGroups', () => {
   });
 });
 
+describe('extractHighlightPhotoGroups：分開描述', () => {
+  const photoCell = span => `<w:tc><w:tcPr><w:gridSpan w:val="${span}"/></w:tcPr><w:p><w:r><w:drawing/></w:r></w:p></w:tc>`;
+  const textCell = (span, text) => `<w:tc><w:tcPr><w:gridSpan w:val="${span}"/></w:tcPr><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`;
+  const table = (photoRow, captionRow) =>
+    `<w:tbl><w:tr><w:tc><w:p><w:r><w:t>點滴分享</w:t></w:r></w:p></w:tc></w:tr><w:tr>${photoRow}</w:tr><w:tr>${captionRow}</w:tr></w:tbl>`;
+
+  it('說明列有兩格、各自對準自己的照片時，讀成分開描述', () => {
+    const [group] = extractHighlightPhotoGroups(table(photoCell(2) + photoCell(2) + photoCell(2), textCell(4, '前兩張') + textCell(2, '第三張')));
+    expect(group.caption).toBe('前兩張\n第三張');
+    expect(group.captionGroups).toEqual([{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }]);
+  });
+
+  it('格子對不上照片、有一格是空的、或有照片格沒有照片時，照舊當成一段描述', () => {
+    const cases = [
+      table(photoCell(2) + photoCell(2) + photoCell(2), textCell(3, '甲') + textCell(3, '乙')),
+      table(photoCell(2) + photoCell(2) + photoCell(2), textCell(4, '甲') + textCell(2, '')),
+      table(photoCell(2) + photoCell(2) + '<w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p></w:p></w:tc>', textCell(4, '甲') + textCell(2, '乙')),
+    ];
+    for (const xml of cases) expect('captionGroups' in extractHighlightPhotoGroups(xml)[0]).toBe(false);
+  });
+});
+
 describe('parseParentReportDocxImport', () => {
   it('returns warnings when header info cannot be found, without throwing', async () => {
     const JSZip = (await import('jszip')).default;

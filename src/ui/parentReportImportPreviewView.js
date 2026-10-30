@@ -194,7 +194,7 @@ export function renderParentReportImportPreviewView(container, { parsed, onCance
         for (const blob of source.photos) {
           photos.push(await compressImage(blob).catch(() => ({ blob, width: 0, height: 0 })));
         }
-        await addHighlightEntry({ reportId: report.id, photos, caption: source.caption });
+        await addHighlightEntry({ reportId: report.id, photos, caption: source.caption, captionGroups: source.captionGroups });
       }
 
       onImported();
