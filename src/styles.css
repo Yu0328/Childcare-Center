@@ -2242,6 +2242,98 @@ fieldset.panel-form__field.import-preview__child legend {
   transform: scale(0.96);
 }
 
+/* 分開描述: on the entry list each part sits under its own photos, as in Word. */
+.highlight-groups {
+  display: flex;
+  gap: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+.highlight-group {
+  flex-basis: 0;
+  min-width: 0;
+}
+.highlight-group__text {
+  margin: 0;
+  text-align: center;
+  white-space: pre-line;
+}
+
+/* Drag a photo onto another to swap them (src/ui/photoDragSwap.js). A long press must not pick
+   text or bring up the phone's save-image menu. */
+[data-drop-slot],
+.highlight-edit-photo {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.photo-drag--source {
+  opacity: 0.45;
+}
+.photo-drag--target {
+  outline: 3px solid var(--brand-dark);
+  outline-offset: 2px;
+}
+.highlight-edit-photos {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.highlight-edit-photo {
+  width: 100%;
+  max-width: 120px;
+  cursor: grab;
+  border-radius: 6px;
+}
+.highlight-edit-photo .highlight-thumb {
+  display: block;
+}
+.highlight-edit-photos__hint,
+.caption-editor__hint {
+  margin: 0 0 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* The 描述 area (src/ui/highlightCaptionEditor.js). */
+.caption-editor__split {
+  margin: 0.2rem 0 0.6rem;
+}
+.caption-editor__arrangements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.caption-editor__arrangements [aria-pressed="true"] {
+  background: var(--brand-tint);
+  border-color: var(--brand-dark);
+  font-weight: 700;
+}
+.caption-editor__drawing {
+  letter-spacing: 0.05em;
+}
+.caption-editor__parts {
+  display: grid;
+  gap: 0.6rem;
+}
+.caption-part__label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+  font-weight: 600;
+}
+.caption-part__thumbs {
+  display: flex;
+  gap: 0.2rem;
+}
+.caption-part__thumbs img {
+  width: 40px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 /* ---------- Word import ---------- */
 
 .import-preview__warnings {

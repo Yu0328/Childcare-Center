@@ -298,7 +298,7 @@ describe('renderHighlightsTab', () => {
     editBtn.click();
     expect(form.hidden).toBe(false);
 
-    const textarea = container.querySelector(`[data-highlight-edit-field="caption"][data-highlight-id="${entry.id}"]`);
+    const textarea = form.querySelector('[data-field="caption"]');
     expect(textarea.value).toBe('原始描述');
     textarea.value = '更新後的描述';
 
@@ -363,6 +363,143 @@ describe('renderHighlightsTab', () => {
     input.dispatchEvent(new Event('change'));
 
     expect(container.querySelector('[data-action="add-highlight"] [data-error]').textContent).toBe('每則最多 3 張照片，多選的 2 張沒有加入');
+  });
+
+  describe('分開描述與拖移照片', () => {
+    // jsdom has no PointerEvent or layout — see tests/photoDragSwap.test.js.
+    function drag(from, to) {
+      const fire = (type, target, x) => {
+        const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, button: 0 });
+        Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+        target.dispatchEvent(event);
+      };
+      document.elementFromPoint = () => to;
+      fire('pointerdown', from, 0);
+      fire('pointermove', document, 50);
+      fire('pointerup', document, 50);
+    }
+
+    async function addThreePendingPhotos(container) {
+      const imagePreprocess = await import('../src/media/imagePreprocess.js');
+      let n = 0;
+      vi.spyOn(imagePreprocess, 'compressImage').mockImplementation(async () => ({ blob: new Blob([String(n)]), width: ++n, height: 1 }));
+      const input = container.querySelector('[data-photo-slot="0"]');
+      Object.defineProperty(input, 'files', { configurable: true, value: [1, 2, 3].map(i => new File(['x'], `${i}.jpg`)) });
+      input.dispatchEvent(new Event('change'));
+      await waitFor(() => container.querySelector('[data-preview-slot="2"] img') !== null);
+    }
+
+    const stored = async () => (await runRequest('highlightEntries', 'readonly', store => store.getAll()))[0];
+    const submit = container =>
+      container.querySelector('[data-action="add-highlight"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    it('新增：三張照片選「前二＋後一」各寫一段，存成分開描述', async () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      let changed = false;
+      await renderHighlightsTab(container, { report, onChange: () => { changed = true; } });
+      await addThreePendingPhotos(container);
+
+      container.querySelector('[data-caption-split]').click();
+      container.querySelector('[data-caption-arrange="2,1"]').click();
+      const [first, second] = container.querySelectorAll('[data-caption-editor="new"] [data-caption-part]');
+      first.value = '一起蓋城堡';
+      second.value = '收玩具';
+      submit(container);
+      await waitFor(() => changed);
+
+      const entry = await stored();
+      expect(entry.captionGroups).toEqual([{ size: 2, text: '一起蓋城堡' }, { size: 1, text: '收玩具' }]);
+      expect(entry.caption).toBe('一起蓋城堡\n收玩具');
+      container.remove();
+    });
+
+    it('新增：還沒選排法就按新增，會提醒先選', async () => {
+      const container = document.createElement('div');
+      let changed = false;
+      await renderHighlightsTab(container, { report, onChange: () => { changed = true; } });
+      await addThreePendingPhotos(container);
+      container.querySelector('[data-caption-split]').click();
+      submit(container);
+      await waitFor(() => container.querySelector('[data-action="add-highlight"] [data-error]').textContent !== '');
+      expect(container.querySelector('[data-action="add-highlight"] [data-error]').textContent).toBe('請選擇照片怎麼分組');
+      expect(changed).toBe(false);
+    });
+
+    it('新增：把第一張拖到第三張的位置，存的順序跟著換', async () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      let changed = false;
+      await renderHighlightsTab(container, { report, onChange: () => { changed = true; } });
+      await addThreePendingPhotos(container);
+
+      drag(container.querySelector('[data-drop-slot="0"] img'), container.querySelector('[data-drop-slot="2"]'));
+      container.querySelector('[data-field="caption"]').value = '三張';
+      submit(container);
+      await waitFor(() => changed);
+
+      expect((await stored()).photos.map(p => p.width)).toEqual([3, 2, 1]);
+      container.remove();
+    });
+
+    it('編輯：拖移換順序、改成分開描述，按儲存才寫進去', async () => {
+      const photo = w => ({ blob: new Blob([String(w)]), width: w, height: 1 });
+      const entry = await addHighlightEntry({ reportId: report.id, photos: [photo(1), photo(2), photo(3)], caption: '原本' });
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      let changed = false;
+      await renderHighlightsTab(container, { report, onChange: () => { changed = true; } });
+      const form = container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`);
+      container.querySelector(`[data-edit-highlight="${entry.id}"]`).click();
+
+      drag(form.querySelector('[data-edit-photo="2"] img'), form.querySelector('[data-edit-photo="0"]'));
+      form.querySelector('[data-caption-split]').click();
+      form.querySelector('[data-caption-arrange="1,2"]').click();
+      form.querySelectorAll('[data-caption-part]')[1].value = '後兩張';
+      form.querySelector(`[data-highlight-edit-save-for="${entry.id}"]`).click();
+      await waitFor(() => changed);
+
+      const saved = await stored();
+      expect(saved.photos.map(p => p.width)).toEqual([3, 2, 1]);
+      expect(saved.captionGroups).toEqual([{ size: 1, text: '原本' }, { size: 2, text: '後兩張' }]);
+      container.remove();
+    });
+
+    it('編輯：按取消，照片順序和描述回到原本的樣子', async () => {
+      const photo = w => ({ blob: new Blob([String(w)]), width: w, height: 1 });
+      const entry = await addHighlightEntry({ reportId: report.id, photos: [photo(1), photo(2)], caption: '原本' });
+      let n = 0;
+      URL.createObjectURL = vi.fn(() => `blob:mock-${++n}`);
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      await renderHighlightsTab(container, { report, onChange: () => {} });
+      const form = container.querySelector(`[data-highlight-edit-form-for="${entry.id}"]`);
+      const srcs = () => [...form.querySelectorAll('[data-edit-photo] img')].map(img => img.getAttribute('src'));
+      const before = srcs();
+
+      drag(form.querySelector('[data-edit-photo="0"] img'), form.querySelector('[data-edit-photo="1"]'));
+      form.querySelector('[data-caption-split]').click();
+      expect(srcs()).toEqual([...before].reverse());
+      container.querySelector(`[data-highlight-edit-cancel-for="${entry.id}"]`).click();
+
+      expect(srcs()).toEqual(before);
+      expect(form.querySelectorAll('[data-caption-part]')).toHaveLength(1);
+      expect(form.querySelector('[data-field="caption"]').value).toBe('原本');
+      container.remove();
+    });
+
+    it('列表上，分開描述的每段字放在自己的照片下面', async () => {
+      const photo = () => ({ blob: new Blob(['x']), width: 1, height: 1 });
+      await addHighlightEntry({
+        reportId: report.id, photos: [photo(), photo(), photo()], caption: '前兩張\n第三張',
+        captionGroups: [{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }],
+      });
+      const container = document.createElement('div');
+      await renderHighlightsTab(container, { report, onChange: () => {} });
+      const groups = [...container.querySelectorAll('.highlight-group')];
+      expect(groups.map(g => g.querySelectorAll('img').length)).toEqual([2, 1]);
+      expect(groups.map(g => g.querySelector('.highlight-group__text').textContent)).toEqual(['前兩張', '第三張']);
+    });
   });
 
   it('重新顯示時，釋放上一次縮圖佔用的記憶體', async () => {
