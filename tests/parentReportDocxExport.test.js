@@ -308,6 +308,49 @@ function tableRows(xml) {
 }
 
 describe('buildHighlightsTable', () => {
+  describe('分開描述', () => {
+    const photosOf = n => Array.from({ length: n }, (_, i) => ({ blob: new Blob([String(i)]), width: 100, height: 80 }));
+    const captionRowOf = async entry => tableRows(await tableToXml(await buildHighlightsTable([entry])))[2];
+    const spansOf = row => [...row.matchAll(/<w:gridSpan w:val="(\d+)"\/>/g)].map(m => Number(m[1]));
+
+    it('前二＋後一：說明列分成兩格，各自蓋住自己的照片（4＋2），中間沒有線', async () => {
+      const row = await captionRowOf({
+        photos: photosOf(3), caption: '前兩張\n第三張',
+        captionGroups: [{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }],
+      });
+      const cells = row.match(/<w:tc>[\s\S]*?<\/w:tc>/g);
+      expect(cells).toHaveLength(2);
+      expect(spansOf(row)).toEqual([4, 2]);
+      expect(cells[0]).toContain('前兩張');
+      expect(cells[1]).toContain('第三張');
+      expect(cells[0]).toMatch(/<w:right w:val="nil"/);
+      expect(cells[0]).not.toMatch(/<w:left w:val="nil"/);
+      expect(cells[1]).toMatch(/<w:left w:val="nil"/);
+      expect(cells[1]).not.toMatch(/<w:right w:val="nil"/);
+    });
+
+    it('各自描述（三張）是 2＋2＋2，兩張是 3＋3', async () => {
+      const three = await captionRowOf({
+        photos: photosOf(3), caption: '一\n二\n三',
+        captionGroups: [{ size: 1, text: '一' }, { size: 1, text: '二' }, { size: 1, text: '三' }],
+      });
+      expect(spansOf(three)).toEqual([2, 2, 2]);
+      const two = await captionRowOf({
+        photos: photosOf(2), caption: '一\n二', captionGroups: [{ size: 1, text: '一' }, { size: 1, text: '二' }],
+      });
+      expect(spansOf(two)).toEqual([3, 3]);
+    });
+
+    it('對不上照片數量的分組就照舊印成一整格', async () => {
+      const row = await captionRowOf({
+        photos: photosOf(2), caption: '前兩張\n第三張',
+        captionGroups: [{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }],
+      });
+      expect(spansOf(row)).toEqual([6]);
+      expect(row).not.toContain('w:val="nil"');
+    });
+  });
+
   it('renders 1 to 3 photos per entry side by side, plus a caption row', async () => {
     const entries = [
       { id: 1, reportId: 1, photos: [{ blob: new Blob(['a']), width: 100, height: 80 }], caption: '我最喜歡騎車車了！' },

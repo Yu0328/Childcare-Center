@@ -1,5 +1,5 @@
 import {
-  AlignmentType, Document, Header, HeightRule, HorizontalPositionRelativeFrom, ImageRun, Packer,
+  AlignmentType, BorderStyle, Document, Header, HeightRule, HorizontalPositionRelativeFrom, ImageRun, Packer,
   Paragraph, ShadingType, Table, TableCell, TableRow, TableLayoutType, TextRun, TextWrappingSide,
   TextWrappingType, VerticalAlign, VerticalMergeType, VerticalPositionRelativeFrom, WidthType,
 } from 'docx';
@@ -11,6 +11,7 @@ import {
   textParagraph, textParagraphs, emptyParagraph, headerIconRunBehindText, toRocDate,
 } from './docxShared.js';
 import { calculateAgeInMonths } from '../domain/ageTier.js';
+import { validCaptionGroups } from '../domain/highlightCaptions.js';
 import { CENTER } from '../centers.js';
 
 // This document type ("每月課程計畫表" / "每月嬰幼兒適性發展紀錄表") is issued under a different
@@ -425,18 +426,39 @@ async function highlightEntryRows(entry) {
   const photoCells = photoCount === 0
     ? await Promise.all(cellSpecs.map(spec => highlightPhotoCell(undefined, spec.widthDxa, spec.columnSpan)))
     : await Promise.all(entry.photos.map((photo, i) => highlightPhotoCell(photo, cellSpecs[i].widthDxa, cellSpecs[i].columnSpan)));
+  const groups = photoCount > 0 && validCaptionGroups(entry);
   return [
     new TableRow({ children: photoCells }),
     new TableRow({
-      children: [
-        new TableCell({
-          columnSpan: HIGHLIGHT_GRID_COLUMN_COUNT,
-          width: { size: COURSE_PLAN_TABLE_WIDTH_DXA, type: WidthType.DXA },
-          children: textParagraphs(entry.caption, { bold: true, ...CENTERED }),
-        }),
-      ],
+      children: groups
+        ? splitCaptionCells(groups, cellSpecs)
+        : [
+          new TableCell({
+            columnSpan: HIGHLIGHT_GRID_COLUMN_COUNT,
+            width: { size: COURSE_PLAN_TABLE_WIDTH_DXA, type: WidthType.DXA },
+            children: textParagraphs(entry.caption, { bold: true, ...CENTERED }),
+          }),
+        ],
     }),
   ];
+}
+
+const NO_BORDER = { style: BorderStyle.NIL, size: 0, color: 'auto' };
+
+// 分開描述: one caption cell per photo group, spanning exactly its photos' grid columns, so each
+// text wraps and centers under its own photos. The lines between these cells are removed, so the
+// row still prints as one box — see docs/superpowers/specs/2026-10-31-highlight-split-captions-design.md.
+function splitCaptionCells(groups, cellSpecs) {
+  let photoIndex = 0;
+  return groups.map((group, i) => {
+    const specs = cellSpecs.slice(photoIndex, (photoIndex += group.size));
+    return new TableCell({
+      columnSpan: specs.reduce((sum, spec) => sum + spec.columnSpan, 0),
+      width: { size: specs.reduce((sum, spec) => sum + spec.widthDxa, 0), type: WidthType.DXA },
+      borders: { ...(i > 0 && { left: NO_BORDER }), ...(i < groups.length - 1 && { right: NO_BORDER }) },
+      children: textParagraphs(group.text, { bold: true, ...CENTERED }),
+    });
+  });
 }
 
 // The design spec requires a 家長回饋／簽名欄 block ("簽名欄留空白，供列印後手寫"). In both real
