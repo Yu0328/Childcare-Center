@@ -28,9 +28,32 @@ export function wirePhotoDragSwap(root, { itemSelector, canDrag = () => true, on
       begin();
     }, HOLD_MS);
 
+    let ghost = null;
+    const rect = item.getBoundingClientRect();
+    const grabX = startX - rect.left;
+    const grabY = startY - rect.top;
+
+    // A lifted copy of the photo follows the pointer, so it feels like carrying the photo itself;
+    // the slot it came from stays behind as a faded outline.
     function begin() {
       dragging = true;
       item.classList.add('photo-drag--source');
+      const photo = item.querySelector('img');
+      if (photo) {
+        ghost = document.createElement('div');
+        ghost.className = 'photo-drag-ghost';
+        ghost.style.width = `${rect.width}px`;
+        ghost.style.height = `${rect.height}px`;
+        ghost.appendChild(Object.assign(photo.cloneNode(), { alt: '' }));
+        document.body.appendChild(ghost);
+        moveGhost(startX, startY);
+      }
+      // A short buzz where the phone supports it (Android), so a finger knows the hold took.
+      if (!isMouse && navigator.vibrate) navigator.vibrate(15);
+    }
+
+    function moveGhost(x, y) {
+      if (ghost) ghost.style.transform = `translate(${x - grabX}px, ${y - grabY}px)`;
     }
 
     function setTarget(next) {
@@ -48,6 +71,7 @@ export function wirePhotoDragSwap(root, { itemSelector, canDrag = () => true, on
         begin();
       }
       moveEvent.preventDefault();
+      moveGhost(moveEvent.clientX, moveEvent.clientY);
       const over = itemAt(moveEvent.clientX, moveEvent.clientY);
       setTarget(over && over !== item ? over : null);
     }
@@ -76,6 +100,8 @@ export function wirePhotoDragSwap(root, { itemSelector, canDrag = () => true, on
     function finish() {
       clearTimeout(holdTimer);
       item.classList.remove('photo-drag--source');
+      if (ghost) ghost.remove();
+      ghost = null;
       setTarget(null);
       dragging = false;
       document.removeEventListener('pointermove', onMove);

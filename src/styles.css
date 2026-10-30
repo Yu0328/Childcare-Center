@@ -2270,11 +2270,44 @@ fieldset.panel-form__field.import-preview__child legend {
   -webkit-touch-callout: none;
 }
 .photo-drag--source {
-  opacity: 0.45;
+  opacity: 0.3;
+  outline: 2px dashed var(--brand-dark);
+  outline-offset: 2px;
 }
 .photo-drag--target {
   outline: 3px solid var(--brand-dark);
   outline-offset: 2px;
+  transform: scale(1.06);
+  transition: transform 0.12s ease;
+}
+/* The photo being carried (src/ui/photoDragSwap.js): lifted, slightly tilted, with a shadow. */
+.photo-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  will-change: transform;
+}
+.photo-drag-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px rgba(15, 23, 20, 0.35);
+  transform: scale(1.08) rotate(-3deg);
+  animation: photo-lift 0.15s ease-out;
+}
+@keyframes photo-lift {
+  from { transform: scale(1) rotate(0); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-drag-ghost img { animation: none; transform: none; }
+  .photo-drag--target { transform: none; }
+}
+[data-drop-slot]:has(img),
+.highlight-edit-photo {
+  cursor: grab;
 }
 .highlight-edit-photos {
   display: flex;
@@ -2284,7 +2317,6 @@ fieldset.panel-form__field.import-preview__child legend {
 .highlight-edit-photo {
   width: 100%;
   max-width: 120px;
-  cursor: grab;
   border-radius: 6px;
 }
 .highlight-edit-photo .highlight-thumb {

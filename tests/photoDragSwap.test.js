@@ -45,6 +45,20 @@ describe('wirePhotoDragSwap', () => {
     expect(clickAfter(items[0]).defaultPrevented).toBe(true);
   });
 
+  it('拖的時候有一張照片的分身跟著游標走，放開就消失', () => {
+    pointer('pointerdown', items[0].querySelector('img'));
+    expect(document.querySelector('.photo-drag-ghost')).toBeNull();
+    over = items[2];
+    pointer('pointermove', document, { x: 50, y: 20 });
+    const ghost = document.querySelector('.photo-drag-ghost');
+    expect(ghost.querySelector('img')).not.toBeNull();
+    expect(ghost.style.transform).toBe('translate(50px, 20px)');
+    expect(items[2].classList.contains('photo-drag--target')).toBe(true);
+    pointer('pointerup', document, { x: 50, y: 20 });
+    expect(document.querySelector('.photo-drag-ghost')).toBeNull();
+    expect(items[2].classList.contains('photo-drag--target')).toBe(false);
+  });
+
   it('只是點一下不會交換，點擊照常（可以換照片）', () => {
     pointer('pointerdown', items[0]);
     pointer('pointerup', document);
