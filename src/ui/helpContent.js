@@ -441,10 +441,20 @@ const pickChild = (m, title) =>
 const devRecordForm = hitSubmit =>
   aside('新增段落', field('領域', '身體動作'), cb('Ⅴ-1-6【我愛畫畫】', true), field('敘述', '能握筆畫出圓形…'), actions(btn('新增', 'primary', hitSubmit)));
 const behaviorForm = hitSubmit => aside('新增行為觀察', field('標題', '分享玩具'), field('敘述', '主動把積木分給同學…'), actions(btn('新增', 'primary', hitSubmit)));
-const photoBoxes = (filled, hit) =>
-  `<div class="ms-photos">${[1, 2, 3].map(n => `<span class="${filled && n < 3 ? 'on' : ''}"${hit && n === 1 ? ' data-hit' : ''}>${filled && n < 3 ? '' : `照片 ${n}`}</span>`).join('')}</div>`;
+// `photos` boxes hold a photo; the rest still read 照片 N.
+const photoBoxes = (photos, hit) =>
+  `<div class="ms-photos">${[1, 2, 3].map(n => `<span class="${n <= photos ? 'on' : ''}"${hit && n === 1 ? ' data-hit' : ''}>${n <= photos ? '' : `照片 ${n}`}</span>`).join('')}</div>`;
 const highlightForm = ({ filled = false, hitPhoto = false, hitSubmit = false } = {}) =>
-  aside('新增點滴分享', photoBoxes(filled, hitPhoto), field('描述', filled ? '和同學一起蓋城堡' : ''), actions(btn('新增', 'primary', hitSubmit)));
+  aside('新增點滴分享', photoBoxes(filled ? 2 : 0, hitPhoto), field('描述', filled ? '和同學一起蓋城堡' : ''), actions(btn('新增', 'primary', hitSubmit)));
+// 分開描述 (src/ui/highlightCaptionEditor.js): one 描述 → pick an arrangement → one box per group.
+const splitHighlightForm = ({ stage = 'one', hitPhoto = false, hitSplit = false, hitSubmit = false } = {}) => {
+  const describe = {
+    one: field('描述', '') + btn('分開描述', '', hitSplit),
+    pick: btn('▢▢│▢ 前二＋後一', '', true) + btn('▢│▢▢ 前一＋後二') + btn('▢│▢│▢ 各自描述'),
+    split: field('第 1、2 張', '一起蓋城堡') + field('第 3 張', '收玩具'),
+  }[stage];
+  return aside('新增點滴分享', photoBoxes(3, hitPhoto), describe, actions(btn('新增', 'primary', hitSubmit)));
+};
 
 const PARENT_REPORT = {
   id: 'parent-report',
@@ -518,7 +528,7 @@ const PARENT_REPORT = {
     {
       id: 'pr-highlights',
       title: '點滴分享（照片）',
-      note: '每則最多 3 張照片。存好之後只能刪照片、不能補照片。',
+      note: '每則最多 3 張照片。存好之後只能刪照片、不能補照片；按「編輯」可以換照片順序、分開描述。',
       steps: [
         { cap: '按「點滴分享」分頁', draw: m => prEditorTabHit(m, '點滴分享') },
         { modes: ['phone'], cap: '按右下角藍色的「＋」', draw: m => prEditor(m, { tab: '點滴分享', form: highlightForm(), fabHit: true }) },
@@ -528,6 +538,23 @@ const PARENT_REPORT = {
           cap: '照片和描述加上去了',
           draw: m =>
             prEditor(m, { tab: '點滴分享', list: row(`<span class="ms-thumbs"><i></i><i></i></span><b>和同學一起蓋城堡</b>${del()}`, { fill: true }), form: highlightForm() }),
+        },
+      ],
+    },
+    {
+      id: 'pr-highlights-split',
+      title: '點滴分享：換照片順序、分開描述',
+      note: '分開描述會印在各自的照片正下方。只有相鄰的照片能分成一組，要換組合就先拖移照片換順序。',
+      steps: [
+        { modes: ['phone'], cap: '按右下角藍色的「＋」', draw: m => prEditor(m, { tab: '點滴分享', form: splitHighlightForm(), fabHit: true }) },
+        { cap: '放好照片後，按住照片拖到別張的位置，就能換順序', draw: m => prEditor(m, { tab: '點滴分享', form: splitHighlightForm({ hitPhoto: true }), popup: true }) },
+        { cap: '想把照片分開寫描述，按「分開描述」', draw: m => prEditor(m, { tab: '點滴分享', form: splitHighlightForm({ hitSplit: true }), popup: true }) },
+        { cap: '選照片怎麼分組，例如「前二＋後一」', draw: m => prEditor(m, { tab: '點滴分享', form: splitHighlightForm({ stage: 'pick' }), popup: true }) },
+        { cap: '每組照片各寫一段描述，按「新增」', draw: m => prEditor(m, { tab: '點滴分享', form: splitHighlightForm({ stage: 'split', hitSubmit: true }), popup: true }) },
+        {
+          cap: '兩段描述都加上去了，匯出的 Word 也會各自放在照片下面',
+          draw: m =>
+            prEditor(m, { tab: '點滴分享', list: row(`<span class="ms-thumbs"><i></i><i></i><i></i></span><b>分開描述（2 段）</b>${del()}`, { fill: true }), form: splitHighlightForm() }),
         },
       ],
     },
