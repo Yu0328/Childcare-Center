@@ -313,7 +313,7 @@ describe('buildHighlightsTable', () => {
     const captionRowOf = async entry => tableRows(await tableToXml(await buildHighlightsTable([entry])))[2];
     const spansOf = row => [...row.matchAll(/<w:gridSpan w:val="(\d+)"\/>/g)].map(m => Number(m[1]));
 
-    it('前二＋後一：說明列分成兩格，各自蓋住自己的照片（4＋2），中間沒有線', async () => {
+    it('前二＋後一：說明列分成兩格，各自蓋住自己的照片（4＋2），中間有分隔線', async () => {
       const row = await captionRowOf({
         photos: photosOf(3), caption: '前兩張\n第三張',
         captionGroups: [{ size: 2, text: '前兩張' }, { size: 1, text: '第三張' }],
@@ -323,10 +323,7 @@ describe('buildHighlightsTable', () => {
       expect(spansOf(row)).toEqual([4, 2]);
       expect(cells[0]).toContain('前兩張');
       expect(cells[1]).toContain('第三張');
-      expect(cells[0]).toMatch(/<w:right w:val="nil"/);
-      expect(cells[0]).not.toMatch(/<w:left w:val="nil"/);
-      expect(cells[1]).toMatch(/<w:left w:val="nil"/);
-      expect(cells[1]).not.toMatch(/<w:right w:val="nil"/);
+      expect(row).not.toContain('w:val="nil"');
     });
 
     it('各自描述（三張）是 2＋2＋2，兩張是 3＋3', async () => {

@@ -24,8 +24,9 @@ under its own photos. Photo order also can't be changed — the only way is to d
    - Every box is required, as the single box is today.
 3. **Word export**: the caption row becomes one cell per group, each spanning its photos' grid
    columns (the table already uses a 6-column grid — a 3-photo row is 2+2+2, so 前二＋後一 is a
-   4+2 caption row; a 2-photo row is 3+3). The vertical border between caption cells is removed,
-   so it prints as one box while each text wraps and centers inside its own part. A long text
+   4+2 caption row; a 2-photo row is 3+3). Each part keeps the table's normal line between it and
+   the next (first built borderless; the user asked for the line back), and each text wraps and
+   centers inside its own part. A long text
    simply makes the row taller (both cells share the row height).
 4. **拖移換照片順序**: press and drag a photo onto another photo's place to swap them — mouse drag
    on a computer, press-and-hold then drag on a phone (pointer events, not the HTML drag-and-drop
@@ -95,7 +96,7 @@ reordering differently at once end with one device's order — acceptable, nothi
 
 - Unit: `highlightCaptions.js` rules (split, join, switch arrangement, remove photo from each
   group position, back to single).
-- Export: a split entry's caption row has the right cell spans and no inner border; a non-split
+- Export: a split entry's caption row has the right cell spans and the normal lines between them; a non-split
   entry's XML is unchanged.
 - Round trip (CLAUDE.md standard): real sample file → import → export → re-import compares equal;
   plus an app-made entry for each arrangement → export → import → same `captionGroups`.

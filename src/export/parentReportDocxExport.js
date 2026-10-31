@@ -1,5 +1,5 @@
 import {
-  AlignmentType, BorderStyle, Document, Header, HeightRule, HorizontalPositionRelativeFrom, ImageRun, Packer,
+  AlignmentType, Document, Header, HeightRule, HorizontalPositionRelativeFrom, ImageRun, Packer,
   Paragraph, ShadingType, Table, TableCell, TableRow, TableLayoutType, TextRun, TextWrappingSide,
   TextWrappingType, VerticalAlign, VerticalMergeType, VerticalPositionRelativeFrom, WidthType,
 } from 'docx';
@@ -443,19 +443,16 @@ async function highlightEntryRows(entry) {
   ];
 }
 
-const NO_BORDER = { style: BorderStyle.NIL, size: 0, color: 'auto' };
-
 // 分開描述: one caption cell per photo group, spanning exactly its photos' grid columns, so each
-// text wraps and centers under its own photos. The lines between these cells are removed, so the
-// row still prints as one box — see docs/superpowers/specs/2026-10-31-highlight-split-captions-design.md.
+// text wraps and centers under its own photos, with the table's normal line between them — see
+// docs/superpowers/specs/2026-10-31-highlight-split-captions-design.md.
 function splitCaptionCells(groups, cellSpecs) {
   let photoIndex = 0;
-  return groups.map((group, i) => {
+  return groups.map(group => {
     const specs = cellSpecs.slice(photoIndex, (photoIndex += group.size));
     return new TableCell({
       columnSpan: specs.reduce((sum, spec) => sum + spec.columnSpan, 0),
       width: { size: specs.reduce((sum, spec) => sum + spec.widthDxa, 0), type: WidthType.DXA },
-      borders: { ...(i > 0 && { left: NO_BORDER }), ...(i < groups.length - 1 && { right: NO_BORDER }) },
       children: textParagraphs(group.text, { bold: true, ...CENTERED }),
     });
   });
