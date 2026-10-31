@@ -3014,33 +3014,27 @@ fieldset.panel-form__field.import-preview__child legend {
   border-color: var(--brand);
 }
 
-/* Monday/Tuesday/Friday carry the fixed 大團體活動/節氣 defaults rather than free planning
-   content — a warm tint marks them as "already filled in" at a glance, distinct from the plain
+/* A centre's pre-filled days (PRESET_WEEKDAYS, src/domain/monthlyCoursePlan.js — 育英 Mon/Tue/Fri)
+   carry fixed defaults like 大團體活動/節氣 rather than free planning content — a warm tint marks them as "already filled in" at a glance, distinct from the plain
    Wed/Thu planning cells, without needing a text label to explain it. */
-.monthly-calendar__day[data-weekday="1"],
-.monthly-calendar__day[data-weekday="2"],
-.monthly-calendar__day[data-weekday="5"] {
+.monthly-calendar__day--preset {
   background: var(--warm-tint);
   border-color: var(--warm-border);
 }
 
-.monthly-calendar__day[data-weekday="1"]:hover,
-.monthly-calendar__day[data-weekday="2"]:hover,
-.monthly-calendar__day[data-weekday="5"]:hover {
+.monthly-calendar__day--preset:hover {
   border-color: var(--warm-accent);
 }
 
-.monthly-calendar__day[data-weekday="1"] .monthly-calendar__date,
-.monthly-calendar__day[data-weekday="2"] .monthly-calendar__date,
-.monthly-calendar__day[data-weekday="5"] .monthly-calendar__date {
+.monthly-calendar__day--preset .monthly-calendar__date {
   color: var(--warm-accent);
 }
 
-/* Wed/Thu cells are free-planning (no default content), so a filled one needs its own visual cue
-   to stand out from the still-empty ones at a glance — Mon/Tue/Fri are excluded since they're
+/* The other days are free-planning (no default content), so a filled one needs its own visual cue
+   to stand out from the still-empty ones at a glance — preset days are excluded since they're
    already tinted warm above (they're never "empty" in the first place, so a second color would be
    noise). */
-.monthly-calendar__day:not([data-weekday="1"]):not([data-weekday="2"]):not([data-weekday="5"]):has(.monthly-calendar__item) {
+.monthly-calendar__day:not(.monthly-calendar__day--preset):has(.monthly-calendar__item) {
   background: var(--filled-tint);
   border-color: var(--filled-border);
 }

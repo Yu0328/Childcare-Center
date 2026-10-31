@@ -6,7 +6,7 @@ import {
   updateMonthlyCoursePlan, deleteChildItemOverridesForChild, deleteChildOnlyItemsForChild, itemVisibleToChild,
 } from '../storage/monthlyPlanDb.js';
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
-import { seedDefaultPlanSlots } from '../domain/monthlyCoursePlan.js';
+import { seedDefaultPlanSlots, PRESET_WEEKDAYS } from '../domain/monthlyCoursePlan.js';
 import { parsePeriod } from './periodFields.js';
 import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../data/indicators.js';
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
@@ -81,7 +81,7 @@ function dayCellHtml(child, tier, week, day, data) {
   return `
     <button
       type="button"
-      class="monthly-calendar__day"
+      class="monthly-calendar__day${PRESET_WEEKDAYS.has(day.weekday) ? ' monthly-calendar__day--preset' : ''}"
       data-child-id="${escapeHtml(child.id)}"
       data-tier="${escapeHtml(tier)}"
       data-week-index="${week.weekIndex}"

@@ -8,6 +8,9 @@ const DEFAULTS = CENTER.monthlyPlanDefaults ?? [
   [5, '大團體活動'],
 ];
 
+// The editor tints these days warm as "already filled in" (src/styles.css `--preset`).
+export const PRESET_WEEKDAYS = new Set(DEFAULTS.map(([weekday]) => weekday));
+
 // New MonthlyCoursePlans start with 大團體活動 (Monday & Friday) and 節氣 (Tuesday) pre-filled for every
 // tier present among the plan's children, for every week that actually has that weekday (a
 // month's first/last week may be partial — see monthlyCalendar.js). Only touches slots that

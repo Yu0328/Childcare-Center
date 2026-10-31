@@ -36,6 +36,15 @@ describe('monthlyPlanEditorView: rendering', () => {
     expect((await getMonthlyCoursePlan(importedPlan.id)).isNew).toBe(false);
   });
 
+  it('tints only the centre\'s pre-filled weekdays (育英: Mon, Tue, Fri) as preset', async () => {
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+
+    const preset = weekday => container.querySelector(
+      `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="1"][data-weekday="${weekday}"]`
+    ).classList.contains('monthly-calendar__day--preset');
+    expect([1, 2, 3, 4, 5].map(preset)).toEqual([true, true, false, false, true]);
+  });
+
   it('renders one calendar section per child, with the child\'s name visible', async () => {
     await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
 

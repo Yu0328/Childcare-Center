@@ -62,7 +62,8 @@ describe('seedDefaultPlanSlots for a centre with its own weekly defaults', () =>
     vi.resetModules();
     const { CENTERS } = await import('../src/centers.js');
     vi.doMock('../src/centers.js', () => ({ CENTERS, CENTER: CENTERS.find(c => c.id === 'wandan') }));
-    const { seedDefaultPlanSlots: seed } = await import('../src/domain/monthlyCoursePlan.js');
+    const { seedDefaultPlanSlots: seed, PRESET_WEEKDAYS } = await import('../src/domain/monthlyCoursePlan.js');
+    expect([...PRESET_WEEKDAYS]).toEqual([1, 2, 5]);
     const db = await import('../src/storage/monthlyPlanDb.js');
     await (await import('../src/storage/db.js')).clearAllData();
     const plan = await db.addMonthlyCoursePlan({ period: '115年06月', childIds: [1], childTiers: { 1: 'Ⅴ' } });
@@ -83,7 +84,8 @@ describe('seedDefaultPlanSlots for a centre with its own weekly defaults', () =>
     vi.resetModules();
     const { CENTERS } = await import('../src/centers.js');
     vi.doMock('../src/centers.js', () => ({ CENTERS, CENTER: CENTERS.find(c => c.id === 'shoutian') }));
-    const { seedDefaultPlanSlots: seed } = await import('../src/domain/monthlyCoursePlan.js');
+    const { seedDefaultPlanSlots: seed, PRESET_WEEKDAYS } = await import('../src/domain/monthlyCoursePlan.js');
+    expect([...PRESET_WEEKDAYS]).toEqual([1, 2, 3, 4]);
     const db = await import('../src/storage/monthlyPlanDb.js');
     await (await import('../src/storage/db.js')).clearAllData();
     const plan = await db.addMonthlyCoursePlan({ period: '115年06月', childIds: [1], childTiers: { 1: 'Ⅴ' } });
