@@ -45,6 +45,8 @@ export const CENTERS = [
     shortName: '壽天公托填表',
     institution: '高雄市岡山壽天公共托嬰中心',
     monthlyPlanInstitution: '高雄市政府社會局委託高雄市嬰幼兒托育協會辦理高雄市岡山壽天公共托嬰中心',
+    // Fri stays open for 適性.
+    monthlyPlanDefaults: [[1, '大團體活動'], [2, '節氣'], [3, '大團體活動'], [4, '大團體活動']],
     driveFolderName: '高雄市岡山壽天公托填表系統',
     dbName: 'c-form-shoutian-db',
     storagePrefix: 'c-form-shoutian',

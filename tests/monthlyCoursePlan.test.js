@@ -78,4 +78,25 @@ describe('seedDefaultPlanSlots for a centre with its own weekly defaults', () =>
     expect(await names(5)).toEqual(['團體課']);
     vi.doUnmock('../src/centers.js');
   });
+
+  it('uses 壽天 defaults: 大團體活動 on Mon/Wed/Thu, Tuesday 節氣, leaving Friday for 適性', async () => {
+    vi.resetModules();
+    const { CENTERS } = await import('../src/centers.js');
+    vi.doMock('../src/centers.js', () => ({ CENTERS, CENTER: CENTERS.find(c => c.id === 'shoutian') }));
+    const { seedDefaultPlanSlots: seed } = await import('../src/domain/monthlyCoursePlan.js');
+    const db = await import('../src/storage/monthlyPlanDb.js');
+    await (await import('../src/storage/db.js')).clearAllData();
+    const plan = await db.addMonthlyCoursePlan({ period: '115年06月', childIds: [1], childTiers: { 1: 'Ⅴ' } });
+
+    await seed({ planId: plan.id, tiers: ['Ⅴ'], weeks: buildMonthlyCalendar(2026, 6) });
+
+    const names = async weekday => (await db.listPlanSlotItems(
+      (await db.getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday })).id)).map(i => i.activityName);
+    expect(await names(1)).toEqual(['大團體活動']);
+    expect(await names(2)).toEqual(['節氣']);
+    expect(await names(3)).toEqual(['大團體活動']);
+    expect(await names(4)).toEqual(['大團體活動']);
+    expect(await names(5)).toEqual([]);
+    vi.doUnmock('../src/centers.js');
+  });
 });
