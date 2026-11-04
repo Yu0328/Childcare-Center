@@ -4,7 +4,10 @@ import {
   listPlanSlotsForPlan, listPlanSlotItems, listChildItemOverridesForPlan,
   getOrCreatePlanSlot, addPlanSlotItem, updatePlanSlotItem, deletePlanSlotItem, setChildItemOverride,
   updateMonthlyCoursePlan, deleteChildItemOverridesForChild, deleteChildOnlyItemsForChild, itemVisibleToChild,
+  splitSharedItems,
 } from '../storage/monthlyPlanDb.js';
+import { childItemCounts, copyMonthlyPlan } from '../domain/copyMonthlyPlan.js';
+import { renderCopyFromChildPanel } from './copyFromChildPanel.js';
 import { buildMonthlyCalendar, weekIndexLabel } from '../domain/monthlyCalendar.js';
 import { seedDefaultPlanSlots, PRESET_WEEKDAYS } from '../domain/monthlyCoursePlan.js';
 import { parsePeriod } from './periodFields.js';
@@ -31,6 +34,9 @@ async function loadEditorData(plan) {
   const validChildIds = plan.childIds.filter(Boolean);
   const childResults = await Promise.all(validChildIds.map(id => getChild(id)));
   const children = childResults.filter(Boolean);
+
+  // Plans from before 2026-11 may still hold tier-shared items; each child gets their own copy.
+  await splitSharedItems(plan, children);
 
   const slots = await listPlanSlotsForPlan(plan.id);
   const itemsBySlotId = {};
@@ -85,9 +91,7 @@ function itemHtml(item, override) {
     ? `<span class="monthly-calendar__replacement">${escapeHtml(override.replacementText || '請假')}</span>`
     : '';
 
-  const tagHtml = item.childId !== undefined ? '<span class="monthly-calendar__item-tag">個別</span>' : '';
-
-  return `<div class="${classes.join(' ')}" data-item-id="${escapeHtml(item.id)}">${tagHtml}${label}${replacementHtml}</div>`;
+  return `<div class="${classes.join(' ')}" data-item-id="${escapeHtml(item.id)}">${label}${replacementHtml}</div>`;
 }
 
 function dayCellHtml(child, tier, week, day, data) {
@@ -145,38 +149,34 @@ const activeChildByPlan = new Map();
 const PANEL_POPUP_QUERY = '(max-width: 1279px)';
 const IDLE_PANEL_HINT = '點選左側日期格子開始規劃';
 
-// The child picker plus the 指定新增 toggle, which sits beside it (or alone, for a one-child plan).
-// On a phone the names fold behind a single 「name ▾」 button (styles.css), so a class of many
-// children still takes one line until it's opened.
+// The child picker. On a phone the names fold behind a single 「name ▾」 button (styles.css), so a
+// class of many children still takes one line until it's opened.
 function planToolbarHtml(children, activeId) {
-  if (children.length === 0) return '';
+  if (children.length < 2) return '';
   const activeName = children.find(c => c.id === activeId)?.name ?? '';
-  const switchHtml = children.length < 2 ? '' : `
-    <button type="button" class="child-switch__current" data-child-switch-toggle aria-expanded="false">
-      <span data-child-switch-current>${escapeHtml(activeName)}</span> ▾
-    </button>
-    <div class="child-switch" role="group" aria-label="選擇幼兒">
-      ${children
-        .map(c => `<button type="button" class="child-switch__button" data-switch-child="${escapeHtml(c.id)}" aria-pressed="${c.id === activeId}">${escapeHtml(c.name)}</button>`)
-        .join('')}
-    </div>
-  `;
   return `
     <div class="monthly-plan-toolbar">
-      ${switchHtml}
-      <div class="monthly-plan-toolbar__mode">
-        <label class="panel-form__checkbox monthly-plan-toolbar__individual">
-          <input type="checkbox" data-individual-add> 指定新增
-        </label>
-        <span class="monthly-plan-toolbar__hint" data-individual-hint hidden>點姓名加選幼兒</span>
+      <button type="button" class="child-switch__current" data-child-switch-toggle aria-expanded="false">
+        <span data-child-switch-current>${escapeHtml(activeName)}</span> ▾
+      </button>
+      <div class="child-switch" role="group" aria-label="選擇幼兒">
+        ${children
+          .map(c => `<button type="button" class="child-switch__button" data-switch-child="${escapeHtml(c.id)}" aria-pressed="${c.id === activeId}">${escapeHtml(c.name)}</button>`)
+          .join('')}
       </div>
     </div>
   `;
 }
 
+function copyConfirmMessage(targetName, sourceName, currentCount, sourceCount) {
+  return currentCount > 0
+    ? `${targetName}目前的 ${currentCount} 筆會換成${sourceName}的 ${sourceCount} 筆，未達成、請假的勾選不會複製。\n確定要套用嗎？`
+    : `要把${sourceName}的 ${sourceCount} 筆套用給${targetName}嗎？`;
+}
+
 export async function renderMonthlyPlanEditorView(
   container,
-  { plan, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false) }
+  { plan, onBack, confirmDelete = message => (typeof confirm === 'function' ? confirm(message) : false), confirmCopy }
 ) {
   // See formEditorView.js's identical guard: opening the plan clears the 新 badge shown on
   // monthlyPlanListView.js's row, and mutating `plan` (not just the DB) prevents repeating this
@@ -198,11 +198,13 @@ export async function renderMonthlyPlanEditorView(
       <button type="button" class="btn btn--ghost" data-action="back">${headerButtonLabel('← 返回課程月計畫列表', '← 返回')}</button>
       <h2 class="page-header__title">${escapeHtml(plan.period)} 課程月計畫</h2>
       <div class="page-header__actions">
+        <button type="button" class="btn btn--purple" data-action="copy-monthly-plan">${headerButtonLabel('套用其他幼兒月計畫', '套用')}</button>
         <button type="button" class="btn btn--purple" data-action="manage-children">${headerButtonLabel('管理幼兒', '管理')}</button>
         <button type="button" class="btn btn--purple" data-action="export-docx">${headerButtonLabel('匯出 Word', '匯出')}</button>
       </div>
     </div>
     <p class="field-error field-error--center" data-error="export"></p>
+    <div data-copy-plan-host></div>
     ${planToolbarHtml(data.children, activeChildId)}
     <div class="tab-layout">
       <div class="monthly-calendar-list">
@@ -245,19 +247,10 @@ export async function renderMonthlyPlanEditorView(
 
   container.querySelector('[data-action="back"]').addEventListener('click', onBack);
 
-  // 指定新增: while on, a new item goes only to the shown child — plus any same-tier classmates
-  // picked by tapping their names, each getting their own separate copy — as a 個別項目, for a run
-  // of make-up lessons without re-choosing each time. Shared items are locked meanwhile, so
-  // nothing done in this mode reaches the rest of the tier. The names pick classmates instead of
-  // switching child while it's on; leaving the plan turns it off.
-  let individualAdd = false;
   let currentChildId = activeChildId;
-  const alsoAddIds = new Set(); // kept across adds while the mode stays on
   const currentChild = () => data.children.find(c => c.id === currentChildId);
-  const isClassmate = c => c.id !== currentChildId && plan.childTiers[c.id] === plan.childTiers[currentChildId];
 
-  // Phone only (styles.css): the folded name list. Opened when 指定新增 turns on, since picking
-  // classmates means tapping their names.
+  // Phone only (styles.css): the folded name list.
   function setNamesOpen(open) {
     const toolbar = container.querySelector('.monthly-plan-toolbar');
     toolbar?.classList.toggle('monthly-plan-toolbar--open', open);
@@ -268,69 +261,51 @@ export async function renderMonthlyPlanEditorView(
     setNamesOpen(!container.querySelector('.monthly-plan-toolbar').classList.contains('monthly-plan-toolbar--open'));
   });
 
-  function setIndividualAdd(on) {
-    individualAdd = on;
-    alsoAddIds.clear();
-    const toggle = container.querySelector('[data-individual-add]');
-    if (toggle) toggle.checked = on;
-    container.querySelector('.tab-layout').classList.toggle('tab-layout--individual', on);
-    container.querySelector('.monthly-plan-toolbar')?.classList.toggle('monthly-plan-toolbar--individual', on);
-    if (on) setNamesOpen(true);
-    syncIndividualUi();
-  }
-
-  function individualNames() {
-    return [currentChild(), ...data.children.filter(c => alsoAddIds.has(c.id))].map(c => c.name).join('、');
-  }
-
-  // Updates the toolbar and the open panel in place (no re-render), so text already typed into
-  // the add form survives a toggle or a name tap.
-  function syncIndividualUi() {
-    container.querySelectorAll('[data-switch-child]').forEach(button => {
-      const child = data.children.find(c => String(c.id) === button.dataset.switchChild);
-      button.classList.toggle('child-switch__button--also', alsoAddIds.has(child.id));
-      button.disabled = individualAdd && child.id !== currentChildId && !isClassmate(child);
-    });
-    const hint = container.querySelector('[data-individual-hint]');
-    if (hint) hint.hidden = !individualAdd || !data.children.some(isClassmate);
-    const current = container.querySelector('[data-child-switch-current]');
-    if (current) current.textContent = currentChild().name + (individualAdd && alsoAddIds.size ? ` ＋${alsoAddIds.size}` : '');
-    const panelItems = container.querySelector('[data-panel-items]');
-    const note = panelItems.querySelector('[data-individual-note]');
-    if (note) {
-      note.hidden = !individualAdd;
-      note.textContent = `新增項目只給${individualNames()}；共用項目暫停編輯、刪除。`;
-    }
-  }
-
-  container.querySelector('[data-individual-add]')?.addEventListener('change', event => setIndividualAdd(event.target.checked));
-
   container.querySelectorAll('[data-switch-child]').forEach(button => {
     button.addEventListener('click', () => {
-      const tapped = data.children.find(c => String(c.id) === button.dataset.switchChild);
-      if (individualAdd) {
-        if (!isClassmate(tapped)) return;
-        if (alsoAddIds.has(tapped.id)) alsoAddIds.delete(tapped.id);
-        else alsoAddIds.add(tapped.id);
-        syncIndividualUi();
-        return;
-      }
+      const tapped = data.children.find(c => String(c.id) === button.dataset.switchChild); // dataset is a string, ids may be numbers
       currentChildId = tapped.id;
+      activeChildByPlan.set(plan.id, tapped.id);
       setNamesOpen(false);
-      syncIndividualUi();
-      const childId = button.dataset.switchChild; // a string, while child ids may be numbers
-      activeChildByPlan.set(plan.id, data.children.find(c => String(c.id) === childId)?.id);
+      container.querySelector('[data-child-switch-current]').textContent = tapped.name;
       container.querySelectorAll('[data-switch-child]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
-      container.querySelectorAll('.monthly-calendar').forEach(section => { section.hidden = section.dataset.childId !== childId; });
+      container.querySelectorAll('.monthly-calendar').forEach(section => { section.hidden = section.dataset.childId !== button.dataset.switchChild; });
       // The open cell belongs to the previous child — drop it so the panel (and the FAB) can't
-      // keep editing that child's overrides while another child's calendar is on screen.
+      // keep editing that child's items while another child's calendar is on screen.
       selected = null;
       container.querySelectorAll('.monthly-calendar__day--selected').forEach(el => el.classList.remove('monthly-calendar__day--selected'));
       container.querySelector('[data-panel-header]').textContent = IDLE_PANEL_HINT;
       renderPanelItems();
       updateFabVisibility();
+      renderCopyPanel();
     });
   });
+
+  // 套用其他幼兒月計畫: replaces the shown child's whole month with a copy of another child's.
+  function renderCopyPanel() {
+    const target = currentChild();
+    if (!target) return;
+    const counts = childItemCounts(plan, Object.values(data.itemsBySlotId).flat());
+    const sources = data.children.filter(c => c.id !== target.id && counts.get(c.id) > 0);
+    // Redrawn whenever counts or the shown child change; a fresh button drops the last wiring.
+    const oldTrigger = container.querySelector('[data-action="copy-monthly-plan"]');
+    const trigger = oldTrigger.cloneNode(true);
+    oldTrigger.replaceWith(trigger);
+    renderCopyFromChildPanel(container.querySelector('[data-copy-plan-host]'), {
+      trigger,
+      title: '套用其他幼兒月計畫',
+      emptyText: '這份月計畫裡沒有其他已排課的幼兒。',
+      sources: sources.map(c => ({ id: c.id, label: `${c.name}（${counts.get(c.id)} 筆）` })),
+      confirmMessage: async id => {
+        const source = data.children.find(c => c.id === id);
+        return copyConfirmMessage(target.name, source.name, counts.get(target.id), counts.get(id));
+      },
+      copy: id => copyMonthlyPlan({ plan, targetChildId: target.id, sourceChildId: id }),
+      onChange: () => renderMonthlyPlanEditorView(container, { plan, onBack, confirmDelete, confirmCopy }),
+      confirmCopy,
+    });
+  }
+  renderCopyPanel();
 
   const manageChildrenForm = container.querySelector('[data-manage-children-form]');
 
@@ -507,9 +482,8 @@ export async function renderMonthlyPlanEditorView(
       : escapeHtml(item.activityName);
 
     return `
-      <div class="indicator-block" data-panel-item="${escapeHtml(item.id)}" ${item.childId === undefined ? 'data-shared-item' : ''}>
+      <div class="indicator-block" data-panel-item="${escapeHtml(item.id)}">
         <h4 class="indicator-block__title">
-          ${item.childId !== undefined ? '<span class="indicator-block__code">個別</span>' : ''}
           ${item.indicatorCode ? `<span class="indicator-block__code">${escapeHtml(item.indicatorCode)}</span>` : ''}
           ${summaryText}
           <span class="indicator-block__actions">
@@ -575,7 +549,6 @@ export async function renderMonthlyPlanEditorView(
     const childProgress = data.progress.get(child.id) || new Map();
 
     panelItems.innerHTML = `
-      <p class="individual-add-note" data-individual-note hidden></p>
       ${items.map(item => panelItemRowHtml(item, overrideByItemId.get(item.id))).join('')}
       <form class="entry-form" data-action="add-item">
         <div class="panel-form__field">
@@ -603,8 +576,6 @@ export async function renderMonthlyPlanEditorView(
         <p class="field-error" data-error></p>
       </form>
     `;
-
-    syncIndividualUi();
 
     panelItems.querySelectorAll('[data-indicator-tier]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -717,16 +688,7 @@ export async function renderMonthlyPlanEditorView(
         return;
       }
       try {
-        if (individualAdd) {
-          // Each picked classmate gets their own separate copy, so editing or deleting one child's
-          // copy never touches another's.
-          const extraIds = data.children.filter(c => alsoAddIds.has(c.id) && plan.childTiers[c.id] === tier).map(c => c.id);
-          for (const childId of [child.id, ...extraIds]) {
-            await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText, childId });
-          }
-        } else {
-          await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText });
-        }
+        await addPlanSlotItem({ slotId: slot.id, indicatorCode, activityName, indicatorText, childId: child.id });
         await refreshCellAndPanel();
       } catch (err) {
         panelItems.querySelector('[data-action="add-item"] [data-error]').textContent = '新增失敗，請再試一次';
@@ -743,27 +705,14 @@ export async function renderMonthlyPlanEditorView(
         discardInput(form);
         form.hidden = true;
       });
-      // 指定新增 hides a shared item's 編輯/× (styles.css); this backs that up.
-      const lockedNow = () => individualAdd && item.childId === undefined;
       panelItems.querySelector(`[data-item-edit-save-for="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
-        if (lockedNow()) return;
         const activityName = panelItems.querySelector(`[data-item-edit-field="activityName"][data-item-id="${escapeHtml(item.id)}"]`).value;
         const indicatorText = panelItems.querySelector(`[data-item-edit-field="indicatorText"][data-item-id="${escapeHtml(item.id)}"]`).value;
         await updatePlanSlotItem(item.id, { activityName, indicatorText });
         await refreshCellAndPanel();
       }));
       panelItems.querySelector(`[data-delete-item="${item.id}"]`).addEventListener('click', oneAtATime(async () => {
-        if (lockedNow()) return;
-        // An item is shared by every same-tier child (and takes their 請假／未達成 marks with it),
-        // though the panel shows only the one child that was clicked — say so before deleting.
-        const name = item.activityName || item.indicatorCode;
-        const sharedCount = data.children.filter(c => plan.childTiers[c.id] === selected.tier).length;
-        const sharedNote = sharedCount > 1
-          ? `同階段的 ${sharedCount} 位幼兒都會一起刪除這個項目，以及他們在這個項目上的請假／未達成標記。`
-          : '';
-        const message = item.childId !== undefined
-          ? `確定要刪除${child.name}的個別項目「${name}」嗎？此操作無法復原。`
-          : `確定要刪除「${name}」嗎？${sharedNote}此操作無法復原。`;
+        const message = `確定要刪除${child.name}的「${item.activityName || item.indicatorCode}」嗎？此操作無法復原。`;
         if (!confirmDelete(message)) return;
         await deletePlanSlotItem(item.id);
         await refreshCellAndPanel();
@@ -799,10 +748,10 @@ export async function renderMonthlyPlanEditorView(
     }
   }
 
-  // Re-reads this one (tier, week, weekday) slot and rewrites every child's cell that shares it
-  // (same tier → same slot, per the shared-per-tier design), then redraws the panel.
+  // Re-reads the plan's items and rewrites the selected child's cell (items belong to one child,
+  // so no other cell changes), then redraws the panel.
   async function refreshCellAndPanel() {
-    const { tier, week, day } = selected;
+    const { child, tier, week, day } = selected;
     const freshSlots = await listPlanSlotsForPlan(plan.id);
     const freshItemsBySlotId = {};
     for (const slot of freshSlots) {
@@ -817,17 +766,11 @@ export async function renderMonthlyPlanEditorView(
     data.itemsBySlotId = freshItemsBySlotId;
     data.overrideByKey = freshOverrideByKey;
 
-    for (const child of data.children) {
-      if (plan.childTiers[child.id] !== tier) continue;
-      const cell = container.querySelector(
-        `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
-      );
-      cell.outerHTML = dayCellHtml(child, tier, week, day, data);
-      const freshCell = container.querySelector(
-        `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`
-      );
-      freshCell.addEventListener('click', () => handleCellTap(child, tier, week, day));
-    }
+    const cellSelector =
+      `.monthly-calendar__day[data-child-id="${child.id}"][data-week-index="${week.weekIndex}"][data-weekday="${day.weekday}"]`;
+    container.querySelector(cellSelector).outerHTML = dayCellHtml(child, tier, week, day, data);
+    container.querySelector(cellSelector).addEventListener('click', () => handleCellTap(child, tier, week, day));
+    renderCopyPanel(); // the 套用 picker's counts
     await renderPanelItems();
   }
 
