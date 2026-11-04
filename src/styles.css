@@ -3313,6 +3313,9 @@ fieldset.panel-form__field.import-preview__child legend {
   background: var(--brand-tint); color: var(--brand-dark); font-weight: 600; text-decoration: none;
 }
 .help-video__jump svg { width: 1em; height: 1em; }
+/* A chapter whose part of the video shows an older screen (HELP_VIDEO_OUTDATED). */
+.help-video__outdated { display: block; color: var(--danger); font-size: 0.8rem; }
+.help-video__chapters .help-video__outdated { padding: 0 0.6rem 0.3rem calc(2.6em + 1.35rem); }
 .help-section-title { margin: 1.75rem 0 0.6rem; font-size: 1.05rem; }
 .help-section-title small { display: block; margin-top: 0.15rem; font-weight: 400; font-size: 0.85rem; color: var(--text-secondary); }
 

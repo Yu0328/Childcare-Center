@@ -290,22 +290,23 @@ const planList = (m, { fabHit = false, popup = false, hitSubmit = false } = {}) 
 
 // The month calendar: one child at a time, a week of day cells.
 const DAYS = [['10/06', ''], ['10/07', 'Ⅴ-1-6【我愛畫畫】'], ['10/08', ''], ['10/09', 'Ⅴ-2-1【積木疊高】'], ['10/10', '']];
-// The child picker + 指定新增 toggle. On a phone the names fold behind one 「王小明 ▾」 button and
-// open (namesOpen) into the list; while 指定新增 is on, a tapped classmate reads 「✓ 林小美」.
-const kidsRow = (m, { individual = false, hitToggle = false, picked = false, hitKid = false, namesOpen = false } = {}) => {
-  const kid = btn(picked ? '✓ 林小美' : '林小美', picked ? 'edit' : '', hitKid);
-  const toggle = cb('指定新增', individual || hitToggle, hitToggle);
-  if (m === 'desk') return `<div class="ms-cal__kids">${btn('王小明', 'brand')}${kid}${toggle}</div>`;
-  const folded = `<div class="ms-cal__kids">${btn(picked ? '王小明 ＋1 ▾' : '王小明 ▾', 'brand')}${toggle}</div>`;
-  return namesOpen ? `${folded}<div class="ms-cal__kids">${btn('王小明', 'brand')}${kid}</div>` : folded;
+// The child picker. On a phone the names fold behind one 「王小明 ▾」 button and open (namesOpen)
+// into the list.
+const kidsRow = (m, { who = '王小明', hitKid = false, namesOpen = false } = {}) => {
+  const kids = `${btn('王小明', who === '王小明' ? 'brand' : '')}${btn('林小美', who === '林小美' ? 'brand' : '', hitKid)}`;
+  if (m === 'desk') return `<div class="ms-cal__kids">${kids}</div>`;
+  const folded = `<div class="ms-cal__kids">${btn(`${who} ▾`, 'brand', hitKid && !namesOpen)}</div>`;
+  return namesOpen ? `${folded}<div class="ms-cal__kids">${kids}</div>` : folded;
 };
-const calendar = (m, { hitDay = -1, newItem = false, absent = false, makeup = false, kids = {} } = {}) =>
-  `<div class="ms-cal">${kidsRow(m, kids)}<span class="ms-group">第二週　10/06–10/10</span><div class="ms-cal__week">${DAYS.map(
+// 林小美's month before 套用: one 戶外散步 on Monday, nothing else.
+const EMPTY_DAYS = [['10/06', 'Ⅴ-1-1【戶外散步】'], ['10/07', ''], ['10/08', ''], ['10/09', ''], ['10/10', '']];
+const calendar = (m, { hitDay = -1, newItem = false, absent = false, makeup = false, kids = {}, days = DAYS } = {}) =>
+  `<div class="ms-cal">${kidsRow(m, kids)}<span class="ms-group">第二週　10/06–10/10</span><div class="ms-cal__week">${days.map(
     ([d, item], i) =>
       `<span class="ms-day"${i === hitDay ? ' data-hit' : ''}><b>${d}</b>${
         i === 1 && absent ? '<em class="ms-struck">戶外教學</em>' : item ? `<em>${item}</em>` : ''
       }${i === 2 && newItem ? '<em class="ms-fill">Ⅴ-3-2【故事時間】</em>' : ''}${
-        i === 4 && makeup ? `<em class="ms-fill">${code('個別')}Ⅴ-2-1【積木疊高】</em>` : ''
+        i === 4 && makeup ? '<em class="ms-fill">Ⅴ-2-1【積木疊高】</em>' : ''
       }</span>`
   ).join('')}</div></div>`;
 const dayPanel = ({ hitAdd = false, hitAbsent = false, absent = false } = {}) =>
@@ -314,20 +315,20 @@ const dayPanel = ({ hitAdd = false, hitAbsent = false, absent = false } = {}) =>
   )}<div class="ms-cbline">${cb('未達成')}${cb('請假／其他活動代替', absent, hitAbsent)}</div>${absent ? field('', '戶外教學') : ''}${
     hitAdd ? `${tierSwitch()}${muted(`${dot('achieved')}已達成　${dot('developing')}未達成　${dot('none')}還沒做過`)}${field('指標', 'Ⅴ-3-2')}${muted(`${dot('developing')}未達成 王小明　${dot('none')}還沒做過 林小美`)}${field('活動名稱', '故事時間')}${actions(btn('新增', 'primary', true))}` : ''
   }</div>`;
-// 指定新增 on: the panel's note names who gets the new item.
 const makeupPanel = () =>
-  `<div class="ms-aside"><b>王小明　第二週　10/10</b><span class="ms-field ms-field--bare">新增項目只給王小明、林小美；共用項目暫停編輯、刪除。</span>${field('指標', 'Ⅴ-2-1')}${field('活動名稱', '積木疊高')}${actions(btn('新增', 'primary', true))}</div>`;
-const planEditor = (m, { hitDay = -1, panel = '', hitExport = false, newItem = false, absent = false, makeup = false, kids = {} } = {}) =>
+  `<div class="ms-aside"><b>王小明　第二週　10/10</b>${field('指標', 'Ⅴ-2-1')}${field('活動名稱', '積木疊高')}${actions(btn('新增', 'primary', true))}</div>`;
+const planCopyPopup = modal('套用其他幼兒月計畫', `<span class="ms-field ms-field--bare">幼兒</span>${radio('王小明（2 筆）', true)}`, btn('套用', 'primary', true) + btn('取消'));
+const planEditor = (m, { hitDay = -1, panel = '', hitExport = false, hitCopy = false, newItem = false, absent = false, makeup = false, kids = {}, days, extra = '' } = {}) =>
   screen(
     bar(m, {
       back: '← 返回課程月計畫列表',
       title: '115年10月 課程月計畫',
-      actions: btn(pick(m, '管理幼兒', '管理'), 'purple') + btn(pick(m, '匯出 Word', '匯出'), 'purple', hitExport),
+      actions: btn(pick(m, '套用其他幼兒月計畫', '套用'), 'purple', hitCopy) + btn(pick(m, '管理幼兒', '管理'), 'purple') + btn(pick(m, '匯出 Word', '匯出'), 'purple', hitExport),
     }),
-    `<div class="ms-main">${calendar(m, { hitDay, newItem, absent, makeup, kids })}${m === 'desk' ? panel : ''}</div>`,
-    m === 'phone' && panel ? `<div class="ms-modal"><div class="ms-dialog ms-dialog--form">${panel}</div></div>` : ''
+    `<div class="ms-main">${calendar(m, { hitDay, newItem, absent, makeup, kids, days })}${m === 'desk' ? panel : ''}</div>`,
+    m === 'phone' && panel ? `<div class="ms-modal"><div class="ms-dialog ms-dialog--form">${panel}</div></div>` : '',
+    extra
   );
-
 const MONTHLY = {
   id: 'monthly-plan',
   title: '課程月計畫',
@@ -347,11 +348,36 @@ const MONTHLY = {
     {
       id: 'plan-day',
       title: '安排一天的活動',
-      note: '活動是同年齡層的幼兒共用的，刪除一個活動，同階段的幼兒都會一起刪掉。要只給一位幼兒，見「幫一位幼兒補課」。',
+      note: '每位幼兒的月計畫是各自獨立的：在誰的月曆上新增、修改、刪除，只會改到那位幼兒。要讓其他幼兒照著排，見「套用其他幼兒的月計畫」。',
       steps: [
         { cap: { desk: '按一下日期格子', phone: '在日期格子上連按兩下' }, draw: m => planEditor(m, { hitDay: 2 }) },
         { cap: '選指標、填活動名稱，按「新增」', draw: m => planEditor(m, { panel: dayPanel({ hitAdd: true }) }) },
-        { cap: '活動加到這一天了', draw: m => planEditor(m, { newItem: true }) },
+        { cap: '活動加到王小明這一天了', draw: m => planEditor(m, { newItem: true }) },
+      ],
+    },
+    {
+      id: 'plan-copy',
+      title: '套用其他幼兒的月計畫',
+      lead: '先把一位幼兒的月計畫排好，其他幼兒直接套用，不用一天一天重排。',
+      note: '套用會把這位幼兒原本的安排整個換掉；「未達成」「請假／其他活動代替」不會跟著複製，請再依每位幼兒的狀況勾選。',
+      steps: [
+        {
+          cap: { desk: '點「林小美」切換到她的月曆', phone: '按「王小明 ▾」，點「林小美」切換到她的月曆' },
+          draw: m => planEditor(m, { kids: { hitKid: true, namesOpen: m === 'phone' } }),
+        },
+        {
+          cap: { desk: '按上方的「套用其他幼兒月計畫」', phone: '按右上角的「套用」' },
+          draw: m => planEditor(m, { hitCopy: true, days: EMPTY_DAYS, kids: { who: '林小美' } }),
+        },
+        { cap: '選要照著排的幼兒，按「套用」', draw: m => planEditor(m, { days: EMPTY_DAYS, kids: { who: '林小美' }, extra: planCopyPopup }) },
+        {
+          cap: '提醒原本的安排會被換掉，沒問題就按「確定」',
+          draw: m => planEditor(m, {
+            days: EMPTY_DAYS, kids: { who: '林小美' },
+            extra: confirmBox('林小美目前的 1 筆會換成王小明的 2 筆，未達成、請假的勾選不會複製。確定要套用嗎？'),
+          }),
+        },
+        { cap: '林小美的月曆變得和王小明一樣了', draw: m => planEditor(m, { kids: { who: '林小美' } }) },
       ],
     },
     {
@@ -365,19 +391,13 @@ const MONTHLY = {
     {
       id: 'plan-makeup',
       title: '幫一位幼兒補課',
-      note: '指定新增開著時，共用項目暫停編輯、刪除；切換幼兒前先把它關掉。',
       steps: [
-        { cap: '在王小明的月曆勾「指定新增」', draw: m => planEditor(m, { kids: { hitToggle: true } }) },
         {
-          cap: '同階段還有人要一起補課，就點他的名字（不用就跳過）',
-          draw: m => planEditor(m, { kids: { individual: true, hitKid: true, namesOpen: true } }),
+          cap: { desk: '在王小明的月曆上，按一下補課那天的格子', phone: '在王小明的月曆上，在補課那天的格子上連按兩下' },
+          draw: m => planEditor(m, { hitDay: 4 }),
         },
-        {
-          cap: { desk: '按一下補課那天的格子', phone: '在補課那天的格子上連按兩下' },
-          draw: m => planEditor(m, { hitDay: 4, kids: { individual: true, picked: true } }),
-        },
-        { cap: '選好指標，按「新增」', draw: m => planEditor(m, { panel: makeupPanel(), kids: { individual: true, picked: true } }) },
-        { cap: '王小明和林小美的格子各多了這堂課，標著「個別」', draw: m => planEditor(m, { makeup: true, kids: { individual: true, picked: true } }) },
+        { cap: '選好指標，按「新增」', draw: m => planEditor(m, { panel: makeupPanel() }) },
+        { cap: '這堂課只加在王小明的月曆上，其他幼兒不受影響', draw: m => planEditor(m, { makeup: true }) },
       ],
     },
     {
@@ -824,6 +844,11 @@ export const HELP_CHAPTERS = [START, CHILDREN_CH, IMPORT, MONTHLY, PARENT_REPORT
 // The two 完整操作教學 videos on YouTube, one per 手機版／電腦版. `chapters` is each help chapter's
 // start (seconds) in that video, copied from the chapter list in its YouTube description — when a
 // video is re-uploaded or re-cut, update the id and these times together.
+// Chapters whose part of the video shows an older screen than the app's (課程月計畫 changed
+// 2026-11). Drop an id once that part is re-recorded and HELP_VIDEOS updated.
+export const HELP_VIDEO_OUTDATED = new Set(['monthly-plan']);
+export const OUTDATED_NOTE = '此段為舊版畫面，請參考下方文字說明';
+
 export const HELP_VIDEOS = {
   desk: {
     id: 'OjBdyI0x72g',

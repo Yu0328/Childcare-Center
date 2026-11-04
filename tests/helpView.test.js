@@ -132,3 +132,15 @@ describe('renderHelpView', () => {
     expect(src()).toContain('start=97');
   });
 });
+
+describe('helpView: a video chapter that shows an older screen', () => {
+  it('notes it beside the 課程月計畫 chapter link and in the chapter list', async () => {
+    const { renderHelpView } = await import('../src/ui/helpView.js');
+    const container = document.createElement('div');
+    await renderHelpView(container, { onBack: () => {}, hosted: true });
+    const notes = [...container.querySelectorAll('.help-video__outdated')];
+    expect(notes.length).toBe(2);
+    expect(notes.every(n => n.textContent === '此段為舊版畫面，請參考下方文字說明')).toBe(true);
+    expect(notes.some(n => n.closest('#help-panel-monthly-plan'))).toBe(true);
+  });
+});

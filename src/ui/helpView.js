@@ -1,4 +1,4 @@
-import { HELP_CHAPTERS, HELP_VIDEOS } from './helpContent.js';
+import { HELP_CHAPTERS, HELP_VIDEOS, HELP_VIDEO_OUTDATED, OUTDATED_NOTE } from './helpContent.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { isMobile } from './formPopup.js';
 import { mountDemo } from './helpDemo.js';
@@ -71,7 +71,7 @@ export async function renderHelpView(container, { onBack, hosted = false }) {
             </h3>
             <div class="help-ch__panel" id="help-panel-${chapter.id}" inert>
               <div class="help-ch__body">
-                ${chapter.id in HELP_VIDEOS.desk.chapters ? `<a class="help-video__jump" data-chapter="${chapter.id}" target="_blank" rel="noopener">${PLAY_ICON}看影片的這一段</a>` : ''}
+                ${chapter.id in HELP_VIDEOS.desk.chapters ? `<a class="help-video__jump" data-chapter="${chapter.id}" target="_blank" rel="noopener">${PLAY_ICON}看影片的這一段</a>${HELP_VIDEO_OUTDATED.has(chapter.id) ? `<small class="help-video__outdated">${OUTDATED_NOTE}</small>` : ''}` : ''}
                 ${chapter.intro ? `<p class="help-ch__intro">${chapter.intro}</p>` : ''}
                 ${(chapter.demos || [])
                   .map(demo => `${demo.webOnly ? WEB_ONLY : ''}<article class="help-demo" data-demo="${demo.id}"></article>`)
@@ -115,7 +115,7 @@ export async function renderHelpView(container, { onBack, hosted = false }) {
     videoBox.querySelector('.help-video__chapters').innerHTML = HELP_CHAPTERS.filter(chapter => chapter.id in video.chapters)
       .map(chapter => {
         const at = video.chapters[chapter.id];
-        return `<li><a href="${watchUrl(video, at)}" target="_blank" rel="noopener" data-seek="${at}"><span>${clock(at)}</span>${chapter.title}</a></li>`;
+        return `<li><a href="${watchUrl(video, at)}" target="_blank" rel="noopener" data-seek="${at}"><span>${clock(at)}</span>${chapter.title}</a>${HELP_VIDEO_OUTDATED.has(chapter.id) ? `<small class="help-video__outdated">${OUTDATED_NOTE}</small>` : ''}</li>`;
       })
       .join('');
     container.querySelectorAll('.help-video__jump').forEach(jump => {
