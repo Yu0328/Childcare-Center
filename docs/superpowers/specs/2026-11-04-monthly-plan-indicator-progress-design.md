@@ -8,9 +8,9 @@
 
 資料來源：這位幼兒**所有**的適性總表（ObservationEntry）和適性紀錄（家長版）課程計畫表（CourseOccurrence，經 coursePlanEntry 取得指標代碼），不分月份、不分階段。
 
-- 有任何一筆 ○（`developed`）→ 🟢 已達成
-- 否則有任何一筆 △（`developing`）→ 🟠 未達成
-- 否則（沒有紀錄，或只有請假／更換課程）→ ⚪ 還沒做過
+- 有任何一筆 ○（`developed`）→ 已達成（綠點）
+- 否則有任何一筆 △（`developing`）→ 未達成（橘點）
+- 否則（沒有紀錄，或只有請假／更換課程）→ 還沒做過（灰點）
 
 請假／更換課程不算觀察：總表的 `absent`／`courseChanged` 狀態，以及家長版 occurrence 勾了 `absent` 或 `courseChanged` 的，都略過。
 
