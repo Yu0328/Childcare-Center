@@ -2969,17 +2969,17 @@ fieldset.panel-form__field.import-preview__child legend {
 .indicator-option--achieved { background: #e6f4ea; }
 .indicator-option--developing { background: #fdf0e3; }
 .indicator-option--none { color: #8a8a8a; }
-.progress-dot {
-  display: inline-block;
-  width: 0.6em;
-  height: 0.6em;
-  margin-right: 0.35em;
-  border-radius: 50%;
-  vertical-align: 0.05em;
+/* Same △-size fix as .entry-row__mark: most fonts draw △ tiny beside ○. Segoe UI Symbol comes first
+   only for the glyphs it has; Chinese still falls through to the normal UI fonts. */
+[data-field="new-item-indicator"],
+[data-field="new-item-indicator"] option,
+.progress-mark {
+  font-family: "Segoe UI Symbol", system-ui, -apple-system, "Microsoft JhengHei", "PingFang TC", sans-serif;
 }
-.progress-dot--achieved { background: #34a853; }
-.progress-dot--developing { background: #f28b30; }
-.progress-dot--none { background: #c4c4c4; }
+.progress-mark { margin-right: 0.25em; font-weight: 700; }
+.progress-mark--achieved { color: #2e9a4b; }
+.progress-mark--developing { color: #e07a1f; }
+.progress-mark--none { color: #b0b0b0; }
 .indicator-progress-legend {
   display: flex;
   gap: 1em;

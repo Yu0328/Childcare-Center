@@ -686,7 +686,7 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     const select = container.querySelector('[data-field="new-item-indicator"]');
 
     const option = code => select.querySelector(`option[value="${code}"]`);
-    expect(option('Ⅴ-1-1').textContent.startsWith('🟢')).toBe(true);
+    expect(option('Ⅴ-1-1').textContent.startsWith('○')).toBe(true);
     expect(option('Ⅴ-1-1').className).toBe('indicator-option--achieved');
     expect(option('Ⅴ-1-2').className).toBe('indicator-option--none');
     expect(container.querySelector('[data-indicator-legend]').textContent).toContain('未達成');

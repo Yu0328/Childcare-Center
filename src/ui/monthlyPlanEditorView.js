@@ -50,17 +50,19 @@ async function loadEditorData(plan) {
   return { children, slots, itemsBySlotId, overrideByKey, weeks, progress };
 }
 
-// 指標 picker marks (see indicatorProgress.js). Phones and Safari ignore an <option>'s styling, so
-// inside the <select> an emoji dot carries the meaning (none gets a blank of the same width — a
-// list of mostly 還沒做過 stays quiet) and the tint/grey text is a bonus where it shows. The legend
-// and roster are ordinary HTML, so they draw exact-colour CSS dots instead.
+// 指標 picker marks (see indicatorProgress.js), in the 總表's own ○／△ vocabulary. Phones and
+// Safari ignore an <option>'s styling, so inside the <select> the plain glyph carries the meaning
+// (none gets a blank of the same width — a list of mostly 還沒做過 stays quiet) and the tint/grey
+// text is a bonus where it shows. Plain glyphs, not emoji: Windows draws emoji dots as 3D blobs.
+// The legend and roster are ordinary HTML, so their glyphs are coloured.
 const PROGRESS_MARKS = [
-  ['achieved', '🟢', '已達成'],
-  ['developing', '🟠', '未達成'],
+  ['achieved', '○', '已達成'],
+  ['developing', '△', '未達成'],
   ['none', '　', '還沒做過'],
 ];
 const PROGRESS_DOT = Object.fromEntries(PROGRESS_MARKS.map(([state, dot]) => [state, dot]));
-const progressLabelHtml = (state, label) => `<span class="progress-dot progress-dot--${state}"></span>${label}`;
+const progressLabelHtml = (state, label) =>
+  `<span class="progress-mark progress-mark--${state}">${state === 'none' ? '－' : PROGRESS_DOT[state]}</span>${label}`;
 const PROGRESS_LEGEND = PROGRESS_MARKS.map(([state, , label]) => `<span>${progressLabelHtml(state, label)}</span>`).join('');
 
 function findSlot(slots, tier, weekIndex, weekday) {
