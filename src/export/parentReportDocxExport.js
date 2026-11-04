@@ -179,7 +179,7 @@ function occurrenceNoteParagraphs(row) {
   }));
 }
 
-function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }) {
+function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry, fillHeight }) {
   const domainName = group.indicator ? group.indicator.domainName : '';
   const description = group.entry.indicatorText || '';
   // Fix 2: domain shading spans the entire row in the real sample, not just the 發展領域 column —
@@ -189,6 +189,7 @@ function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }
 
   return new TableRow({
     cantSplit: true, // a split last row left a near-empty page holding only its final line
+    ...(fillHeight ? { height: { value: fillHeight, rule: HeightRule.ATLEAST } } : {}),
     children: [
       mergedCell(0, [textParagraph(domainName, { bold: true, ...CENTERED })], isFirstRowOfDomain, domainShading),
       mergedCell(1, [textParagraph(group.entry.indicatorCode, CENTERED)], isFirstRowOfEntry, domainShading),
@@ -212,14 +213,66 @@ function coursePlanBodyRow(group, row, { isFirstRowOfDomain, isFirstRowOfEntry }
   });
 }
 
+// ── Filling a short 課程計畫表 down to the page bottom ──────────────────────────────────────
+// Word has no "stretch this table to the page" setting, so the rows' natural heights are
+// estimated here: a 12pt 標楷體 full-width character is 240 twips wide (half that for ASCII), and
+// each line is LINE_TWIPS tall. When the whole table fits on the first page, every body row gets
+// the same minimum height H — the tallest H that still fits — so short rows grow evenly while
+// rows already taller than H stay as they are. A table that runs past one page is left alone.
+// The constants were measured in Word COM on rendered exports (2026-11-04): a 4-line entry adds
+// 63.6pt (so 15.6pt a line plus ~0.5pt of border per row); the table's first body row starts
+// ~177pt down the page (page header + the 4-line column-header row); the page body ends at
+// 841.9 − 36 = 805.9pt. Seen there, the trailing section-break paragraph needs no room of its own.
+const LINE_TWIPS = 312;
+const ROW_BORDER_TWIPS = 10;
+const TABLE_BODY_TOP_TWIPS = 3540;
+const PAGE_BODY_BOTTOM_TWIPS = 16118;
+// One line of slack, so a slightly short estimate (an unexpected wrap) still stays on page one.
+const FILL_TARGET_TWIPS = PAGE_BODY_BOTTOM_TWIPS - TABLE_BODY_TOP_TWIPS - LINE_TWIPS;
+
+function textWidthTwips(text) {
+  let width = 0;
+  for (const ch of text) width += ch.charCodeAt(0) < 0x2000 ? 120 : 240;
+  return width;
+}
+
+export function estimateLines(text, columnIndex) {
+  const usable = COURSE_PLAN_COLUMN_WIDTHS[columnIndex] - 2 * TABLE_CELL_MARGIN_DXA;
+  return String(text ?? '').split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil(textWidthTwips(line) / usable)), 0);
+}
+
+// Returns the minimum body-row height (twips) that fills the page, or null when the table
+// doesn't fit on one page (or there's nothing to fill). A row set to "at least h" renders
+// max(its text, h) plus its border.
+export function coursePlanFillHeight(groups) {
+  const estimated = groups.map(group => ({
+    rows: group.rows.map(row => Math.max(1, estimateLines(formatNoteText(row), 4)) * LINE_TWIPS),
+    // The 活動名稱 cell spans all of this entry's rows: 【name】 plus its 指標內容 lines.
+    merged: (estimateLines(`【${group.entry.activityName}】`, 2) + estimateLines(group.entry.indicatorText || '', 2)) * LINE_TWIPS,
+  }));
+  const total = h => estimated.reduce((sum, g) => sum + g.rows.length * ROW_BORDER_TWIPS +
+    Math.max(g.rows.reduce((s, r) => s + Math.max(r, h), 0), g.merged), 0);
+  if (groups.length === 0 || total(0) > FILL_TARGET_TWIPS) return null;
+  let low = 0;
+  let high = FILL_TARGET_TWIPS;
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    if (total(mid) <= FILL_TARGET_TWIPS) low = mid;
+    else high = mid;
+  }
+  return low;
+}
+
 export function buildCoursePlanTable(entries, occurrencesByEntryId, tier) {
   const groups = buildCoursePlanRowGroups(entries, occurrencesByEntryId, tier);
+  const fillHeight = coursePlanFillHeight(groups);
 
   const bodyRows = groups.flatMap((group, groupIndex) =>
     group.rows.map((row, rowIndex) =>
       coursePlanBodyRow(group, row, {
         isFirstRowOfDomain: group.isFirstEntryOfDomain && rowIndex === 0,
         isFirstRowOfEntry: rowIndex === 0,
+        fillHeight,
       })
     )
   );

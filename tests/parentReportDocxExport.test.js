@@ -5,6 +5,7 @@ import {
   buildCoursePlanRowGroups, buildCoursePlanTable,
   groupEntriesByDomain, buildDevelopmentRecordTable,
   buildHighlightsTable, generateParentReportDocxBlob,
+  coursePlanFillHeight, estimateLines,
 } from '../src/export/parentReportDocxExport.js';
 import { extractHighlightPhotoGroups } from '../src/import/parentReportDocxImport.js';
 
@@ -222,6 +223,45 @@ describe('buildCoursePlanTable', () => {
     const xml = await tableToXml(buildCoursePlanTable(entries, occurrencesByEntryId));
     const bodyRowXml = xml.split('<w:tr>').find(r => r.includes('Ⅴ-1-6'));
     expect(bodyRowXml).toContain('<w:cantSplit/>');
+  });
+});
+
+describe('課程計畫表不滿一頁時拉高格子補滿', () => {
+  const manyEntries = n => Array.from({ length: n }, (_, i) => ({ id: i + 1, indicatorCode: 'Ⅴ-1-1', activityName: 'a', indicatorText: '' }));
+  const occurrences = (n, perEntry) => Object.fromEntries(Array.from({ length: n }, (_, i) =>
+    [i + 1, Array.from({ length: perEntry }, () => ({ date: '2026-03-02', status: 'developed', note: '' }))]));
+  const bodyHeights = xml => tableRows(xml).slice(1).map(row => /<w:trHeight w:val="(\d+)" w:hRule="atLeast"\/>/.exec(row)?.[1] ?? null);
+
+  it('內容不多：每一列都拉到同一個最低高度，加起來剛好一頁', async () => {
+    const xml = await tableToXml(buildCoursePlanTable(manyEntries(3), occurrences(3, 1)));
+    const heights = bodyHeights(xml);
+    expect(heights).toHaveLength(3);
+    expect(new Set(heights).size).toBe(1);
+    expect(Number(heights[0])).toBeGreaterThan(3000); // ~4 lines' worth more than one line
+  });
+
+  it('原本就高的列（說明很多行）不再加高，其他矮的列一起拉高', () => {
+    const groups = buildCoursePlanRowGroups(manyEntries(3), {
+      ...occurrences(3, 1),
+      1: [{ date: '2026-03-02', status: 'developed', note: Array(30).fill('行').join('\n') }],
+    });
+    const h = coursePlanFillHeight(groups);
+    // The 30-line row (~9400 twips) is taller than H, so it keeps its own height; the other two
+    // share what's left of the page.
+    expect(h).toBeGreaterThan(1000);
+    expect(h).toBeLessThan(30 * 312);
+  });
+
+  it('內容超過一頁：不拉高，維持原樣', async () => {
+    const xml = await tableToXml(buildCoursePlanTable(manyEntries(30), occurrences(30, 2)));
+    expect(bodyHeights(xml).every(h => h === null)).toBe(true);
+  });
+
+  it('估算行數：中文一字 240，英數字一半，每行各自換行', () => {
+    expect(estimateLines('', 4)).toBe(1);
+    expect(estimateLines('一二三四五六七八九十一二三四', 4)).toBe(1); // 14 × 240 = 3360 ≤ 3386
+    expect(estimateLines('一二三四五六七八九十一二三四五', 4)).toBe(2);
+    expect(estimateLines('a\nb', 4)).toBe(2);
   });
 });
 
