@@ -188,6 +188,8 @@ export async function renderMonthlyPlanEditorView(
 
   const data = await loadEditorData(plan);
   let selected = null; // { child, tier, week, day }
+  // The 指標 list reopens where the last pick was (not at the top) after 新增 or on another day.
+  let lastPickedIndicator = '';
   const remembered = activeChildByPlan.get(plan.id);
   const activeChildId = data.children.some(c => c.id === remembered) ? remembered : data.children[0]?.id;
   const showOneChild = data.children.length > 1;
@@ -644,7 +646,11 @@ export async function renderMonthlyPlanEditorView(
       window[listen]('resize', closePicker);
       if (!open) return;
       placePickerList();
-      pickerList.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' }); // ?.() — jsdom has no scrollIntoView
+      // The picked indicator, else the last one picked (if this tier's list has it), mid-list.
+      // Sets scrollTop rather than scrollIntoView, which could scroll the page and close the list.
+      const code = indicatorSelect.value || lastPickedIndicator;
+      const row = [...pickerList.querySelectorAll('[data-pick-indicator]')].find(r => code && r.dataset.pickIndicator === code);
+      if (row) pickerList.scrollTop = row.offsetTop - (pickerList.clientHeight - row.offsetHeight) / 2;
     }
     renderPickerCurrent('');
     pickerToggle.addEventListener('click', () => setPickerOpen(pickerList.hidden));
@@ -664,6 +670,7 @@ export async function renderMonthlyPlanEditorView(
     });
 
     indicatorSelect.addEventListener('change', event => {
+      if (event.target.value) lastPickedIndicator = event.target.value;
       renderPickerCurrent(event.target.value);
       renderRoster(event.target.value);
       const indicator = getIndicator(event.target.value);

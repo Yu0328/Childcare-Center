@@ -668,4 +668,28 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     expect(container.querySelector('[data-field="new-item-indicator-text"]').value).not.toBe('');
     expect(roster.textContent).toContain('已達成甲');
   });
+
+  it('新增後再打開指標清單，從上次選的指標那一段開始顯示，不是從最上面', async () => {
+    await clearAllData();
+    const container = document.createElement('div');
+    const a = await addChild({ name: '甲', birthDate: '2024-07-01' });
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [a.id], childTiers: { [a.id]: 'Ⅴ' } });
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${a.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector('[data-indicator-picker-toggle]'));
+
+    container.querySelector('[data-indicator-picker-toggle]').click();
+    container.querySelector('[data-pick-indicator="Ⅴ-3-2"]').click();
+    container.querySelector('[data-action="add-item"]').dispatchEvent(new Event('submit', { cancelable: true }));
+    // The panel redraws after 新增 with nothing picked.
+    await waitFor(() => container.querySelector('[data-field="new-item-indicator"]')?.value === '' && container.querySelectorAll('[data-edit-item]').length === 1);
+
+    // jsdom has no layout: give the remembered row a position and catch where the list scrolls to.
+    const list = container.querySelector('[data-indicator-picker-list]');
+    Object.defineProperty(container.querySelector('[data-pick-indicator="Ⅴ-3-2"]'), 'offsetTop', { value: 600 });
+    let scrolledTo = null;
+    Object.defineProperty(list, 'scrollTop', { get: () => scrolledTo ?? 0, set: value => { scrolledTo = value; } });
+    container.querySelector('[data-indicator-picker-toggle]').click();
+    expect(scrolledTo).toBeGreaterThan(0);
+  });
 });
