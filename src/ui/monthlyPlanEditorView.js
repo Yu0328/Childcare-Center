@@ -285,7 +285,7 @@ export async function renderMonthlyPlanEditorView(
   function renderCopyPanel() {
     const target = currentChild();
     if (!target) return;
-    const counts = childItemCounts(plan, Object.values(data.itemsBySlotId).flat());
+    const counts = childItemCounts(plan, data.slots, data.itemsBySlotId);
     const sources = data.children.filter(c => c.id !== target.id && counts.get(c.id) > 0);
     // Redrawn whenever counts or the shown child change; a fresh button drops the last wiring.
     const oldTrigger = container.querySelector('[data-action="copy-monthly-plan"]');

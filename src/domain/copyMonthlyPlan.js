@@ -1,12 +1,17 @@
 import {
   listPlanSlotsForPlan, listPlanSlotItems, getOrCreatePlanSlot, addPlanSlotItem, deletePlanSlotItem,
 } from '../storage/monthlyPlanDb.js';
+import { isPresetItem } from './monthlyCoursePlan.js';
 
-// How many items each of the plan's children has (the 套用 picker's 「林小美（12 筆）」).
-export function childItemCounts(plan, items) {
+// How many items each of the plan's children has planned (the 套用 picker's 「林小美（12 筆）」 and
+// its confirm). Untouched 大團體活動／節氣 presets don't count — every child starts with them, so
+// they say nothing about what's been planned. They're still copied by 套用.
+export function childItemCounts(plan, slots, itemsBySlotId) {
   const counts = new Map(plan.childIds.map(id => [id, 0]));
-  for (const item of items) {
-    if (counts.has(item.childId)) counts.set(item.childId, counts.get(item.childId) + 1);
+  for (const slot of slots) {
+    for (const item of itemsBySlotId[slot.id] || []) {
+      if (counts.has(item.childId) && !isPresetItem(item, slot)) counts.set(item.childId, counts.get(item.childId) + 1);
+    }
   }
   return counts;
 }

@@ -33,7 +33,9 @@ describe('copyMonthlyPlan', () => {
     const old = await addPlanSlotItem({ slotId: bSlot.id, activityName: '舊的', childId: b.id });
     await setChildItemOverride({ planId: plan.id, childId: b.id, itemId: old.id, notAchieved: false, replaced: true });
 
-    expect(childItemCounts(plan, await allItems(plan.id))).toEqual(new Map([[a.id, 1], [b.id, 1]]));
+    const slots = await listPlanSlotsForPlan(plan.id);
+    const itemsBySlotId = Object.fromEntries(await Promise.all(slots.map(async s => [s.id, await listPlanSlotItems(s.id)])));
+    expect(childItemCounts(plan, slots, itemsBySlotId)).toEqual(new Map([[a.id, 1], [b.id, 1]]));
     await copyMonthlyPlan({ plan, targetChildId: b.id, sourceChildId: a.id });
 
     const copied = await itemsOf(plan.id, b.id);
@@ -57,3 +59,25 @@ async function allItems(planId) {
   for (const slot of await listPlanSlotsForPlan(planId)) result.push(...await listPlanSlotItems(slot.id));
   return result;
 }
+
+describe('childItemCounts', () => {
+  beforeEach(async () => {
+    await clearAllData();
+  });
+
+  it('leaves out untouched preset activities (大團體活動／節氣 on their own days), but counts an edited one', async () => {
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds: [1], childTiers: { 1: 'Ⅴ' } });
+    const monday = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 1 });
+    const tuesday = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 2 });
+    const wednesday = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    await addPlanSlotItem({ slotId: monday.id, activityName: '大團體活動', childId: 1 });
+    await addPlanSlotItem({ slotId: tuesday.id, activityName: '節氣', childId: 1 });
+    await addPlanSlotItem({ slotId: tuesday.id, activityName: '戶外教學', childId: 1 });
+    await addPlanSlotItem({ slotId: wednesday.id, activityName: '大團體活動', childId: 1 }); // not a preset day
+    await addPlanSlotItem({ slotId: monday.id, indicatorCode: 'Ⅴ-1-1', activityName: '大團體活動', childId: 1 });
+
+    const slots = await listPlanSlotsForPlan(plan.id);
+    const itemsBySlotId = Object.fromEntries(await Promise.all(slots.map(async s => [s.id, await listPlanSlotItems(s.id)])));
+    expect(childItemCounts(plan, slots, itemsBySlotId)).toEqual(new Map([[1, 3]]));
+  });
+});

@@ -11,6 +11,11 @@ const DEFAULTS = CENTER.monthlyPlanDefaults ?? [
 // The editor tints these days warm as "already filled in" (src/styles.css `--preset`).
 export const PRESET_WEEKDAYS = new Set(DEFAULTS.map(([weekday]) => weekday));
 
+// A pre-filled activity the teacher hasn't touched: on its own weekday, its default name, no indicator.
+export function isPresetItem(item, slot) {
+  return !item.indicatorCode && DEFAULTS.some(([weekday, name]) => weekday === slot.weekday && name === item.activityName);
+}
+
 // New MonthlyCoursePlans start with 大團體活動 (Monday & Friday) and 節氣 (Tuesday) pre-filled for every
 // child — each their own copy, in their own tier's slot — for every week that actually has that
 // weekday (a month's first/last week may be partial — see monthlyCalendar.js). A child who already
