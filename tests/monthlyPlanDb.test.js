@@ -218,3 +218,57 @@ describe('monthlyPlanDb: child-only (個別) items', () => {
     expect((await listChildItemOverridesForPlan(plan.id)).map(o => o.itemId)).toEqual([shared.id]);
   });
 });
+
+describe('monthlyPlanDb: splitSharedItems (old shared items → one copy per child)', () => {
+  let plan, a, b, c;
+  beforeEach(async () => {
+    await clearAllData();
+    const { addChild } = await import('../src/storage/db.js');
+    a = await addChild({ name: '甲', birthDate: '2024-07-01' });
+    b = await addChild({ name: '乙', birthDate: '2024-08-01' });
+    c = await addChild({ name: '丙', birthDate: '2025-01-01' });
+    plan = await addMonthlyCoursePlan({
+      period: '115年06月', childIds: [a.id, b.id, c.id], childTiers: { [a.id]: 'Ⅴ', [b.id]: 'Ⅴ', [c.id]: 'Ⅳ' },
+    });
+  });
+
+  it('gives each same-tier child their own copy, moves their marks onto it, and drops the shared one', async () => {
+    const { splitSharedItems } = await import('../src/storage/monthlyPlanDb.js');
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const shared = await addPlanSlotItem({ slotId: slot.id, indicatorCode: 'Ⅴ-1-1', activityName: '畫畫', indicatorText: '說明' });
+    const makeup = await addPlanSlotItem({ slotId: slot.id, activityName: '補課', childId: a.id });
+    await setChildItemOverride({ planId: plan.id, childId: b.id, itemId: shared.id, notAchieved: true, replaced: false });
+
+    await splitSharedItems(plan, [a, b, c]);
+
+    const items = await listPlanSlotItems(slot.id);
+    expect(items.find(i => i.id === shared.id)).toBeUndefined();
+    expect(items.find(i => i.id === makeup.id)).toBeDefined();
+    const copies = items.filter(i => i.activityName === '畫畫');
+    expect(copies.map(i => i.childId).sort()).toEqual([a.id, b.id].sort());
+    expect(copies.every(i => i.indicatorCode === 'Ⅴ-1-1' && i.indicatorText === '說明')).toBe(true);
+    expect(copies.find(i => i.childId === a.id).uid).toBe(`${shared.uid}~${a.uid}`);
+
+    const overrides = await listChildItemOverridesForPlan(plan.id);
+    expect(overrides).toHaveLength(1);
+    expect(overrides[0].itemId).toBe(copies.find(i => i.childId === b.id).id);
+  });
+
+  it('is safe to run twice or concurrently', async () => {
+    const { splitSharedItems } = await import('../src/storage/monthlyPlanDb.js');
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '畫畫' });
+    await Promise.all([splitSharedItems(plan, [a, b, c]), splitSharedItems(plan, [a, b, c])]);
+    await splitSharedItems(plan, [a, b, c]);
+    expect((await listPlanSlotItems(slot.id)).map(i => i.childId).sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it('resumes after an interrupted split without duplicating a copy already made', async () => {
+    const { splitSharedItems } = await import('../src/storage/monthlyPlanDb.js');
+    const slot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 3 });
+    const shared = await addPlanSlotItem({ slotId: slot.id, activityName: '畫畫' });
+    await addPlanSlotItem({ slotId: slot.id, activityName: '畫畫', childId: a.id, uid: `${shared.uid}~${a.uid}` });
+    await splitSharedItems(plan, [a, b, c]);
+    expect((await listPlanSlotItems(slot.id)).map(i => i.childId).sort()).toEqual([a.id, b.id].sort());
+  });
+});

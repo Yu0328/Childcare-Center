@@ -84,10 +84,11 @@ export async function listPlanSlotItems(slotId) {
   return runRequest('planSlotItems', 'readonly', store => store.index('by_slotId').getAll(slotId));
 }
 
-// `childId` makes a 個別項目 — an item only that one child sees (e.g. a make-up lesson), still filed
-// under the shared same-tier slot. A shared item has no `childId` field at all rather than
-// `childId: null`: sync's deserializeRecord treats a child ref it can't resolve as "parent not
-// arrived yet" and skips the whole record, which a null would trip on every pull.
+// Every item belongs to one child (`childId`), filed under that child's tier slot. Items saved
+// before 2026-11 may have no `childId` field at all (shared by the whole tier) until
+// splitSharedItems turns them into per-child copies. Never write `childId: null`: sync's
+// deserializeRecord treats a child ref it can't resolve as "parent not arrived yet" and skips the
+// whole record, which a null would trip on every pull.
 export async function addPlanSlotItem({ slotId, indicatorCode = null, activityName, indicatorText = '', childId, uid, updatedAt }) {
   const record = { slotId, indicatorCode, activityName, indicatorText, uid, updatedAt };
   if (childId !== undefined) record.childId = childId;
@@ -150,6 +151,34 @@ async function writeChildItemOverride({ planId, childId, itemId, notAchieved, re
 
   return addRecord('childItemOverrides', {
     planId, childId, itemId, notAchieved, replaced, replacementText, uid, updatedAt,
+  });
+}
+
+// Before 2026-11 an item without `childId` was shared by every same-tier child. Each child now
+// owns their own items, so an old shared item becomes one copy per same-tier child (taking that
+// child's 未達成／請假 mark along) and is then deleted. A copy's uid is `${shared uid}~${child uid}`,
+// so two signed-in devices that each split the same plan make the same records and sync merges
+// them instead of doubling up; it also lets a re-run skip copies an interrupted run already made.
+export async function splitSharedItems(plan, children) {
+  return serializeByKey(`split:${plan.id}`, async () => {
+    let overrides = null;
+    for (const slot of await listPlanSlotsForPlan(plan.id)) {
+      const items = await listPlanSlotItems(slot.id);
+      for (const shared of items.filter(item => item.childId === undefined)) {
+        overrides ??= await listChildItemOverridesForPlan(plan.id);
+        for (const child of children.filter(c => plan.childTiers[c.id] === slot.tier)) {
+          const uid = shared.uid && child.uid ? `${shared.uid}~${child.uid}` : undefined;
+          let copy = uid && items.find(item => item.uid === uid);
+          if (!copy) {
+            const { id, uid: _uid, updatedAt, ...fields } = shared;
+            copy = await addRecord('planSlotItems', { ...fields, childId: child.id, uid });
+          }
+          const mark = overrides.find(o => o.childId === child.id && o.itemId === shared.id);
+          if (mark) await putRecord('childItemOverrides', { ...mark, itemId: copy.id });
+        }
+        await deletePlanSlotItem(shared.id);
+      }
+    }
   });
 }
 
