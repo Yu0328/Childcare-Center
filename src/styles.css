@@ -3033,6 +3033,8 @@ fieldset.panel-form__field.import-preview__child legend {
   cursor: default;
 }
 .indicator-picker__option--plain { padding-left: 0.6rem; }
+.indicator-picker__option--achieved { background: #eaf6ed; }
+.indicator-picker__option--developing { background: #fdf1e5; }
 .indicator-picker__option:hover,
 .indicator-picker__option:focus-visible { background: #e5f1fb; outline: none; }
 .indicator-picker__option[aria-selected="true"] { background: #cce4f7; }
