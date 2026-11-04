@@ -50,7 +50,7 @@
 |---|---|
 | 編輯面板新增 | 一律帶 `childId: 目前幼兒` |
 | `monthlyPlanImportPreviewView.js`（Word 匯入） | 每位幼兒各建一份；該幼兒的 override 掛在他自己那份上 |
-| 管理幼兒加入新幼兒 | 月曆一開始是空的，由老師用「套用」複製（以前會自動看到共用項目） |
+| 預設活動（大團體活動／節氣） | 新增月計畫時每位幼兒各填一份；管理幼兒加入新幼兒時只幫新加入的幼兒填，其他內容由老師用「套用」複製 |
 | `itemVisibleToChild` | 保留，讓舊版資料轉換前也能正常篩選；共用項目分支之後不會再產生 |
 | 同步 `naturalKey`、備份、`deleteChildOnlyItemsForChild` | 不變 |
 
@@ -58,7 +58,7 @@
 
 ## 一次性通知
 
-- 進入「課程月計畫」清單頁時，如果這台裝置**已經有月計畫**，而且還沒看過通知，就跳出通知視窗（`<dialog>`，這樣自動更新會等它關閉）。按「我知道了」以後寫入 localStorage `${CENTER.storagePrefix}-monthly-plan-per-child-notice`，之後不再出現。全新使用者（沒有月計畫）也直接寫入，以後不跳。
+- 進入「課程月計畫」清單頁時（ 的 ），如果這台裝置**已經有月計畫**，而且還沒看過通知，就跳出通知視窗（`<dialog>`，這樣自動更新會等它關閉）。跳出時就寫入 localStorage（避免清單重畫時又跳一次） `${CENTER.storagePrefix}-monthly-plan-per-child-notice`，之後不再出現。全新使用者（沒有月計畫）也直接寫入，以後不跳。
 - 每台裝置各跳一次。
 - 內容：
 
