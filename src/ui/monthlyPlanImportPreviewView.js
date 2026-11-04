@@ -199,23 +199,26 @@ async function renderAsync(container, { parsed, onCancel, onImported }) {
       const childTiers = Object.fromEntries(resolvedChildren.map(rc => [rc.child.id, rc.tier]));
       const plan = await addMonthlyCoursePlan({ period, childIds, childTiers, isNew: true });
 
-      const tiersUsed = [...new Set(resolvedChildren.map(rc => rc.tier))];
+      // Every child gets their own copy of their tier's items (月計畫 items belong to one child).
       const itemIdsBySlotKey = new Map();
-      for (const tier of tiersUsed) {
-        for (const slot of slotsByTier[tier] || []) {
-          const createdSlot = await getOrCreatePlanSlot({ planId: plan.id, tier, weekIndex: slot.weekIndex, weekday: slot.weekday });
+      for (const rc of resolvedChildren) {
+        for (const slot of slotsByTier[rc.tier] || []) {
+          const createdSlot = await getOrCreatePlanSlot({ planId: plan.id, tier: rc.tier, weekIndex: slot.weekIndex, weekday: slot.weekday });
           const itemIds = [];
           for (const item of slot.items) {
-            const created = await addPlanSlotItem({ slotId: createdSlot.id, indicatorCode: item.indicatorCode, activityName: item.activityName, indicatorText: item.indicatorText });
+            const created = await addPlanSlotItem({
+              slotId: createdSlot.id, indicatorCode: item.indicatorCode, activityName: item.activityName,
+              indicatorText: item.indicatorText, childId: rc.child.id,
+            });
             itemIds.push(created.id);
           }
-          itemIdsBySlotKey.set(`${tier}:${slot.weekIndex}:${slot.weekday}`, itemIds);
+          itemIdsBySlotKey.set(`${rc.child.id}:${slot.weekIndex}:${slot.weekday}`, itemIds);
         }
       }
 
       for (const rc of resolvedChildren) {
         for (const override of rc.overrides) {
-          const itemIds = itemIdsBySlotKey.get(`${rc.tier}:${override.weekIndex}:${override.weekday}`);
+          const itemIds = itemIdsBySlotKey.get(`${rc.child.id}:${override.weekIndex}:${override.weekday}`);
           const itemId = itemIds && itemIds[override.itemIndex];
           if (!itemId) continue;
           await setChildItemOverride({

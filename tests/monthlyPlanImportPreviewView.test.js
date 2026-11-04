@@ -57,10 +57,31 @@ describe('renderMonthlyPlanImportPreviewView', () => {
     const [slot] = await listPlanSlotsForPlan(plans[0].id);
     expect(slot).toMatchObject({ tier: 'Ⅴ', weekIndex: 1, weekday: 1 });
     const [item] = await listPlanSlotItems(slot.id);
-    expect(item).toMatchObject({ indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲' });
+    expect(item).toMatchObject({ indicatorCode: 'Ⅴ-4-3', activityName: '分類遊戲', childId: existing.id });
 
     const [override] = await listChildItemOverridesForPlan(plans[0].id);
     expect(override).toMatchObject({ childId: existing.id, itemId: item.id, notAchieved: true, replaced: false });
+  });
+
+  it('gives two same-tier children each their own copy, with each one’s marks on their own copy', async () => {
+    const a = await addChild({ name: '趙萬竑', birthDate: '2024-07-01' });
+    const b = await addChild({ name: '鍾晴妍', birthDate: '2024-08-01' });
+    const container = document.createElement('div');
+    let imported = false;
+    const parsed = buildParsed({ children: [
+      { name: '趙萬竑', tier: 'Ⅴ', overrides: [{ weekIndex: 1, weekday: 1, itemIndex: 0, notAchieved: true, replaced: false, replacementText: '' }] },
+      { name: '鍾晴妍', tier: 'Ⅴ', overrides: [] },
+    ] });
+    await renderMonthlyPlanImportPreviewView(container, { parsed, onCancel: () => {}, onImported: () => { imported = true; } });
+    container.querySelector('[data-action="confirm-import"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => imported);
+
+    const [plan] = await listMonthlyCoursePlans();
+    const [slot] = await listPlanSlotsForPlan(plan.id);
+    const items = await listPlanSlotItems(slot.id);
+    expect(items.map(i => i.childId).sort()).toEqual([a.id, b.id].sort());
+    const [override] = await listChildItemOverridesForPlan(plan.id);
+    expect(override).toMatchObject({ childId: a.id, itemId: items.find(i => i.childId === a.id).id });
   });
 
   it('requires a manual pick when there is no existing child with that name, "建立新小朋友" creates one', async () => {
