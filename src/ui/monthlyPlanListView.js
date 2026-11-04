@@ -137,8 +137,7 @@ export async function renderMonthlyPlanListView(
       const plan = await addMonthlyCoursePlan({ period, childIds, childTiers });
 
       const weeks = buildMonthlyCalendar(gYear + 1911, gMonth);
-      const tiers = [...new Set(Object.values(childTiers))];
-      await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
+      await seedDefaultPlanSlots({ plan, weeks });
 
       await keepScroll(() => onSelectPlan(plan));
     } catch (err) {

@@ -14,7 +14,7 @@ describe('seedDefaultPlanSlots', () => {
   });
 
   it('fills every week\'s Monday and Friday with 大團體活動 and Tuesday with 節氣, for the given tier', async () => {
-    await seedDefaultPlanSlots({ planId: plan.id, tiers: ['Ⅴ'], weeks });
+    await seedDefaultPlanSlots({ plan, weeks });
 
     for (const week of weeks) {
       const mondaySlot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: week.weekIndex, weekday: 1 });
@@ -32,16 +32,19 @@ describe('seedDefaultPlanSlots', () => {
     }
   });
 
-  it('seeds every tier passed in', async () => {
-    await seedDefaultPlanSlots({ planId: plan.id, tiers: ['Ⅳ', 'Ⅴ'], weeks });
+  it('gives every child their own copy, in their own tier', async () => {
+    const twoTiers = await addMonthlyCoursePlan({ period: '115年07月', childIds: [1, 2, 3], childTiers: { 1: 'Ⅳ', 2: 'Ⅴ', 3: 'Ⅴ' } });
+    await seedDefaultPlanSlots({ plan: twoTiers, weeks });
 
-    const ivMonday = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅳ', weekIndex: 1, weekday: 1 });
-    expect((await listPlanSlotItems(ivMonday.id)).map(i => i.activityName)).toEqual(['大團體活動']);
+    const ivMonday = await getOrCreatePlanSlot({ planId: twoTiers.id, tier: 'Ⅳ', weekIndex: 1, weekday: 1 });
+    expect((await listPlanSlotItems(ivMonday.id)).map(i => [i.activityName, i.childId])).toEqual([['大團體活動', 1]]);
+    const vMonday = await getOrCreatePlanSlot({ planId: twoTiers.id, tier: 'Ⅴ', weekIndex: 1, weekday: 1 });
+    expect((await listPlanSlotItems(vMonday.id)).map(i => i.childId).sort()).toEqual([2, 3]);
   });
 
   it('does not duplicate items when called again on an already-seeded tier', async () => {
-    await seedDefaultPlanSlots({ planId: plan.id, tiers: ['Ⅴ'], weeks });
-    await seedDefaultPlanSlots({ planId: plan.id, tiers: ['Ⅴ'], weeks });
+    await seedDefaultPlanSlots({ plan, weeks });
+    await seedDefaultPlanSlots({ plan, weeks });
 
     const mondaySlot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 1 });
     expect(await listPlanSlotItems(mondaySlot.id)).toHaveLength(1);
@@ -49,9 +52,9 @@ describe('seedDefaultPlanSlots', () => {
 
   it('leaves a Monday item the teacher already edited untouched on a later call', async () => {
     const mondaySlot = await getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday: 1 });
-    await addPlanSlotItem({ slotId: mondaySlot.id, activityName: '戶外教學' });
+    await addPlanSlotItem({ slotId: mondaySlot.id, activityName: '戶外教學', childId: 1 });
 
-    await seedDefaultPlanSlots({ planId: plan.id, tiers: ['Ⅴ'], weeks });
+    await seedDefaultPlanSlots({ plan, weeks });
 
     expect((await listPlanSlotItems(mondaySlot.id)).map(i => i.activityName)).toEqual(['戶外教學']);
   });
@@ -68,7 +71,7 @@ describe('seedDefaultPlanSlots for a centre with its own weekly defaults', () =>
     await (await import('../src/storage/db.js')).clearAllData();
     const plan = await db.addMonthlyCoursePlan({ period: '115年06月', childIds: [1], childTiers: { 1: 'Ⅴ' } });
 
-    await seed({ planId: plan.id, tiers: ['Ⅴ'], weeks: buildMonthlyCalendar(2026, 6) });
+    await seed({ plan, weeks: buildMonthlyCalendar(2026, 6) });
 
     const names = async weekday => (await db.listPlanSlotItems(
       (await db.getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday })).id)).map(i => i.activityName);
@@ -90,7 +93,7 @@ describe('seedDefaultPlanSlots for a centre with its own weekly defaults', () =>
     await (await import('../src/storage/db.js')).clearAllData();
     const plan = await db.addMonthlyCoursePlan({ period: '115年06月', childIds: [1], childTiers: { 1: 'Ⅴ' } });
 
-    await seed({ planId: plan.id, tiers: ['Ⅴ'], weeks: buildMonthlyCalendar(2026, 6) });
+    await seed({ plan, weeks: buildMonthlyCalendar(2026, 6) });
 
     const names = async weekday => (await db.listPlanSlotItems(
       (await db.getOrCreatePlanSlot({ planId: plan.id, tier: 'Ⅴ', weekIndex: 1, weekday })).id)).map(i => i.activityName);

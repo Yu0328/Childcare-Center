@@ -425,8 +425,9 @@ export async function renderMonthlyPlanEditorView(
       const updatedPlan = await updateMonthlyCoursePlan(plan.id, { childIds: newChildIds, childTiers: newChildTiers });
 
       const weeks = buildMonthlyCalendar(year + 1911, month);
-      const tiers = [...new Set(Object.values(newChildTiers))];
-      await seedDefaultPlanSlots({ planId: plan.id, tiers, weeks });
+      // Only the newcomers: a child already here may have deleted a preset day on purpose.
+      const addedIds = newChildIds.filter(id => !plan.childIds.includes(id));
+      await seedDefaultPlanSlots({ plan: { ...updatedPlan, childIds: addedIds }, weeks });
 
       for (const childId of removedChildIds) {
         await deleteChildItemOverridesForChild(plan.id, childId);
