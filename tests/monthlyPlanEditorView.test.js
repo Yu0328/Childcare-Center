@@ -709,7 +709,6 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     row('Ⅴ-1-1').click();
     expect(select.value).toBe('Ⅴ-1-1');
     expect(container.querySelector('[data-indicator-picker-list]').hidden).toBe(true);
-    expect(toggle.textContent).toContain('Ⅴ-1-1');
     expect(container.querySelector('[data-field="new-item-indicator-text"]').value).not.toBe('');
     expect(roster.textContent).toContain('已達成甲');
   });

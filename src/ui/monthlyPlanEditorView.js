@@ -51,9 +51,10 @@ async function loadEditorData(plan) {
 }
 
 // 指標 picker marks (see indicatorProgress.js). A native <select> can't draw a coloured dot on a
-// phone (option styling is ignored) and an emoji dot is a 3D blob on Windows, so the picker is a
-// drawn list over a hidden <select> that still holds the value — the rest of the form, and its
-// tests, keep reading and setting that <select> as before.
+// phone (option styling is ignored) and an emoji dot is a 3D blob on Windows, so only the dropdown
+// is drawn: the closed field is still the real <select> (so it looks exactly like every other
+// select), with a see-through button over it that opens the drawn list instead of the native one.
+// The <select> still holds the value — the rest of the form, and its tests, read and set it as before.
 const PROGRESS_MARKS = [
   ['achieved', '已達成'],
   ['developing', '未達成'],
@@ -475,7 +476,7 @@ export async function renderMonthlyPlanEditorView(
   }
 
   function indicatorRowHtml(code, text, state) {
-    return `<button type="button" class="indicator-picker__option${state ? ` indicator-picker__option--${state}` : ''}" role="option" data-pick-indicator="${escapeHtml(code)}">${state ? progressDotHtml(state) : ''}<span>${text}</span></button>`;
+    return `<button type="button" class="indicator-picker__option indicator-picker__option--${state || 'plain'}" role="option" data-pick-indicator="${escapeHtml(code)}">${state ? progressDotHtml(state) : ''}<span>${text}</span></button>`;
   }
 
   function indicatorListHtml(tier, childProgress) {
@@ -588,9 +589,9 @@ export async function renderMonthlyPlanEditorView(
         <div class="panel-form__field">
           指標
           <span class="indicator-progress-legend" data-indicator-legend>${PROGRESS_LEGEND}</span>
-          <select data-field="new-item-indicator" hidden>${indicatorOptionsHtml(tier)}</select>
           <div class="indicator-picker">
-            <button type="button" class="indicator-picker__current" data-indicator-picker-toggle aria-expanded="false"></button>
+            <select data-field="new-item-indicator" tabindex="-1">${indicatorOptionsHtml(tier)}</select>
+            <button type="button" class="indicator-picker__toggle" data-indicator-picker-toggle aria-label="選擇指標" aria-haspopup="listbox" aria-expanded="false"></button>
             <div class="indicator-picker__list" role="listbox" data-indicator-picker-list hidden>${indicatorListHtml(tier, childProgress)}</div>
           </div>
         </div>
@@ -633,13 +634,45 @@ export async function renderMonthlyPlanEditorView(
     const pickerList = panelItems.querySelector('[data-indicator-picker-list]');
     function renderPickerCurrent(code) {
       const row = [...pickerList.querySelectorAll('[data-pick-indicator]')].find(r => r.dataset.pickIndicator === code);
-      pickerToggle.innerHTML = `${row ? row.innerHTML : `<span>${NO_INDICATOR_LABEL}</span>`}<span class="indicator-picker__caret">▾</span>`;
       pickerList.querySelectorAll('[data-pick-indicator]').forEach(r => r.setAttribute('aria-selected', String(r === row)));
+    }
+    // Floats like a native select's dropdown (position: fixed, so it neither stretches nor gets
+    // clipped by the scrolling panel): below the button, or above it when there's more room there,
+    // as tall as that room allows. Like a native one, it closes on a tap outside, Esc, a resize, or
+    // a scroll of anything but itself — it's pinned to where the button was when it opened.
+    function placePickerList() {
+      const rect = pickerToggle.getBoundingClientRect();
+      const margin = 8;
+      const below = window.innerHeight - rect.bottom - margin;
+      const above = rect.top - margin;
+      const openUp = below < 240 && above > below;
+      Object.assign(pickerList.style, {
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        top: openUp ? '' : `${rect.bottom + 2}px`,
+        bottom: openUp ? `${window.innerHeight - rect.top + 2}px` : '',
+        maxHeight: `${Math.min(openUp ? above : below, 480)}px`,
+      });
+    }
+    function closeOnOutside(event) {
+      if (!pickerList.contains(event.target) && !pickerToggle.contains(event.target)) setPickerOpen(false);
+    }
+    function closeOnScroll(event) {
+      if (!pickerList.contains(event.target)) setPickerOpen(false);
+    }
+    function closePicker() {
+      setPickerOpen(false);
     }
     function setPickerOpen(open) {
       pickerList.hidden = !open;
       pickerToggle.setAttribute('aria-expanded', String(open));
-      if (open) pickerList.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+      const listen = open ? 'addEventListener' : 'removeEventListener';
+      document[listen]('pointerdown', closeOnOutside, true);
+      document[listen]('scroll', closeOnScroll, true);
+      window[listen]('resize', closePicker);
+      if (!open) return;
+      placePickerList();
+      pickerList.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
     }
     renderPickerCurrent('');
     pickerToggle.addEventListener('click', () => setPickerOpen(pickerList.hidden));
