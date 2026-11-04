@@ -293,6 +293,29 @@ describe('buildDevelopmentRecordTable', () => {
     expect(xml).not.toContain('w:fill="D9D9D9"');
   });
 
+  it('每個標題列都和下面的內容綁在同一頁（領域、行為觀察）', async () => {
+    const xml = await tableToXml(buildDevelopmentRecordTable(
+      [{ id: 1, reportId: 1, domain: 1, courseEntryIds: [], narrative: 'n' }],
+      [{ id: 1, reportId: 1, title: 't', narrative: 'n' }],
+      coursePlanEntries,
+    ));
+    const headerRows = tableRows(xml).filter(row => row.includes('F7CAAC'));
+    expect(headerRows).toHaveLength(2);
+    for (const row of headerRows) expect(row).toContain('<w:keepNext/>');
+    for (const row of tableRows(xml).filter(row => !row.includes('F7CAAC'))) expect(row).not.toContain('<w:keepNext/>');
+  });
+
+  it('同一領域裡，上一則指標＋內容和下一則之間空一行，最後一則後面不空', async () => {
+    const twoEntries = [
+      { id: 1, reportId: 1, domain: 1, courseEntryIds: [1], narrative: '第一則' },
+      { id: 2, reportId: 1, domain: 1, courseEntryIds: [], narrative: '第二則' },
+    ];
+    const xml = await tableToXml(buildDevelopmentRecordTable(twoEntries, [], coursePlanEntries));
+    const contentRow = tableRows(xml).find(row => row.includes('第一則'));
+    const paragraphs = contentRow.match(/<w:p>[\s\S]*?<\/w:p>|<w:p\/>/g).map(p => [...p.matchAll(/<w:t[^>]*>([^<]*)</g)].map(m => m[1]).join(''));
+    expect(paragraphs).toEqual(['Ⅴ-1-4　能踢球', '第一則', '', '第二則']);
+  });
+
   it('prints just "行為觀察" with no trailing dash when the title is empty', async () => {
     const behaviorObservations = [{ id: 1, reportId: 1, title: '', narrative: 'n' }];
     const xml = await tableToXml(buildDevelopmentRecordTable([], behaviorObservations, coursePlanEntries));
@@ -446,6 +469,13 @@ describe('buildHighlightsTable', () => {
     expect(xml).toContain('家長簽名：');
     expect(xml.indexOf('家長回饋')).toBeGreaterThan(xml.indexOf('點滴分享'));
     expect(xml.indexOf('家長簽名：')).toBeGreaterThan(xml.indexOf('家長回饋'));
+  });
+
+  it('點滴分享、家長回饋標題列都和下面的內容綁在同一頁', async () => {
+    const xml = await tableToXml(await buildHighlightsTable([]));
+    const headerRows = tableRows(xml).filter(row => row.includes('F7CAAC'));
+    expect(headerRows).toHaveLength(2);
+    for (const row of headerRows) expect(row).toContain('<w:keepNext/>');
   });
 
   it('留 15 個空行給家長手寫回饋，再接家長簽名：', async () => {

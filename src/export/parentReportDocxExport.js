@@ -256,8 +256,12 @@ function fullWidthCell(children, fill) {
   });
 }
 
+// Every F7CAAC section bar is kept on the same page as the row under it, so a bar never sits
+// alone at the foot of a page with its content starting on the next one.
+const SECTION_HEADER_TEXT = { bold: true, keepNext: true, ...CENTERED };
+
 function domainHeaderRow(label, fill) {
-  return new TableRow({ children: [fullWidthCell([textParagraph(label, { bold: true, ...CENTERED })], fill)] });
+  return new TableRow({ children: [fullWidthCell([textParagraph(label, SECTION_HEADER_TEXT)], fill)] });
 }
 
 // First-line indent (each paragraph's first line indented, matching the essay-style prose in the
@@ -290,7 +294,9 @@ export function buildDevelopmentRecordTable(developmentRecordEntries, behaviorOb
       new TableRow({
         children: [
           fullWidthCell(
-            entries.flatMap(entry => [
+            // A blank line between one entry's 指標＋內容 and the next, so they don't run together.
+            entries.flatMap((entry, index) => [
+              ...(index > 0 ? [emptyParagraph()] : []),
               ...referencedIndicatorLines(entry.courseEntryIds, coursePlanEntriesById),
               ...narrativeParagraphs(entry.narrative),
             ])
@@ -471,7 +477,7 @@ export function parentFeedbackRows() {
           columnSpan: HIGHLIGHT_GRID_COLUMN_COUNT,
           width: { size: COURSE_PLAN_TABLE_WIDTH_DXA, type: WidthType.DXA },
           shading: { type: ShadingType.CLEAR, color: 'auto', fill: SECTION_HEADER_FILL },
-          children: [textParagraph('家長回饋', { bold: true, ...CENTERED })],
+          children: [textParagraph('家長回饋', SECTION_HEADER_TEXT)],
         }),
       ],
     }),
@@ -497,7 +503,7 @@ export async function buildHighlightsTable(highlightEntries) {
         columnSpan: HIGHLIGHT_GRID_COLUMN_COUNT,
         width: { size: COURSE_PLAN_TABLE_WIDTH_DXA, type: WidthType.DXA },
         shading: { type: ShadingType.CLEAR, color: 'auto', fill: SECTION_HEADER_FILL },
-        children: [textParagraph('點滴分享', { bold: true, ...CENTERED })],
+        children: [textParagraph('點滴分享', SECTION_HEADER_TEXT)],
       }),
     ],
   });

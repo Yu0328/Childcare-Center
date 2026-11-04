@@ -34,9 +34,10 @@ function runFont() {
   return { ascii: FONT, eastAsia: FONT, hAnsi: FONT, cs: FONT };
 }
 
-export function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, alignment, color } = {}) {
+export function textParagraph(text, { bold = false, size = DEFAULT_TEXT_SIZE, alignment, color, keepNext } = {}) {
   return new Paragraph({
     ...(alignment ? { alignment } : {}),
+    ...(keepNext ? { keepNext: true } : {}),
     children: [
       new TextRun({
         text: String(text ?? ''),
