@@ -7,6 +7,8 @@ import { renderParentReportEditorView } from './ui/parentReportEditorView.js';
 import { renderAggregateCoursePlanView } from './ui/aggregateCoursePlanView.js';
 import { renderMonthlyPlanListView } from './ui/monthlyPlanListView.js';
 import { renderMonthlyPlanEditorView } from './ui/monthlyPlanEditorView.js';
+import { maybeShowMonthlyPlanNotice } from './ui/monthlyPlanNotice.js';
+import { listMonthlyCoursePlans } from './storage/monthlyPlanDb.js';
 import { renderHelpView } from './ui/helpView.js';
 import { exportBackup, importBackup, importHugeBackupFile, HUGE_IMPORT_THRESHOLD_BYTES } from './storage/backup.js';
 import { downloadBlob } from './export/downloadBlob.js';
@@ -77,10 +79,14 @@ export function mountApp(container, { gate } = {}) {
   }
 
   function showMonthlyPlanList() {
-    runView(() => renderMonthlyPlanListView(container, {
-      onSelectPlan: plan => showMonthlyPlanEditor(plan),
-      onBack: showReportTypeSelect,
-    }));
+    runView(async () => {
+      await renderMonthlyPlanListView(container, {
+        onSelectPlan: plan => showMonthlyPlanEditor(plan),
+        onBack: showReportTypeSelect,
+      });
+      // One-time 「月計畫的排課方式改了」 (2026-11), for anyone who already had a plan.
+      maybeShowMonthlyPlanNotice({ hasPlans: (await listMonthlyCoursePlans()).length > 0 });
+    });
   }
 
   function showMonthlyPlanEditor(plan) {
