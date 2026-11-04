@@ -309,7 +309,7 @@ const dayPanel = ({ hitAdd = false, hitAbsent = false, absent = false } = {}) =>
   `<div class="ms-aside"><b>王小明　第二週　10/07</b>${row(
     `${code('Ⅴ-1-6')}<b>【我愛畫畫】</b>${btn('編輯', 'edit')}${del()}`
   )}<div class="ms-cbline">${cb('未達成')}${cb('請假／其他活動代替', absent, hitAbsent)}</div>${absent ? field('', '戶外教學') : ''}${
-    hitAdd ? `${tierSwitch()}${muted('🟢已達成　🟠未達成　⚪還沒做過')}${field('指標', '🟠 Ⅴ-3-2')}${muted('🟠 未達成：王小明　⚪ 還沒做過：林小美')}${field('活動名稱', '故事時間')}${actions(btn('新增', 'primary', true))}` : ''
+    hitAdd ? `${tierSwitch()}${muted('🟢已達成　🟠未達成　還沒做過')}${field('指標', '🟠 Ⅴ-3-2')}${muted('🟠 未達成：王小明　還沒做過：林小美')}${field('活動名稱', '故事時間')}${actions(btn('新增', 'primary', true))}` : ''
   }</div>`;
 // 指定新增 on: the panel's note names who gets the new item.
 const makeupPanel = () =>

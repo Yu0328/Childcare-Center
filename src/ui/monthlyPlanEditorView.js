@@ -50,15 +50,18 @@ async function loadEditorData(plan) {
   return { children, slots, itemsBySlotId, overrideByKey, weeks, progress };
 }
 
-// 指標 picker marks (see indicatorProgress.js). Phones and Safari ignore an <option>'s
-// background, so the dot carries the meaning everywhere and the tint is a bonus where it shows.
+// 指標 picker marks (see indicatorProgress.js). Phones and Safari ignore an <option>'s styling, so
+// inside the <select> an emoji dot carries the meaning (none gets a blank of the same width — a
+// list of mostly 還沒做過 stays quiet) and the tint/grey text is a bonus where it shows. The legend
+// and roster are ordinary HTML, so they draw exact-colour CSS dots instead.
 const PROGRESS_MARKS = [
   ['achieved', '🟢', '已達成'],
   ['developing', '🟠', '未達成'],
-  ['none', '⚪', '還沒做過'],
+  ['none', '　', '還沒做過'],
 ];
 const PROGRESS_DOT = Object.fromEntries(PROGRESS_MARKS.map(([state, dot]) => [state, dot]));
-const PROGRESS_LEGEND = PROGRESS_MARKS.map(([, dot, label]) => `${dot}${label}`).join('　');
+const progressLabelHtml = (state, label) => `<span class="progress-dot progress-dot--${state}"></span>${label}`;
+const PROGRESS_LEGEND = PROGRESS_MARKS.map(([state, , label]) => `<span>${progressLabelHtml(state, label)}</span>`).join('');
 
 function findSlot(slots, tier, weekIndex, weekday) {
   return slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
@@ -599,9 +602,11 @@ export async function renderMonthlyPlanEditorView(
       const classmates = data.children.filter(c => plan.childTiers[c.id] === tier);
       panelItems.querySelector('[data-indicator-roster]').innerHTML = !code
         ? ''
-        : PROGRESS_MARKS.map(([state, dot, label]) => {
+        : PROGRESS_MARKS.map(([state, , label]) => {
             const names = classmates.filter(c => (data.progress.get(c.id)?.get(code) || 'none') === state).map(c => escapeHtml(c.name));
-            return names.length ? `<div>${dot} ${label}：${names.join('、')}</div>` : '';
+            return names.length
+              ? `<div class="indicator-progress-roster__row"><b>${progressLabelHtml(state, label)}</b><span>${names.join('、')}</span></div>`
+              : '';
           }).join('');
     }
 

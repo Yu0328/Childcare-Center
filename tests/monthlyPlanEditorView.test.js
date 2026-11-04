@@ -688,14 +688,14 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     const option = code => select.querySelector(`option[value="${code}"]`);
     expect(option('Ⅴ-1-1').textContent.startsWith('🟢')).toBe(true);
     expect(option('Ⅴ-1-1').className).toBe('indicator-option--achieved');
-    expect(option('Ⅴ-1-2').textContent.startsWith('⚪')).toBe(true);
-    expect(container.querySelector('[data-indicator-legend]').textContent).toContain('🟠未達成');
+    expect(option('Ⅴ-1-2').className).toBe('indicator-option--none');
+    expect(container.querySelector('[data-indicator-legend]').textContent).toContain('未達成');
 
     const roster = container.querySelector('[data-indicator-roster]');
     select.value = 'Ⅴ-1-1';
     select.dispatchEvent(new Event('change'));
-    expect(roster.textContent).toContain('已達成：甲');
-    expect(roster.textContent).toContain('未達成：乙');
+    expect(roster.textContent).toContain('已達成甲');
+    expect(roster.textContent).toContain('未達成乙');
     expect(roster.textContent).not.toContain('丙'); // different tier
     expect(roster.textContent).not.toContain('還沒做過');
 

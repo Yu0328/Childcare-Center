@@ -2966,23 +2966,45 @@ fieldset.panel-form__field.import-preview__child legend {
 }
 
 /* 指標 picker progress marks — option tints only show in Chrome/Edge; the dot carries the meaning. */
-.indicator-option--achieved { background: #e3f5e6; }
-.indicator-option--developing { background: #fdebd8; }
+.indicator-option--achieved { background: #e6f4ea; }
+.indicator-option--developing { background: #fdf0e3; }
+.indicator-option--none { color: #8a8a8a; }
+.progress-dot {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  vertical-align: 0.05em;
+}
+.progress-dot--achieved { background: #34a853; }
+.progress-dot--developing { background: #f28b30; }
+.progress-dot--none { background: #c4c4c4; }
 .indicator-progress-legend {
-  display: block;
-  margin: 0.15rem 0 0.3rem;
+  display: flex;
+  gap: 1em;
+  margin: 0.2rem 0 0.35rem;
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: normal;
 }
 .indicator-progress-roster:empty { display: none; }
 .indicator-progress-roster {
-  margin: -0.3rem 0 0.75rem;
-  padding: 0.45rem 0.7rem;
+  display: grid;
+  gap: 0.25rem;
+  margin: -0.35rem 0 0.8rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--edit-tint);
-  font-size: 0.86rem;
-  line-height: 1.6;
+  background: #fff;
+  font-size: 0.85rem;
+}
+.indicator-progress-roster__row { display: flex; gap: 0.6em; }
+.indicator-progress-roster__row b {
+  flex: none;
+  min-width: 5.2em;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 .monthly-calendar__title {
