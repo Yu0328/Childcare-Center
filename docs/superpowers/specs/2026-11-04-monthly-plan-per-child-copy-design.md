@@ -58,7 +58,7 @@
 
 ## 一次性通知
 
-- 進入「課程月計畫」清單頁時（ 的 ），如果這台裝置**已經有月計畫**，而且還沒看過通知，就跳出通知視窗（`<dialog>`，這樣自動更新會等它關閉）。跳出時就寫入 localStorage（避免清單重畫時又跳一次） `${CENTER.storagePrefix}-monthly-plan-per-child-notice`，之後不再出現。全新使用者（沒有月計畫）也直接寫入，以後不跳。
+- 進入「課程月計畫」清單頁時（app.js 的 showMonthlyPlanList），如果這台裝置**已經有月計畫**，而且還沒看過通知，就跳出通知視窗（`<dialog>`，這樣自動更新會等它關閉）。跳出時就寫入 localStorage（避免清單重畫時又跳一次） `${CENTER.storagePrefix}-monthly-plan-per-child-notice`，之後不再出現。全新使用者（沒有月計畫）也直接寫入，以後不跳。
 - 每台裝置各跳一次。
 - 內容：
 
