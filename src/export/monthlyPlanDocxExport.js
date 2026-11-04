@@ -1,5 +1,5 @@
 import {
-  AlignmentType, BorderStyle, Document, Header, HeightRule, Packer, Paragraph, ShadingType, Table,
+  AlignmentType, BorderStyle, Document, Header, HeightRule, LineRuleType, Packer, Paragraph, ShadingType, Table,
   TableCell, TableRow, TableLayoutType, TextRun, VerticalAlign, VerticalMergeType, WidthType,
 } from 'docx';
 import { tierFormLabel } from '../data/indicators.js';
@@ -323,15 +323,27 @@ function buildChildTable(child, tier, weeks, slots, itemsBySlotId, allOverrides)
   });
 }
 
+// Each child after the first starts on a fresh page, via a "page break before" paragraph ahead of
+// its table — not a manual page break, which would leave a blank page whenever the previous table
+// exactly fills its last page. Squeezed to ~1pt so the new page shows no visible blank line.
+function pageBreakParagraph() {
+  return new Paragraph({
+    pageBreakBefore: true,
+    spacing: { before: 0, after: 0, line: 20, lineRule: LineRuleType.EXACT },
+    children: [new TextRun({ text: '', size: 2 })],
+  });
+}
+
 export async function generateMonthlyPlanDocxBlob({ plan, children, slots, itemsBySlotId, overrides }) {
   const { year, month } = parsePeriod(plan.period);
   const weeks = buildMonthlyCalendar(year + 1911, month);
 
   const children_ = children.filter(c => plan.childIds.includes(c.id));
-  const tables = children_.flatMap(child => [
+  const tables = children_.flatMap((child, index) => [
+    ...(index > 0 ? [pageBreakParagraph()] : []),
     buildChildTable(child, plan.childTiers[child.id], weeks, slots, itemsBySlotId, overrides),
-    emptyParagraph(),
   ]);
+  if (tables.length > 0) tables.push(emptyParagraph()); // Word needs a paragraph after the last table
 
   const doc = new Document({
     sections: [

@@ -70,6 +70,19 @@ describe('generateMonthlyPlanDocxBlob', () => {
     expect(tables[1]).toContain('補課活動');
   });
 
+  it('第二位幼兒起每張表都從新的一頁開始，第一張表前沒有分頁', async () => {
+    const plan = { id: 1, period: '115年06月', childIds: [10, 11, 12], childTiers: { 10: 'Ⅴ', 11: 'Ⅴ', 12: 'Ⅴ' } };
+    const children = [10, 11, 12].map(id => ({ id, name: `幼兒${id}`, birthDate: '2024-07-01' }));
+    const blob = await generateMonthlyPlanDocxBlob({ plan, children, slots: [], itemsBySlotId: {}, overrides: [] });
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()));
+    const body = await zip.file('word/document.xml').async('text');
+    const [beforeFirst, ...rest] = body.split('<w:tbl>');
+    expect(beforeFirst).not.toContain('<w:pageBreakBefore/>');
+    expect(rest).toHaveLength(3);
+    for (const chunk of rest.slice(0, -1)) expect(chunk.split('</w:tbl>').pop()).toContain('<w:pageBreakBefore/>');
+    expect(rest.at(-1).split('</w:tbl>').pop()).not.toContain('<w:pageBreakBefore/>');
+  });
+
   it('generates a non-empty docx Blob for a plan with one child and no items', async () => {
     const plan = { id: 1, period: '115年06月', childIds: [10], childTiers: { 10: 'Ⅴ' } };
     const children = [{ id: 10, name: '趙萬竑', birthDate: '2024-07-01' }];
