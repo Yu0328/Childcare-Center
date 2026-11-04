@@ -672,7 +672,7 @@ export async function renderMonthlyPlanEditorView(
       window[listen]('resize', closePicker);
       if (!open) return;
       placePickerList();
-      pickerList.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+      pickerList.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' }); // ?.() — jsdom has no scrollIntoView
     }
     renderPickerCurrent('');
     pickerToggle.addEventListener('click', () => setPickerOpen(pickerList.hidden));
