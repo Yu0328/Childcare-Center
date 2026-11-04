@@ -661,3 +661,46 @@ describe('monthlyPlanEditorView: export sees fresh data after a panel edit', () 
     expect(exportedOverride).toMatchObject({ notAchieved: true });
   });
 });
+
+describe('monthlyPlanEditorView: 指標達成狀況', () => {
+  it('marks each option by the selected child\'s records and lists same-tier classmates once one is picked', async () => {
+    await clearAllData();
+    const { addForm, addEntry } = await import('../src/storage/db.js');
+    const container = document.createElement('div');
+    const a = await addChild({ name: '甲', birthDate: '2024-07-01' });
+    const b = await addChild({ name: '乙', birthDate: '2024-07-01' });
+    const c = await addChild({ name: '丙', birthDate: '2023-01-01' });
+    const formA = await addForm({ childId: a.id, tier: 'Ⅴ', period: '115年05月' });
+    await addEntry({ formId: formA.id, indicatorCode: 'Ⅴ-1-1', date: '2026-05-01', status: 'developed', note: '' });
+    const formB = await addForm({ childId: b.id, tier: 'Ⅴ', period: '115年05月' });
+    await addEntry({ formId: formB.id, indicatorCode: 'Ⅴ-1-1', date: '2026-05-01', status: 'developing', note: '' });
+    const formC = await addForm({ childId: c.id, tier: 'Ⅴ', period: '115年05月' });
+    await addEntry({ formId: formC.id, indicatorCode: 'Ⅴ-1-1', date: '2026-05-01', status: 'developed', note: '' });
+    const plan = await addMonthlyCoursePlan({
+      period: '115年06月', childIds: [a.id, b.id, c.id], childTiers: { [a.id]: 'Ⅴ', [b.id]: 'Ⅴ', [c.id]: 'Ⅵ' },
+    });
+
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    container.querySelector(`.monthly-calendar__day[data-child-id="${a.id}"][data-week-index="1"][data-weekday="3"]`).click();
+    await waitFor(() => container.querySelector('[data-field="new-item-indicator"]'));
+    const select = container.querySelector('[data-field="new-item-indicator"]');
+
+    const option = code => select.querySelector(`option[value="${code}"]`);
+    expect(option('Ⅴ-1-1').textContent.startsWith('🟢')).toBe(true);
+    expect(option('Ⅴ-1-1').className).toBe('indicator-option--achieved');
+    expect(option('Ⅴ-1-2').textContent.startsWith('⚪')).toBe(true);
+    expect(container.querySelector('[data-indicator-legend]').textContent).toContain('🟠未達成');
+
+    const roster = container.querySelector('[data-indicator-roster]');
+    select.value = 'Ⅴ-1-1';
+    select.dispatchEvent(new Event('change'));
+    expect(roster.textContent).toContain('已達成：甲');
+    expect(roster.textContent).toContain('未達成：乙');
+    expect(roster.textContent).not.toContain('丙'); // different tier
+    expect(roster.textContent).not.toContain('還沒做過');
+
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    expect(roster.textContent).toBe('');
+  });
+});

@@ -11,6 +11,7 @@ import { parsePeriod } from './periodFields.js';
 import { TIERS, getIndicatorsForTier, getIndicator, tierFormLabel } from '../data/indicators.js';
 import { calculateAgeInMonths, suggestTier } from '../domain/ageTier.js';
 import { escapeHtml } from './escapeHtml.js';
+import { loadIndicatorProgress } from '../domain/indicatorProgress.js';
 import { headerButtonLabel } from './headerButtonLabel.js';
 import { isMobile, fabIconHtml, nestedEntryFormDialog, wireNestedEntryForm, wireFabDrag, lockBodyScroll, unlockBodyScroll, closeOnBackdropClick } from './formPopup.js';
 import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js';
@@ -43,8 +44,21 @@ async function loadEditorData(plan) {
   const { year, month } = parsePeriod(plan.period);
   const weeks = buildMonthlyCalendar(year + 1911, month);
 
-  return { children, slots, itemsBySlotId, overrideByKey, weeks };
+  // Read once per open: nothing on this screen changes a 總表 or 適性紀錄.
+  const progress = await loadIndicatorProgress(children.map(c => c.id));
+
+  return { children, slots, itemsBySlotId, overrideByKey, weeks, progress };
 }
+
+// 指標 picker marks (see indicatorProgress.js). Phones and Safari ignore an <option>'s
+// background, so the dot carries the meaning everywhere and the tint is a bonus where it shows.
+const PROGRESS_MARKS = [
+  ['achieved', '🟢', '已達成'],
+  ['developing', '🟠', '未達成'],
+  ['none', '⚪', '還沒做過'],
+];
+const PROGRESS_DOT = Object.fromEntries(PROGRESS_MARKS.map(([state, dot]) => [state, dot]));
+const PROGRESS_LEGEND = PROGRESS_MARKS.map(([, dot, label]) => `${dot}${label}`).join('　');
 
 function findSlot(slots, tier, weekIndex, weekday) {
   return slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
@@ -438,7 +452,7 @@ export async function renderMonthlyPlanEditorView(
     updateFabVisibility();
   }
 
-  function indicatorOptionsHtml(tier) {
+  function indicatorOptionsHtml(tier, childProgress) {
     const indicators = getIndicatorsForTier(tier);
     const byDomain = new Map();
     for (const indicator of indicators) {
@@ -451,7 +465,12 @@ export async function renderMonthlyPlanEditorView(
         .map(
           ([domainName, group]) =>
             `<optgroup label="${escapeHtml(domainName)}">
-              ${group.map(i => `<option value="${escapeHtml(i.code)}">${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`).join('')}
+              ${group
+                .map(i => {
+                  const state = childProgress.get(i.code) || 'none';
+                  return `<option value="${escapeHtml(i.code)}" class="indicator-option--${state}">${PROGRESS_DOT[state]} ${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`;
+                })
+                .join('')}
             </optgroup>`
         )
         .join('')
@@ -536,6 +555,7 @@ export async function renderMonthlyPlanEditorView(
     // select shows; the item is still saved into this cell's own slot regardless of which tier
     // its indicator came from.
     let indicatorTier = tier;
+    const childProgress = data.progress.get(child.id) || new Map();
 
     panelItems.innerHTML = `
       <p class="individual-add-note" data-individual-note hidden></p>
@@ -552,8 +572,10 @@ export async function renderMonthlyPlanEditorView(
         </div>
         <label class="panel-form__field">
           指標
-          <select data-field="new-item-indicator">${indicatorOptionsHtml(tier)}</select>
+          <span class="indicator-progress-legend" data-indicator-legend>${PROGRESS_LEGEND}</span>
+          <select data-field="new-item-indicator">${indicatorOptionsHtml(tier, childProgress)}</select>
         </label>
+        <div class="indicator-progress-roster" data-indicator-roster></div>
         <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name"></label>
         <label class="panel-form__field">指標內容 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
         <button type="submit" class="btn btn--primary btn--small" data-add-submit>新增</button>
@@ -567,11 +589,24 @@ export async function renderMonthlyPlanEditorView(
       btn.addEventListener('click', () => {
         indicatorTier = btn.dataset.indicatorTier;
         panelItems.querySelectorAll('[data-indicator-tier]').forEach(b => b.classList.toggle('tier-switch__btn--active', b === btn));
-        panelItems.querySelector('[data-field="new-item-indicator"]').innerHTML = indicatorOptionsHtml(indicatorTier);
+        panelItems.querySelector('[data-field="new-item-indicator"]').innerHTML = indicatorOptionsHtml(indicatorTier, childProgress);
+        renderRoster('');
       });
     });
 
+    // Who among the children sharing this cell's tier has already got the picked indicator.
+    function renderRoster(code) {
+      const classmates = data.children.filter(c => plan.childTiers[c.id] === tier);
+      panelItems.querySelector('[data-indicator-roster]').innerHTML = !code
+        ? ''
+        : PROGRESS_MARKS.map(([state, dot, label]) => {
+            const names = classmates.filter(c => (data.progress.get(c.id)?.get(code) || 'none') === state).map(c => escapeHtml(c.name));
+            return names.length ? `<div>${dot} ${label}：${names.join('、')}</div>` : '';
+          }).join('');
+    }
+
     panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener('change', event => {
+      renderRoster(event.target.value);
       const indicator = getIndicator(event.target.value);
       if (!indicator) return;
       // activityName is the indicator's own official 【活動名稱】 label (not a copy of the

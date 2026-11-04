@@ -2965,6 +2965,26 @@ fieldset.panel-form__field.import-preview__child legend {
   font-weight: 600;
 }
 
+/* 指標 picker progress marks — option tints only show in Chrome/Edge; the dot carries the meaning. */
+.indicator-option--achieved { background: #e3f5e6; }
+.indicator-option--developing { background: #fdebd8; }
+.indicator-progress-legend {
+  display: block;
+  margin: 0.15rem 0 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: normal;
+}
+.indicator-progress-roster:empty { display: none; }
+.indicator-progress-roster {
+  margin: -0.3rem 0 0.75rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  background: var(--edit-tint);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
 .monthly-calendar__title {
   margin: 0 0 0.9rem;
   font-size: 1.05rem;
