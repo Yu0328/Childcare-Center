@@ -685,10 +685,9 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     await waitFor(() => container.querySelector('[data-field="new-item-indicator"]'));
     const select = container.querySelector('[data-field="new-item-indicator"]');
 
-    const option = code => select.querySelector(`option[value="${code}"]`);
-    expect(option('Ⅴ-1-1').textContent.startsWith('○')).toBe(true);
-    expect(option('Ⅴ-1-1').className).toBe('indicator-option--achieved');
-    expect(option('Ⅴ-1-2').className).toBe('indicator-option--none');
+    const row = code => container.querySelector(`[data-pick-indicator="${code}"]`);
+    expect(row('Ⅴ-1-1').querySelector('.progress-dot--achieved')).not.toBeNull();
+    expect(row('Ⅴ-1-2').querySelector('.progress-dot--none')).not.toBeNull();
     expect(container.querySelector('[data-indicator-legend]').textContent).toContain('未達成');
 
     const roster = container.querySelector('[data-indicator-roster]');
@@ -702,5 +701,16 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     select.value = '';
     select.dispatchEvent(new Event('change'));
     expect(roster.textContent).toBe('');
+
+    // Picking from the drawn list sets the hidden <select> and fills the form like before.
+    const toggle = container.querySelector('[data-indicator-picker-toggle]');
+    toggle.click();
+    expect(container.querySelector('[data-indicator-picker-list]').hidden).toBe(false);
+    row('Ⅴ-1-1').click();
+    expect(select.value).toBe('Ⅴ-1-1');
+    expect(container.querySelector('[data-indicator-picker-list]').hidden).toBe(true);
+    expect(toggle.textContent).toContain('Ⅴ-1-1');
+    expect(container.querySelector('[data-field="new-item-indicator-text"]').value).not.toBe('');
+    expect(roster.textContent).toContain('已達成甲');
   });
 });

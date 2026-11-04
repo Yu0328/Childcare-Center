@@ -274,6 +274,9 @@ const IMPORT = {
 // 指標所屬年齡層: the tier switch above a 指標 picker (月計畫 and 課程計畫表 share it).
 const tierSwitch = () => `<span class="ms-field ms-field--bare">指標所屬年齡層</span>${tabs(['7-12個月', '13-18個月', '19-24個月'], '19-24個月')}`;
 
+// The 指標 picker's progress dot (same class the real picker uses).
+const dot = state => `<span class="progress-dot progress-dot--${state}"></span>`;
+
 const planListForm = hitSubmit =>
   aside('新增課程月計畫', field('年月', '115年10月'), `<span class="ms-field ms-field--bare">幼兒</span>${cb('王小明', true)}${cb('林小美', true)}`, actions(btn('新增', 'primary', hitSubmit)));
 const planList = (m, { fabHit = false, popup = false, hitSubmit = false } = {}) =>
@@ -309,7 +312,7 @@ const dayPanel = ({ hitAdd = false, hitAbsent = false, absent = false } = {}) =>
   `<div class="ms-aside"><b>王小明　第二週　10/07</b>${row(
     `${code('Ⅴ-1-6')}<b>【我愛畫畫】</b>${btn('編輯', 'edit')}${del()}`
   )}<div class="ms-cbline">${cb('未達成')}${cb('請假／其他活動代替', absent, hitAbsent)}</div>${absent ? field('', '戶外教學') : ''}${
-    hitAdd ? `${tierSwitch()}${muted('○已達成　△未達成　－還沒做過')}${field('指標', '△ Ⅴ-3-2')}${muted('△未達成 王小明　－還沒做過 林小美')}${field('活動名稱', '故事時間')}${actions(btn('新增', 'primary', true))}` : ''
+    hitAdd ? `${tierSwitch()}${muted(`${dot('achieved')}已達成　${dot('developing')}未達成　${dot('none')}還沒做過`)}${field('指標', 'Ⅴ-3-2')}${muted(`${dot('developing')}未達成 王小明　${dot('none')}還沒做過 林小美`)}${field('活動名稱', '故事時間')}${actions(btn('新增', 'primary', true))}` : ''
   }</div>`;
 // 指定新增 on: the panel's note names who gets the new item.
 const makeupPanel = () =>

@@ -50,20 +50,19 @@ async function loadEditorData(plan) {
   return { children, slots, itemsBySlotId, overrideByKey, weeks, progress };
 }
 
-// 指標 picker marks (see indicatorProgress.js), in the 總表's own ○／△ vocabulary. Phones and
-// Safari ignore an <option>'s styling, so inside the <select> the plain glyph carries the meaning
-// (none gets a blank of the same width — a list of mostly 還沒做過 stays quiet) and the tint/grey
-// text is a bonus where it shows. Plain glyphs, not emoji: Windows draws emoji dots as 3D blobs.
-// The legend and roster are ordinary HTML, so their glyphs are coloured.
+// 指標 picker marks (see indicatorProgress.js). A native <select> can't draw a coloured dot on a
+// phone (option styling is ignored) and an emoji dot is a 3D blob on Windows, so the picker is a
+// drawn list over a hidden <select> that still holds the value — the rest of the form, and its
+// tests, keep reading and setting that <select> as before.
 const PROGRESS_MARKS = [
-  ['achieved', '○', '已達成'],
-  ['developing', '△', '未達成'],
-  ['none', '　', '還沒做過'],
+  ['achieved', '已達成'],
+  ['developing', '未達成'],
+  ['none', '還沒做過'],
 ];
-const PROGRESS_DOT = Object.fromEntries(PROGRESS_MARKS.map(([state, dot]) => [state, dot]));
-const progressLabelHtml = (state, label) =>
-  `<span class="progress-mark progress-mark--${state}">${state === 'none' ? '－' : PROGRESS_DOT[state]}</span>${label}`;
-const PROGRESS_LEGEND = PROGRESS_MARKS.map(([state, , label]) => `<span>${progressLabelHtml(state, label)}</span>`).join('');
+const progressDotHtml = state => `<span class="progress-dot progress-dot--${state}"></span>`;
+const progressLabelHtml = (state, label) => `${progressDotHtml(state)}${label}`;
+const PROGRESS_LEGEND = PROGRESS_MARKS.map(([state, label]) => `<span>${progressLabelHtml(state, label)}</span>`).join('');
+const NO_INDICATOR_LABEL = '（不選指標，純活動）';
 
 function findSlot(slots, tier, weekIndex, weekday) {
   return slots.find(s => s.tier === tier && s.weekIndex === weekIndex && s.weekday === weekday);
@@ -457,30 +456,41 @@ export async function renderMonthlyPlanEditorView(
     updateFabVisibility();
   }
 
-  function indicatorOptionsHtml(tier, childProgress) {
-    const indicators = getIndicatorsForTier(tier);
+  function indicatorGroups(tier) {
     const byDomain = new Map();
-    for (const indicator of indicators) {
+    for (const indicator of getIndicatorsForTier(tier)) {
       if (!byDomain.has(indicator.domainName)) byDomain.set(indicator.domainName, []);
       byDomain.get(indicator.domainName).push(indicator);
     }
+    return [...byDomain.entries()];
+  }
+
+  function indicatorOptionsHtml(tier) {
     return (
-      '<option value="">（不選指標，純活動）</option>' +
-      [...byDomain.entries()]
+      `<option value="">${NO_INDICATOR_LABEL}</option>` +
+      indicatorGroups(tier)
+        .map(([, group]) => group.map(i => `<option value="${escapeHtml(i.code)}">${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`).join(''))
+        .join('')
+    );
+  }
+
+  function indicatorRowHtml(code, text, state) {
+    return `<button type="button" class="indicator-picker__option${state ? ` indicator-picker__option--${state}` : ''}" role="option" data-pick-indicator="${escapeHtml(code)}">${state ? progressDotHtml(state) : ''}<span>${text}</span></button>`;
+  }
+
+  function indicatorListHtml(tier, childProgress) {
+    return (
+      indicatorRowHtml('', NO_INDICATOR_LABEL, '') +
+      indicatorGroups(tier)
         .map(
           ([domainName, group]) =>
-            `<optgroup label="${escapeHtml(domainName)}">
-              ${group
-                .map(i => {
-                  const state = childProgress.get(i.code) || 'none';
-                  return `<option value="${escapeHtml(i.code)}" class="indicator-option--${state}">${PROGRESS_DOT[state]} ${escapeHtml(i.code)} ${escapeHtml(i.description)}</option>`;
-                })
-                .join('')}
-            </optgroup>`
+            `<div class="indicator-picker__group">${escapeHtml(domainName)}</div>` +
+            group.map(i => indicatorRowHtml(i.code, `${escapeHtml(i.code)} ${escapeHtml(i.description)}`, childProgress.get(i.code) || 'none')).join('')
         )
         .join('')
     );
   }
+
 
   // Read-only summary by default (code badge + activity + description, corner 編輯/× actions —
   // same card pattern as courseplanTabView.js's entryCard) with the actual editable fields tucked
@@ -575,11 +585,15 @@ export async function renderMonthlyPlanEditorView(
             ).join('')}
           </div>
         </div>
-        <label class="panel-form__field">
+        <div class="panel-form__field">
           指標
           <span class="indicator-progress-legend" data-indicator-legend>${PROGRESS_LEGEND}</span>
-          <select data-field="new-item-indicator">${indicatorOptionsHtml(tier, childProgress)}</select>
-        </label>
+          <select data-field="new-item-indicator" hidden>${indicatorOptionsHtml(tier)}</select>
+          <div class="indicator-picker">
+            <button type="button" class="indicator-picker__current" data-indicator-picker-toggle aria-expanded="false"></button>
+            <div class="indicator-picker__list" role="listbox" data-indicator-picker-list hidden>${indicatorListHtml(tier, childProgress)}</div>
+          </div>
+        </div>
         <div class="indicator-progress-roster" data-indicator-roster></div>
         <label class="panel-form__field">活動名稱 <input data-field="new-item-activity-name"></label>
         <label class="panel-form__field">指標內容 <textarea data-field="new-item-indicator-text" rows="2"></textarea></label>
@@ -594,7 +608,9 @@ export async function renderMonthlyPlanEditorView(
       btn.addEventListener('click', () => {
         indicatorTier = btn.dataset.indicatorTier;
         panelItems.querySelectorAll('[data-indicator-tier]').forEach(b => b.classList.toggle('tier-switch__btn--active', b === btn));
-        panelItems.querySelector('[data-field="new-item-indicator"]').innerHTML = indicatorOptionsHtml(indicatorTier, childProgress);
+        panelItems.querySelector('[data-field="new-item-indicator"]').innerHTML = indicatorOptionsHtml(indicatorTier);
+        pickerList.innerHTML = indicatorListHtml(indicatorTier, childProgress);
+        renderPickerCurrent('');
         renderRoster('');
       });
     });
@@ -604,7 +620,7 @@ export async function renderMonthlyPlanEditorView(
       const classmates = data.children.filter(c => plan.childTiers[c.id] === tier);
       panelItems.querySelector('[data-indicator-roster]').innerHTML = !code
         ? ''
-        : PROGRESS_MARKS.map(([state, , label]) => {
+        : PROGRESS_MARKS.map(([state, label]) => {
             const names = classmates.filter(c => (data.progress.get(c.id)?.get(code) || 'none') === state).map(c => escapeHtml(c.name));
             return names.length
               ? `<div class="indicator-progress-roster__row"><b>${progressLabelHtml(state, label)}</b><span>${names.join('、')}</span></div>`
@@ -612,7 +628,38 @@ export async function renderMonthlyPlanEditorView(
           }).join('');
     }
 
-    panelItems.querySelector('[data-field="new-item-indicator"]').addEventListener('change', event => {
+    const indicatorSelect = panelItems.querySelector('[data-field="new-item-indicator"]');
+    const pickerToggle = panelItems.querySelector('[data-indicator-picker-toggle]');
+    const pickerList = panelItems.querySelector('[data-indicator-picker-list]');
+    function renderPickerCurrent(code) {
+      const row = [...pickerList.querySelectorAll('[data-pick-indicator]')].find(r => r.dataset.pickIndicator === code);
+      pickerToggle.innerHTML = `${row ? row.innerHTML : `<span>${NO_INDICATOR_LABEL}</span>`}<span class="indicator-picker__caret">▾</span>`;
+      pickerList.querySelectorAll('[data-pick-indicator]').forEach(r => r.setAttribute('aria-selected', String(r === row)));
+    }
+    function setPickerOpen(open) {
+      pickerList.hidden = !open;
+      pickerToggle.setAttribute('aria-expanded', String(open));
+      if (open) pickerList.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    }
+    renderPickerCurrent('');
+    pickerToggle.addEventListener('click', () => setPickerOpen(pickerList.hidden));
+    pickerList.addEventListener('click', event => {
+      const row = event.target.closest('[data-pick-indicator]');
+      if (!row) return;
+      indicatorSelect.value = row.dataset.pickIndicator;
+      indicatorSelect.dispatchEvent(new Event('change'));
+      setPickerOpen(false);
+      pickerToggle.focus();
+    });
+    pickerList.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        setPickerOpen(false);
+        pickerToggle.focus();
+      }
+    });
+
+    indicatorSelect.addEventListener('change', event => {
+      renderPickerCurrent(event.target.value);
       renderRoster(event.target.value);
       const indicator = getIndicator(event.target.value);
       if (!indicator) return;
