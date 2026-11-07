@@ -21,6 +21,7 @@ import { generateMonthlyPlanDocxBlob } from '../export/monthlyPlanDocxExport.js'
 import { downloadBlob } from '../export/downloadBlob.js';
 import { oneAtATime } from './oneAtATime.js';
 import { discardInput } from './unsavedInput.js';
+import { applyTapOrder, finalChildIds } from '../domain/childOrder.js';
 
 // Loads everything the render pass needs in one pass: the plan's still-existing children (a
 // child deleted elsewhere after being added to this plan is silently skipped rather than
@@ -194,6 +195,7 @@ export async function renderMonthlyPlanEditorView(
   const activeChildId = data.children.some(c => c.id === remembered) ? remembered : data.children[0]?.id;
   const showOneChild = data.children.length > 1;
   const panelAsPopup = typeof matchMedia === 'function' && matchMedia(PANEL_POPUP_QUERY).matches;
+  const allChildren = await listChildren();
 
   container.innerHTML = `
     <div class="page-header page-header--editor">
@@ -215,11 +217,12 @@ export async function renderMonthlyPlanEditorView(
       <div class="monthly-plan-side">
         ${nestedEntryFormDialog(`
         <form class="panel-form" data-manage-children-form>
+          <div data-manage-children-pick>
           <h3 class="panel-form__title">選擇本月計畫涵蓋的幼兒</h3>
           <fieldset class="panel-form__field">
-            <legend>幼兒</legend>
+            <legend class="child-order__legend">幼兒 <button type="button" class="btn btn--outline btn--small" data-action="sort-children">排順序</button></legend>
             <div class="panel-form__checkbox-list">
-              ${(await listChildren())
+              ${allChildren
                 .map(
                   c =>
                     `<label class="panel-form__checkbox">
@@ -234,6 +237,16 @@ export async function renderMonthlyPlanEditorView(
             <button type="button" class="btn btn--outline btn--small" data-action="cancel-manage-children">取消</button>
           </div>
           <p class="field-error" data-error="manage-children"></p>
+          </div>
+          <div data-sort-children hidden>
+            <h3 class="panel-form__title">依序點選幼兒</h3>
+            <p class="child-order__hint">沒點到的會照原本順序排在後面</p>
+            <div class="panel-form__checkbox-list" data-sort-list></div>
+            <div class="entry-form__actions">
+              <button type="button" class="btn btn--primary btn--small" data-action="sort-done">完成</button>
+              <button type="button" class="btn btn--outline btn--small" data-action="sort-cancel">取消</button>
+            </div>
+          </div>
         </form>
         `, panelAsPopup)}
         ${nestedEntryFormDialog(`
@@ -313,7 +326,53 @@ export async function renderMonthlyPlanEditorView(
 
   wireNestedEntryForm(container.querySelector('[data-action="manage-children"]'), manageChildrenForm);
 
+  // 排順序: the order 儲存 will write; changed only by 完成 in the sort view (see childOrder.js).
+  let childOrder = [...plan.childIds];
+  let tapped = [];
+  const pickView = manageChildrenForm.querySelector('[data-manage-children-pick]');
+  const sortView = manageChildrenForm.querySelector('[data-sort-children]');
+  const checkedChildIds = () =>
+    allChildren.filter(c => manageChildrenForm.querySelector(`[data-manage-child-checkbox="${c.id}"]`)?.checked).map(c => c.id);
+  const showSortView = show => {
+    pickView.hidden = show;
+    sortView.hidden = !show;
+  };
+  const tapNumber = n => (n <= 20 ? String.fromCodePoint(0x2460 + n - 1) : `${n}.`);
+  const renderSortList = () => {
+    const nameById = new Map(allChildren.map(c => [c.id, c.name]));
+    sortView.querySelector('[data-sort-list]').innerHTML = finalChildIds(childOrder, checkedChildIds())
+      .map(id => {
+        const n = tapped.indexOf(id) + 1;
+        return `<button type="button" class="panel-form__checkbox child-order__item" data-sort-child="${escapeHtml(id)}" aria-pressed="${n > 0}">
+          <span class="child-order__number" data-sort-number>${n > 0 ? tapNumber(n) : ''}</span>${escapeHtml(nameById.get(id) ?? '')}
+        </button>`;
+      })
+      .join('');
+  };
+
+  manageChildrenForm.querySelector('[data-action="sort-children"]').addEventListener('click', () => {
+    tapped = [];
+    renderSortList();
+    showSortView(true);
+  });
+  sortView.querySelector('[data-sort-list]').addEventListener('click', event => {
+    const button = event.target.closest('[data-sort-child]');
+    if (!button) return;
+    const id = allChildren.find(c => String(c.id) === button.dataset.sortChild)?.id;
+    tapped = tapped.includes(id) ? tapped.filter(t => t !== id) : [...tapped, id];
+    renderSortList();
+  });
+  sortView.querySelector('[data-action="sort-done"]').addEventListener('click', () => {
+    childOrder = applyTapOrder(finalChildIds(childOrder, checkedChildIds()), tapped);
+    showSortView(false);
+  });
+  sortView.querySelector('[data-action="sort-cancel"]').addEventListener('click', () => showSortView(false));
+  // A popup closed by Esc or a backdrop tap mid-sort reopens on the checkbox view.
+  container.querySelector('[data-action="manage-children"]').addEventListener('click', () => showSortView(false));
+
   container.querySelector('[data-action="cancel-manage-children"]').addEventListener('click', () => {
+    childOrder = [...plan.childIds];
+    showSortView(false);
     discardInput(manageChildrenForm);
     const dialog = manageChildrenForm.closest('dialog.form-popup');
     if (dialog) dialog.close();
@@ -384,7 +443,10 @@ export async function renderMonthlyPlanEditorView(
   container.querySelector('[data-action="save-children"]').addEventListener('click', oneAtATime(async () => {
     try {
       const allChildren = await listChildren();
-      const newChildIds = allChildren.filter(c => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`).checked).map(c => c.id);
+      const newChildIds = finalChildIds(
+        childOrder,
+        allChildren.filter(c => container.querySelector(`[data-manage-child-checkbox="${c.id}"]`)?.checked).map(c => c.id)
+      );
       const removedChildIds = plan.childIds.filter(id => !newChildIds.includes(id));
 
       const { year, month } = parsePeriod(plan.period);

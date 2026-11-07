@@ -693,3 +693,89 @@ describe('monthlyPlanEditorView: 指標達成狀況', () => {
     expect(scrolledTo).toBeGreaterThan(0);
   });
 });
+
+describe('monthlyPlanEditorView: child order', () => {
+  let container, childA, childB, childC;
+
+  const q = selector => container.querySelector(selector);
+  const savedOrder = async planId => (await getMonthlyCoursePlan(planId)).childIds;
+  const switchOrder = () => [...container.querySelectorAll('[data-switch-child]')].map(b => Number(b.dataset.switchChild));
+
+  async function open(childIds) {
+    const childTiers = Object.fromEntries(childIds.map(id => [id, 'Ⅴ']));
+    const plan = await addMonthlyCoursePlan({ period: '115年06月', childIds, childTiers });
+    await renderMonthlyPlanEditorView(container, { plan, onBack: vi.fn() });
+    q('[data-action="manage-children"]').click();
+    return plan;
+  }
+
+  async function saveAndWait(plan, expected) {
+    q('[data-action="save-children"]').click();
+    await waitFor(async () => JSON.stringify(await savedOrder(plan.id)) === JSON.stringify(expected) && switchOrder().length === expected.length);
+  }
+
+  beforeEach(async () => {
+    await clearAllData();
+    container = document.createElement('div');
+    childA = await addChild({ name: '甲', birthDate: '2024-07-01' });
+    childB = await addChild({ name: '乙', birthDate: '2024-07-02' });
+    childC = await addChild({ name: '丙', birthDate: '2024-07-03' });
+  });
+
+  it('saves the tapped order, untapped children after them', async () => {
+    const plan = await open([childA.id, childB.id, childC.id]);
+    q('[data-action="sort-children"]').click();
+    q(`[data-sort-child="${childC.id}"]`).click();
+    q(`[data-sort-child="${childA.id}"]`).click();
+    q('[data-action="sort-done"]').click();
+    await saveAndWait(plan, [childC.id, childA.id, childB.id]);
+
+    expect(await savedOrder(plan.id)).toEqual([childC.id, childA.id, childB.id]);
+    expect(switchOrder()).toEqual([childC.id, childA.id, childB.id]);
+  });
+
+  it('tapping a numbered child again removes its number and moves later numbers up', async () => {
+    await open([childA.id, childB.id, childC.id]);
+    q('[data-action="sort-children"]').click();
+    q(`[data-sort-child="${childA.id}"]`).click();
+    q(`[data-sort-child="${childB.id}"]`).click();
+    q(`[data-sort-child="${childA.id}"]`).click();
+
+    expect(q(`[data-sort-child="${childB.id}"] [data-sort-number]`).textContent).toBe('①');
+    expect(q(`[data-sort-child="${childA.id}"] [data-sort-number]`).textContent).toBe('');
+  });
+
+  it('keeps the saved order when only a new child is checked', async () => {
+    const plan = await open([childB.id, childA.id]);
+    q(`[data-manage-child-checkbox="${childC.id}"]`).checked = true;
+    await saveAndWait(plan, [childB.id, childA.id, childC.id]);
+
+    expect(await savedOrder(plan.id)).toEqual([childB.id, childA.id, childC.id]);
+  });
+
+  it('cancelling the sort, or the whole popup, leaves the order alone', async () => {
+    const plan = await open([childA.id, childB.id, childC.id]);
+    q('[data-action="sort-children"]').click();
+    q(`[data-sort-child="${childC.id}"]`).click();
+    q('[data-action="sort-cancel"]').click();
+    expect(q('[data-sort-children]').hidden).toBe(true);
+
+    q('[data-action="sort-children"]').click();
+    q(`[data-sort-child="${childC.id}"]`).click();
+    q('[data-action="sort-done"]').click();
+    q('[data-action="cancel-manage-children"]').click();
+
+    q('[data-action="manage-children"]').click();
+    q(`[data-manage-child-checkbox="${childB.id}"]`).checked = false;
+    await saveAndWait(plan, [childA.id, childC.id]);
+    expect(await savedOrder(plan.id)).toEqual([childA.id, childC.id]);
+  });
+
+  it('lists only checked children, with no checkboxes, in the sort view', async () => {
+    await open([childA.id, childB.id]);
+    q('[data-action="sort-children"]').click();
+
+    expect(q('[data-sort-children] input[type=checkbox]')).toBeNull();
+    expect([...container.querySelectorAll('[data-sort-child]')].map(b => Number(b.dataset.sortChild))).toEqual([childA.id, childB.id]);
+  });
+});
