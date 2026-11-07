@@ -741,7 +741,7 @@ describe('monthlyPlanEditorView: child order', () => {
     q(`[data-sort-child="${childB.id}"]`).click();
     q(`[data-sort-child="${childA.id}"]`).click();
 
-    expect(q(`[data-sort-child="${childB.id}"] [data-sort-number]`).textContent).toBe('①');
+    expect(q(`[data-sort-child="${childB.id}"] [data-sort-number]`).textContent).toBe('1');
     expect(q(`[data-sort-child="${childA.id}"] [data-sort-number]`).textContent).toBe('');
   });
 
@@ -781,6 +781,28 @@ describe('monthlyPlanEditorView: child order', () => {
     q(`[data-manage-child-checkbox="${childC.id}"]`).checked = true;
     await saveAndWait(plan, [childA.id, childB.id, childC.id]);
     expect(await savedOrder(plan.id)).toEqual([childA.id, childB.id, childC.id]);
+  });
+
+  it('moves tapped children to the top in tap order; untapping puts one back in its old place', async () => {
+    await open([childA.id, childB.id, childC.id]);
+    const order = () => [...container.querySelectorAll('[data-sort-child]')].map(b => Number(b.dataset.sortChild));
+    const number = child => q(`[data-sort-child="${child.id}"] [data-sort-number]`).textContent;
+    q('[data-action="sort-children"]').click();
+    q(`[data-sort-child="${childC.id}"]`).click();
+    q(`[data-sort-child="${childB.id}"]`).click();
+    expect(order()).toEqual([childC.id, childB.id, childA.id]);
+    expect([number(childC), number(childB), number(childA)]).toEqual(['1', '2', '']);
+
+    q(`[data-sort-child="${childC.id}"]`).click();
+    expect(order()).toEqual([childB.id, childA.id, childC.id]);
+    expect(number(childB)).toBe('1');
+  });
+
+  it('titles the sort view 排順序 with the one-line hint 依序點選幼兒', async () => {
+    await open([childA.id, childB.id]);
+    q('[data-action="sort-children"]').click();
+    expect(q('[data-sort-children] .panel-form__title').textContent.trim()).toBe('排順序');
+    expect(q('[data-sort-children] .child-order__hint').textContent.trim()).toBe('依序點選幼兒');
   });
 
   it('lists only checked children, with no checkboxes, in the sort view', async () => {

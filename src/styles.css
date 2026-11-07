@@ -3663,7 +3663,7 @@ fieldset.panel-form__field.import-preview__child legend {
   .help-view *, .help-view *::before, .help-view *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
-/* 月計畫 管理幼兒 → 排順序 (see childOrder.js). The sort list reuses the checkbox pills. */
+/* 月計畫 管理幼兒 → 排順序 (see childOrder.js): one child per row, tapped ones on top. */
 .child-order__legend {
   display: flex;
   align-items: center;
@@ -3672,26 +3672,67 @@ fieldset.panel-form__field.import-preview__child legend {
   width: 100%;
 }
 
+.child-order__sort-button {
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  border: none;
+}
+
+.child-order__sort-button:hover {
+  background: var(--brand-tint);
+  filter: brightness(0.96);
+}
+
 .child-order__hint {
-  margin: 0 0 0.6rem;
+  margin: -0.25rem 0 0.8rem;
+  text-align: center;
   color: var(--text-muted);
   font-size: 0.85rem;
 }
 
+.child-order__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 .child-order__item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
   font: inherit;
-  font-size: 0.9rem;
-  color: inherit;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
   text-align: left;
+  cursor: pointer;
 }
 
 .child-order__item[aria-pressed="true"] {
   border-color: var(--brand);
+  background: #f2f7fd;
+  color: var(--text-primary);
 }
 
 .child-order__number {
-  display: inline-block;
-  min-width: 1.2em;
-  color: var(--brand);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--border-strong);
+  font-size: 0.8rem;
   font-weight: 700;
+}
+
+.child-order__item[aria-pressed="true"] .child-order__number {
+  border: none;
+  background: var(--brand);
+  color: #fff;
 }

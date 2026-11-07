@@ -220,7 +220,7 @@ export async function renderMonthlyPlanEditorView(
           <div data-manage-children-pick>
           <h3 class="panel-form__title">選擇本月計畫涵蓋的幼兒</h3>
           <fieldset class="panel-form__field">
-            <legend class="child-order__legend">幼兒 <button type="button" class="btn btn--outline btn--small" data-action="sort-children">排順序</button></legend>
+            <legend class="child-order__legend">幼兒 <button type="button" class="btn btn--small child-order__sort-button" data-action="sort-children">⇅ 排順序</button></legend>
             <div class="panel-form__checkbox-list">
               ${allChildren
                 .map(
@@ -239,9 +239,9 @@ export async function renderMonthlyPlanEditorView(
           <p class="field-error" data-error="manage-children"></p>
           </div>
           <div data-sort-children hidden>
-            <h3 class="panel-form__title">依序點選幼兒</h3>
-            <p class="child-order__hint">沒點到的會照原本順序排在後面</p>
-            <div class="panel-form__checkbox-list" data-sort-list></div>
+            <h3 class="panel-form__title">排順序</h3>
+            <p class="child-order__hint">依序點選幼兒</p>
+            <div class="child-order__list" data-sort-list></div>
             <div class="entry-form__actions">
               <button type="button" class="btn btn--primary btn--small" data-action="sort-done">完成</button>
               <button type="button" class="btn btn--outline btn--small" data-action="sort-cancel">取消</button>
@@ -337,14 +337,14 @@ export async function renderMonthlyPlanEditorView(
     pickView.hidden = show;
     sortView.hidden = !show;
   };
-  const tapNumber = n => (n <= 20 ? String.fromCodePoint(0x2460 + n - 1) : `${n}.`);
   const renderSortList = () => {
     const nameById = new Map(allChildren.map(c => [c.id, c.name]));
-    sortView.querySelector('[data-sort-list]').innerHTML = finalChildIds(childOrder, checkedChildIds())
+    // Tapped children move to the top, so the list always reads as the order 完成 will give.
+    sortView.querySelector('[data-sort-list]').innerHTML = applyTapOrder(finalChildIds(childOrder, checkedChildIds()), tapped)
       .map(id => {
         const n = tapped.indexOf(id) + 1;
-        return `<button type="button" class="panel-form__checkbox child-order__item" data-sort-child="${escapeHtml(id)}" aria-pressed="${n > 0}">
-          <span class="child-order__number" data-sort-number>${n > 0 ? tapNumber(n) : ''}</span>${escapeHtml(nameById.get(id) ?? '')}
+        return `<button type="button" class="child-order__item" data-sort-child="${escapeHtml(id)}" aria-pressed="${n > 0}">
+          <span class="child-order__number" data-sort-number>${n > 0 ? n : ''}</span>${escapeHtml(nameById.get(id) ?? '')}
         </button>`;
       })
       .join('');
