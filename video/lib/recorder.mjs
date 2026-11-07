@@ -2,17 +2,19 @@
 // and frames captured through the CDP screencast. Times are seconds from the first frame.
 import { chromium } from 'playwright';
 import esbuild from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { splitCaption } from './timeline.mjs';
 import { createFakeDrive } from './fakeDrive.mjs';
 
 const LAYOUTS = {
-  desktop: { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1, out: { w: 1920, h: 1080 } },
+  // 1440 CSS px drawn at 4/3: the same 1920×1080 frame with text a third larger.
+  desktop: { viewport: { width: 1440, height: 810 }, deviceScaleFactor: 4 / 3, out: { w: 1920, h: 1080 } },
   phone: { viewport: { width: 412, height: 732 }, deviceScaleFactor: 1080 / 412, isMobile: true, hasTouch: true, out: { w: 1080, h: 1920 } },
 };
 const STEP_GAP_MS = 400;
 const WAIT_MS = 10000;
+export const IMPORT_DOCX = 'video/out/fixtures/陳小華-D表-115年09月.docx';
 export const RECORDING_TIME = '2026-11-16T09:30:00+08:00';
 const NOTICE_KEYS = ['c-form-monthly-plan-per-child-notice'];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -26,6 +28,28 @@ async function seedBundle() {
     },
   });
   return result.outputFiles[0].text;
+}
+
+// Placeholder 點滴分享 photos (drawn, no real child), written once to video/assets/photos/.
+export const PHOTOS = ['photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'].map(f => `video/assets/photos/${f}`);
+const PHOTO_SCENES = [
+  ['#ffe3b3', '#ffb86b', '🧱', '積木時間'],
+  ['#d6f0ff', '#8cc8ff', '🎨', '塗鴉創作'],
+  ['#dff5d8', '#9ed98a', '🌳', '戶外散步'],
+];
+async function drawPhotos(context) {
+  if (PHOTOS.every(existsSync)) return;
+  mkdirSync('video/assets/photos', { recursive: true });
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 800, height: 600 });
+  for (const [i, [a, b, icon, text]] of PHOTO_SCENES.entries()) {
+    await page.setContent(`<body style="margin:0;width:800px;height:600px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,${a},${b});font-family:'Microsoft JhengHei',sans-serif">
+      <div style="font-size:200px;line-height:1">${icon}</div><div style="margin-top:24px;font-size:48px;color:#3a3a3a">${text}</div>
+      <div style="position:absolute;bottom:20px;right:28px;font-size:22px;color:rgba(0,0,0,.45)">示範照片</div></body>`);
+    await page.screenshot({ path: PHOTOS[i], type: 'jpeg', quality: 90 });
+  }
+  await page.close();
 }
 
 async function routeEverything(context, appOrigin, drive, unhandled) {
@@ -52,8 +76,14 @@ async function routeEverything(context, appOrigin, drive, unhandled) {
 function helpers(page) {
   const demo = (fn, ...args) => page.evaluate(([name, a]) => window.__demo[name](...a), [fn, args]);
   async function target(sel) {
-    const loc = page.locator(sel).first();
+    let loc = page.locator(sel).first();
     try {
+      await loc.waitFor({ state: 'attached', timeout: WAIT_MS });
+      // A checkbox/radio inside a <label> (often styled through it, the input itself hidden or
+      // covered): aim at the label, as a person would.
+      if (await loc.evaluate(el => el.matches('input[type="checkbox"], input[type="radio"]') && Boolean(el.closest('label')))) {
+        loc = loc.locator('xpath=ancestor::label[1]');
+      }
       await loc.waitFor({ state: 'visible', timeout: WAIT_MS });
     } catch {
       throw new Error(`selector not visible within ${WAIT_MS} ms: ${sel}`);
@@ -75,6 +105,12 @@ function helpers(page) {
       const t = await pointAt(sel);
       await demo('ripple', t.x, t.y);
       await t.loc.click();
+      await sleep(300);
+    },
+    async doubleClick(sel) {
+      const t = await pointAt(sel);
+      await demo('ripple', t.x, t.y);
+      await t.loc.dblclick();
       await sleep(300);
     },
     async type(sel, text) {
@@ -117,6 +153,23 @@ function helpers(page) {
       await page.mouse.up();
       await sleep(300);
     },
+    // For a click that opens the browser's confirm(): the first click is answered 取消 to learn the
+    // message, the drawn box is shown and 確定 pressed, then the click is repeated and accepted.
+    async clickConfirm(sel) {
+      const t = await pointAt(sel);
+      await demo('ripple', t.x, t.y);
+      const message = new Promise(resolve => page.once('dialog', dialog => { resolve(dialog.message()); dialog.dismiss(); }));
+      await t.loc.click();
+      const ok = await demo('confirm', await message);
+      await sleep(1400);
+      await demo('moveTo', ok.x, ok.y, 600);
+      await demo('ripple', ok.x, ok.y);
+      await sleep(250);
+      await demo('hideConfirm');
+      page.once('dialog', dialog => dialog.accept());
+      await t.loc.click();
+      await sleep(400);
+    },
     async highlight(sel, label) {
       const { box } = await target(sel);
       await demo('ring', box, label);
@@ -127,6 +180,18 @@ function helpers(page) {
       await demo('zoom', box, scale, 900);
     },
     unzoom: () => demo('unzoom', 900),
+    // Script-writing aid: lists the visible controls and saves a screenshot under video/out/dump/.
+    async dump(label) {
+      mkdirSync('video/out/dump', { recursive: true });
+      await page.screenshot({ path: `video/out/dump/${label}.png` });
+      const lines = await page.evaluate(() => [...document.querySelectorAll('button, a, input, select, textarea, [data-action], [role="tab"], dialog[open]')]
+        .filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden')
+        .map(el => {
+          const attrs = [...el.attributes].filter(a => /^(data-|name|type|class|id|value|aria-)/.test(a.name)).map(a => `${a.name}="${a.value.slice(0, 40)}"`).join(' ');
+          return `<${el.tagName.toLowerCase()} ${attrs}> ${(el.innerText || el.value || '').replace(/\s+/g, ' ').trim().slice(0, 50)}`;
+        }));
+      writeFileSync(`video/out/dump/${label}.txt`, lines.join('\n'));
+    },
     card: (title, subtitle) => demo('card', title, subtitle),
     hideCard: () => demo('hideCard'),
   };
@@ -158,7 +223,8 @@ export async function record({ layout, setup, steps, framesDir, appUrl }) {
   await page.evaluate(() => window.__seed.seed());
   await page.evaluate(keys => keys.forEach(k => localStorage.setItem(k, '1')), NOTICE_KEYS);
   mkdirSync('video/out/fixtures', { recursive: true });
-  writeFileSync('video/out/fixtures/陳小華-D表-115年09月.docx', Buffer.from(await page.evaluate(() => window.__seed.importDocxBase64()), 'base64'));
+  writeFileSync(IMPORT_DOCX, Buffer.from(await page.evaluate(() => window.__seed.importDocxBase64()), 'base64'));
+  await drawPhotos(context);
   await page.reload();
   await page.waitForSelector('[data-action="sign-in-google"]');
   const d = helpers(page);

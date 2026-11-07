@@ -3,16 +3,16 @@
   const BRAND = '#2a78d6';
   const css = `
     #demo-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; font-family: "Microsoft JhengHei", system-ui, sans-serif; }
-    #demo-layer .cursor { position: fixed; left: 0; top: 0; width: 28px; height: 28px; margin: -4px 0 0 -4px; transition-property: left, top; transition-timing-function: cubic-bezier(.4,0,.2,1);
+    #demo-layer .cursor { position: fixed; left: 0; top: 0; width: 22px; height: 22px; margin: -4px 0 0 -4px; transition-property: left, top; transition-timing-function: cubic-bezier(.4,0,.2,1);
       background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 2l16 11-7 1.5L9.5 21z' fill='%23fff' stroke='%23222' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E");
       filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
     #demo-layer .ripple { position: fixed; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 3px solid ${BRAND}; animation: demo-ripple .6s ease-out forwards; }
     @keyframes demo-ripple { to { transform: scale(4); opacity: 0; } }
     #demo-layer .ring { position: fixed; border-radius: 12px; box-shadow: 0 0 0 4px ${BRAND}, 0 0 24px 6px rgba(42,120,214,.45); opacity: 0; transition: opacity .3s; }
     #demo-layer .ring.on { opacity: 1; }
-    #demo-layer .bubble { position: fixed; max-width: 360px; padding: 10px 16px; border-radius: 10px; background: ${BRAND}; color: #fff; font-size: 22px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s; }
+    #demo-layer .bubble { position: fixed; max-width: 360px; padding: 10px 16px; border-radius: 10px; background: ${BRAND}; color: #fff; font-size: 17px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s; }
     #demo-layer .bubble.on { opacity: 1; transform: none; }
-    #demo-layer .caption { position: fixed; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; padding: 12px 28px; border-radius: 12px; background: rgba(20,24,22,.78); color: #fff; font-size: 34px; line-height: 1.45; text-align: center; opacity: 0; transition: opacity .2s; }
+    #demo-layer .caption { position: fixed; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; padding: 12px 28px; border-radius: 12px; background: rgba(20,24,22,.78); color: #fff; font-size: 26px; line-height: 1.45; text-align: center; opacity: 0; transition: opacity .2s; }
     #demo-layer .caption.on { opacity: 1; }
     #demo-layer.phone .caption { bottom: 9%; font-size: 15px; padding: 6px 14px; border-radius: 8px; max-width: 90%; }
     #demo-layer.phone .chapter { top: 132px; right: 10px; font-size: 11px; padding: 3px 10px; }
@@ -21,12 +21,19 @@
     #demo-layer.phone .ripple { border-width: 2px; }
     #demo-layer.phone .card h1 { font-size: 28px; padding: 0 20px; }
     #demo-layer.phone .card p { font-size: 15px; padding: 0 20px; }
-    #demo-layer .chapter { position: fixed; top: 84px; right: 24px; padding: 6px 16px; border-radius: 999px; background: rgba(255,255,255,.92); color: ${BRAND}; font-size: 20px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.12); opacity: 0; transition: opacity .3s; }
+    #demo-layer .chapter { position: fixed; top: 76px; right: 18px; padding: 5px 14px; border-radius: 999px; background: rgba(255,255,255,.92); color: ${BRAND}; font-size: 15px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.12); opacity: 0; transition: opacity .3s; }
     #demo-layer .chapter.on { opacity: 1; }
     #demo-layer .card { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: linear-gradient(135deg, #f4f4f1, #dceafb); color: #1f2422; opacity: 0; transition: opacity .6s; }
     #demo-layer .card.on { opacity: 1; }
-    #demo-layer .card h1 { margin: 0; font-size: 64px; color: #1c5cab; text-align: center; padding: 0 40px; }
-    #demo-layer .card p { margin: 0; font-size: 30px; color: #55605c; text-align: center; padding: 0 40px; }
+    #demo-layer .confirm { position: fixed; left: 50%; top: 24px; transform: translateX(-50%); width: min(460px, 92vw); padding: 22px 24px 18px; border-radius: 12px; background: #fff; color: #1f2422; box-shadow: 0 10px 32px rgba(0,0,0,.28); font-size: 15px; opacity: 0; transition: opacity .2s; }
+    #demo-layer .confirm.on { opacity: 1; }
+    #demo-layer .confirm b { display: block; margin-bottom: 12px; font-size: 15px; }
+    #demo-layer .confirm p { margin: 0 0 18px; line-height: 1.5; white-space: pre-wrap; }
+    #demo-layer .confirm .row { display: flex; justify-content: flex-end; gap: 8px; }
+    #demo-layer .confirm span { padding: 7px 18px; border-radius: 999px; border: 1px solid #c7d0cc; color: #1c5cab; }
+    #demo-layer .confirm span.ok { background: #1c5cab; border-color: #1c5cab; color: #fff; }
+    #demo-layer .card h1 { margin: 0; font-size: 48px; color: #1c5cab; text-align: center; padding: 0 40px; }
+    #demo-layer .card p { margin: 0; font-size: 24px; color: #55605c; text-align: center; padding: 0 40px; }
   `;
   let layer;
   const $ = sel => layer.querySelector(sel);
@@ -40,7 +47,7 @@
     layer = document.createElement('div');
     layer.id = 'demo-layer';
     if (innerWidth < innerHeight) layer.classList.add('phone');
-    layer.innerHTML = '<div class="card"><h1></h1><p></p></div><div class="ring"></div><div class="bubble"></div><div class="chapter"></div><div class="caption"></div><div class="cursor"></div>';
+    layer.innerHTML = '<div class="confirm"><b>yu0328.github.io 顯示</b><p></p><div class="row"><span>取消</span><span class="ok">確定</span></div></div><div class="card"><h1></h1><p></p></div><div class="ring"></div><div class="bubble"></div><div class="chapter"></div><div class="caption"></div><div class="cursor"></div>';
     document.documentElement.appendChild(layer);
     Object.assign($('.cursor').style, { left: `${innerWidth * 0.6}px`, top: `${innerHeight * 0.6}px` });
   }
@@ -105,6 +112,20 @@
       ensure();
       $('.card').classList.remove('on');
       return sleep(600);
+    },
+    // A drawn stand-in for the browser's own confirm(), which a headless recording can't show.
+    // Returns the 確定 button's centre for the cursor.
+    confirm(message) {
+      ensure();
+      const box = $('.confirm');
+      box.querySelector('p').textContent = message;
+      box.classList.add('on');
+      const ok = box.querySelector('.ok').getBoundingClientRect();
+      return { x: ok.x + ok.width / 2, y: ok.y + ok.height / 2 };
+    },
+    hideConfirm() {
+      ensure();
+      $('.confirm').classList.remove('on');
     },
     chapter(text) {
       ensure();
