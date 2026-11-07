@@ -56,9 +56,18 @@ export function createDriveClient({ auth, fetchImpl = (...args) => fetch(...args
       ...options,
       headers: { Authorization: `Bearer ${token}`, ...(options.headers || {}) },
     });
-    // 403 covers a revoked grant as well as quota; both need the teacher to act, and both are
-    // surfaced as the same persistent "登入已失效" warning rather than a vanishing toast.
-    if (response.status === 401 || response.status === 403) throw new AuthExpiredError('AUTH_EXPIRED');
+    // A revoked grant needs the teacher to sign in again, so it shows as the persistent "登入已失效"
+    // warning. A rate limit is also a 403 but passes on its own, so it fails like any network error
+    // and the next sync retries it.
+    if (response.status === 401) throw new AuthExpiredError('AUTH_EXPIRED');
+    if (response.status === 403) {
+      const body = await response.json().catch(() => null);
+      const reasons = ((body && body.error && body.error.errors) || []).map(e => e.reason);
+      if (reasons.some(reason => reason === 'rateLimitExceeded' || reason === 'userRateLimitExceeded')) {
+        throw new Error('DRIVE_403');
+      }
+      throw new AuthExpiredError('AUTH_EXPIRED');
+    }
     if (!response.ok) throw new Error(`DRIVE_${response.status}`);
     return response;
   }

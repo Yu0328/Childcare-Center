@@ -30,6 +30,28 @@ describe('reconcileByNaturalKey', () => {
     expect(differing).toEqual([{ localUid: 'local-1', cloudUid: 'cloud-1', store: 'behaviorObservations' }]);
   });
 
+  it('本機兩筆同樣特徵的紀錄只有一筆會配到雲端那筆', () => {
+    const { adopt } = reconcileByNaturalKey({
+      localRecords: map([
+        ['local-1', 'behaviorObservations', { reportId: 'r1', title: '', narrative: '甲' }],
+        ['local-2', 'behaviorObservations', { reportId: 'r1', title: '', narrative: '乙' }],
+      ]),
+      cloudRecords: map([['cloud-1', 'behaviorObservations', { reportId: 'r1', title: '', narrative: '甲' }]]),
+    });
+    expect([...adopt.values()]).toEqual(['cloud-1']);
+  });
+
+  it('雲端那筆的 uid 本機已經有了，就不會再配給別筆', () => {
+    const { adopt } = reconcileByNaturalKey({
+      localRecords: map([
+        ['local-2', 'behaviorObservations', { reportId: 'r1', title: '', narrative: '乙' }],
+        ['cloud-1', 'behaviorObservations', { reportId: 'r1', title: '', narrative: '甲' }],
+      ]),
+      cloudRecords: map([['cloud-1', 'behaviorObservations', { reportId: 'r1', title: '', narrative: '甲' }]]),
+    });
+    expect(adopt.size).toBe(0);
+  });
+
   it('只有 uid／updatedAt／isNew 不同不算內容不同', () => {
     const { differing } = reconcileByNaturalKey({
       localRecords: map([['local-1', 'children', { name: '測試童', birthDate: '2024-01-01', updatedAt: 'T1', isNew: true }]]),

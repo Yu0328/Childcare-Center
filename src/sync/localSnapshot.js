@@ -32,12 +32,14 @@ export async function readLocalSnapshot() {
   const rows = new Map();
   for (const { store } of SYNC_STORES) {
     let all = await runRequest(store, 'readonly', objectStore => objectStore.getAll());
-    // Turned into Blobs right away: an old entry's stored Blob can stop being readable in Safari
-    // once other async work has run (see listHighlightEntriesForReport), and the loop below awaits plenty.
+    // Only old-format entries are read into Blobs, and right away: their stored Blob can stop being
+    // readable in Safari once other async work has run (see listHighlightEntriesForReport). Entries
+    // already holding bytes stay as bytes — copying every photo into a Blob on every sync (every
+    // two minutes, several times a sync) is wasted memory; photoSync builds a Blob only to upload.
     if (store === PHOTO_STORE) {
       const hasOldBlob = row => (row.photos || []).some(photo => photo && !photo.bytes && photo.blob);
       const oldFormatIds = new Set(all.filter(hasOldBlob).map(row => row.id));
-      all = await Promise.all(all.map(withReadablePhotos));
+      all = await Promise.all(all.map(row => (oldFormatIds.has(row.id) ? withReadablePhotos(row) : row)));
       // Moves every old-format entry to the bytes format here, instead of waiting for an edit that
       // may never come: a readable photo keeps its bytes, an unreadable one loses its dead Blob, and
       // photoSync below re-downloads it from the cloud copy.

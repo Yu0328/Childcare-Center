@@ -40,6 +40,9 @@ function remapRefs(storeName, payload, adopt) {
 export function reconcileByNaturalKey({ localRecords, cloudRecords }) {
   const adopt = new Map();
   const differing = [];
+  // A cloud uid can belong to one local record only. Two local records with the same natural key
+  // (two untitled 行為觀察 in one report) would otherwise both take it and end up sharing a uid.
+  const taken = new Set(localRecords.keys());
 
   for (const { store, naturalKey } of SYNC_STORES) {
     const cloudByKey = new Map();
@@ -52,8 +55,9 @@ export function reconcileByNaturalKey({ localRecords, cloudRecords }) {
       if (entry.store !== store) continue;
       const localPayload = remapRefs(store, entry.payload, adopt);
       const cloudUid = cloudByKey.get(naturalKey(localPayload));
-      if (!cloudUid || cloudUid === uid) continue;
+      if (!cloudUid || taken.has(cloudUid)) continue;
 
+      taken.add(cloudUid);
       adopt.set(uid, cloudUid);
       if (comparable(localPayload) !== comparable(cloudRecords.get(cloudUid).payload)) {
         differing.push({ localUid: uid, cloudUid, store });

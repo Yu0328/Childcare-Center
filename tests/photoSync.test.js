@@ -4,7 +4,7 @@ import { readLocalSnapshot } from '../src/sync/localSnapshot.js';
 import { readSyncState, writeSyncState } from '../src/storage/syncStateDb.js';
 import { addChild, clearAllData } from '../src/storage/db.js';
 import { addParentReport, addHighlightEntry } from '../src/storage/parentReportDb.js';
-import { runRequest } from '../src/storage/dbCore.js';
+import { runRequest, blobToArrayBuffer } from '../src/storage/dbCore.js';
 
 const CLOUD_NOW = '2026-09-13T06:32:00.000Z';
 
@@ -57,6 +57,24 @@ describe('syncPhotos', () => {
     expect(drive.uploaded).toEqual(['p2']);
     expect(result.uploaded).toBe(1);
     expect((await readSyncState()).get('p2')).toMatchObject({ store: 'photo', fileId: 'file-p2' });
+  });
+
+  // The snapshot keeps stored photos as raw bytes; the upload still has to send the real photo.
+  it('上傳的是照片本身的內容和格式', async () => {
+    await seedEntry([
+      { photoUid: 'p1', blob: new Blob([new Uint8Array([7, 8, 9])], { type: 'image/png' }), width: 1, height: 1 },
+    ]);
+    const sent = [];
+    const drive = { ...fakeDrive(), uploadPhoto: async (folderId, { photoUid, blob }) => {
+      sent.push({ photoUid, type: blob.type, bytes: [...new Uint8Array(await blobToArrayBuffer(blob))] });
+      return { fileId: `file-${photoUid}` };
+    } };
+
+    await syncPhotos({
+      drive, folderId: 'folder-1', snapshot: await readLocalSnapshot(), cloudPhotos: new Map(), state: await readSyncState(), cloudNow: CLOUD_NOW,
+    });
+
+    expect(sent).toEqual([{ photoUid: 'p1', type: 'image/png', bytes: [7, 8, 9] }]);
   });
 
   it('改了文字說明但照片沒換時不重傳照片', async () => {

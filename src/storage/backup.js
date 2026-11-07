@@ -119,6 +119,7 @@ export async function exportBackup(onProgress) {
           () =>
             Promise.all(
               highlight.photos.map(async photo => ({
+                photoUid: photo.photoUid,
                 base64: await blobToBase64(photo.blob),
                 type: photo.blob.type,
                 width: photo.width,
@@ -272,6 +273,7 @@ async function importParentReports(data, childIdMap) {
 
   for (const highlight of data.highlightEntries ?? []) {
     const photos = highlight.photos.map(photo => ({
+      photoUid: photo.photoUid,
       blob: base64ToBlob(photo.base64, photo.type),
       width: photo.width,
       height: photo.height,

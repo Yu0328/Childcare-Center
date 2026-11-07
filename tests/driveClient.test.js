@@ -228,4 +228,26 @@ describe('uploadRecord / downloadRecord / trashFile', () => {
     const drive = createDriveClient({ auth, fetchImpl });
     await expect(drive.downloadRecord('f1')).rejects.toBeInstanceOf(AuthExpiredError);
   });
+
+  it('403 是權限問題才當成登入失效', async () => {
+    const { fetchImpl } = scriptedFetch([{
+      match: 'files/f1?alt=media', status: 403,
+      json: { error: { errors: [{ reason: 'insufficientPermissions' }] } },
+    }]);
+    const drive = createDriveClient({ auth, fetchImpl });
+    await expect(drive.downloadRecord('f1')).rejects.toBeInstanceOf(AuthExpiredError);
+  });
+
+  // Too many requests at once (a first sync's burst) is also a 403; it clears on its own, so it must
+  // not send the teacher to sign in again.
+  it('403 是請求太多就當成一般失敗，稍後自動重試', async () => {
+    const { fetchImpl } = scriptedFetch([{
+      match: 'files/f1?alt=media', status: 403,
+      json: { error: { errors: [{ reason: 'userRateLimitExceeded' }] } },
+    }]);
+    const drive = createDriveClient({ auth, fetchImpl });
+    const error = await drive.downloadRecord('f1').catch(err => err);
+    expect(error).not.toBeInstanceOf(AuthExpiredError);
+    expect(error.message).toBe('DRIVE_403');
+  });
 });

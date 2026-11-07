@@ -39,9 +39,11 @@ export async function syncPhotos({
   const toUpload = [];
   const toDownload = [];
   for (const [photoUid, { entry, photo }] of localPhotos) {
-    if (photo.blob && !state.has(photoUid)) {
-      toUpload.push({ photoUid, blob: photo.blob });
-    } else if (!photo.blob && cloudPhotos.has(photoUid)) {
+    // A snapshot photo holds either a Blob or (as stored) raw bytes — see readLocalSnapshot.
+    const hasContent = Boolean(photo.blob || photo.bytes);
+    if (hasContent && !state.has(photoUid)) {
+      toUpload.push({ photoUid, photo });
+    } else if (!hasContent && cloudPhotos.has(photoUid)) {
       // Descriptor without bytes: this record arrived from the cloud and its photo has not been
       // fetched yet. Each photo is its own file, so an interrupted first sync resumes here.
       toDownload.push({ photoUid, entry, fileId: cloudPhotos.get(photoUid).fileId });
@@ -58,7 +60,8 @@ export async function syncPhotos({
     }
   }
 
-  const uploads = await mapWithConcurrency(toUpload, concurrency, async ({ photoUid, blob }) => {
+  const uploads = await mapWithConcurrency(toUpload, concurrency, async ({ photoUid, photo }) => {
+    const blob = photo.blob || new Blob([photo.bytes], { type: photo.type || 'image/jpeg' });
     const { fileId } = await drive.uploadPhoto(folderId, { photoUid, blob });
     await writeSyncState({ uid: photoUid, store: 'photo', hash: null, fileId, syncedAt: cloudNow });
   });

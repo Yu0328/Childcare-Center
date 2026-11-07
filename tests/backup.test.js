@@ -158,6 +158,26 @@ describe('backup export/import', () => {
     expect(restoredHighlight.captionGroups).toEqual(captionGroups);
   });
 
+  // Without the photo's sync id, Google sync later sees the restored photo as a new one next to the
+  // cloud copy and keeps both — every photo doubles.
+  it('點滴分享照片的同步編號備份還原後不變', async () => {
+    const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
+    const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
+    await addHighlightEntry({
+      reportId: report.id, caption: 'x',
+      photos: [{ photoUid: 'p-1', blob: new Blob([new Uint8Array([1])], { type: 'image/jpeg' }), width: 1, height: 1 }],
+    });
+
+    const parts = await exportBackup();
+    await clearAllData();
+    await importBackup(parts.join(''));
+
+    const [restoredChild] = await listChildren();
+    const [restoredReport] = await listParentReportsForChild(restoredChild.id);
+    const [restoredHighlight] = await listHighlightEntriesForReport(restoredReport.id);
+    expect(restoredHighlight.photos[0].photoUid).toBe('p-1');
+  });
+
   it('keeps each highlight entry as its own export part, so no single JSON.stringify call ever spans the whole photo payload', async () => {
     const child = await addChild({ name: '陳小安', birthDate: '2024-06-20' });
     const report = await addParentReport({ childId: child.id, tier: 'Ⅴ', period: '115年06月' });
