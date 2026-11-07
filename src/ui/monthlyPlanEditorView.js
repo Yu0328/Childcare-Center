@@ -367,8 +367,12 @@ export async function renderMonthlyPlanEditorView(
     showSortView(false);
   });
   sortView.querySelector('[data-action="sort-cancel"]').addEventListener('click', () => showSortView(false));
-  // A popup closed by Esc or a backdrop tap mid-sort reopens on the checkbox view.
-  container.querySelector('[data-action="manage-children"]').addEventListener('click', () => showSortView(false));
+  // A popup closed by ×, Esc or a backdrop tap reopens on the checkbox view with the saved order:
+  // the checkbox view shows no numbers, so a kept-but-unsaved order would be saved unseen.
+  container.querySelector('[data-action="manage-children"]').addEventListener('click', () => {
+    childOrder = [...plan.childIds];
+    showSortView(false);
+  });
 
   container.querySelector('[data-action="cancel-manage-children"]').addEventListener('click', () => {
     childOrder = [...plan.childIds];

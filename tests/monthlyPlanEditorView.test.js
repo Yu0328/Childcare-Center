@@ -771,6 +771,18 @@ describe('monthlyPlanEditorView: child order', () => {
     expect(await savedOrder(plan.id)).toEqual([childA.id, childC.id]);
   });
 
+  it('closing the popup another way (×, Esc, backdrop) after 完成 drops the unsaved order', async () => {
+    const plan = await open([childA.id, childB.id]);
+    q('[data-action="sort-children"]').click();
+    q(`[data-sort-child="${childB.id}"]`).click();
+    q('[data-action="sort-done"]').click();
+
+    q('[data-action="manage-children"]').click(); // reopen without 取消
+    q(`[data-manage-child-checkbox="${childC.id}"]`).checked = true;
+    await saveAndWait(plan, [childA.id, childB.id, childC.id]);
+    expect(await savedOrder(plan.id)).toEqual([childA.id, childB.id, childC.id]);
+  });
+
   it('lists only checked children, with no checkboxes, in the sort view', async () => {
     await open([childA.id, childB.id]);
     q('[data-action="sort-children"]').click();
