@@ -338,7 +338,8 @@ export async function generateMonthlyPlanDocxBlob({ plan, children, slots, items
   const { year, month } = parsePeriod(plan.period);
   const weeks = buildMonthlyCalendar(year + 1911, month);
 
-  const children_ = children.filter(c => plan.childIds.includes(c.id));
+  // plan.childIds is the teacher's chosen order (管理幼兒 → 排順序).
+  const children_ = plan.childIds.map(id => children.find(c => c.id === id)).filter(Boolean);
   const tables = children_.flatMap((child, index) => [
     ...(index > 0 ? [pageBreakParagraph()] : []),
     buildChildTable(child, plan.childTiers[child.id], weeks, slots, itemsBySlotId, overrides),

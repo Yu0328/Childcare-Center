@@ -83,6 +83,16 @@ describe('generateMonthlyPlanDocxBlob', () => {
     expect(rest.at(-1).split('</w:tbl>').pop()).not.toContain('<w:pageBreakBefore/>');
   });
 
+  it('照 plan.childIds 的順序輸出，不照傳進來的 children 順序', async () => {
+    const plan = { id: 1, period: '115年06月', childIds: [11, 10], childTiers: { 10: 'Ⅴ', 11: 'Ⅴ' } };
+    const children = [{ id: 10, name: '甲甲', birthDate: '2024-07-01' }, { id: 11, name: '乙乙', birthDate: '2024-07-01' }];
+    const blob = await generateMonthlyPlanDocxBlob({ plan, children, slots: [], itemsBySlotId: {}, overrides: [] });
+    const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()));
+    const body = await zip.file('word/document.xml').async('text');
+    expect(body.indexOf('乙乙')).toBeGreaterThan(-1);
+    expect(body.indexOf('乙乙')).toBeLessThan(body.indexOf('甲甲'));
+  });
+
   it('generates a non-empty docx Blob for a plan with one child and no items', async () => {
     const plan = { id: 1, period: '115年06月', childIds: [10], childTiers: { 10: 'Ⅴ' } };
     const children = [{ id: 10, name: '趙萬竑', birthDate: '2024-07-01' }];
