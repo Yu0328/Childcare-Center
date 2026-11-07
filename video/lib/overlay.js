@@ -14,8 +14,14 @@
     #demo-layer .bubble.on { opacity: 1; transform: none; }
     #demo-layer .caption { position: fixed; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; padding: 12px 28px; border-radius: 12px; background: rgba(20,24,22,.78); color: #fff; font-size: 34px; line-height: 1.45; text-align: center; opacity: 0; transition: opacity .2s; }
     #demo-layer .caption.on { opacity: 1; }
-    #demo-layer.phone .caption { bottom: 16%; font-size: 30px; }
-    #demo-layer .chapter { position: fixed; top: 20px; right: 24px; padding: 6px 16px; border-radius: 999px; background: rgba(255,255,255,.92); color: ${BRAND}; font-size: 20px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.12); opacity: 0; transition: opacity .3s; }
+    #demo-layer.phone .caption { bottom: 9%; font-size: 15px; padding: 6px 14px; border-radius: 8px; max-width: 90%; }
+    #demo-layer.phone .chapter { top: 132px; right: 10px; font-size: 11px; padding: 3px 10px; }
+    #demo-layer.phone .bubble { font-size: 12px; padding: 5px 10px; max-width: 200px; }
+    #demo-layer.phone .cursor { width: 16px; height: 16px; margin: -2px 0 0 -2px; }
+    #demo-layer.phone .ripple { border-width: 2px; }
+    #demo-layer.phone .card h1 { font-size: 28px; padding: 0 20px; }
+    #demo-layer.phone .card p { font-size: 15px; padding: 0 20px; }
+    #demo-layer .chapter { position: fixed; top: 84px; right: 24px; padding: 6px 16px; border-radius: 999px; background: rgba(255,255,255,.92); color: ${BRAND}; font-size: 20px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.12); opacity: 0; transition: opacity .3s; }
     #demo-layer .chapter.on { opacity: 1; }
     #demo-layer .card { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: linear-gradient(135deg, #f4f4f1, #dceafb); color: #1f2422; opacity: 0; transition: opacity .6s; }
     #demo-layer .card.on { opacity: 1; }
@@ -74,7 +80,7 @@
       b.textContent = label;
       // Below the target if there is room, else above; clamped inside the viewport.
       const below = rect.y + rect.height + pad + 16;
-      b.style.left = `${Math.max(16, Math.min(rect.x, innerWidth - 376))}px`;
+      b.style.left = `${Math.max(8, Math.min(rect.x, innerWidth - b.offsetWidth - 8))}px`;
       b.style.top = below + 60 < innerHeight ? `${below}px` : `${Math.max(16, rect.y - pad - 70)}px`;
       b.classList.add('on');
     },

@@ -9,13 +9,13 @@ const MAX_CAPTION_CHARS = 28;
 
 // One cue per sentence; a sentence too long for one caption line is packed at its commas.
 // Time is shared by character count, since narration speed is roughly constant per character.
-export function splitCaption(text, start, duration) {
+export function splitCaption(text, start, duration, maxChars = MAX_CAPTION_CHARS) {
   const pieces = [];
   for (const sentence of text.split(/(?<=[。！？；])/).filter(Boolean)) {
-    if (sentence.length <= MAX_CAPTION_CHARS) { pieces.push(sentence); continue; }
+    if (sentence.length <= maxChars) { pieces.push(sentence); continue; }
     let current = '';
     for (const part of sentence.split(/(?<=[，、])/)) {
-      if (current && current.length + part.length > MAX_CAPTION_CHARS) { pieces.push(current); current = ''; }
+      if (current && current.length + part.length > maxChars) { pieces.push(current); current = ''; }
       current += part;
     }
     if (current) pieces.push(current);

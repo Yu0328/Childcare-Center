@@ -7,7 +7,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "node scripts/build.mjs",
-    "build:web": "node scripts/build-web.mjs"
+    "build:web": "node scripts/build-web.mjs",
+    "video": "node video/make.mjs",
+    "video:desktop": "node video/make.mjs tutorial-desktop",
+    "video:phone": "node video/make.mjs tutorial-phone"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

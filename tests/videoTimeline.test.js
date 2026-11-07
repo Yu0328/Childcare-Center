@@ -33,6 +33,12 @@ describe('splitCaption', () => {
   });
 });
 
+describe('splitCaption maxChars', () => {
+  it('packs at commas to a shorter limit for the phone', () => {
+    expect(splitCaption('甲乙丙丁戊，己庚辛壬癸。', 0, 2, 6).map(c => c.text)).toEqual(['甲乙丙丁戊，', '己庚辛壬癸。']);
+  });
+});
+
 describe('toSrt', () => {
   it('numbers cues and formats hh:mm:ss,mmm', () => {
     expect(toSrt([
