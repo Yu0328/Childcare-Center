@@ -1,17 +1,50 @@
-import { point, pick, HOME } from './common.mjs';
+import { openAddForm, point, pick, HOME } from './common.mjs';
 
 export const title = '適性總表';
 const AGG = 'form[data-action="aggregate"]';
+const CODE = 'Ⅴ-1-3';
+const field = name => `[data-entry-field="${name}"][data-indicator-code="${CODE}"]:visible`;
 
 export function steps(layout) {
   return [
     {
       chapter: title,
-      say: '適性總表可以自己填，也可以直接從適性紀錄彙整，不用再抄一次。在首頁按「適性總表」，選幼兒。',
+      say: '適性總表是依年齡層整理的發展觀察紀錄。在首頁按「適性總表」，選幼兒。',
       do: async d => {
         await d.click('[data-type="assessment"]');
         await d.click('[data-child-id="1"]');
       },
+    },
+    {
+      say: pick(layout,
+        '先看自己填的方式。在右邊確認月齡階段和紀錄年月，按「新增」，再打開這份總表。',
+        '先看自己填的方式。按加號，確認月齡階段和紀錄年月，按「新增」，再打開這份總表。'),
+      do: async d => {
+        await openAddForm(d, layout);
+        await d.click('form[data-action="add-form"] button[type="submit"]');
+        await d.click('[data-form-id]');
+      },
+    },
+    {
+      say: '總表會依領域列出這個年齡層的每一個指標。要記錄一次觀察，在指標下面按「新增觀察紀錄」。',
+      do: d => d.click(`[data-add-entry-for="${CODE}"]`),
+    },
+    {
+      say: '選日期和狀態，寫下觀察敘述，按「儲存」。',
+      do: async d => {
+        await d.fill(field('date'), '2026-11-12');
+        await d.click(`${field('status')}[value="developing"]`);
+        await d.type(field('note'), '能在原地雙腳跳起，落地時還需要扶一下。');
+        await d.click(`[data-entry-save-for="${CODE}"]:visible`);
+      },
+    },
+    {
+      say: '紀錄會排在指標下面，圓圈是已發展，三角形是發展中。之後想改，點那一筆就能編輯。',
+      do: d => point(d, 'text=能在原地雙腳跳起', '已記錄', 2800),
+    },
+    {
+      say: '如果已經寫好適性紀錄，就不用再抄一次，可以直接彙整。先回到總表列表。',
+      do: d => d.click('[data-action="back"]'),
     },
     {
       say: pick(layout, '按「從適性紀錄彙整」，勾選要彙整的月份，好幾個月可以一次彙整。', '按「彙整」，勾選要彙整的月份，好幾個月可以一次彙整。'),
@@ -46,15 +79,6 @@ export function steps(layout) {
       do: d => pick(layout,
         () => point(d, '[data-domain-tab="1"]', '依領域分頁', 2800),
         () => point(d, 'summary:has-text("身體動作")', '依領域分段', 2800))(),
-    },
-    {
-      say: '要補一筆紀錄，在指標下面按「新增觀察紀錄」。',
-      do: async d => {
-        await d.click('[data-add-entry-for="Ⅴ-1-2"]');
-        await d.wait(1500);
-        // Phone: the form opens in a popup (close with ×); computer: inline (the same button folds it).
-        await d.click(layout === 'phone' ? 'dialog[open] [data-action="close-form-popup"]' : '[data-add-entry-for="Ⅴ-1-2"]');
-      },
     },
     {
       say: pick(layout, '檢查好了，按右上角的「匯出 Word」，就是印出來的適性總表。', '檢查好了，按右上角的「匯出」，就是印出來的適性總表。'),

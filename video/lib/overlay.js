@@ -12,13 +12,11 @@
     #demo-layer .ring.on { opacity: 1; }
     #demo-layer .bubble { position: fixed; max-width: 360px; padding: 10px 16px; border-radius: 10px; background: ${BRAND}; color: #fff; font-size: 17px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s; }
     #demo-layer .bubble.on { opacity: 1; transform: none; }
-    #demo-layer .caption { position: fixed; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; padding: 12px 28px; border-radius: 12px; background: rgba(20,24,22,.78); color: #fff; font-size: 26px; line-height: 1.45; text-align: center; opacity: 0; transition: opacity .2s; }
+    #demo-layer .caption { position: fixed; left: 50%; bottom: 6%; transform: translateX(-50%); white-space: nowrap; padding: 12px 28px; border-radius: 12px; background: rgba(20,24,22,.78); color: #fff; font-size: 26px; line-height: 1.45; text-align: center; opacity: 0; transition: opacity .2s; }
     #demo-layer .caption.on { opacity: 1; }
-    #demo-layer .caption.top { bottom: auto; top: 6px; }
-    #demo-layer.phone .caption.top { top: 4px; bottom: auto; }
     #demo-layer .card.on ~ .cursor { opacity: 0; }
     #demo-layer[popover] { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; color: inherit; }
-    #demo-layer.phone .caption { bottom: 9%; font-size: 15px; padding: 6px 14px; border-radius: 8px; max-width: 90%; }
+    #demo-layer.phone .caption { bottom: 9%; font-size: 15px; padding: 6px 14px; border-radius: 8px; }
     #demo-layer.phone .chapter { top: 132px; right: 10px; font-size: 11px; padding: 3px 10px; }
     #demo-layer.phone .bubble { font-size: 12px; padding: 5px 10px; max-width: 200px; }
     #demo-layer.phone .cursor { width: 16px; height: 16px; margin: -2px 0 0 -2px; }
@@ -158,13 +156,6 @@
       c.classList.toggle('on', Boolean(text));
       clearTimeout(c.hideTimer);
       if (text) c.hideTimer = setTimeout(() => c.classList.remove('on'), 3500);
-    },
-    // Moves the caption to the top while the given rect would sit under it.
-    avoid(rect) {
-      ensure();
-      const c = $('.caption');
-      const zoneTop = innerHeight * (layer.classList.contains('phone') ? 0.78 : 0.8);
-      c.classList.toggle('top', Boolean(rect) && rect.y + rect.height > zoneTop);
     },
     // Scales <body> about the target's centre, clamped so no page edge comes into view.
     // shortcut: assumes no scrolling while zoomed; unzoom before scrolling.

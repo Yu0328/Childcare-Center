@@ -99,7 +99,6 @@ function helpers(page) {
     });
     if (moved) await sleep(50);
     const box = await loc.boundingBox();
-    await demo('avoid', box);
     return { loc, box, x: box.x + box.width / 2, y: box.y + box.height / 2 };
   }
   async function pointAt(sel) {
@@ -272,7 +271,7 @@ export async function record({ layout, setup, cover, steps, framesDir, appUrl })
       const waits = [step.do ? step.do(d).catch(err => { throw new Error(`step ${index} (${step.say || step.chapter || ''}): ${err.message}`); }) : Promise.resolve()];
       if (step.audio) {
         clips.push({ file: step.audio.file, start });
-        for (const cue of splitCaption(step.say, start, step.audio.duration, layout === 'phone' ? 15 : 28)) {
+        for (const cue of splitCaption(step.say, start, step.audio.duration, layout === 'phone' ? 20 : 32)) {
           cues.push(cue);
           waits.push(sleep((cue.start - start) * 1000).then(() => page.evaluate(text => window.__demo.caption(text), cue.text)));
         }

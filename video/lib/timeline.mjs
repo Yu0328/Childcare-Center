@@ -7,24 +7,36 @@ export function ttsKey(voice, rate, text) {
 
 const MAX_CAPTION_CHARS = 28;
 
-// One cue per sentence; a sentence too long for one caption line is packed at its commas.
-// Time is shared by character count, since narration speed is roughly constant per character.
+// Burned-in captions are one line each, without punctuation: each sentence becomes one or more
+// lines, its comma parts packed (joined by a space) up to maxChars; a run with no comma that is
+// still too long is cut into even pieces. Time is shared by character count, since narration speed
+// is roughly constant per character.
+const clean = part => part.replace(/[「」『』（）()]/g, '').replace(/[／/]/g, ' ').replace(/[，。！？；：、]/g, '').trim();
+
+function evenPieces(part, maxChars) {
+  const n = Math.ceil(part.length / maxChars);
+  const size = Math.ceil(part.length / n);
+  return Array.from({ length: n }, (_, i) => part.slice(i * size, (i + 1) * size));
+}
+
 export function splitCaption(text, start, duration, maxChars = MAX_CAPTION_CHARS) {
-  const pieces = [];
-  for (const sentence of text.split(/(?<=[。！？；])/).filter(Boolean)) {
-    if (sentence.length <= maxChars) { pieces.push(sentence); continue; }
+  const lines = [];
+  for (const sentence of text.split(/(?<=[。！？；])/)) {
     let current = '';
-    for (const part of sentence.split(/(?<=[，、])/)) {
-      if (current && current.length + part.length > maxChars) { pieces.push(current); current = ''; }
-      current += part;
+    for (const part of sentence.split(/(?<=[，、：])/).map(clean).filter(Boolean)) {
+      for (const piece of part.length > maxChars ? evenPieces(part, maxChars) : [part]) {
+        if (current && current.length + 1 + piece.length > maxChars) { lines.push(current); current = ''; }
+        current = current ? `${current} ${piece}` : piece;
+      }
     }
-    if (current) pieces.push(current);
+    if (current) lines.push(current);
   }
-  const total = pieces.reduce((sum, p) => sum + p.length, 0);
+  const weight = line => line.replace(/ /g, '').length;
+  const total = lines.reduce((sum, line) => sum + weight(line), 0);
   let t = start;
-  return pieces.map((p, i) => {
-    const end = i === pieces.length - 1 ? start + duration : t + (duration * p.length) / total;
-    const cue = { text: p, start: t, end };
+  return lines.map((line, i) => {
+    const end = i === lines.length - 1 ? start + duration : t + (duration * weight(line)) / total;
+    const cue = { text: line, start: t, end };
     t = end;
     return cue;
   });

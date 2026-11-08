@@ -14,28 +14,39 @@ describe('ttsKey', () => {
 });
 
 describe('splitCaption', () => {
-  it('keeps a short line as one cue spanning the whole duration', () => {
-    expect(splitCaption('點這裡新增幼兒。', 2, 3)).toEqual([{ text: '點這裡新增幼兒。', start: 2, end: 5 }]);
+  it('keeps a short line as one cue spanning the whole duration, without punctuation', () => {
+    expect(splitCaption('點這裡新增幼兒。', 2, 3)).toEqual([{ text: '點這裡新增幼兒', start: 2, end: 5 }]);
   });
 
-  it('splits on sentence ends and shares time by length', () => {
-    const cues = splitCaption('一二三。四五六七八九。', 0, 10);
-    expect(cues.map(c => c.text)).toEqual(['一二三。', '四五六七八九。']);
+  it('breaks at sentence ends and shares time by length', () => {
+    const cues = splitCaption('一二三。四五六七八九。', 0, 12);
+    expect(cues.map(c => c.text)).toEqual(['一二三', '四五六七八九']);
     expect(cues[0].start).toBe(0);
-    expect(cues[0].end).toBeCloseTo(40 / 11, 5); // 4 of 11 chars
-    expect(cues[1].start).toBeCloseTo(40 / 11, 5);
-    expect(cues[1].end).toBe(10);
+    expect(cues[0].end).toBeCloseTo(4, 5); // 3 of 9 chars
+    expect(cues[1].start).toBeCloseTo(4, 5);
+    expect(cues[1].end).toBe(12);
   });
 
-  it('breaks a sentence longer than 28 chars at commas', () => {
+  it('packs comma parts of one sentence into one line, joined by a space', () => {
+    expect(splitCaption('甲乙，丙丁。', 0, 1, 10).map(c => c.text)).toEqual(['甲乙 丙丁']);
+  });
+
+  it('breaks a sentence longer than the line at its commas', () => {
     const long = `${'甲'.repeat(20)}，${'乙'.repeat(20)}。`;
-    expect(splitCaption(long, 0, 4).map(c => c.text)).toEqual([`${'甲'.repeat(20)}，`, `${'乙'.repeat(20)}。`]);
+    expect(splitCaption(long, 0, 4, 28).map(c => c.text)).toEqual(['甲'.repeat(20), '乙'.repeat(20)]);
   });
-});
 
-describe('splitCaption maxChars', () => {
-  it('packs at commas to a shorter limit for the phone', () => {
-    expect(splitCaption('甲乙丙丁戊，己庚辛壬癸。', 0, 2, 6).map(c => c.text)).toEqual(['甲乙丙丁戊，', '己庚辛壬癸。']);
+  it('cuts a comma-free run longer than the line into even pieces', () => {
+    expect(splitCaption(`${'甲'.repeat(30)}。`, 0, 1, 28).map(c => c.text)).toEqual(['甲'.repeat(15), '甲'.repeat(15)]);
+  });
+
+  it('drops quote marks and turns slashes into spaces', () => {
+    expect(splitCaption('勾「請假／其他活動代替」。', 0, 1).map(c => c.text)).toEqual(['勾請假 其他活動代替']);
+  });
+
+  it('never makes a line longer than maxChars', () => {
+    const text = '按右下角的加號，填姓名、選出生日期，按「新增」。這位幼兒所有的表單也會一起刪除。';
+    for (const cue of splitCaption(text, 0, 5, 12)) expect(cue.text.length).toBeLessThanOrEqual(12);
   });
 });
 
