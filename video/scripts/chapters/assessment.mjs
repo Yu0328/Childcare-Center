@@ -51,8 +51,9 @@ export function steps(layout) {
       say: '要補一筆紀錄，在指標下面按「新增觀察紀錄」。',
       do: async d => {
         await d.click('[data-add-entry-for="Ⅴ-1-2"]');
-        await d.wait(1200);
-        await d.page.keyboard.press('Escape');
+        await d.wait(1500);
+        // Phone: the form opens in a popup (close with ×); computer: inline (the same button folds it).
+        await d.click(layout === 'phone' ? 'dialog[open] [data-action="close-form-popup"]' : '[data-add-entry-for="Ⅴ-1-2"]');
       },
     },
     {

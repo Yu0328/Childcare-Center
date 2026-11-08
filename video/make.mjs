@@ -21,7 +21,7 @@ const server = await serve('site');
 console.log('recording…');
 let rec;
 try {
-  rec = await record({ layout: script.layout, setup: script.setup, steps, framesDir: `video/out/frames-${name}`, appUrl: `${server.url}/yuying/` });
+  rec = await record({ layout: script.layout, setup: script.setup, cover: script.cover, steps, framesDir: `video/out/frames-${name}`, appUrl: `${server.url}/yuying/` });
 } finally {
   await server.close();
 }

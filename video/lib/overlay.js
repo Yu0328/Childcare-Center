@@ -14,6 +14,10 @@
     #demo-layer .bubble.on { opacity: 1; transform: none; }
     #demo-layer .caption { position: fixed; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; padding: 12px 28px; border-radius: 12px; background: rgba(20,24,22,.78); color: #fff; font-size: 26px; line-height: 1.45; text-align: center; opacity: 0; transition: opacity .2s; }
     #demo-layer .caption.on { opacity: 1; }
+    #demo-layer .caption.top { bottom: auto; top: 6px; }
+    #demo-layer.phone .caption.top { top: 4px; bottom: auto; }
+    #demo-layer .card.on ~ .cursor { opacity: 0; }
+    #demo-layer[popover] { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; color: inherit; }
     #demo-layer.phone .caption { bottom: 9%; font-size: 15px; padding: 6px 14px; border-radius: 8px; max-width: 90%; }
     #demo-layer.phone .chapter { top: 132px; right: 10px; font-size: 11px; padding: 3px 10px; }
     #demo-layer.phone .bubble { font-size: 12px; padding: 5px 10px; max-width: 200px; }
@@ -49,6 +53,16 @@
     if (innerWidth < innerHeight) layer.classList.add('phone');
     layer.innerHTML = '<div class="confirm"><b>yu0328.github.io 顯示</b><p></p><div class="row"><span>取消</span><span class="ok">確定</span></div></div><div class="card"><h1></h1><p></p></div><div class="ring"></div><div class="bubble"></div><div class="chapter"></div><div class="caption"></div><div class="cursor"></div>';
     document.documentElement.appendChild(layer);
+    // An app popup (a modal <dialog>) sits in the browser's top layer, above any z-index, and its
+    // grey backdrop would cover the captions and cursor. As a popover the layer is in the top layer
+    // too; re-showing it whenever a dialog opens keeps it the topmost.
+    layer.popover = 'manual';
+    layer.showPopover();
+    new MutationObserver(() => {
+      if (!document.querySelector('dialog[open]')) return;
+      layer.hidePopover();
+      layer.showPopover();
+    }).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['open'] });
     Object.assign($('.cursor').style, { left: `${innerWidth * 0.6}px`, top: `${innerHeight * 0.6}px` });
   }
 
@@ -85,10 +99,20 @@
       const b = $('.bubble');
       if (!label) { b.classList.remove('on'); return; }
       b.textContent = label;
-      // Below the target if there is room, else above; clamped inside the viewport.
-      const below = rect.y + rect.height + pad + 16;
-      b.style.left = `${Math.max(8, Math.min(rect.x, innerWidth - b.offsetWidth - 8))}px`;
-      b.style.top = below + 60 < innerHeight ? `${below}px` : `${Math.max(16, rect.y - pad - 70)}px`;
+      // Beside the target if there is room (so the next row stays visible), else below, else above.
+      const w = b.offsetWidth;
+      const h = b.offsetHeight;
+      const midY = rect.y + rect.height / 2 - h / 2;
+      let left;
+      let top;
+      if (rect.x + rect.width + pad + 14 + w < innerWidth - 8) { left = rect.x + rect.width + pad + 14; top = midY; }
+      else if (rect.x - pad - 14 - w > 8) { left = rect.x - pad - 14 - w; top = midY; }
+      else {
+        left = Math.max(8, Math.min(rect.x, innerWidth - w - 8));
+        top = rect.y + rect.height + pad + 12 + h < innerHeight ? rect.y + rect.height + pad + 12 : rect.y - pad - 12 - h;
+      }
+      b.style.left = `${left}px`;
+      b.style.top = `${Math.max(8, Math.min(top, innerHeight - h - 8))}px`;
       b.classList.add('on');
     },
     clearRing() {
@@ -132,6 +156,15 @@
       const c = $('.chapter');
       if (text) c.textContent = text;
       c.classList.toggle('on', Boolean(text));
+      clearTimeout(c.hideTimer);
+      if (text) c.hideTimer = setTimeout(() => c.classList.remove('on'), 3500);
+    },
+    // Moves the caption to the top while the given rect would sit under it.
+    avoid(rect) {
+      ensure();
+      const c = $('.caption');
+      const zoneTop = innerHeight * (layer.classList.contains('phone') ? 0.78 : 0.8);
+      c.classList.toggle('top', Boolean(rect) && rect.y + rect.height > zoneTop);
     },
     // Scales <body> about the target's centre, clamped so no page edge comes into view.
     // shortcut: assumes no scrolling while zoomed; unzoom before scrolling.

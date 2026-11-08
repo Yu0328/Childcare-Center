@@ -18,8 +18,9 @@ export function tutorial(layout) {
   return {
     layout,
     setup: only && !only.includes(start.title) ? signIn : undefined,
+    cover: ['育英公托填表系統', `完整操作教學（${label}）`],
     steps: [
-      { say: '歡迎使用育英公托填表系統。', do: d => d.card('育英公托填表系統', `完整操作教學（${label}）`) },
+      { say: '歡迎使用育英公托填表系統。' },
       { do: d => d.hideCard() },
       ...chapters.flatMap(c => c.steps(layout)),
       { say: '以上就是育英公托填表系統的操作方式，感謝收看。', do: d => d.card('感謝收看', '育英公托填表系統') },

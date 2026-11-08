@@ -88,8 +88,18 @@ function helpers(page) {
     } catch {
       throw new Error(`selector not visible within ${WAIT_MS} ms: ${sel}`);
     }
-    await loc.scrollIntoViewIfNeeded();
+    // Off screen or under the caption: glide it to the middle instead of jumping there.
+    const moved = await loc.evaluate(el => {
+      if (document.body.style.transform) return false; // zoomed: scrolling would misplace the zoom
+      const r = el.getBoundingClientRect();
+      const header = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+      if (r.top >= header + 8 && r.bottom <= innerHeight * 0.78) return false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return new Promise(resolve => setTimeout(() => resolve(true), 750));
+    });
+    if (moved) await sleep(50);
     const box = await loc.boundingBox();
+    await demo('avoid', box);
     return { loc, box, x: box.x + box.width / 2, y: box.y + box.height / 2 };
   }
   async function pointAt(sel) {
@@ -197,7 +207,7 @@ function helpers(page) {
   };
 }
 
-export async function record({ layout, setup, steps, framesDir, appUrl }) {
+export async function record({ layout, setup, cover, steps, framesDir, appUrl }) {
   const cfg = LAYOUTS[layout];
   rmSync(framesDir, { recursive: true, force: true });
   mkdirSync(framesDir, { recursive: true });
@@ -229,6 +239,11 @@ export async function record({ layout, setup, steps, framesDir, appUrl }) {
   await page.waitForSelector('[data-action="sign-in-google"]');
   const d = helpers(page);
   if (setup) await setup(d);
+  // The opening title card is up before the first frame, so the video never opens on the app.
+  if (cover) {
+    await d.card(...cover);
+    await sleep(800);
+  }
 
   const cdp = await context.newCDPSession(page);
   const frames = [];
@@ -264,7 +279,8 @@ export async function record({ layout, setup, steps, framesDir, appUrl }) {
         waits.push(sleep(step.audio.duration * 1000));
       }
       await Promise.all(waits);
-      await page.evaluate(() => window.__demo.caption(''));
+      // Keep the caption up into the next spoken step (it is replaced there) so it doesn't blink.
+      if (!steps[index + 1]?.audio) await page.evaluate(() => window.__demo.caption(''));
       await sleep(STEP_GAP_MS);
     }
   } catch (err) {
