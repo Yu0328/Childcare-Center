@@ -101,18 +101,18 @@ describe('renderHelpView', () => {
     await renderHelpView(container, { onBack: () => {} });
     const cover = () => container.querySelector('.help-video__cover');
     expect(cover().href).toBe(`https://youtu.be/${HELP_VIDEOS.desk.id}`);
-    expect(container.querySelector('.help-video__chapters').textContent).toContain('1:37管理幼兒');
+    expect(container.querySelector('.help-video__chapters').textContent).toContain('1:02管理幼兒');
 
     container.querySelector('.help-seg [data-mode="phone"]').click();
     expect(cover().href).toBe(`https://youtu.be/${HELP_VIDEOS.phone.id}`);
-    expect(container.querySelector('.help-video__chapters').textContent).toContain('1:43管理幼兒');
+    expect(container.querySelector('.help-video__chapters').textContent).toContain('1:01管理幼兒');
   });
 
   it('offline: the video and every 看影片的這一段 open YouTube in a new tab at that time', async () => {
     const container = document.createElement('div');
     await renderHelpView(container, { onBack: () => {} });
     const jump = container.querySelector('#help-panel-children .help-video__jump');
-    expect(jump.href).toBe(`https://youtu.be/${HELP_VIDEOS.desk.id}?t=97`);
+    expect(jump.href).toBe(`https://youtu.be/${HELP_VIDEOS.desk.id}?t=62`);
     expect(jump.target).toBe('_blank');
     const click = new MouseEvent('click', { bubbles: true, cancelable: true });
     container.querySelector('.help-video__cover').dispatchEvent(click);
@@ -129,18 +129,17 @@ describe('renderHelpView', () => {
     expect(src()).toContain('autoplay=1');
 
     container.querySelector('#help-panel-children .help-video__jump').click();
-    expect(src()).toContain('start=97');
+    expect(src()).toContain('start=62');
   });
 });
 
-describe('helpView: a video chapter that shows an older screen', () => {
-  it('notes it beside the 課程月計畫 chapter link and in the chapter list', async () => {
+describe('helpView: videos re-recorded 2026-11', () => {
+  it('points at the new videos and notes no chapter as an older screen', async () => {
     const { renderHelpView } = await import('../src/ui/helpView.js');
+    expect(HELP_VIDEOS.desk.id).toBe('RnWRISdx9Ns');
+    expect(HELP_VIDEOS.phone.id).toBe('45E3rnpWprg');
     const container = document.createElement('div');
     await renderHelpView(container, { onBack: () => {}, hosted: true });
-    const notes = [...container.querySelectorAll('.help-video__outdated')];
-    expect(notes.length).toBe(2);
-    expect(notes.every(n => n.textContent === '此段為舊版畫面，請參考下方文字說明')).toBe(true);
-    expect(notes.some(n => n.closest('#help-panel-monthly-plan'))).toBe(true);
+    expect(container.querySelectorAll('.help-video__outdated').length).toBe(0);
   });
 });

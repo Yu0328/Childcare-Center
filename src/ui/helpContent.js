@@ -844,22 +844,22 @@ export const HELP_CHAPTERS = [START, CHILDREN_CH, IMPORT, MONTHLY, PARENT_REPORT
 // The two 完整操作教學 videos on YouTube, one per 手機版／電腦版. `chapters` is each help chapter's
 // start (seconds) in that video, copied from the chapter list in its YouTube description — when a
 // video is re-uploaded or re-cut, update the id and these times together.
-// Chapters whose part of the video shows an older screen than the app's (課程月計畫 changed
-// 2026-11). Drop an id once that part is re-recorded and HELP_VIDEOS updated.
-export const HELP_VIDEO_OUTDATED = new Set(['monthly-plan']);
+// Chapters whose part of the video shows an older screen than the app's — add an id when a
+// change outdates that part, drop it once re-recorded (npm run video:desktop / video:phone).
+export const HELP_VIDEO_OUTDATED = new Set();
 export const OUTDATED_NOTE = '此段為舊版畫面，請參考下方文字說明';
 
 export const HELP_VIDEOS = {
   desk: {
-    id: 'OjBdyI0x72g',
+    id: 'RnWRISdx9Ns',
     title: '完整操作教學（電腦版）',
-    minutes: 11,
-    chapters: { start: 11, children: 97, import: 136, 'monthly-plan': 175, 'parent-report': 332, assessment: 509, backup: 589 },
+    minutes: 10,
+    chapters: { start: 4, children: 62, import: 105, 'monthly-plan': 145, 'parent-report': 272, assessment: 422, backup: 523 },
   },
   phone: {
-    id: 'Tt7wcXTPkjg',
+    id: '45E3rnpWprg',
     title: '完整操作教學（手機版）',
-    minutes: 11,
-    chapters: { start: 11, children: 103, import: 141, 'monthly-plan': 181, 'parent-report': 339, assessment: 515, backup: 592 },
+    minutes: 10,
+    chapters: { start: 4, children: 61, import: 104, 'monthly-plan': 144, 'parent-report': 271, assessment: 428, backup: 526 },
   },
 };
